@@ -35,6 +35,7 @@ Reactors decide when a transition is needed. Domain modules coordinate how their
 own events and projections are written.
 
 - `rules.py` detects CPU threshold conditions and belief transitions.
+- `reactors.py` runs the synchronous CPU observation-to-evidence-to-rules cycle.
 - `proposals.py` coordinates `proposal_created` events and `proposal_log` rows.
 - `ledger.py` replays events into rebuildable projections.
 

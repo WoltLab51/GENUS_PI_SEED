@@ -5,7 +5,7 @@ import os
 
 import click
 
-from genus import db, ledger, projection, proposals, rules, sensor
+from genus import db, ledger, projection, proposals, reactors, sensor
 
 
 def get_conn():
@@ -22,36 +22,20 @@ def observe_cpu() -> None:
     reading = sensor.read_cpu()
     conn = get_conn()
     try:
-        observation_id = ledger.append(
-            conn,
-            "observation_created",
-            {
-                "source": reading["source"],
-                "raw_value": reading["raw_value"],
-                "unit": reading["unit"],
-                "interval": reading["interval"],
-            },
-        )
-        evidence_id = ledger.append(
-            conn,
-            "evidence_recorded",
-            {
-                "observation_id": observation_id,
-                "metric_key": rules.METRIC_KEY,
-                "metric_value": reading["raw_value"],
-            },
-        )
-        written = rules.apply_cpu_threshold(conn)
+        result = reactors.observe_cpu_reading(conn, reading)
 
         click.echo(
             f"[OBS] CPU: {reading['raw_value']:.1f}% (source: {reading['source']})"
         )
-        click.echo(f"[EVT] observation_created     (id={observation_id})")
-        click.echo(
-            f"[EVT] evidence_recorded       (id={evidence_id}, metric: {rules.METRIC_KEY}={reading['raw_value']:.1f})"
-        )
-        for event_type in written:
-            click.echo(f"[EVT] {event_type}")
+        click.echo(f"[EVT] observation_created     (id={result['observation_id']})")
+        for event in result["events"]:
+            if event["event_type"] == "evidence_recorded":
+                click.echo(
+                    f"[EVT] evidence_recorded       "
+                    f"(id={event['id']}, metric: {event['metric_key']}={event['metric_value']:.1f})"
+                )
+            else:
+                click.echo(f"[EVT] {event['event_type']}")
         _print_active_belief_summary(conn)
     finally:
         conn.close()

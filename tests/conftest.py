@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from genus import ledger, rules
+from genus import reactors
 from genus.db import init_schema
 from genus.sensor import mock_cpu
 
@@ -34,23 +34,5 @@ def cli_conn(conn):
 
 def observe_cpu_value(conn, value: float) -> list[str]:
     reading = mock_cpu(value)
-    observation_id = ledger.append(
-        conn,
-        "observation_created",
-        {
-            "source": reading["source"],
-            "raw_value": reading["raw_value"],
-            "unit": reading["unit"],
-            "interval": reading["interval"],
-        },
-    )
-    ledger.append(
-        conn,
-        "evidence_recorded",
-        {
-            "observation_id": observation_id,
-            "metric_key": rules.METRIC_KEY,
-            "metric_value": reading["raw_value"],
-        },
-    )
-    return rules.apply_cpu_threshold(conn)
+    result = reactors.observe_cpu_reading(conn, reading)
+    return [event["event_type"] for event in result["events"]]

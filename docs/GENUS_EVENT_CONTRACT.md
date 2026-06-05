@@ -9,7 +9,7 @@ are rebuildable.
 | Event type | Required payload keys | Producer | Replay effect |
 | --- | --- | --- | --- |
 | `observation_created` | `source`, `raw_value`, `unit` | Sensor/CLI | None directly |
-| `evidence_recorded` | `observation_id`, `metric_key`, `metric_value` | Evidence path | None directly |
+| `evidence_recorded` | `observation_id`, `metric_key`, `metric_value` | Synchronous reactor | None directly |
 | `belief_created` | `belief_id`, `claim_key`, `claim_value`, `derivation`, `supporting_events` | Rules | Insert active belief |
 | `belief_confirmed` | `belief_id`, `new_supporting_event` | Rules | Add supporting event |
 | `belief_weakened` | `belief_id`, `contradicting_event` | Rules | Add contradicting event |
