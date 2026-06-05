@@ -54,15 +54,10 @@ def apply_cpu_threshold(conn) -> list[str]:
                 },
             )
             written.append("belief_created")
-            _create_proposal_created_event(
+            proposals.record_resource_proposal_for_sustained_high(
                 conn,
-                proposal_id=proposals.next_proposal_id(conn),
-                proposal_type="ResourceProposal",
-                claim_key=CLAIM_KEY,
-                claim_value=HIGH_VALUE,
-                source_belief=belief_id,
-                source_event=belief_event_id,
-                payload=proposals.proposal_payload_for_sustained_high(),
+                trigger_belief_id=belief_id,
+                trigger_event_id=belief_event_id,
             )
             written.append("proposal_created")
         else:
@@ -112,15 +107,10 @@ def apply_cpu_threshold(conn) -> list[str]:
             },
         )
         written.append("contradiction_detected")
-        _create_proposal_created_event(
+        proposals.record_resource_proposal_for_contradiction(
             conn,
-            proposal_id=proposals.next_proposal_id(conn),
-            proposal_type="ResourceProposal",
-            claim_key=CLAIM_KEY,
-            claim_value=HIGH_VALUE,
-            source_belief=int(high_belief["id"]),
-            source_event=contradiction_event_id,
-            payload=proposals.proposal_payload_for_contradiction(),
+            trigger_belief_id=int(high_belief["id"]),
+            trigger_event_id=contradiction_event_id,
         )
         written.append("proposal_created")
 
@@ -146,36 +136,6 @@ def apply_cpu_threshold(conn) -> list[str]:
 
     conn.commit()
     return written
-
-
-def _create_proposal_created_event(
-    conn,
-    proposal_id: int,
-    proposal_type: str,
-    claim_key: str,
-    claim_value: str,
-    source_belief: int,
-    source_event: int,
-    payload: dict,
-) -> int:
-    event_payload = {
-        "proposal_id": proposal_id,
-        "proposal_type": proposal_type,
-        "claim_key": claim_key,
-        "claim_value": claim_value,
-        "source_belief": source_belief,
-        "source_event": source_event,
-        "payload": payload,
-        "reason": payload["description"],
-    }
-    event_id = ledger.append(
-        conn,
-        "proposal_created",
-        event_payload,
-    )
-    event_payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
-    proposals.apply_proposal_created(conn, event_payload)
-    return event_id
 
 
 def _latest_evidence_window(conn):
