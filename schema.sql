@@ -49,3 +49,18 @@ CREATE TABLE IF NOT EXISTS proposal_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_proposal_log_state ON proposal_log(state);
+
+CREATE TABLE IF NOT EXISTS inquiry_log (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    inquiry_type   TEXT    NOT NULL,
+    claim_key      TEXT    NOT NULL,
+    source_belief  INTEGER REFERENCES belief_projection(id),
+    source_event   INTEGER REFERENCES event_log(id),
+    question_key   TEXT    NOT NULL,
+    payload        TEXT    NOT NULL,
+    state          TEXT    NOT NULL DEFAULT 'open',
+    created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    resolved_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_inquiry_log_state ON inquiry_log(state);

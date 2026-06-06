@@ -79,3 +79,14 @@ def test_integrity_check_command_exits_zero(monkeypatch, cli_conn, conn):
 
     assert result.exit_code == 0
     assert "[INTEGRITY] OK" in result.output
+
+
+def test_inquiries_list_command_exits_zero(monkeypatch, cli_conn, conn):
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    for value in [92, 93, 94, 40, 41, 42]:
+        observe_cpu_value(conn, value)
+
+    result = CliRunner().invoke(cli.main, ["inquiries", "list"])
+
+    assert result.exit_code == 0
+    assert "OPEN INQUIRIES" in result.output

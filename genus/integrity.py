@@ -37,6 +37,16 @@ REQUIRED_EVENT_KEYS = {
         "payload",
         "reason",
     },
+    "inquiry_created": {
+        "inquiry_id",
+        "inquiry_type",
+        "claim_key",
+        "source_belief",
+        "source_event",
+        "question_key",
+        "payload",
+        "state",
+    },
 }
 
 
@@ -64,6 +74,7 @@ def check(conn) -> dict:
             1 for row in projection_after["beliefs"] if row["state"] == "active"
         ),
         "proposals": len(projection_after["proposals"]),
+        "inquiries": len(projection_after["inquiries"]),
     }
 
 
@@ -159,4 +170,15 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
-    return {"beliefs": beliefs, "proposals": proposals}
+    inquiries = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, inquiry_type, claim_key, source_belief, source_event,
+                   question_key, payload, state, created_at, resolved_at
+            FROM inquiry_log
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
+    return {"beliefs": beliefs, "proposals": proposals, "inquiries": inquiries}

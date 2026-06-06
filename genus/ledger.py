@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import projection, proposals
+from genus import inquiries, projection, proposals
 
 
 def append(conn, event_type: str, payload: dict) -> int:
@@ -42,8 +42,12 @@ def replay(conn) -> dict:
     events = conn.execute("SELECT * FROM event_log ORDER BY id").fetchall()
     conn.execute("DELETE FROM belief_projection")
     conn.execute("DELETE FROM proposal_log")
+    conn.execute("DELETE FROM inquiry_log")
     conn.execute(
-        "DELETE FROM sqlite_sequence WHERE name IN ('belief_projection', 'proposal_log')"
+        """
+        DELETE FROM sqlite_sequence
+        WHERE name IN ('belief_projection', 'proposal_log', 'inquiry_log')
+        """
     )
 
     for event in events:
@@ -55,11 +59,15 @@ def replay(conn) -> dict:
     proposal_count = conn.execute("SELECT COUNT(*) AS count FROM proposal_log").fetchone()[
         "count"
     ]
+    inquiry_count = conn.execute("SELECT COUNT(*) AS count FROM inquiry_log").fetchone()[
+        "count"
+    ]
     conn.commit()
     return {
         "events": len(events),
         "active_beliefs": int(active_count),
         "proposals": int(proposal_count),
+        "inquiries": int(inquiry_count),
     }
 
 
@@ -77,6 +85,8 @@ def apply_event(conn, event) -> None:
         projection.apply_belief_superseded(conn, payload)
     elif event_type == "proposal_created":
         proposals.apply_proposal_created(conn, payload)
+    elif event_type == "inquiry_created":
+        inquiries.apply_inquiry_created(conn, payload)
 
 
 def _event_dict(row) -> dict:

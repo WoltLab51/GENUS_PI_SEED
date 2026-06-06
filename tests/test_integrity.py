@@ -14,6 +14,7 @@ def test_integrity_check_passes_after_observations(conn):
     assert result["issues"] == []
     assert result["events"] > 0
     assert result["proposals"] == 2
+    assert result["inquiries"] == 1
 
 
 def test_integrity_check_preserves_event_log(conn):
@@ -45,6 +46,27 @@ def test_validate_event_contract_detects_invalid_json(conn):
     issues = integrity.validate_event_contract(conn)
 
     assert any("payload is not valid JSON" in issue for issue in issues)
+
+
+def test_validate_event_contract_accepts_inquiry_created(conn):
+    ledger.append(
+        conn,
+        "inquiry_created",
+        {
+            "inquiry_id": 1,
+            "inquiry_type": "CauseInquiry",
+            "claim_key": "system.load",
+            "source_belief": 1,
+            "source_event": 2,
+            "question_key": "cause.changed_state",
+            "payload": {"changed_from": "high", "changed_to": "normal"},
+            "state": "open",
+        },
+    )
+
+    issues = integrity.validate_event_contract(conn)
+
+    assert issues == []
 
 
 def test_validate_schema_detects_confidence_column(conn):

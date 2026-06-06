@@ -76,6 +76,16 @@ def test_generated_events_have_required_contract_keys(conn):
             "payload",
             "reason",
         },
+        "inquiry_created": {
+            "inquiry_id",
+            "inquiry_type",
+            "claim_key",
+            "source_belief",
+            "source_event",
+            "question_key",
+            "payload",
+            "state",
+        },
     }
     rows = conn.execute("SELECT event_type, payload FROM event_log").fetchall()
 

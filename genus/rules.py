@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import ledger, projection, proposals
+from genus import inquiries, ledger, projection, proposals
 
 
 CPU_HIGH_THRESHOLD = 80.0
@@ -152,6 +152,13 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
             },
         )
         written.append("contradiction_detected")
+        inquiries.record_cause_inquiry_for_contradiction(
+            conn,
+            claim_key=claim_key,
+            source_belief=int(high_belief["id"]),
+            source_event=contradiction_event_id,
+        )
+        written.append("inquiry_created")
         proposals.record_resource_proposal_for_contradiction(
             conn,
             trigger_belief_id=int(high_belief["id"]),

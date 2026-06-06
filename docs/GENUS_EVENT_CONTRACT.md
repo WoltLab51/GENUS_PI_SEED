@@ -16,6 +16,7 @@ are rebuildable.
 | `belief_superseded` | `old_belief_id`, `new_belief_id`, `claim_key`, `claim_value`, `derivation`, `supporting_events`, `reason` | Rules | Insert new belief and supersede old one |
 | `contradiction_detected` | `belief_id`, `reason` | Rules | None directly |
 | `proposal_created` | `proposal_id`, `proposal_type`, `claim_key`, `claim_value`, `source_belief`, `source_event`, `payload`, `reason` | Proposals | Insert proposal row |
+| `inquiry_created` | `inquiry_id`, `inquiry_type`, `claim_key`, `source_belief`, `source_event`, `question_key`, `payload`, `state` | Inquiries | Insert inquiry row |
 
 ## Invariants
 
@@ -29,3 +30,5 @@ are rebuildable.
   `proposal_log` is projected.
 - `proposal_created` is emitted for first sustained high and high-to-normal
   contradiction only; it is not emitted for `belief_confirmed`.
+- `inquiry_created` is emitted for contradictions only; it is not an action and
+  does not resolve itself automatically.

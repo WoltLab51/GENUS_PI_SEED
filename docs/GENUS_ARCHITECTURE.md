@@ -17,6 +17,8 @@ it currently believes, and keeps every important state change replayable.
   `superseded`, and `archived`. They are never stored as `true`.
 - **Proposal is not action:** Proposals create attention and review work. They
   do not execute changes.
+- **Inquiry is not action:** Inquiries name open uncertainty. They ask what
+  should be clarified, but do not execute changes.
 
 ## Layer Model
 
@@ -37,6 +39,7 @@ own events and projections are written.
 - `rules.py` detects CPU threshold conditions and belief transitions.
 - `reactors.py` runs synchronous CPU and memory observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` events and `proposal_log` rows.
+- `inquiries.py` coordinates `inquiry_created` events and `inquiry_log` rows.
 - `ledger.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
 

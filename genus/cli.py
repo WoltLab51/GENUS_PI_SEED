@@ -5,7 +5,7 @@ import os
 
 import click
 
-from genus import db, integrity, ledger, projection, proposals, reactors, sensor
+from genus import db, inquiries, integrity, ledger, projection, proposals, reactors, sensor
 
 
 def get_conn():
@@ -102,7 +102,7 @@ def replay_command() -> None:
         after = _state_snapshot(conn)
         click.echo(
             f"[REPLAY] Result: {summary['active_beliefs']} active belief(s), "
-            f"{summary['proposals']} proposal(s)"
+            f"{summary['proposals']} proposal(s), {summary['inquiries']} inquiry(s)"
         )
         if before == after:
             click.echo("[REPLAY] State matches current projection")
@@ -125,12 +125,35 @@ def integrity_check() -> None:
         if result["ok"]:
             click.echo(
                 f"[INTEGRITY] OK events={result['events']} "
-                f"active_beliefs={result['active_beliefs']} proposals={result['proposals']}"
+                f"active_beliefs={result['active_beliefs']} "
+                f"proposals={result['proposals']} inquiries={result['inquiries']}"
             )
             return
         for issue in result["issues"]:
             click.echo(f"[INTEGRITY] FAIL {issue}")
         raise click.ClickException("integrity check failed")
+    finally:
+        conn.close()
+
+
+@main.group(name="inquiries")
+def inquiries_group() -> None:
+    pass
+
+
+@inquiries_group.command("list")
+@click.option("--all", "include_all", is_flag=True)
+def inquiries_list(include_all: bool) -> None:
+    conn = get_conn()
+    try:
+        rows = inquiries.list_inquiries(conn, include_all=include_all)
+        click.echo("INQUIRIES" if include_all else "OPEN INQUIRIES")
+        click.echo("id  type          claim_key      state  question_key")
+        for row in rows:
+            click.echo(
+                f"{row['id']:<3} {row['inquiry_type']:<13} {row['claim_key']:<14} "
+                f"{row['state']:<6} {row['question_key']}"
+            )
     finally:
         conn.close()
 
@@ -201,9 +224,18 @@ def _state_snapshot(conn) -> dict:
         ORDER BY id
         """
     ).fetchall()
+    inquiry_rows = conn.execute(
+        """
+        SELECT id, inquiry_type, claim_key, source_belief, source_event,
+               question_key, payload, state, resolved_at
+        FROM inquiry_log
+        ORDER BY id
+        """
+    ).fetchall()
     return {
         "beliefs": beliefs,
         "proposals": [dict(row) for row in proposal_rows],
+        "inquiries": [dict(row) for row in inquiry_rows],
     }
 
 
