@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+import json
+
+from genus import ledger
+
+
+REQUIRED_EVENT_KEYS = {
+    "observation_created": {"source", "raw_value", "unit"},
+    "evidence_recorded": {"observation_id", "metric_key", "metric_value"},
+    "belief_created": {
+        "belief_id",
+        "claim_key",
+        "claim_value",
+        "derivation",
+        "supporting_events",
+    },
+    "belief_confirmed": {"belief_id", "new_supporting_event"},
+    "belief_weakened": {"belief_id", "contradicting_event"},
+    "belief_superseded": {
+        "old_belief_id",
+        "new_belief_id",
+        "claim_key",
+        "claim_value",
+        "derivation",
+        "supporting_events",
+        "reason",
+    },
+    "contradiction_detected": {"belief_id", "reason"},
+    "proposal_created": {
+        "proposal_id",
+        "proposal_type",
+        "claim_key",
+        "claim_value",
+        "source_belief",
+        "source_event",
+        "payload",
+        "reason",
+    },
+}
+
+
+def check(conn) -> dict:
+    issues = []
+    issues.extend(validate_schema(conn))
+    issues.extend(validate_event_contract(conn))
+
+    event_log_before = snapshot_event_log(conn)
+    projection_before = snapshot_projections(conn)
+    ledger.replay(conn)
+    event_log_after = snapshot_event_log(conn)
+    projection_after = snapshot_projections(conn)
+
+    if event_log_after != event_log_before:
+        issues.append("event_log changed during replay")
+    if projection_after != projection_before:
+        issues.append("projection state changed after replay")
+
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "events": len(event_log_after),
+        "active_beliefs": sum(
+            1 for row in projection_after["beliefs"] if row["state"] == "active"
+        ),
+        "proposals": len(projection_after["proposals"]),
+    }
+
+
+def validate_schema(conn) -> list[str]:
+    issues = []
+    belief_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(belief_projection)").fetchall()
+    ]
+    if "confidence" in belief_columns:
+        issues.append("belief_projection must not store confidence")
+
+    empty_derivations = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM belief_projection
+        WHERE derivation IS NULL OR TRIM(derivation) = ''
+        """
+    ).fetchone()["count"]
+    if empty_derivations:
+        issues.append("belief_projection contains empty derivation")
+    return issues
+
+
+def validate_event_contract(conn) -> list[str]:
+    issues = []
+    rows = conn.execute("SELECT id, event_type, payload FROM event_log ORDER BY id").fetchall()
+    ids = [row["id"] for row in rows]
+    if ids and ids != list(range(ids[0], ids[-1] + 1)):
+        issues.append("event_log ids are not contiguous")
+
+    for row in rows:
+        event_type = row["event_type"]
+        try:
+            payload = json.loads(row["payload"])
+        except json.JSONDecodeError:
+            issues.append(f"event {row['id']} payload is not valid JSON")
+            continue
+
+        required = REQUIRED_EVENT_KEYS.get(event_type)
+        if required is None:
+            issues.append(f"event {row['id']} has unknown event_type {event_type}")
+            continue
+
+        missing = sorted(required - set(payload))
+        if missing:
+            issues.append(
+                f"event {row['id']} {event_type} missing keys: {', '.join(missing)}"
+            )
+
+        if event_type in {"belief_created", "belief_superseded"} and not payload.get(
+            "derivation"
+        ):
+            issues.append(f"event {row['id']} {event_type} has empty derivation")
+    return issues
+
+
+def snapshot_event_log(conn) -> list[dict]:
+    return [
+        {
+            "id": row["id"],
+            "event_type": row["event_type"],
+            "payload": row["payload"],
+            "created_at": row["created_at"],
+        }
+        for row in conn.execute(
+            "SELECT id, event_type, payload, created_at FROM event_log ORDER BY id"
+        ).fetchall()
+    ]
+
+
+def snapshot_projections(conn) -> dict:
+    beliefs = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, claim_key, claim_value, state, derivation,
+                   supporting_events, contradicting_events,
+                   created_at, last_updated_at, superseded_by
+            FROM belief_projection
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
+    proposals = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, proposal_type, claim_key, claim_value, source_belief,
+                   source_event, payload, state, created_at
+            FROM proposal_log
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
+    return {"beliefs": beliefs, "proposals": proposals}

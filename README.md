@@ -16,6 +16,7 @@ genus beliefs show
 genus proposals list
 genus proposals list --all
 genus replay
+genus integrity check
 genus ledger tail --n 20
 ```
 

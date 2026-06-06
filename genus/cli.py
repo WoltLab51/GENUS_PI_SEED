@@ -5,7 +5,7 @@ import os
 
 import click
 
-from genus import db, ledger, projection, proposals, reactors, sensor
+from genus import db, integrity, ledger, projection, proposals, reactors, sensor
 
 
 def get_conn():
@@ -106,6 +106,29 @@ def replay_command() -> None:
             click.echo("[REPLAY] State matches current projection")
         else:
             raise click.ClickException("state changed after replay")
+    finally:
+        conn.close()
+
+
+@main.group(name="integrity")
+def integrity_group() -> None:
+    pass
+
+
+@integrity_group.command("check")
+def integrity_check() -> None:
+    conn = get_conn()
+    try:
+        result = integrity.check(conn)
+        if result["ok"]:
+            click.echo(
+                f"[INTEGRITY] OK events={result['events']} "
+                f"active_beliefs={result['active_beliefs']} proposals={result['proposals']}"
+            )
+            return
+        for issue in result["issues"]:
+            click.echo(f"[INTEGRITY] FAIL {issue}")
+        raise click.ClickException("integrity check failed")
     finally:
         conn.close()
 
