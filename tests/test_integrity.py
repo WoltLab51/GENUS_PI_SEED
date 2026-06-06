@@ -21,12 +21,32 @@ def test_integrity_check_preserves_event_log(conn):
     for value in [92, 93, 94, 40, 41, 42]:
         observe_cpu_value(conn, value)
     before = integrity.snapshot_event_log(conn)
+    projection_before = integrity.snapshot_projections(conn)
 
     result = integrity.check(conn)
     after = integrity.snapshot_event_log(conn)
+    projection_after = integrity.snapshot_projections(conn)
 
     assert result["ok"] is True
     assert after == before
+    assert projection_after == projection_before
+
+
+def test_integrity_check_detects_projection_drift_without_rebuilding_live_db(conn):
+    for _ in range(3):
+        observe_cpu_value(conn, 92.0)
+    conn.execute(
+        "UPDATE belief_projection SET derivation = ? WHERE claim_key = ?",
+        ("manual:drift", "system.load"),
+    )
+    drifted_before = integrity.snapshot_projections(conn)
+
+    result = integrity.check(conn)
+    drifted_after = integrity.snapshot_projections(conn)
+
+    assert result["ok"] is False
+    assert "projection state changed after replay" in result["issues"]
+    assert drifted_after == drifted_before
 
 
 def test_validate_event_contract_detects_missing_required_key(conn):

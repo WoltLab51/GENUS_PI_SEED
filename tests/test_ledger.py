@@ -15,6 +15,15 @@ def test_append_creates_row(conn):
     assert json.loads(row["payload"]) == {"source": "x", "raw_value": 1, "unit": "n"}
 
 
+def test_append_does_not_commit(conn):
+    ledger.append(conn, "observation_created", {"source": "x"})
+    conn.rollback()
+
+    count = conn.execute("SELECT COUNT(*) AS count FROM event_log").fetchone()["count"]
+
+    assert count == 0
+
+
 def test_event_log_is_append_only(conn):
     event_id = ledger.append(conn, "observation_created", {"source": "x"})
 

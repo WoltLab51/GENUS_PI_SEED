@@ -14,19 +14,24 @@ def observe_memory_reading(conn, reading: dict) -> dict:
 
 
 def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:
-    observation_id = ledger.append(
-        conn,
-        "observation_created",
-        {
-            "source": reading["source"],
-            "raw_value": reading["raw_value"],
-            "unit": reading["unit"],
-            "interval": reading["interval"],
-            "metric_key": metric_key,
-        },
-    )
-    events = process_observation(conn, observation_id)
-    return {"observation_id": observation_id, "events": events}
+    try:
+        observation_id = ledger.append(
+            conn,
+            "observation_created",
+            {
+                "source": reading["source"],
+                "raw_value": reading["raw_value"],
+                "unit": reading["unit"],
+                "interval": reading["interval"],
+                "metric_key": metric_key,
+            },
+        )
+        events = process_observation(conn, observation_id)
+        conn.commit()
+        return {"observation_id": observation_id, "events": events}
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def process_observation(conn, observation_id: int) -> list[dict]:

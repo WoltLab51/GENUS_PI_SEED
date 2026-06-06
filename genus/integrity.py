@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 from genus import event_router
+from genus.db import init_schema
 
 
 REQUIRED_EVENT_KEYS = {
@@ -57,9 +59,11 @@ def check(conn) -> dict:
 
     event_log_before = snapshot_event_log(conn)
     projection_before = snapshot_projections(conn)
-    event_router.replay(conn)
+    replay_conn = replay_connection_from_events(event_log_before)
+    replay_summary = event_router.replay(replay_conn)
     event_log_after = snapshot_event_log(conn)
-    projection_after = snapshot_projections(conn)
+    projection_after = snapshot_projections(replay_conn)
+    replay_conn.close()
 
     if event_log_after != event_log_before:
         issues.append("event_log changed during replay")
@@ -70,12 +74,25 @@ def check(conn) -> dict:
         "ok": not issues,
         "issues": issues,
         "events": len(event_log_after),
-        "active_beliefs": sum(
-            1 for row in projection_after["beliefs"] if row["state"] == "active"
-        ),
-        "proposals": len(projection_after["proposals"]),
-        "inquiries": len(projection_after["inquiries"]),
+        "active_beliefs": replay_summary["active_beliefs"],
+        "proposals": replay_summary["proposals"],
+        "inquiries": replay_summary["inquiries"],
     }
+
+
+def replay_connection_from_events(events: list[dict]) -> sqlite3.Connection:
+    replay_conn = sqlite3.connect(":memory:")
+    replay_conn.row_factory = sqlite3.Row
+    init_schema(replay_conn)
+    replay_conn.executemany(
+        """
+        INSERT INTO event_log (id, event_type, payload, created_at)
+        VALUES (:id, :event_type, :payload, :created_at)
+        """,
+        events,
+    )
+    replay_conn.commit()
+    return replay_conn
 
 
 def validate_schema(conn) -> list[str]:

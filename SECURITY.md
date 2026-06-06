@@ -2,20 +2,28 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+GENUS_PI_SEED ist ein pre-1.0-Projekt. Unterstützt wird jeweils nur der
+aktuelle Stand von `main`; ältere Zwischenstände werden nicht separat
+gepflegt.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Scope
+
+Der aktuelle v0.x-Umfang ist eine lokale Python/SQLite-CLI. Das System darf
+keine LLM-, HTTP-, Web- oder Worker-Abhängigkeiten verwenden. Besonders
+kritische Invarianten sind:
+
+- `event_log` ist append-only.
+- `belief_projection`, `proposal_log` und `inquiry_log` sind rebuildbare
+  Projektionen aus dem Ledger.
+- `confidence` wird berechnet und nie gespeichert.
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+Bitte melde Sicherheitsprobleme über GitHub, bevorzugt als private Security
+Advisory, falls im Repository verfügbar. Wenn das nicht möglich ist, erstelle
+ein knappes Issue ohne ausnutzbare Details und markiere es klar als
+Sicherheitsmeldung.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Bitte füge reproduzierbare Schritte, betroffene Version bzw. Commit-SHA und
+die erwartete Auswirkung hinzu. Keine Secrets, Tokens, privaten Datenbanken
+oder sensiblen Hostdaten posten.

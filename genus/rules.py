@@ -10,16 +10,11 @@ MEMORY_LOW_THRESHOLD = 70.0
 WINDOW_SIZE = 3
 CPU_METRIC_KEY = "system.cpu_percent"
 MEMORY_METRIC_KEY = "system.memory_percent"
-METRIC_KEY = CPU_METRIC_KEY
 CLAIM_KEY = "system.load"
 HIGH_VALUE = "high"
 NORMAL_VALUE = "normal"
 CPU_DERIVATION = "rule:cpu_threshold_v1"
 MEMORY_DERIVATION = "rule:memory_threshold_v1"
-DERIVATION = CPU_DERIVATION
-
-HIGH_THRESHOLD = CPU_HIGH_THRESHOLD
-LOW_THRESHOLD = CPU_LOW_THRESHOLD
 
 RULES = {
     CPU_METRIC_KEY: {
@@ -183,11 +178,10 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
         )
         written.append("belief_weakened")
 
-    conn.commit()
     return written
 
 
-def _latest_evidence_window(conn, metric_key: str = METRIC_KEY):
+def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY):
     rows = conn.execute(
         """
         SELECT id, json_extract(payload, '$.metric_value') AS metric_value

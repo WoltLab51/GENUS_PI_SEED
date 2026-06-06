@@ -13,8 +13,8 @@ it currently believes, and keeps every important state change replayable.
   workers are out of scope until replay and idempotency rules are explicit.
 - **No magic knowledge:** Confidence is calculated at read time. A language
   output or external answer is never knowledge by itself.
-- **Belief is not truth:** Beliefs have lifecycle states such as `active`,
-  `superseded`, and `archived`. They are never stored as `true`.
+- **Belief is not truth:** Beliefs have lifecycle states such as `active` and
+  `superseded`. They are never stored as `true`.
 - **Proposal is not action:** Proposals create attention and review work. They
   do not execute changes.
 - **Inquiry is not action:** Inquiries name open uncertainty. They ask what

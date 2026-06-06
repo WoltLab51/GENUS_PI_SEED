@@ -9,7 +9,6 @@ from genus.confidence import calculate_confidence
 
 ACTIVE = "active"
 SUPERSEDED = "superseded"
-ARCHIVED = "archived"
 
 
 def json_list(value: str | None) -> list[int]:

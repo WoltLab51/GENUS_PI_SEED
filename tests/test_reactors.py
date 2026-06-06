@@ -24,6 +24,20 @@ def test_process_observation_rejects_non_observation_event(conn):
         reactors.process_observation(conn, event_id)
 
 
+def test_observe_rolls_back_partial_cycle_on_error(conn, monkeypatch):
+    def fail_threshold(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(reactors.rules, "apply_threshold", fail_threshold)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        reactors.observe_cpu_reading(conn, mock_cpu(42.0))
+
+    count = conn.execute("SELECT COUNT(*) AS count FROM event_log").fetchone()["count"]
+
+    assert count == 0
+
+
 def test_reactor_preserves_belief_and_proposal_behavior(conn):
     for _ in range(3):
         observe_cpu_value(conn, 92.0)

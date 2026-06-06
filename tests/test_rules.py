@@ -44,7 +44,7 @@ def test_derivation_is_always_set(conn):
     rows = conn.execute("SELECT derivation FROM belief_projection").fetchall()
 
     assert rows
-    assert all(row["derivation"] == rules.DERIVATION for row in rows)
+    assert all(row["derivation"] == rules.CPU_DERIVATION for row in rows)
 
 
 def test_no_http_in_rules():
@@ -55,8 +55,8 @@ def test_no_http_in_rules():
 
 
 def test_thresholds_are_binding():
-    assert rules.HIGH_THRESHOLD == 80.0
-    assert rules.LOW_THRESHOLD == 60.0
+    assert rules.CPU_HIGH_THRESHOLD == 80.0
+    assert rules.CPU_LOW_THRESHOLD == 60.0
     assert rules.WINDOW_SIZE == 3
 
 

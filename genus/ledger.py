@@ -9,7 +9,6 @@ def append(conn, event_type: str, payload: dict) -> int:
         "INSERT INTO event_log (event_type, payload) VALUES (?, ?)",
         (event_type, serialized),
     )
-    conn.commit()
     return int(cur.lastrowid)
 
 
