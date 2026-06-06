@@ -24,18 +24,20 @@ def observe_cpu() -> None:
     try:
         result = reactors.observe_cpu_reading(conn, reading)
 
-        click.echo(
-            f"[OBS] CPU: {reading['raw_value']:.1f}% (source: {reading['source']})"
-        )
-        click.echo(f"[EVT] observation_created     (id={result['observation_id']})")
-        for event in result["events"]:
-            if event["event_type"] == "evidence_recorded":
-                click.echo(
-                    f"[EVT] evidence_recorded       "
-                    f"(id={event['id']}, metric: {event['metric_key']}={event['metric_value']:.1f})"
-                )
-            else:
-                click.echo(f"[EVT] {event['event_type']}")
+        _print_observation_result("CPU", reading, result)
+        _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
+@main.command("observe-memory")
+def observe_memory() -> None:
+    reading = sensor.read_memory()
+    conn = get_conn()
+    try:
+        result = reactors.observe_memory_reading(conn, reading)
+
+        _print_observation_result("MEM", reading, result)
         _print_active_belief_summary(conn)
     finally:
         conn.close()
@@ -162,6 +164,21 @@ def _print_active_belief_summary(conn) -> None:
         click.echo(
             f"      confidence: {row['confidence']:.3f}  derivation: {row['derivation']}"
         )
+
+
+def _print_observation_result(label: str, reading: dict, result: dict) -> None:
+    click.echo(
+        f"[OBS] {label}: {reading['raw_value']:.1f}% (source: {reading['source']})"
+    )
+    click.echo(f"[EVT] observation_created     (id={result['observation_id']})")
+    for event in result["events"]:
+        if event["event_type"] == "evidence_recorded":
+            click.echo(
+                f"[EVT] evidence_recorded       "
+                f"(id={event['id']}, metric: {event['metric_key']}={event['metric_value']:.1f})"
+            )
+        else:
+            click.echo(f"[EVT] {event['event_type']}")
 
 
 def _state_snapshot(conn) -> dict:

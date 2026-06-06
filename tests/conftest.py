@@ -4,7 +4,7 @@ import pytest
 
 from genus import reactors
 from genus.db import init_schema
-from genus.sensor import mock_cpu
+from genus.sensor import mock_cpu, mock_memory
 
 
 @pytest.fixture
@@ -35,4 +35,10 @@ def cli_conn(conn):
 def observe_cpu_value(conn, value: float) -> list[str]:
     reading = mock_cpu(value)
     result = reactors.observe_cpu_reading(conn, reading)
+    return [event["event_type"] for event in result["events"]]
+
+
+def observe_memory_value(conn, value: float) -> list[str]:
+    reading = mock_memory(value)
+    result = reactors.observe_memory_reading(conn, reading)
     return [event["event_type"] for event in result["events"]]

@@ -10,7 +10,25 @@ def read_cpu() -> dict:
     }
 
 
+def read_memory() -> dict:
+    return {
+        "source": "psutil.virtual_memory.percent",
+        "raw_value": psutil.virtual_memory().percent,
+        "unit": "percent",
+        "interval": 0.0,
+    }
+
+
 def mock_cpu(value: float) -> dict:
+    return {
+        "source": "mock",
+        "raw_value": value,
+        "unit": "percent",
+        "interval": 0.0,
+    }
+
+
+def mock_memory(value: float) -> dict:
     return {
         "source": "mock",
         "raw_value": value,

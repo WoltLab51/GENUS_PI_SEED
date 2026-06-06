@@ -6,6 +6,14 @@ from genus import ledger, rules
 
 
 def observe_cpu_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.CPU_METRIC_KEY)
+
+
+def observe_memory_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.MEMORY_METRIC_KEY)
+
+
+def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:
     observation_id = ledger.append(
         conn,
         "observation_created",
@@ -14,6 +22,7 @@ def observe_cpu_reading(conn, reading: dict) -> dict:
             "raw_value": reading["raw_value"],
             "unit": reading["unit"],
             "interval": reading["interval"],
+            "metric_key": metric_key,
         },
     )
     events = process_observation(conn, observation_id)
@@ -31,19 +40,20 @@ def process_observation(conn, observation_id: int) -> list[dict]:
         "evidence_recorded",
         {
             "observation_id": observation_id,
-            "metric_key": rules.METRIC_KEY,
+            "metric_key": payload.get("metric_key", rules.CPU_METRIC_KEY),
             "metric_value": payload["raw_value"],
         },
     )
+    metric_key = payload.get("metric_key", rules.CPU_METRIC_KEY)
     events = [
         {
             "event_type": "evidence_recorded",
             "id": evidence_id,
-            "metric_key": rules.METRIC_KEY,
+            "metric_key": metric_key,
             "metric_value": payload["raw_value"],
         }
     ]
-    events.extend({"event_type": event_type} for event_type in rules.apply_cpu_threshold(conn))
+    events.extend({"event_type": event_type} for event_type in rules.apply_threshold(conn, metric_key))
     return events
 
 

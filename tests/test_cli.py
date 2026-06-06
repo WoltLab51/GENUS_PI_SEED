@@ -1,7 +1,7 @@
 from click.testing import CliRunner
 
 from genus import cli
-from genus.sensor import mock_cpu
+from genus.sensor import mock_cpu, mock_memory
 from tests.conftest import observe_cpu_value
 
 
@@ -10,6 +10,20 @@ def test_observe_cpu_writes_two_base_events(monkeypatch, cli_conn, conn):
     monkeypatch.setattr(cli.sensor, "read_cpu", lambda: mock_cpu(92.0))
 
     result = CliRunner().invoke(cli.main, ["observe-cpu"])
+
+    assert result.exit_code == 0
+    rows = conn.execute("SELECT event_type FROM event_log ORDER BY id").fetchall()
+    assert [row["event_type"] for row in rows] == [
+        "observation_created",
+        "evidence_recorded",
+    ]
+
+
+def test_observe_memory_writes_two_base_events(monkeypatch, cli_conn, conn):
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    monkeypatch.setattr(cli.sensor, "read_memory", lambda: mock_memory(91.0))
+
+    result = CliRunner().invoke(cli.main, ["observe-memory"])
 
     assert result.exit_code == 0
     rows = conn.execute("SELECT event_type FROM event_log ORDER BY id").fetchall()

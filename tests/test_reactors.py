@@ -1,7 +1,7 @@
 import pytest
 
 from genus import ledger, reactors
-from genus.sensor import mock_cpu
+from genus.sensor import mock_cpu, mock_memory
 from tests.conftest import observe_cpu_value
 
 
@@ -38,3 +38,10 @@ def test_reactor_preserves_belief_and_proposal_behavior(conn):
 
     assert belief["state"] == "active"
     assert proposals["count"] == 1
+
+
+def test_observe_memory_reading_uses_memory_metric(conn):
+    result = reactors.observe_memory_reading(conn, mock_memory(91.0))
+
+    assert result["events"][0]["event_type"] == "evidence_recorded"
+    assert result["events"][0]["metric_key"] == "system.memory_percent"

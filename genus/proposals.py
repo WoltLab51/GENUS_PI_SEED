@@ -82,32 +82,38 @@ def next_proposal_id(conn) -> int:
 
 
 def record_resource_proposal_for_sustained_high(
-    conn, trigger_belief_id: int, trigger_event_id: int
+    conn,
+    trigger_belief_id: int,
+    trigger_event_id: int,
+    claim_key: str = LOAD_CLAIM_KEY,
 ) -> int:
     return record_proposal_created_event(
         conn,
         proposal_id=next_proposal_id(conn),
         proposal_type=PROPOSAL_TYPE,
-        claim_key=LOAD_CLAIM_KEY,
+        claim_key=claim_key,
         claim_value=HIGH_CLAIM_VALUE,
         source_belief=trigger_belief_id,
         source_event=trigger_event_id,
-        payload=proposal_payload_for_sustained_high(),
+        payload=proposal_payload_for_sustained_high(claim_key),
     )
 
 
 def record_resource_proposal_for_contradiction(
-    conn, trigger_belief_id: int, trigger_event_id: int
+    conn,
+    trigger_belief_id: int,
+    trigger_event_id: int,
+    claim_key: str = LOAD_CLAIM_KEY,
 ) -> int:
     return record_proposal_created_event(
         conn,
         proposal_id=next_proposal_id(conn),
         proposal_type=PROPOSAL_TYPE,
-        claim_key=LOAD_CLAIM_KEY,
+        claim_key=claim_key,
         claim_value=HIGH_CLAIM_VALUE,
         source_belief=trigger_belief_id,
         source_event=trigger_event_id,
-        payload=proposal_payload_for_contradiction(),
+        payload=proposal_payload_for_contradiction(claim_key),
     )
 
 
@@ -139,19 +145,19 @@ def record_proposal_created_event(
     return event_id
 
 
-def proposal_payload_for_sustained_high() -> dict:
+def proposal_payload_for_sustained_high(claim_key: str = LOAD_CLAIM_KEY) -> dict:
     return {
-        "description": "CPU load is sustained high. Investigate resource pressure.",
-        "observed_pattern": "system.load: high",
+        "description": f"{claim_key} is sustained high. Investigate resource pressure.",
+        "observed_pattern": f"{claim_key}: high",
         "action_required": False,
         "review_recommended": True,
     }
 
 
-def proposal_payload_for_contradiction() -> dict:
+def proposal_payload_for_contradiction(claim_key: str = LOAD_CLAIM_KEY) -> dict:
     return {
-        "description": "CPU load was high, then dropped. Investigate cause.",
-        "observed_pattern": "system.load: high -> normal",
+        "description": f"{claim_key} was high, then dropped. Investigate cause.",
+        "observed_pattern": f"{claim_key}: high -> normal",
         "action_required": False,
         "review_recommended": True,
     }

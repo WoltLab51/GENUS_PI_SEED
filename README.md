@@ -1,6 +1,6 @@
 # GENUS_PI_SEED
 
-GENUS PI SEED v0 is a minimal CPU belief loop:
+GENUS PI SEED v0 is a minimal system belief loop:
 
 - observations and evidence are separate immutable ledger events
 - beliefs are derived projections, not source-of-truth rows
@@ -12,6 +12,7 @@ GENUS PI SEED v0 is a minimal CPU belief loop:
 
 ```bash
 genus observe-cpu
+genus observe-memory
 genus beliefs show
 genus proposals list
 genus proposals list --all
