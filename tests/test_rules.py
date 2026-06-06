@@ -1,7 +1,7 @@
 import inspect
 
 from genus import rules
-from tests.conftest import observe_cpu_value
+from tests.conftest import observe_cpu_value, observe_memory_value
 
 
 def test_window_below_threshold_does_not_create_belief(conn):
@@ -58,3 +58,18 @@ def test_thresholds_are_binding():
     assert rules.HIGH_THRESHOLD == 80.0
     assert rules.LOW_THRESHOLD == 60.0
     assert rules.WINDOW_SIZE == 3
+
+
+def test_latest_evidence_window_filters_metric_in_sql(conn):
+    for index in range(20):
+        observe_cpu_value(conn, 10.0)
+        observe_cpu_value(conn, 11.0)
+        observe_cpu_value(conn, 12.0)
+        observe_cpu_value(conn, 13.0)
+        observe_cpu_value(conn, 14.0)
+        observe_memory_value(conn, 90.0 + index)
+
+    window = rules._latest_evidence_window(conn, rules.MEMORY_METRIC_KEY)
+
+    assert len(window) == rules.WINDOW_SIZE
+    assert [row["metric_value"] for row in window] == [107.0, 108.0, 109.0]

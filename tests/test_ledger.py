@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from genus import ledger
+from genus import event_router, ledger
 from tests.conftest import observe_cpu_value
 
 
@@ -40,11 +40,24 @@ def test_replay_rebuilds_identical_state(conn):
         observe_cpu_value(conn, value)
 
     before = snapshot(conn)
-    summary = ledger.replay(conn)
+    summary = event_router.replay(conn)
     after = snapshot(conn)
 
     assert summary["events"] > 0
     assert after == before
+
+
+def test_replay_delete_order_allows_foreign_keys(conn):
+    conn.execute("PRAGMA foreign_keys = ON")
+    for _ in range(3):
+        observe_cpu_value(conn, 92.0)
+    for _ in range(3):
+        observe_cpu_value(conn, 40.0)
+
+    summary = event_router.replay(conn)
+
+    assert summary["inquiries"] == 1
+    assert summary["proposals"] == 2
 
 
 def snapshot(conn):

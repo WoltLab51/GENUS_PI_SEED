@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from genus import cli, ledger
+from genus import cli, event_router
 from tests.conftest import observe_cpu_value
 
 
@@ -34,7 +34,7 @@ def test_inquiry_log_rebuilds_on_replay(conn):
         observe_cpu_value(conn, 40.0)
 
     before = [dict(row) for row in conn.execute("SELECT * FROM inquiry_log").fetchall()]
-    summary = ledger.replay(conn)
+    summary = event_router.replay(conn)
     after = [dict(row) for row in conn.execute("SELECT * FROM inquiry_log").fetchall()]
 
     assert summary["inquiries"] == 1

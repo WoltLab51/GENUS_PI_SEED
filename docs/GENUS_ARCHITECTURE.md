@@ -40,7 +40,8 @@ own events and projections are written.
 - `reactors.py` runs synchronous CPU and memory observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` events and `proposal_log` rows.
 - `inquiries.py` coordinates `inquiry_created` events and `inquiry_log` rows.
-- `ledger.py` replays events into rebuildable projections.
+- `ledger.py` stores and reads immutable events.
+- `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
 
 ## Growth Rule

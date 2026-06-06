@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from genus import ledger
+
 
 PROPOSAL_TYPE = "ResourceProposal"
 LOAD_CLAIM_KEY = "system.load"
@@ -127,8 +129,6 @@ def record_proposal_created_event(
     source_event: int,
     payload: dict,
 ) -> int:
-    from genus import ledger
-
     event_payload = {
         "proposal_id": proposal_id,
         "proposal_type": proposal_type,

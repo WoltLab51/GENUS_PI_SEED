@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from genus import inquiries, ledger, projection, proposals
 
 
@@ -123,7 +121,6 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
                 },
             )
             written.append("belief_confirmed")
-            assert event_id > 0
 
     elif all(value < rule["low_threshold"] for value in values) and high_belief is not None:
         new_belief_id = projection.next_belief_id(conn)
@@ -185,7 +182,6 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
             },
         )
         written.append("belief_weakened")
-        assert event_id > 0
 
     conn.commit()
     return written
@@ -194,21 +190,21 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
 def _latest_evidence_window(conn, metric_key: str = METRIC_KEY):
     rows = conn.execute(
         """
-        SELECT id, payload
+        SELECT id, json_extract(payload, '$.metric_value') AS metric_value
         FROM event_log
         WHERE event_type = 'evidence_recorded'
+          AND json_extract(payload, '$.metric_key') = ?
         ORDER BY id DESC
+        LIMIT ?
         """,
+        (metric_key, WINDOW_SIZE),
     ).fetchall()
     evidence = []
     for row in reversed(rows):
-        payload = json.loads(row["payload"])
-        if payload.get("metric_key") == metric_key:
-            evidence.append(
-                {
-                    "id": row["id"],
-                    "metric_value": payload["metric_value"],
-                }
-            )
-    evidence = evidence[-WINDOW_SIZE:]
+        evidence.append(
+            {
+                "id": row["id"],
+                "metric_value": row["metric_value"],
+            }
+        )
     return evidence

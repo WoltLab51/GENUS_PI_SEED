@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import ledger
+from genus import event_router
 
 
 REQUIRED_EVENT_KEYS = {
@@ -57,7 +57,7 @@ def check(conn) -> dict:
 
     event_log_before = snapshot_event_log(conn)
     projection_before = snapshot_projections(conn)
-    ledger.replay(conn)
+    event_router.replay(conn)
     event_log_after = snapshot_event_log(conn)
     projection_after = snapshot_projections(conn)
 

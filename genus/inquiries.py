@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from genus import ledger
+
 
 INQUIRY_TYPE = "CauseInquiry"
 QUESTION_KEY = "cause.changed_state"
@@ -102,8 +104,6 @@ def record_inquiry_created_event(
     question_key: str,
     payload: dict,
 ) -> int:
-    from genus import ledger
-
     event_payload = {
         "inquiry_id": inquiry_id,
         "inquiry_type": inquiry_type,

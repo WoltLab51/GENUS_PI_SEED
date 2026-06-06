@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 
-from genus import inquiries, projection, proposals
-
 
 def append(conn, event_type: str, payload: dict) -> int:
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -36,57 +34,6 @@ def event_created_at(conn, event_id: int) -> str:
     if row is None:
         raise ValueError(f"event not found: {event_id}")
     return row["created_at"]
-
-
-def replay(conn) -> dict:
-    events = conn.execute("SELECT * FROM event_log ORDER BY id").fetchall()
-    conn.execute("DELETE FROM belief_projection")
-    conn.execute("DELETE FROM proposal_log")
-    conn.execute("DELETE FROM inquiry_log")
-    conn.execute(
-        """
-        DELETE FROM sqlite_sequence
-        WHERE name IN ('belief_projection', 'proposal_log', 'inquiry_log')
-        """
-    )
-
-    for event in events:
-        apply_event(conn, event)
-
-    active_count = conn.execute(
-        "SELECT COUNT(*) AS count FROM belief_projection WHERE state = 'active'"
-    ).fetchone()["count"]
-    proposal_count = conn.execute("SELECT COUNT(*) AS count FROM proposal_log").fetchone()[
-        "count"
-    ]
-    inquiry_count = conn.execute("SELECT COUNT(*) AS count FROM inquiry_log").fetchone()[
-        "count"
-    ]
-    conn.commit()
-    return {
-        "events": len(events),
-        "active_beliefs": int(active_count),
-        "proposals": int(proposal_count),
-        "inquiries": int(inquiry_count),
-    }
-
-
-def apply_event(conn, event) -> None:
-    payload = json.loads(event["payload"])
-    payload["_event_created_at"] = event["created_at"]
-    event_type = event["event_type"]
-    if event_type == "belief_created":
-        projection.apply_belief_created(conn, payload)
-    elif event_type == "belief_confirmed":
-        projection.apply_belief_confirmed(conn, payload)
-    elif event_type == "belief_weakened":
-        projection.apply_belief_weakened(conn, payload)
-    elif event_type == "belief_superseded":
-        projection.apply_belief_superseded(conn, payload)
-    elif event_type == "proposal_created":
-        proposals.apply_proposal_created(conn, payload)
-    elif event_type == "inquiry_created":
-        inquiries.apply_inquiry_created(conn, payload)
 
 
 def _event_dict(row) -> dict:

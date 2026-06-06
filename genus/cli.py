@@ -5,7 +5,7 @@ import os
 
 import click
 
-from genus import db, inquiries, integrity, ledger, projection, proposals, reactors, sensor
+from genus import db, event_router, inquiries, integrity, ledger, projection, proposals, reactors, sensor
 
 
 def get_conn():
@@ -98,7 +98,7 @@ def replay_command() -> None:
         click.echo(f"[REPLAY] Reading {event_count} events from event_log...")
         click.echo("[REPLAY] Rebuilding belief_projection...")
         click.echo("[REPLAY] Rebuilding proposal_log...")
-        summary = ledger.replay(conn)
+        summary = event_router.replay(conn)
         after = _state_snapshot(conn)
         click.echo(
             f"[REPLAY] Result: {summary['active_beliefs']} active belief(s), "
