@@ -13,18 +13,26 @@ def observe_memory_reading(conn, reading: dict) -> dict:
     return observe_system_reading(conn, reading, rules.MEMORY_METRIC_KEY)
 
 
+def observe_disk_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.DISK_METRIC_KEY)
+
+
+def observe_activity_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.ACTIVITY_METRIC_KEY)
+
+
+def observe_temperature_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.TEMPERATURE_METRIC_KEY)
+
+
 def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:
     try:
+        payload = dict(reading)
+        payload["metric_key"] = metric_key
         observation_id = ledger.append(
             conn,
             "observation_created",
-            {
-                "source": reading["source"],
-                "raw_value": reading["raw_value"],
-                "unit": reading["unit"],
-                "interval": reading["interval"],
-                "metric_key": metric_key,
-            },
+            payload,
         )
         events = process_observation(conn, observation_id)
         conn.commit()

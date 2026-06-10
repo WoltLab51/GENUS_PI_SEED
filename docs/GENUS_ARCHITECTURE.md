@@ -37,14 +37,18 @@ those events so the current state can always be reconstructed.
 Reactors decide when a transition is needed. Domain modules coordinate how their
 own events and projections are written.
 
-- `rules.py` detects threshold and belief-transition conditions for supported
-  metrics.
+- `rules.py` detects threshold and binary belief-transition conditions for
+  supported metrics.
 - `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` events and `proposal_log` rows.
 - `inquiries.py` coordinates `inquiry_created` events and `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
 - `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
+
+Supported local metrics in v0.6 are CPU percent, memory percent, disk percent,
+activity, and temperature. Disk and temperature are threshold/revision training
+in v0.6; activity is binary and changes belief immediately.
 
 ## Document Family
 

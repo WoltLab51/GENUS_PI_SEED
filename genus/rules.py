@@ -7,17 +7,28 @@ CPU_HIGH_THRESHOLD = 80.0
 CPU_LOW_THRESHOLD = 60.0
 MEMORY_HIGH_THRESHOLD = 85.0
 MEMORY_LOW_THRESHOLD = 70.0
+DISK_HIGH_THRESHOLD = 85.0
+DISK_LOW_THRESHOLD = 60.0
+TEMP_HIGH_THRESHOLD = 75.0
+TEMP_LOW_THRESHOLD = 55.0
 WINDOW_SIZE = 3
 CPU_METRIC_KEY = "system.cpu_percent"
 MEMORY_METRIC_KEY = "system.memory_percent"
+DISK_METRIC_KEY = "system.disk_percent"
+ACTIVITY_METRIC_KEY = "system.activity"
+TEMPERATURE_METRIC_KEY = "system.temperature"
 CLAIM_KEY = "system.load"
 HIGH_VALUE = "high"
 NORMAL_VALUE = "normal"
 CPU_DERIVATION = "rule:cpu_threshold_v1"
 MEMORY_DERIVATION = "rule:memory_threshold_v1"
+DISK_DERIVATION = "rule:disk_threshold_v1"
+ACTIVITY_DERIVATION = "rule:activity_binary_v1"
+TEMPERATURE_DERIVATION = "rule:temperature_threshold_v1"
 
 RULES = {
     CPU_METRIC_KEY: {
+        "type": "threshold",
         "high_threshold": CPU_HIGH_THRESHOLD,
         "low_threshold": CPU_LOW_THRESHOLD,
         "claim_key": CLAIM_KEY,
@@ -25,11 +36,35 @@ RULES = {
         "contradiction_reason": "system.load high contradicted by sustained normal readings",
     },
     MEMORY_METRIC_KEY: {
+        "type": "threshold",
         "high_threshold": MEMORY_HIGH_THRESHOLD,
         "low_threshold": MEMORY_LOW_THRESHOLD,
         "claim_key": "system.memory",
         "derivation": MEMORY_DERIVATION,
         "contradiction_reason": "system.memory high contradicted by sustained normal readings",
+    },
+    DISK_METRIC_KEY: {
+        "type": "threshold",
+        "high_threshold": DISK_HIGH_THRESHOLD,
+        "low_threshold": DISK_LOW_THRESHOLD,
+        "claim_key": "system.disk",
+        "derivation": DISK_DERIVATION,
+        "contradiction_reason": "system.disk high contradicted by sustained normal readings",
+    },
+    TEMPERATURE_METRIC_KEY: {
+        "type": "threshold",
+        "high_threshold": TEMP_HIGH_THRESHOLD,
+        "low_threshold": TEMP_LOW_THRESHOLD,
+        "claim_key": "system.temperature",
+        "derivation": TEMPERATURE_DERIVATION,
+        "contradiction_reason": "system.temperature high contradicted by sustained normal readings",
+    },
+    ACTIVITY_METRIC_KEY: {
+        "type": "binary",
+        "active_value": "active",
+        "idle_value": "idle",
+        "claim_key": "system.activity",
+        "derivation": ACTIVITY_DERIVATION,
     },
 }
 
@@ -49,8 +84,23 @@ def apply_memory_threshold(conn) -> list[str]:
     return apply_threshold(conn, MEMORY_METRIC_KEY)
 
 
+def apply_disk_threshold(conn) -> list[str]:
+    return apply_threshold(conn, DISK_METRIC_KEY)
+
+
+def apply_activity_rule(conn) -> list[str]:
+    return apply_threshold(conn, ACTIVITY_METRIC_KEY)
+
+
+def apply_temperature_threshold(conn) -> list[str]:
+    return apply_threshold(conn, TEMPERATURE_METRIC_KEY)
+
+
 def apply_threshold(conn, metric_key: str) -> list[str]:
     rule = RULES[metric_key]
+    if rule.get("type") == "binary":
+        return apply_binary_rule(conn, metric_key, rule)
+
     window = _latest_evidence_window(conn, metric_key)
     if len(window) < WINDOW_SIZE:
         return []
@@ -181,7 +231,85 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
     return written
 
 
-def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY):
+def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
+    window = _latest_evidence_window(conn, metric_key, n=1)
+    if not window:
+        return []
+
+    latest = window[0]
+    value = float(latest["metric_value"])
+    event_id = int(latest["id"])
+    claim_key = rule["claim_key"]
+    derivation = rule["derivation"]
+    new_value = rule["active_value"] if value >= 1.0 else rule["idle_value"]
+    current = projection.active_belief(conn, claim_key)
+    written: list[str] = []
+
+    if current is None:
+        belief_id = projection.next_belief_id(conn)
+        belief_event_id = ledger.append(
+            conn,
+            "belief_created",
+            {
+                "belief_id": belief_id,
+                "claim_key": claim_key,
+                "claim_value": new_value,
+                "derivation": derivation,
+                "supporting_events": [event_id],
+            },
+        )
+        projection.apply_belief_created(
+            conn,
+            {
+                "belief_id": belief_id,
+                "claim_key": claim_key,
+                "claim_value": new_value,
+                "derivation": derivation,
+                "supporting_events": [event_id],
+                "_event_created_at": ledger.event_created_at(conn, belief_event_id),
+            },
+        )
+        written.append("belief_created")
+    elif current["claim_value"] == new_value:
+        confirmation_event_id = ledger.append(
+            conn,
+            "belief_confirmed",
+            {
+                "belief_id": int(current["id"]),
+                "new_supporting_event": event_id,
+            },
+        )
+        projection.apply_belief_confirmed(
+            conn,
+            {
+                "belief_id": int(current["id"]),
+                "new_supporting_event": event_id,
+                "_event_created_at": ledger.event_created_at(conn, confirmation_event_id),
+            },
+        )
+        written.append("belief_confirmed")
+    else:
+        new_belief_id = projection.next_belief_id(conn)
+        superseded_payload = {
+            "old_belief_id": int(current["id"]),
+            "new_belief_id": new_belief_id,
+            "claim_key": claim_key,
+            "claim_value": new_value,
+            "derivation": derivation,
+            "supporting_events": [event_id],
+            "reason": f"{metric_key}_changed_to_{new_value}",
+        }
+        superseded_event_id = ledger.append(conn, "belief_superseded", superseded_payload)
+        superseded_payload["_event_created_at"] = ledger.event_created_at(
+            conn, superseded_event_id
+        )
+        projection.apply_belief_superseded(conn, superseded_payload)
+        written.append("belief_superseded")
+
+    return written
+
+
+def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY, n: int = WINDOW_SIZE):
     rows = conn.execute(
         """
         SELECT id, json_extract(payload, '$.metric_value') AS metric_value
@@ -191,7 +319,7 @@ def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY):
         ORDER BY id DESC
         LIMIT ?
         """,
-        (metric_key, WINDOW_SIZE),
+        (metric_key, n),
     ).fetchall()
     evidence = []
     for row in reversed(rows):

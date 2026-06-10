@@ -23,6 +23,10 @@ The project documentation lives in `docs/`.
 ```bash
 genus observe-cpu
 genus observe-memory
+genus observe-disk
+genus observe-activity
+genus observe-temperature
+genus observe-all
 genus beliefs show
 genus proposals list
 genus proposals list --all
@@ -36,6 +40,32 @@ The default SQLite database is `genus.sqlite3`. Override it with:
 
 ```bash
 GENUS_DB_PATH=/path/to/genus.sqlite3 genus replay
+```
+
+## Habitat Sensors
+
+v0.6 extends the local, offline habitat with disk, activity, and temperature
+observations. Disk and temperature currently use the same threshold/revision
+mechanic as CPU and memory. Activity is binary and creates or supersedes a
+belief immediately without waiting for the three-reading threshold window.
+
+## Automatic Collection With Cron
+
+GENUS does not need a daemon for the first Pi loop. Run all local sensors from
+cron and keep the core UNIX-simple:
+
+```bash
+crontab -e
+```
+
+```cron
+*/5 * * * * cd /path/to/GENUS_PI_SEED && .venv/bin/genus observe-all >> ~/.genus/cron.log 2>&1
+```
+
+With an explicit database path:
+
+```cron
+*/5 * * * * cd /path/to/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus observe-all >> /home/pi/.genus/cron.log 2>&1
 ```
 
 ## Quality Checks

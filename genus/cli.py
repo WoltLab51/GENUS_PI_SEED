@@ -43,6 +43,75 @@ def observe_memory() -> None:
         conn.close()
 
 
+@main.command("observe-disk")
+def observe_disk() -> None:
+    reading = sensor.read_disk()
+    conn = get_conn()
+    try:
+        result = reactors.observe_disk_reading(conn, reading)
+
+        _print_observation_result("DSK", reading, result)
+        _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
+@main.command("observe-activity")
+def observe_activity() -> None:
+    reading = sensor.read_activity()
+    conn = get_conn()
+    try:
+        result = reactors.observe_activity_reading(conn, reading)
+
+        _print_observation_result("ACT", reading, result)
+        _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
+@main.command("observe-temperature")
+def observe_temperature() -> None:
+    reading = sensor.read_temperature()
+    if reading is None:
+        click.echo("[OBS] TMP: not available on this system")
+        return
+
+    conn = get_conn()
+    try:
+        result = reactors.observe_temperature_reading(conn, reading)
+
+        _print_observation_result("TMP", reading, result)
+        _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
+@main.command("observe-all")
+def observe_all() -> None:
+    conn = get_conn()
+    try:
+        for label, reading_fn, observe_fn in [
+            ("CPU", sensor.read_cpu, reactors.observe_cpu_reading),
+            ("MEM", sensor.read_memory, reactors.observe_memory_reading),
+            ("DSK", sensor.read_disk, reactors.observe_disk_reading),
+            ("ACT", sensor.read_activity, reactors.observe_activity_reading),
+        ]:
+            reading = reading_fn()
+            result = observe_fn(conn, reading)
+            _print_observation_result(label, reading, result)
+
+        temperature = sensor.read_temperature()
+        if temperature is None:
+            click.echo("[OBS] TMP: not available on this system")
+        else:
+            result = reactors.observe_temperature_reading(conn, temperature)
+            _print_observation_result("TMP", temperature, result)
+
+        _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
 @main.group()
 def beliefs() -> None:
     pass
@@ -190,18 +259,37 @@ def _print_active_belief_summary(conn) -> None:
 
 
 def _print_observation_result(label: str, reading: dict, result: dict) -> None:
-    click.echo(
-        f"[OBS] {label}: {reading['raw_value']:.1f}% (source: {reading['source']})"
-    )
+    click.echo(f"[OBS] {label}: {_format_reading_value(reading)} (source: {reading['source']})")
     click.echo(f"[EVT] observation_created     (id={result['observation_id']})")
     for event in result["events"]:
         if event["event_type"] == "evidence_recorded":
             click.echo(
                 f"[EVT] evidence_recorded       "
-                f"(id={event['id']}, metric: {event['metric_key']}={event['metric_value']:.1f})"
+                f"(id={event['id']}, metric: {event['metric_key']}="
+                f"{_format_metric_value(event['metric_key'], event['metric_value'])})"
             )
         else:
             click.echo(f"[EVT] {event['event_type']}")
+
+
+def _format_reading_value(reading: dict) -> str:
+    value = float(reading["raw_value"])
+    unit = reading.get("unit", "")
+    if unit == "percent":
+        return f"{value:.1f}%"
+    if unit == "celsius":
+        return f"{value:.1f}C"
+    if unit == "binary":
+        return "active" if value >= 1.0 else "idle"
+    return f"{value:.1f} {unit}".strip()
+
+
+def _format_metric_value(metric_key: str, value: float) -> str:
+    if metric_key == "system.activity":
+        return "active" if float(value) >= 1.0 else "idle"
+    if metric_key == "system.temperature":
+        return f"{float(value):.1f}C"
+    return f"{float(value):.1f}"
 
 
 def _state_snapshot(conn) -> dict:

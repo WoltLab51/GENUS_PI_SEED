@@ -4,7 +4,7 @@ import pytest
 
 from genus import reactors
 from genus.db import init_schema
-from genus.sensor import mock_cpu, mock_memory
+from genus.sensor import mock_activity, mock_cpu, mock_disk, mock_memory, mock_temperature
 
 
 @pytest.fixture
@@ -41,4 +41,22 @@ def observe_cpu_value(conn, value: float) -> list[str]:
 def observe_memory_value(conn, value: float) -> list[str]:
     reading = mock_memory(value)
     result = reactors.observe_memory_reading(conn, reading)
+    return [event["event_type"] for event in result["events"]]
+
+
+def observe_disk_value(conn, value: float) -> list[str]:
+    reading = mock_disk(value)
+    result = reactors.observe_disk_reading(conn, reading)
+    return [event["event_type"] for event in result["events"]]
+
+
+def observe_activity_value(conn, value: float) -> list[str]:
+    reading = mock_activity(value)
+    result = reactors.observe_activity_reading(conn, reading)
+    return [event["event_type"] for event in result["events"]]
+
+
+def observe_temperature_value(conn, value: float) -> list[str]:
+    reading = mock_temperature(value)
+    result = reactors.observe_temperature_reading(conn, reading)
     return [event["event_type"] for event in result["events"]]

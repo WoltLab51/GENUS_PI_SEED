@@ -43,10 +43,10 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.5)
+## Wo wir stehen (v0.6)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
-CLI · Replay · Integrity · append-only Trigger
+Disk/Activity/Temperature-Sensor · CLI · Replay · Integrity · append-only Trigger
 **Gelb:** Proposal (kein Review) · Inquiry (nie resolved)
 **Rot:** alles Übrige der Karte
 
@@ -57,6 +57,12 @@ CLI · Replay · Integrity · append-only Trigger
 ---
 
 ## v0.6 — Habitat vervollständigen · *mehr Material*
+
+**Status:** umgesetzt. CPU, Memory, Disk, Activity und Temperature sind lokale,
+offline Sensoren. Activity ist die erste binäre Regel-Art ohne Window. Disk und
+Temperature nutzen in v0.6 bewusst noch Threshold/Revision; echter Trend bzw.
+echte CPU-Temperatur-Korrelation bleiben spätere Vertiefungen, sobald Query und
+Experience sichtbar machen können, was daran gelernt wurde.
 
 **Warum jetzt:** Mit zwei Metriken (CPU, Memory) gibt es kaum Muster zu lernen
 und kaum Zustand zu aggregieren. Erst mehr Sensoren machen die spätere
