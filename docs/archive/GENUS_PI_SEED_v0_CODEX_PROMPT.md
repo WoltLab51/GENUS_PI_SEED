@@ -1,5 +1,10 @@
 # GENUS_PI_SEED_v0 — Codex Prompt
 
+> Historical build prompt. This file records the original implementation
+> request and is not the current source of truth. Current contracts live in
+> `../GENUS_ARCHITECTURE.md`, `../GENUS_EVENT_CONTRACT.md`, and
+> `../GENUS_ROADMAP.md`.
+
 Copy this prompt verbatim into Codex. Do not paraphrase.
 
 ---

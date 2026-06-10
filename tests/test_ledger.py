@@ -15,6 +15,12 @@ def test_append_creates_row(conn):
     assert json.loads(row["payload"]) == {"source": "x", "raw_value": 1, "unit": "n"}
 
 
+def test_schema_enables_foreign_keys(conn):
+    enabled = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+
+    assert enabled == 1
+
+
 def test_append_does_not_commit(conn):
     ledger.append(conn, "observation_created", {"source": "x"})
     conn.rollback()

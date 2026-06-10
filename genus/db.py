@@ -16,5 +16,6 @@ def connect(path: str | Path = "genus.sqlite3") -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     conn.commit()

@@ -1,5 +1,11 @@
 # GENUS_PI_SEED_v0.6 — Codex Prompt: Habitat Sensors
 
+> Historical build prompt. This file records the pre-implementation request.
+> The merged v0.6 behavior is authoritative in code, tests, and
+> `../GENUS_ROADMAP.md`. In particular, disk and temperature are threshold
+> training in v0.6; true disk trend and CPU-temperature correlation are later
+> work.
+
 Read the existing codebase in this repository carefully before writing
 anything. Understand the patterns in sensor.py, rules.py, reactors.py,
 cli.py and tests/ — then extend them.

@@ -1,15 +1,26 @@
 import json
 
-from genus import proposals
+from genus import ledger, projection, proposals, rules
 from tests.conftest import observe_cpu_value
 
 
 def test_proposal_module_writes_event_and_projection(conn):
-    source_event = 1
+    source_event = ledger.append(
+        conn,
+        "observation_created",
+        {"source": "test", "raw_value": 1, "unit": "n"},
+    )
+    source_belief = projection.create_belief(
+        conn,
+        claim_key=rules.CLAIM_KEY,
+        claim_value=rules.HIGH_VALUE,
+        derivation=rules.CPU_DERIVATION,
+        supporting_events=[source_event],
+    )
 
     event_id = proposals.record_resource_proposal_for_sustained_high(
         conn,
-        trigger_belief_id=7,
+        trigger_belief_id=source_belief,
         trigger_event_id=source_event,
     )
 
@@ -20,7 +31,7 @@ def test_proposal_module_writes_event_and_projection(conn):
     assert event["event_type"] == "proposal_created"
     assert event_payload["proposal_id"] == proposal["id"]
     assert event_payload["proposal_type"] == "ResourceProposal"
-    assert proposal["source_belief"] == 7
+    assert proposal["source_belief"] == source_belief
     assert proposal["source_event"] == source_event
 
 
