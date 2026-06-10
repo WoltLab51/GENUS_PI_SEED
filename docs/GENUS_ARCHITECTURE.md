@@ -7,8 +7,9 @@ it currently believes, and keeps every important state change replayable.
 
 - **Ledger-first:** `event_log` is the source of truth. It is append-only and
   ordered.
-- **Projection-only state:** Tables such as `belief_projection` and
-  `proposal_log` are derived views. They may be cleared and rebuilt by replay.
+- **Projection-only state:** Tables such as `belief_projection`,
+  `proposal_log`, and `inquiry_log` are derived views. They may be cleared and
+  rebuilt by replay.
 - **Deterministic first:** v0.x processing is synchronous and ordered. Parallel
   workers are out of scope until replay and idempotency rules are explicit.
 - **No magic knowledge:** Confidence is calculated at read time. A language
@@ -23,7 +24,7 @@ it currently believes, and keeps every important state change replayable.
 ## Layer Model
 
 ```text
-Observation -> Evidence -> Rules -> Beliefs -> Contradictions -> Proposals
+Observation -> Evidence -> Rules -> Beliefs -> Contradictions -> Proposals/Inquiries
        \______________________________________________________________/
                               Event Ledger
 ```
@@ -36,13 +37,24 @@ those events so the current state can always be reconstructed.
 Reactors decide when a transition is needed. Domain modules coordinate how their
 own events and projections are written.
 
-- `rules.py` detects CPU threshold conditions and belief transitions.
-- `reactors.py` runs synchronous CPU and memory observation-to-evidence-to-rules cycles.
+- `rules.py` detects threshold and belief-transition conditions for supported
+  metrics.
+- `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` events and `proposal_log` rows.
 - `inquiries.py` coordinates `inquiry_created` events and `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
 - `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
+
+## Document Family
+
+- `GENUS_GESAMTBILD.md` synthesizes the whole project direction.
+- `GENUS_ROADMAP.md` defines the build order and next-step discipline.
+- `GENUS_GRUNDAUSBILDUNG.md` maps local sensors to epistemic training forms.
+- `GENUS_SENSOR_PRINCIPLE.md` defines what sensors may and may not do.
+- `GENUS_PHYSIK.md`, `GENUS_ANTIZIPATION.md`, and
+  `GENUS_VISUAL_THINKING.md` preserve later-stage concepts without pulling
+  them into the current core.
 
 ## Growth Rule
 

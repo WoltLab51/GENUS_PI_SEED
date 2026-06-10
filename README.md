@@ -8,6 +8,16 @@ GENUS PI SEED v0 is a minimal system belief loop:
 - proposals are suggestions only and default to `pending`
 - no LLM, no HTTP, no worker, no web interface
 
+## Documentation
+
+The project documentation lives in `docs/`.
+
+- `docs/GENUS_GESAMTBILD.md` is the navigation document for the overall goal.
+- `docs/GENUS_ROADMAP.md` defines the next build steps and growth gates.
+- `docs/GENUS_ARCHITECTURE.md` and `docs/GENUS_EVENT_CONTRACT.md` are the
+  current technical contracts.
+- `docs/GENUS_SENSOR_PRINCIPLE.md` defines the boundary for future sensors.
+
 ## Commands
 
 ```bash

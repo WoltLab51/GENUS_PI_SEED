@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GENUS CORE — Reifegrad-Karte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d12;
+    --panel:#11151c;
+    --panel-2:#0d1117;
+    --line:#1e252f;
+    --txt:#e8edf4;
+    --txt-dim:#8a96a6;
+    --txt-faint:#5a6675;
+    --built:#37d399;
+    --built-bg:rgba(55,211,153,.09);
+    --built-line:rgba(55,211,153,.35);
+    --partial:#f0b429;
+    --partial-bg:rgba(240,180,41,.09);
+    --partial-line:rgba(240,180,41,.32);
+    --vision:#e0556b;
+    --vision-bg:rgba(224,85,107,.07);
+    --vision-line:rgba(224,85,107,.28);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(900px 500px at 18% -5%, rgba(55,211,153,.05), transparent 60%),
+      radial-gradient(900px 500px at 85% 0%, rgba(224,85,107,.05), transparent 60%),
+      var(--bg);
+    color:var(--txt);
+    font-family:'IBM Plex Sans',sans-serif;
+    padding:34px 30px 40px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+
+  /* header */
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:30px;margin-bottom:24px;flex-wrap:wrap}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.5px;line-height:1}
+  h1 small{display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:var(--txt-dim);letter-spacing:3px;margin-top:8px}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+  .legend .li{display:flex;align-items:center;gap:9px;font-size:12px}
+  .legend .li b{font-weight:600}
+  .legend .li span{color:var(--txt-dim)}
+  .dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+  .dot.b{background:var(--built);box-shadow:0 0 10px var(--built-line)}
+  .dot.p{background:var(--partial);box-shadow:0 0 10px var(--partial-line)}
+  .dot.v{background:var(--vision)}
+
+  /* principle */
+  .principle{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:26px;text-align:center}
+  .principle .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--txt-faint);margin-bottom:7px}
+  .principle p{font-size:16px;color:var(--txt);font-weight:500;font-style:italic}
+
+  .section-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--txt-dim);margin:0 0 13px 2px;text-transform:uppercase}
+
+  /* pipeline */
+  .pipeline{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin-bottom:8px}
+  .core{
+    position:relative;border-radius:11px;padding:13px 11px 12px;min-height:148px;
+    border:1px solid var(--line);background:var(--panel-2);
+    display:flex;flex-direction:column;
+  }
+  .core.built{background:var(--built-bg);border-color:var(--built-line)}
+  .core.partial{background:var(--partial-bg);border-color:var(--partial-line)}
+  .core.vision{background:var(--vision-bg);border-color:var(--vision-line)}
+  .core .num{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid currentColor;margin-bottom:9px}
+  .core.built .num{color:var(--built)}
+  .core.partial .num{color:var(--partial)}
+  .core.vision .num{color:var(--vision)}
+  .core h3{font-size:12.5px;font-weight:700;line-height:1.15;letter-spacing:.2px;margin-bottom:7px}
+  .core .q{font-size:10.5px;color:var(--txt-dim);line-height:1.35;flex:1}
+  .core .out{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--txt-faint);margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
+  .core .stat{position:absolute;top:11px;right:10px;width:8px;height:8px;border-radius:50%}
+  .core.built .stat{background:var(--built);box-shadow:0 0 8px var(--built-line)}
+  .core.partial .stat{background:var(--partial);box-shadow:0 0 8px var(--partial-line)}
+  .core.vision .stat{background:var(--vision)}
+
+  /* generic layer panel */
+  .layer{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:9px}
+  .layer.cross{border-color:var(--vision-line);background:linear-gradient(180deg,var(--vision-bg),transparent)}
+  .grid{display:grid;gap:13px}
+  .g6{grid-template-columns:repeat(6,1fr)}
+  .g5{grid-template-columns:repeat(5,1fr)}
+  .g7{grid-template-columns:repeat(7,1fr)}
+  .cell .ch{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;margin-bottom:4px}
+  .cell .cd{font-size:10px;color:var(--txt-dim);line-height:1.4}
+  .mini{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .mini.b{background:var(--built)}
+  .mini.p{background:var(--partial)}
+  .mini.v{background:var(--vision)}
+
+  /* dna */
+  .dna{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 18px;margin-top:18px}
+  .dna .title{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13px;padding-right:6px}
+  .rule{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--txt-dim);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:6px 11px}
+  .rule.ok{color:var(--built);border-color:var(--built-line)}
+
+  .foot{margin-top:20px;font-size:11px;color:var(--txt-faint);font-family:'IBM Plex Mono',monospace;text-align:center;line-height:1.7}
+  .arrow-row{display:flex;justify-content:center;margin:2px 0 18px;color:var(--txt-faint);font-size:14px;letter-spacing:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v0.5</small></h1>
+    <div class="legend">
+      <div class="li"><span class="dot b"></span><div><b>Gebaut &amp; getestet</b><br><span>läuft im Code, durch Tests gedeckt</span></div></div>
+      <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, aber unvollständig</span></div></div>
+      <div class="li"><span class="dot v"></span><div><b>Nur Vision</b><br><span>geplant, noch kein Code</span></div></div>
+    </div>
+  </header>
+
+  <div class="principle">
+    <div class="k">KERNPRINZIP</div>
+    <p>"GENUS ist ein governiertes System, das Beobachtungen in Erfahrungen und Erfahrungen in Verbesserungsvorschläge verwandelt."</p>
+  </div>
+
+  <div class="section-label">Kern-Pipeline — der Stoffwechsel</div>
+  <div class="pipeline">
+    <div class="core built"><span class="stat"></span><div class="num">1</div><h3>Observation Core</h3><div class="q">Was wurde wahrgenommen?</div><div class="out">observation_created</div></div>
+    <div class="core built"><span class="stat"></span><div class="num">2</div><h3>Evidence Core</h3><div class="q">Was ist belegbar? Woher stammt es?</div><div class="out">evidence_recorded</div></div>
+    <div class="core built"><span class="stat"></span><div class="num">3</div><h3>Belief Core</h3><div class="q">Was hält GENUS aktuell für plausibel?</div><div class="out">belief_projection</div></div>
+    <div class="core vision"><span class="stat"></span><div class="num">4</div><h3>State Core</h3><div class="q">Welcher Gesamtzustand entsteht aus vielen Beliefs?</div><div class="out">— kein State Vector</div></div>
+    <div class="core vision"><span class="stat"></span><div class="num">5</div><h3>Transition Core</h3><div class="q">Welche Veränderung wäre möglich?</div><div class="out">— nicht gebaut</div></div>
+    <div class="core vision"><span class="stat"></span><div class="num">6</div><h3>Constraint Core</h3><div class="q">Darf diese Veränderung überhaupt weiter?</div><div class="out">— nicht gebaut</div></div>
+    <div class="core partial"><span class="stat"></span><div class="num">7</div><h3>Proposal Core</h3><div class="q">Was wird vorgeschlagen — und reviewt?</div><div class="out">proposal_log · kein Review</div></div>
+    <div class="core built"><span class="stat"></span><div class="num">8</div><h3>Ledger Core</h3><div class="q">Was ist nachweislich passiert?</div><div class="out">event_log · replay</div></div>
+    <div class="core vision"><span class="stat"></span><div class="num">9</div><h3>Experience Core</h3><div class="q">Welche Muster wiederholen sich über Zeit?</div><div class="out">— keine Aggregation</div></div>
+  </div>
+  <div class="arrow-row">↓</div>
+
+  <div class="section-label">Querschnitt: Governance &amp; Sicherheit</div>
+  <div class="layer cross">
+    <div class="grid g6">
+      <div class="cell"><div class="ch"><span class="mini v"></span>Constitutional Kernel</div><div class="cd">Grundregeln, Werte, Hard Boundaries</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Authority Matrix</div><div class="cd">Wer darf was, wo, wann?</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Room System</div><div class="cd">Kontexte, Räume, Zugriffsgrenzen</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Policy Engine</div><div class="cd">Regeln, Guards, Verträge</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Audit &amp; Trace</div><div class="cd">Ledger + Integrity-Check vorhanden</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Identity Core</div><div class="cd">Wer ist GENUS?</div></div>
+    </div>
+  </div>
+  <div class="arrow-row">↓</div>
+
+  <div class="section-label">Unterstützende Kernschichten</div>
+  <div class="layer">
+    <div class="grid g7">
+      <div class="cell"><div class="ch"><span class="mini v"></span>Meaning Engine</div><div class="cd">Bedeutung verstehen &amp; strukturieren</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Memory Core</div><div class="cd">Kurzzeit, Langzeit, Semantik</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Graph Core</div><div class="cd">Beziehungen zwischen Beliefs</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Scheduler Core</div><div class="cd">Priorisierung, Reihenfolge</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Worker Interface</div><div class="cd">Ausführung über Worker</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Maturation Core</div><div class="cd">Reifung, Anpassung, Evolution</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Monitoring Core</div><div class="cd">CPU + Memory Sensor gebaut</div></div>
+    </div>
+  </div>
+  <div class="arrow-row">↓</div>
+
+  <div class="section-label">Infrastruktur &amp; Runtime</div>
+  <div class="layer">
+    <div class="grid g5">
+      <div class="cell"><div class="ch"><span class="mini p"></span>Habitat</div><div class="cd">X1 lokal · Pi 5 als Ziel</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Database Layer</div><div class="cd">SQLite · append-only Ledger</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>CLI / Runtime</div><div class="cd">Click · synchron · deterministisch</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Network Layer</div><div class="cd">bewusst leer in v0 (kein HTTP)</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Test &amp; Integrity</div><div class="cd">pytest · replay · contract checks</div></div>
+    </div>
+  </div>
+
+  <div class="dna">
+    <div class="title"><span class="dot b" style="box-shadow:none"></span>DNA — Goldene Regeln</div>
+    <span class="rule ok">Observation ≠ Evidence</span>
+    <span class="rule ok">Evidence ≠ Belief</span>
+    <span class="rule ok">Belief ≠ Truth</span>
+    <span class="rule ok">Ledger ≠ Memory</span>
+    <span class="rule ok">Model Output ≠ Knowledge</span>
+    <span class="rule">Proposal ≠ Change</span>
+    <span class="rule">Policy ≠ Decision</span>
+    <span class="rule">Transition ≠ Action</span>
+  </div>
+
+  <div class="foot">
+    grün = im Code bewiesen &nbsp;·&nbsp; gelb = existiert, Lebenszyklus fehlt &nbsp;·&nbsp; rot = Vision ohne Code<br>
+    nächste ehrliche Schicht: Proposal/Inquiry-Lebenszyklus (= erste Governance) &amp; Experience-Aggregation (= erstes Lernen)
+  </div>
+
+</div>
+</body>
+</html>

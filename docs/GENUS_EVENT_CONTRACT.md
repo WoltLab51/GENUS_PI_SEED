@@ -21,8 +21,8 @@ are rebuildable.
 ## Invariants
 
 - `event_log` must never be updated or deleted.
-- `replay()` may clear `belief_projection` and `proposal_log`, but never
-  changes `event_log`.
+- `replay()` may clear `belief_projection`, `proposal_log`, and `inquiry_log`,
+  but never changes `event_log`.
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
