@@ -89,6 +89,27 @@ def test_validate_event_contract_accepts_inquiry_created(conn):
     assert issues == []
 
 
+def test_validate_event_contract_accepts_experience_recorded(conn):
+    ledger.append(
+        conn,
+        "experience_recorded",
+        {
+            "experience_id": 1,
+            "experience_key": "activity_hourly_rhythm:system.activity:14:active",
+            "experience_type": "ActivityHourlyRhythm",
+            "subject_key": "system.activity",
+            "pattern": {"hour_utc": 14, "value": "active", "count": 3},
+            "supporting_events": [1, 2, 3],
+            "derivation": "rule:activity_hourly_rhythm_v1",
+            "summary": "system.activity is repeatedly active around 14:00 UTC",
+        },
+    )
+
+    issues = integrity.validate_event_contract(conn)
+
+    assert issues == []
+
+
 def test_validate_schema_detects_confidence_column(conn):
     conn.execute("ALTER TABLE belief_projection ADD COLUMN confidence REAL")
 

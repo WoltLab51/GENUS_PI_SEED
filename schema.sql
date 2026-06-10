@@ -67,3 +67,18 @@ CREATE TABLE IF NOT EXISTS inquiry_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_inquiry_log_state ON inquiry_log(state);
+
+CREATE TABLE IF NOT EXISTS experience_log (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    experience_key     TEXT    NOT NULL UNIQUE,
+    experience_type    TEXT    NOT NULL,
+    subject_key        TEXT    NOT NULL,
+    pattern            TEXT    NOT NULL,
+    supporting_events  TEXT    NOT NULL DEFAULT '[]',
+    derivation         TEXT    NOT NULL,
+    summary            TEXT    NOT NULL,
+    created_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_experience_log_subject
+ON experience_log(subject_key, experience_type);

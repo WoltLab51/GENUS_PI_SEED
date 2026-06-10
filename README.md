@@ -30,8 +30,11 @@ genus observe-all
 genus ask "was glaubst du"
 genus ask "status"
 genus explain belief 1
+genus explain experience 1
 genus why proposal 1
 genus beliefs show
+genus experience scan
+genus experience show
 genus proposals list
 genus proposals list --all
 genus proposals review 1 --accept --note "makes sense"
@@ -77,6 +80,19 @@ Accepting a proposal does not execute anything; `Proposal != Change` is still a
 hard rule. Existing databases get the new projection columns automatically on
 startup; run `genus replay` after upgrading to rebuild projections from the
 ledger.
+
+## Experience Core
+
+v0.9 adds deterministic first learning from the ledger. `genus experience scan`
+aggregates existing `event_log` evidence and records repeated activity in the
+same UTC hour as an `ActivityHourlyRhythm` experience.
+
+- `experience_recorded` is the durable event.
+- `experience_log` is a rebuildable projection.
+- `genus experience show` lists recorded experiences.
+- `genus explain experience <id>` shows the source event, supporting evidence,
+  and any review-only `ExperienceProposal`.
+- `genus ask "welche muster"` exposes the same records through the query layer.
 
 ## Automatic Collection With Cron
 

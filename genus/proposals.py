@@ -130,7 +130,7 @@ def record_proposal_created_event(
     proposal_type: str,
     claim_key: str,
     claim_value: str,
-    source_belief: int,
+    source_belief: int | None,
     source_event: int,
     payload: dict,
 ) -> int:

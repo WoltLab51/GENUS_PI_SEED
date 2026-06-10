@@ -1,0 +1,217 @@
+from __future__ import annotations
+
+import json
+
+from genus import ledger, proposals
+
+
+ACTIVITY_METRIC_KEY = "system.activity"
+DERIVATION = "rule:activity_hourly_rhythm_v1"
+EXPERIENCE_TYPE = "ActivityHourlyRhythm"
+PROPOSAL_TYPE = "ExperienceProposal"
+MIN_SUPPORT = 3
+
+
+def scan(conn) -> list[dict]:
+    recorded: list[dict] = []
+    for candidate in _activity_hourly_rhythm_candidates(conn):
+        if experience_exists(conn, candidate["experience_key"]):
+            continue
+        experience_event_id = record_experience_event(conn, candidate)
+        proposal_event_id = record_experience_proposal(conn, candidate, experience_event_id)
+        recorded.append(
+            {
+                "experience_event_id": experience_event_id,
+                "proposal_event_id": proposal_event_id,
+                **candidate,
+            }
+        )
+    return recorded
+
+
+def record_experience_event(conn, candidate: dict) -> int:
+    experience_id = next_experience_id(conn)
+    candidate["experience_id"] = experience_id
+    event_payload = {
+        "experience_id": experience_id,
+        "experience_key": candidate["experience_key"],
+        "experience_type": candidate["experience_type"],
+        "subject_key": candidate["subject_key"],
+        "pattern": candidate["pattern"],
+        "supporting_events": candidate["supporting_events"],
+        "derivation": candidate["derivation"],
+        "summary": candidate["summary"],
+    }
+    event_id = ledger.append(conn, "experience_recorded", event_payload)
+    event_payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+    apply_experience_recorded(conn, event_payload)
+    return event_id
+
+
+def record_experience_proposal(conn, candidate: dict, experience_event_id: int) -> int:
+    return proposals.record_proposal_created_event(
+        conn,
+        proposal_id=proposals.next_proposal_id(conn),
+        proposal_type=PROPOSAL_TYPE,
+        claim_key=candidate["subject_key"],
+        claim_value="hourly_rhythm",
+        source_belief=None,
+        source_event=experience_event_id,
+        payload={
+            "description": (
+                f"Recurring experience detected: {candidate['summary']}. "
+                "Review whether this rhythm is expected."
+            ),
+            "observed_pattern": candidate["experience_key"],
+            "experience_id": candidate["experience_id"],
+            "experience_key": candidate["experience_key"],
+            "experience_type": candidate["experience_type"],
+            "action_required": False,
+            "review_recommended": True,
+        },
+    )
+
+
+def apply_experience_recorded(conn, payload: dict) -> int:
+    serialized_pattern = json.dumps(
+        payload["pattern"], sort_keys=True, separators=(",", ":")
+    )
+    serialized_supporting = json.dumps(
+        payload["supporting_events"], sort_keys=True, separators=(",", ":")
+    )
+    conn.execute(
+        """
+        INSERT INTO experience_log
+            (id, experience_key, experience_type, subject_key, pattern,
+             supporting_events, derivation, summary, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))
+        """,
+        (
+            int(payload["experience_id"]),
+            payload["experience_key"],
+            payload["experience_type"],
+            payload["subject_key"],
+            serialized_pattern,
+            serialized_supporting,
+            payload["derivation"],
+            payload["summary"],
+            payload.get("_event_created_at"),
+        ),
+    )
+    return int(payload["experience_id"])
+
+
+def list_experiences(conn) -> list[dict]:
+    rows = conn.execute("SELECT * FROM experience_log ORDER BY id").fetchall()
+    return [experience_dict(row) for row in rows]
+
+
+def get_experience(conn, experience_id: int):
+    row = conn.execute(
+        "SELECT * FROM experience_log WHERE id = ?",
+        (experience_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"experience not found: {experience_id}")
+    return row
+
+
+def experience_dict(row) -> dict:
+    data = dict(row)
+    data["pattern"] = json.loads(row["pattern"])
+    data["supporting_events"] = json.loads(row["supporting_events"])
+    return data
+
+
+def experience_exists(conn, experience_key: str) -> bool:
+    projection_row = conn.execute(
+        "SELECT 1 FROM experience_log WHERE experience_key = ? LIMIT 1",
+        (experience_key,),
+    ).fetchone()
+    if projection_row is not None:
+        return True
+    event_row = conn.execute(
+        """
+        SELECT 1
+        FROM event_log
+        WHERE event_type = 'experience_recorded'
+          AND json_extract(payload, '$.experience_key') = ?
+        LIMIT 1
+        """,
+        (experience_key,),
+    ).fetchone()
+    return event_row is not None
+
+
+def next_experience_id(conn) -> int:
+    row = conn.execute(
+        "SELECT seq FROM sqlite_sequence WHERE name = 'experience_log'"
+    ).fetchone()
+    if row is not None:
+        return int(row["seq"]) + 1
+    row = conn.execute(
+        "SELECT COALESCE(MAX(id), 0) AS max_id FROM experience_log"
+    ).fetchone()
+    return int(row["max_id"]) + 1
+
+
+def _activity_hourly_rhythm_candidates(conn) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT
+            hour_utc,
+            activity_value,
+            COUNT(*) AS count,
+            json_group_array(id) AS supporting_events
+        FROM (
+            SELECT
+                id,
+                CAST(strftime('%H', created_at) AS INTEGER) AS hour_utc,
+                CASE
+                    WHEN CAST(json_extract(payload, '$.metric_value') AS REAL) >= 1.0
+                    THEN 'active'
+                    ELSE 'idle'
+                END AS activity_value
+            FROM event_log
+            WHERE event_type = 'evidence_recorded'
+              AND json_extract(payload, '$.metric_key') = ?
+            ORDER BY id
+        )
+        GROUP BY hour_utc, activity_value
+        HAVING COUNT(*) >= ?
+        ORDER BY hour_utc, activity_value
+        """,
+        (ACTIVITY_METRIC_KEY, MIN_SUPPORT),
+    ).fetchall()
+
+    candidates = []
+    for row in rows:
+        hour = int(row["hour_utc"])
+        value = row["activity_value"]
+        count = int(row["count"])
+        supporting_events = json.loads(row["supporting_events"])
+        experience_key = (
+            f"activity_hourly_rhythm:{ACTIVITY_METRIC_KEY}:{hour:02d}:{value}"
+        )
+        pattern = {
+            "bucket": "hour_of_day_utc",
+            "hour_utc": hour,
+            "value": value,
+            "count": count,
+        }
+        candidates.append(
+            {
+                "experience_key": experience_key,
+                "experience_type": EXPERIENCE_TYPE,
+                "subject_key": ACTIVITY_METRIC_KEY,
+                "pattern": pattern,
+                "supporting_events": supporting_events,
+                "derivation": DERIVATION,
+                "summary": (
+                    f"{ACTIVITY_METRIC_KEY} is repeatedly {value} around "
+                    f"{hour:02d}:00 UTC ({count} observations)"
+                ),
+            }
+        )
+    return candidates

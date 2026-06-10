@@ -8,6 +8,7 @@ import click
 from genus import (
     db,
     event_router,
+    experience,
     inquiries,
     integrity,
     ledger,
@@ -149,6 +150,16 @@ def explain_belief_command(belief_id: int) -> None:
         conn.close()
 
 
+@explain_group.command("experience")
+@click.argument("experience_id", type=int)
+def explain_experience_command(experience_id: int) -> None:
+    conn = get_conn()
+    try:
+        _print_experience_explanation(query.explain_experience(conn, experience_id))
+    finally:
+        conn.close()
+
+
 @main.group(name="why")
 def why_group() -> None:
     pass
@@ -189,6 +200,51 @@ def beliefs_show() -> None:
 @main.group(name="proposals")
 def proposals_group() -> None:
     pass
+
+
+@main.group(name="experience")
+def experience_group() -> None:
+    pass
+
+
+@experience_group.command("scan")
+def experience_scan() -> None:
+    conn = get_conn()
+    try:
+        try:
+            rows = experience.scan(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        if not rows:
+            click.echo("[EXP] no new experience")
+            return
+        click.echo(f"[EXP] recorded {len(rows)} experience(s)")
+        for row in rows:
+            click.echo(
+                f"[EXP] #{row['experience_id']} {row['experience_type']} "
+                f"{row['experience_key']}"
+            )
+    finally:
+        conn.close()
+
+
+@experience_group.command("show")
+def experience_show() -> None:
+    conn = get_conn()
+    try:
+        rows = experience.list_experiences(conn)
+        click.echo("EXPERIENCES")
+        click.echo("id  type                   subject          derivation")
+        for row in rows:
+            click.echo(
+                f"{row['id']:<3} {row['experience_type']:<22} "
+                f"{row['subject_key']:<16} {row['derivation']}"
+            )
+            click.echo(f"    {row['summary']}")
+    finally:
+        conn.close()
 
 
 @proposals_group.command("list")
@@ -255,12 +311,14 @@ def replay_command() -> None:
         ]
         click.echo(f"[REPLAY] Reading {event_count} events from event_log...")
         click.echo("[REPLAY] Rebuilding belief_projection...")
+        click.echo("[REPLAY] Rebuilding experience_log...")
         click.echo("[REPLAY] Rebuilding proposal_log...")
         summary = event_router.replay(conn)
         after = _state_snapshot(conn)
         click.echo(
             f"[REPLAY] Result: {summary['active_beliefs']} active belief(s), "
-            f"{summary['proposals']} proposal(s), {summary['inquiries']} inquiry(s)"
+            f"{summary['proposals']} proposal(s), {summary['inquiries']} inquiry(s), "
+            f"{summary['experiences']} experience(s)"
         )
         if before == after:
             click.echo("[REPLAY] State matches current projection")
@@ -284,7 +342,8 @@ def integrity_check() -> None:
             click.echo(
                 f"[INTEGRITY] OK events={result['events']} "
                 f"active_beliefs={result['active_beliefs']} "
-                f"proposals={result['proposals']} inquiries={result['inquiries']}"
+                f"proposals={result['proposals']} inquiries={result['inquiries']} "
+                f"experiences={result['experiences']}"
             )
             return
         for issue in result["issues"]:
@@ -419,6 +478,12 @@ def _print_ask_response(response: dict) -> None:
                 f"{inquiry['claim_key']} state={inquiry['state']} "
                 f"question={inquiry['question_key']}"
             )
+    elif response["kind"] == "experiences":
+        for row in response["experiences"]:
+            click.echo(
+                f"[EXP] #{row['id']} {row['experience_type']} "
+                f"{row['experience_key']}"
+            )
     elif response["kind"] == "status":
         for key, value in response["status"].items():
             click.echo(f"{key}: {value}")
@@ -480,6 +545,33 @@ def _print_proposal_explanation(explanation: dict) -> None:
         _print_belief_explanation(explanation["source_belief"])
 
 
+def _print_experience_explanation(explanation: dict) -> None:
+    row = explanation["experience"]
+    click.echo(
+        f"EXPERIENCE #{row['id']} {row['experience_type']} "
+        f"{row['experience_key']}"
+    )
+    click.echo(f"subject={row['subject_key']} derivation={row['derivation']}")
+    click.echo(f"summary={row['summary']}")
+    experience_event = explanation["experience_event"]
+    if experience_event is not None:
+        click.echo(
+            f"experience_event: #{experience_event['id']} "
+            f"{experience_event['event_type']}"
+        )
+    click.echo("supporting_evidence:")
+    _print_evidence_chain(explanation["supporting_evidence"])
+    click.echo("proposals:")
+    if not explanation["proposals"]:
+        click.echo("- none")
+    for proposal in explanation["proposals"]:
+        click.echo(
+            f"- #{proposal['id']} {proposal['proposal_type']} "
+            f"{proposal['claim_key']}={proposal['claim_value']} "
+            f"state={proposal['state']}"
+        )
+
+
 def _print_evidence_chain(events: list[dict]) -> None:
     if not events:
         click.echo("- none")
@@ -535,10 +627,19 @@ def _state_snapshot(conn) -> dict:
         ORDER BY id
         """
     ).fetchall()
+    experience_rows = conn.execute(
+        """
+        SELECT id, experience_key, experience_type, subject_key, pattern,
+               supporting_events, derivation, summary
+        FROM experience_log
+        ORDER BY id
+        """
+    ).fetchall()
     return {
         "beliefs": beliefs,
         "proposals": [dict(row) for row in proposal_rows],
         "inquiries": [dict(row) for row in inquiry_rows],
+        "experiences": [dict(row) for row in experience_rows],
     }
 
 

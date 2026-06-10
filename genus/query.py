@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import string
 
-from genus import inquiries, projection, proposals
+from genus import experience, inquiries, projection, proposals
 
 
 BELIEF_PATTERNS = (
@@ -27,6 +27,14 @@ INQUIRY_PATTERNS = (
     "questions",
     "fragen",
 )
+EXPERIENCE_PATTERNS = (
+    "experience",
+    "experiences",
+    "erfahrung",
+    "muster",
+    "pattern",
+    "rhythmus",
+)
 STATUS_PATTERNS = (
     "status",
     "summary",
@@ -38,6 +46,7 @@ SUPPORTED_PATTERNS = (
     'ask "status"',
     'ask "welche proposals"',
     'ask "was ist offen"',
+    'ask "welche muster"',
 )
 
 
@@ -66,6 +75,14 @@ def ask(conn, question: str) -> dict:
             "question": question,
             "answer": f"{len(rows)} open inquiry/inquiries",
             "inquiries": rows,
+        }
+    if _matches(normalized, EXPERIENCE_PATTERNS):
+        rows = experience.list_experiences(conn)
+        return {
+            "kind": "experiences",
+            "question": question,
+            "answer": f"{len(rows)} experience(s)",
+            "experiences": rows,
         }
     if _matches(normalized, STATUS_PATTERNS):
         return {
@@ -100,12 +117,16 @@ def status(conn) -> dict:
     inquiry_count = conn.execute(
         "SELECT COUNT(*) AS count FROM inquiry_log WHERE state = 'open'"
     ).fetchone()["count"]
+    experience_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM experience_log"
+    ).fetchone()["count"]
     return {
         "events": int(event_count),
         "active_beliefs": int(active_count),
         "superseded_beliefs": int(superseded_count),
         "pending_proposals": int(proposal_count),
         "open_inquiries": int(inquiry_count),
+        "experiences": int(experience_count),
     }
 
 
@@ -140,6 +161,20 @@ def explain_proposal(conn, proposal_id: int) -> dict:
             if source_belief_id is not None
             else None
         ),
+    }
+
+
+def explain_experience(conn, experience_id: int) -> dict:
+    row = experience.get_experience(conn, experience_id)
+    data = experience.experience_dict(row)
+    supporting_ids = data["supporting_events"]
+    return {
+        "experience": data,
+        "experience_event": _find_experience_event(conn, experience_id),
+        "supporting_evidence": [
+            _event_with_observation(conn, event_id) for event_id in supporting_ids
+        ],
+        "proposals": _find_experience_proposals(conn, experience_id),
     }
 
 
@@ -248,6 +283,32 @@ def _find_proposal_review_event(conn, proposal_id: int) -> dict | None:
         (proposal_id,),
     ).fetchone()
     return _event_dict(row) if row is not None else None
+
+
+def _find_experience_event(conn, experience_id: int) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT * FROM event_log
+        WHERE event_type = 'experience_recorded'
+          AND json_extract(payload, '$.experience_id') = ?
+        ORDER BY id
+        LIMIT 1
+        """,
+        (experience_id,),
+    ).fetchone()
+    return _event_dict(row) if row is not None else None
+
+
+def _find_experience_proposals(conn, experience_id: int) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT * FROM proposal_log
+        WHERE json_extract(payload, '$.experience_id') = ?
+        ORDER BY id
+        """,
+        (experience_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def _get_proposal(conn, proposal_id: int):

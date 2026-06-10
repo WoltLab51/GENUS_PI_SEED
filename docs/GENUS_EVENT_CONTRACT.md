@@ -17,23 +17,30 @@ are rebuildable.
 | `contradiction_detected` | `belief_id`, `reason` | Rules | None directly |
 | `proposal_created` | `proposal_id`, `proposal_type`, `claim_key`, `claim_value`, `source_belief`, `source_event`, `payload`, `reason` | Proposals | Insert proposal row |
 | `proposal_reviewed` | `proposal_id`, `decision`, `note` | Human via CLI | Mark proposal accepted/rejected |
+| `experience_recorded` | `experience_id`, `experience_key`, `experience_type`, `subject_key`, `pattern`, `supporting_events`, `derivation`, `summary` | Experience | Insert experience row |
 | `inquiry_created` | `inquiry_id`, `inquiry_type`, `claim_key`, `source_belief`, `source_event`, `question_key`, `payload`, `state` | Inquiries | Insert inquiry row |
 | `inquiry_resolved` | `inquiry_id`, `answer` | Human via CLI | Mark inquiry resolved |
 
 ## Invariants
 
 - `event_log` must never be updated or deleted.
-- `replay()` may clear `belief_projection`, `proposal_log`, and `inquiry_log`,
-  but never changes `event_log`.
+- `replay()` may clear `belief_projection`, `experience_log`, `proposal_log`,
+  and `inquiry_log`, but never changes `event_log`.
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
+- `experience_log.derivation` is required and `experience_log` has no
+  `confidence` column.
 - Proposal creation is event-backed: `proposal_created` is written before
   `proposal_log` is projected.
 - `proposal_created` is emitted for first sustained high and high-to-normal
   contradiction only; it is not emitted for `belief_confirmed`.
 - `inquiry_created` is emitted for contradictions only; it is not an action and
   does not resolve itself automatically.
+- `experience_recorded` is emitted by deterministic ledger aggregation. The
+  first v0.9 detector records repeated activity in the same UTC hour.
+- An experience may create an `ExperienceProposal`, but the proposal is still
+  review work only and does not execute changes.
 - `proposal_reviewed` and `inquiry_resolved` are terminal: at most one review
   per proposal and one resolution per inquiry, enforced before the event is
   written.

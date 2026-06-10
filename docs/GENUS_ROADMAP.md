@@ -43,12 +43,12 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.8)
+## Wo wir stehen (v0.9)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
-append-only Trigger · Proposal Review · Inquiry Resolve
-**Gelb:** Experience fehlt · State fehlt · Governance Policy fehlt
+append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core
+**Gelb:** State fehlt · Governance Policy fehlt
 **Rot:** alles Übrige der Karte
 
 ---
@@ -152,6 +152,11 @@ Governance-Akt und bereitet die spätere Governance-Schicht vor.
 
 ## v0.9 — Experience Core · *erstes Lernen*
 
+**Status:** umgesetzt. `experience_recorded` ist im Contract und in Integrity.
+`experience_log` ist eine rebuildbare Projektion. Der erste Detector erkennt
+wiederkehrende `system.activity`-Häufungen in derselben UTC-Stunde und erzeugt
+bei neuer Experience einen review-only `ExperienceProposal`.
+
 **Warum jetzt:** Jetzt gibt es Material (Muster sind da) *und* Query (du kannst
 sie sehen). Zeitliche Verdichtung über den Ledger: aus "Disk um 14:03 hoch"
 wird "Disk füllt sich immer mittwochs". Rein deterministisch, SQL über
@@ -168,10 +173,10 @@ Zeitfenster.
 - ein wiederkehrendes Muster kann einen Proposal erzeugen
 
 **Definition of Done:**
-- [ ] `experience_recorded` im Contract + Integrity
-- [ ] mind. ein Muster-Typ erkannt, Replay-stabil
-- [ ] über Query inspizierbar
-- [ ] Wachstumsregel ✓
+- [x] `experience_recorded` im Contract + Integrity
+- [x] mind. ein Muster-Typ erkannt, Replay-stabil
+- [x] über Query inspizierbar
+- [x] Wachstumsregel ✓
 
 ---
 

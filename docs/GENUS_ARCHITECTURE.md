@@ -8,8 +8,8 @@ it currently believes, and keeps every important state change replayable.
 - **Ledger-first:** `event_log` is the source of truth. It is append-only and
   ordered.
 - **Projection-only state:** Tables such as `belief_projection`,
-  `proposal_log`, and `inquiry_log` are derived views. They may be cleared and
-  rebuilt by replay.
+  `experience_log`, `proposal_log`, and `inquiry_log` are derived views. They
+  may be cleared and rebuilt by replay.
 - **Deterministic first:** v0.x processing is synchronous and ordered. Parallel
   workers are out of scope until replay and idempotency rules are explicit.
 - **No magic knowledge:** Confidence is calculated at read time. A language
@@ -26,6 +26,7 @@ it currently believes, and keeps every important state change replayable.
 
 ```text
 Observation -> Evidence -> Rules -> Beliefs -> Contradictions -> Proposals/Inquiries
+                     \-> Experience -> Proposals
        \______________________________________________________________/
                               Event Ledger
 ```
@@ -43,6 +44,8 @@ own events and projections are written.
 - `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` and `proposal_reviewed` events
   with `proposal_log` rows.
+- `experience.py` scans the ledger for deterministic repeated patterns and
+  coordinates `experience_recorded` events with `experience_log` rows.
 - `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
   with `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
@@ -54,6 +57,11 @@ own events and projections are written.
 Supported local metrics in v0.6 are CPU percent, memory percent, disk percent,
 activity, and temperature. Disk and temperature are threshold/revision training
 in v0.6; activity is binary and changes belief immediately.
+
+v0.9 adds the first Experience detector: repeated `system.activity` evidence in
+the same UTC hour is recorded as an `ActivityHourlyRhythm`. Experience records
+are projections from `experience_recorded` events and may create review-only
+`ExperienceProposal` rows.
 
 ## Document Family
 

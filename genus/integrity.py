@@ -40,6 +40,16 @@ REQUIRED_EVENT_KEYS = {
         "reason",
     },
     "proposal_reviewed": {"proposal_id", "decision", "note"},
+    "experience_recorded": {
+        "experience_id",
+        "experience_key",
+        "experience_type",
+        "subject_key",
+        "pattern",
+        "supporting_events",
+        "derivation",
+        "summary",
+    },
     "inquiry_created": {
         "inquiry_id",
         "inquiry_type",
@@ -79,6 +89,7 @@ def check(conn) -> dict:
         "active_beliefs": replay_summary["active_beliefs"],
         "proposals": replay_summary["proposals"],
         "inquiries": replay_summary["inquiries"],
+        "experiences": replay_summary["experiences"],
     }
 
 
@@ -109,12 +120,28 @@ def validate_schema(conn) -> list[str]:
     inquiry_columns = [
         row["name"] for row in conn.execute("PRAGMA table_info(inquiry_log)").fetchall()
     ]
+    experience_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(experience_log)").fetchall()
+    ]
     if "confidence" in belief_columns:
         issues.append("belief_projection must not store confidence")
     if not {"decision", "reviewed_at"}.issubset(proposal_columns):
         issues.append("proposal_log missing lifecycle columns")
     if "answer" not in inquiry_columns:
         issues.append("inquiry_log missing answer column")
+    if not {
+        "experience_key",
+        "experience_type",
+        "subject_key",
+        "pattern",
+        "supporting_events",
+        "derivation",
+        "summary",
+    }.issubset(experience_columns):
+        issues.append("experience_log missing required columns")
+    if "confidence" in experience_columns:
+        issues.append("experience_log must not store confidence")
 
     empty_derivations = conn.execute(
         """
@@ -125,6 +152,15 @@ def validate_schema(conn) -> list[str]:
     ).fetchone()["count"]
     if empty_derivations:
         issues.append("belief_projection contains empty derivation")
+    empty_experience_derivations = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM experience_log
+        WHERE derivation IS NULL OR TRIM(derivation) = ''
+        """
+    ).fetchone()["count"]
+    if empty_experience_derivations:
+        issues.append("experience_log contains empty derivation")
     return issues
 
 
@@ -160,6 +196,8 @@ def validate_event_contract(conn) -> list[str]:
             "derivation"
         ):
             issues.append(f"event {row['id']} {event_type} has empty derivation")
+        if event_type == "experience_recorded" and not payload.get("derivation"):
+            issues.append(f"event {row['id']} experience_recorded has empty derivation")
         if event_type == "proposal_reviewed":
             proposal_id = payload["proposal_id"]
             if payload["decision"] not in {"accepted", "rejected"}:
@@ -226,4 +264,20 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
-    return {"beliefs": beliefs, "proposals": proposals, "inquiries": inquiries}
+    experiences = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, experience_key, experience_type, subject_key, pattern,
+                   supporting_events, derivation, summary, created_at
+            FROM experience_log
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
+    return {
+        "beliefs": beliefs,
+        "proposals": proposals,
+        "inquiries": inquiries,
+        "experiences": experiences,
+    }
