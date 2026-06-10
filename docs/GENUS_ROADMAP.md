@@ -43,12 +43,13 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.9)
+## Wo wir stehen (v0.10)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
-append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core
-**Gelb:** State fehlt · Governance Policy fehlt
+append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
+State Core
+**Gelb:** Governance Policy fehlt
 **Rot:** alles Übrige der Karte
 
 ---
@@ -182,6 +183,11 @@ Zeitfenster.
 
 ## v0.10 — State Core · *Gesamtzustand aus vielen Beliefs*
 
+**Status:** umgesetzt. `state_changed` ist im Contract und in Integrity.
+`state_projection` ist eine rebuildbare Projektion. Der erste StateVector
+leitet `system.pressure` aus aktiven Activity- und Ressourcen-Beliefs ab und
+ist über `genus state show`, `genus explain state` und Query inspizierbar.
+
 **Warum jetzt:** Mit 4–5 Belief-Typen ist Aggregation endlich nicht-trivial.
 Mehrere Beliefs → ein `StateVector` (z.B. `aktiv + CPU hoch + Disk wächst`
 → `pressure=elevated`). Fundament, das Governance im nächsten Schritt braucht.
@@ -195,9 +201,9 @@ Mehrere Beliefs → ein `StateVector` (z.B. `aktiv + CPU hoch + Disk wächst`
 - `genus state show`, über Query erklärbar
 
 **Definition of Done:**
-- [ ] `state_changed` im Contract + Integrity
-- [ ] State aus Beliefs abgeleitet, Replay-stabil
-- [ ] Wachstumsregel ✓
+- [x] `state_changed` im Contract + Integrity
+- [x] State aus Beliefs abgeleitet, Replay-stabil
+- [x] Wachstumsregel ✓
 
 ---
 

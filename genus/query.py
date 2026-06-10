@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import string
 
-from genus import experience, inquiries, projection, proposals
+from genus import experience, inquiries, projection, proposals, state
 
 
 BELIEF_PATTERNS = (
@@ -35,11 +35,18 @@ EXPERIENCE_PATTERNS = (
     "pattern",
     "rhythmus",
 )
+STATE_PATTERNS = (
+    "state",
+    "state vector",
+    "gesamtzustand",
+    "zustand",
+    "pressure",
+    "druck",
+)
 STATUS_PATTERNS = (
     "status",
     "summary",
     "zusammenfassung",
-    "zustand",
 )
 SUPPORTED_PATTERNS = (
     'ask "was glaubst du"',
@@ -47,6 +54,7 @@ SUPPORTED_PATTERNS = (
     'ask "welche proposals"',
     'ask "was ist offen"',
     'ask "welche muster"',
+    'ask "zustand"',
 )
 
 
@@ -84,6 +92,14 @@ def ask(conn, question: str) -> dict:
             "answer": f"{len(rows)} experience(s)",
             "experiences": rows,
         }
+    if _matches(normalized, STATE_PATTERNS):
+        rows = state.list_active_states(conn)
+        return {
+            "kind": "states",
+            "question": question,
+            "answer": f"{len(rows)} active state(s)",
+            "states": rows,
+        }
     if _matches(normalized, STATUS_PATTERNS):
         return {
             "kind": "status",
@@ -120,6 +136,9 @@ def status(conn) -> dict:
     experience_count = conn.execute(
         "SELECT COUNT(*) AS count FROM experience_log"
     ).fetchone()["count"]
+    active_state_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM state_projection WHERE status = 'active'"
+    ).fetchone()["count"]
     return {
         "events": int(event_count),
         "active_beliefs": int(active_count),
@@ -127,6 +146,7 @@ def status(conn) -> dict:
         "pending_proposals": int(proposal_count),
         "open_inquiries": int(inquiry_count),
         "experiences": int(experience_count),
+        "active_states": int(active_state_count),
     }
 
 
@@ -175,6 +195,23 @@ def explain_experience(conn, experience_id: int) -> dict:
             _event_with_observation(conn, event_id) for event_id in supporting_ids
         ],
         "proposals": _find_experience_proposals(conn, experience_id),
+    }
+
+
+def explain_state(conn, state_id: int) -> dict:
+    row = state.get_state(conn, state_id)
+    data = state.state_dict(row)
+    supporting_ids = data["supporting_beliefs"]
+    return {
+        "state": data,
+        "state_event": _find_state_event(conn, state_id),
+        "supporting_beliefs": [
+            projection.belief_with_confidence(
+                conn,
+                projection.get_belief(conn, belief_id),
+            )
+            for belief_id in supporting_ids
+        ],
     }
 
 
@@ -309,6 +346,20 @@ def _find_experience_proposals(conn, experience_id: int) -> list[dict]:
         (experience_id,),
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def _find_state_event(conn, state_id: int) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT * FROM event_log
+        WHERE event_type = 'state_changed'
+          AND json_extract(payload, '$.state_id') = ?
+        ORDER BY id
+        LIMIT 1
+        """,
+        (state_id,),
+    ).fetchone()
+    return _event_dict(row) if row is not None else None
 
 
 def _get_proposal(conn, proposal_id: int):

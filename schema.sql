@@ -82,3 +82,20 @@ CREATE TABLE IF NOT EXISTS experience_log (
 
 CREATE INDEX IF NOT EXISTS idx_experience_log_subject
 ON experience_log(subject_key, experience_type);
+
+CREATE TABLE IF NOT EXISTS state_projection (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    state_key           TEXT    NOT NULL,
+    state_value         TEXT    NOT NULL,
+    status              TEXT    NOT NULL DEFAULT 'active',
+    derivation          TEXT    NOT NULL,
+    supporting_beliefs  TEXT    NOT NULL DEFAULT '[]',
+    components          TEXT    NOT NULL DEFAULT '{}',
+    reason              TEXT    NOT NULL,
+    created_at          TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    last_updated_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    superseded_by       INTEGER REFERENCES state_projection(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_state_projection_key_status
+ON state_projection(state_key, status);

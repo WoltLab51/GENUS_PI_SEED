@@ -110,6 +110,31 @@ def test_validate_event_contract_accepts_experience_recorded(conn):
     assert issues == []
 
 
+def test_validate_event_contract_accepts_state_changed(conn):
+    ledger.append(
+        conn,
+        "state_changed",
+        {
+            "state_id": 1,
+            "state_key": "system.pressure",
+            "state_value": "elevated",
+            "previous_state_id": None,
+            "derivation": "rule:system_pressure_state_v1",
+            "supporting_beliefs": [1, 2],
+            "components": {
+                "system.activity": "active",
+                "system.load": "high",
+                "pressure_high_count": 1,
+            },
+            "reason": "active or unknown activity with high resource pressure",
+        },
+    )
+
+    issues = integrity.validate_event_contract(conn)
+
+    assert issues == []
+
+
 def test_validate_schema_detects_confidence_column(conn):
     conn.execute("ALTER TABLE belief_projection ADD COLUMN confidence REAL")
 

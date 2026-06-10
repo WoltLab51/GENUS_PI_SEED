@@ -50,6 +50,16 @@ REQUIRED_EVENT_KEYS = {
         "derivation",
         "summary",
     },
+    "state_changed": {
+        "state_id",
+        "state_key",
+        "state_value",
+        "previous_state_id",
+        "derivation",
+        "supporting_beliefs",
+        "components",
+        "reason",
+    },
     "inquiry_created": {
         "inquiry_id",
         "inquiry_type",
@@ -90,6 +100,7 @@ def check(conn) -> dict:
         "proposals": replay_summary["proposals"],
         "inquiries": replay_summary["inquiries"],
         "experiences": replay_summary["experiences"],
+        "active_states": replay_summary["active_states"],
     }
 
 
@@ -124,6 +135,10 @@ def validate_schema(conn) -> list[str]:
         row["name"]
         for row in conn.execute("PRAGMA table_info(experience_log)").fetchall()
     ]
+    state_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(state_projection)").fetchall()
+    ]
     if "confidence" in belief_columns:
         issues.append("belief_projection must not store confidence")
     if not {"decision", "reviewed_at"}.issubset(proposal_columns):
@@ -142,6 +157,18 @@ def validate_schema(conn) -> list[str]:
         issues.append("experience_log missing required columns")
     if "confidence" in experience_columns:
         issues.append("experience_log must not store confidence")
+    if not {
+        "state_key",
+        "state_value",
+        "status",
+        "derivation",
+        "supporting_beliefs",
+        "components",
+        "reason",
+    }.issubset(state_columns):
+        issues.append("state_projection missing required columns")
+    if "confidence" in state_columns:
+        issues.append("state_projection must not store confidence")
 
     empty_derivations = conn.execute(
         """
@@ -161,6 +188,15 @@ def validate_schema(conn) -> list[str]:
     ).fetchone()["count"]
     if empty_experience_derivations:
         issues.append("experience_log contains empty derivation")
+    empty_state_derivations = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM state_projection
+        WHERE derivation IS NULL OR TRIM(derivation) = ''
+        """
+    ).fetchone()["count"]
+    if empty_state_derivations:
+        issues.append("state_projection contains empty derivation")
     return issues
 
 
@@ -198,6 +234,8 @@ def validate_event_contract(conn) -> list[str]:
             issues.append(f"event {row['id']} {event_type} has empty derivation")
         if event_type == "experience_recorded" and not payload.get("derivation"):
             issues.append(f"event {row['id']} experience_recorded has empty derivation")
+        if event_type == "state_changed" and not payload.get("derivation"):
+            issues.append(f"event {row['id']} state_changed has empty derivation")
         if event_type == "proposal_reviewed":
             proposal_id = payload["proposal_id"]
             if payload["decision"] not in {"accepted", "rejected"}:
@@ -275,9 +313,22 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
+    states = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, state_key, state_value, status, derivation,
+                   supporting_beliefs, components, reason,
+                   created_at, last_updated_at, superseded_by
+            FROM state_projection
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
     return {
         "beliefs": beliefs,
         "proposals": proposals,
         "inquiries": inquiries,
         "experiences": experiences,
+        "states": states,
     }

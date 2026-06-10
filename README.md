@@ -31,10 +31,13 @@ genus ask "was glaubst du"
 genus ask "status"
 genus explain belief 1
 genus explain experience 1
+genus explain state 1
 genus why proposal 1
 genus beliefs show
 genus experience scan
 genus experience show
+genus state refresh
+genus state show
 genus proposals list
 genus proposals list --all
 genus proposals review 1 --accept --note "makes sense"
@@ -93,6 +96,18 @@ same UTC hour as an `ActivityHourlyRhythm` experience.
 - `genus explain experience <id>` shows the source event, supporting evidence,
   and any review-only `ExperienceProposal`.
 - `genus ask "welche muster"` exposes the same records through the query layer.
+
+## State Core
+
+v0.10 adds the first deterministic state vector. `genus state refresh` derives
+`system.pressure` from active beliefs and records a `state_changed` event only
+when the vector changes.
+
+- `state_changed` is the durable event.
+- `state_projection` is a rebuildable projection.
+- `genus state show` lists active states.
+- `genus explain state <id>` shows the state event and supporting beliefs.
+- `genus ask "zustand"` exposes active states through the query layer.
 
 ## Automatic Collection With Cron
 

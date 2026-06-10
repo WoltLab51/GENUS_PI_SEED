@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import experience, inquiries, projection, proposals
+from genus import experience, inquiries, projection, proposals, state
 
 
 def replay(conn) -> dict:
@@ -10,6 +10,7 @@ def replay(conn) -> dict:
     conn.execute("DELETE FROM inquiry_log")
     conn.execute("DELETE FROM proposal_log")
     conn.execute("DELETE FROM experience_log")
+    conn.execute("DELETE FROM state_projection")
     conn.execute("DELETE FROM belief_projection")
     conn.execute(
         """
@@ -18,6 +19,7 @@ def replay(conn) -> dict:
             'inquiry_log',
             'proposal_log',
             'experience_log',
+            'state_projection',
             'belief_projection'
         )
         """
@@ -38,6 +40,9 @@ def replay(conn) -> dict:
     experience_count = conn.execute(
         "SELECT COUNT(*) AS count FROM experience_log"
     ).fetchone()["count"]
+    state_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM state_projection WHERE status = 'active'"
+    ).fetchone()["count"]
     conn.commit()
     return {
         "events": len(events),
@@ -45,6 +50,7 @@ def replay(conn) -> dict:
         "proposals": int(proposal_count),
         "inquiries": int(inquiry_count),
         "experiences": int(experience_count),
+        "active_states": int(state_count),
     }
 
 
@@ -66,6 +72,8 @@ def apply_event(conn, event) -> None:
         proposals.apply_proposal_reviewed(conn, payload)
     elif event_type == "experience_recorded":
         experience.apply_experience_recorded(conn, payload)
+    elif event_type == "state_changed":
+        state.apply_state_changed(conn, payload)
     elif event_type == "inquiry_created":
         inquiries.apply_inquiry_created(conn, payload)
     elif event_type == "inquiry_resolved":

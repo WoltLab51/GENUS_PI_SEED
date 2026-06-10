@@ -18,18 +18,22 @@ are rebuildable.
 | `proposal_created` | `proposal_id`, `proposal_type`, `claim_key`, `claim_value`, `source_belief`, `source_event`, `payload`, `reason` | Proposals | Insert proposal row |
 | `proposal_reviewed` | `proposal_id`, `decision`, `note` | Human via CLI | Mark proposal accepted/rejected |
 | `experience_recorded` | `experience_id`, `experience_key`, `experience_type`, `subject_key`, `pattern`, `supporting_events`, `derivation`, `summary` | Experience | Insert experience row |
+| `state_changed` | `state_id`, `state_key`, `state_value`, `previous_state_id`, `derivation`, `supporting_beliefs`, `components`, `reason` | State | Insert active state row and supersede previous state |
 | `inquiry_created` | `inquiry_id`, `inquiry_type`, `claim_key`, `source_belief`, `source_event`, `question_key`, `payload`, `state` | Inquiries | Insert inquiry row |
 | `inquiry_resolved` | `inquiry_id`, `answer` | Human via CLI | Mark inquiry resolved |
 
 ## Invariants
 
 - `event_log` must never be updated or deleted.
-- `replay()` may clear `belief_projection`, `experience_log`, `proposal_log`,
-  and `inquiry_log`, but never changes `event_log`.
+- `replay()` may clear `belief_projection`, `state_projection`,
+  `experience_log`, `proposal_log`, and `inquiry_log`, but never changes
+  `event_log`.
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
 - `experience_log.derivation` is required and `experience_log` has no
+  `confidence` column.
+- `state_projection.derivation` is required and `state_projection` has no
   `confidence` column.
 - Proposal creation is event-backed: `proposal_created` is written before
   `proposal_log` is projected.
@@ -41,6 +45,8 @@ are rebuildable.
   first v0.9 detector records repeated activity in the same UTC hour.
 - An experience may create an `ExperienceProposal`, but the proposal is still
   review work only and does not execute changes.
+- `state_changed` is emitted by deterministic aggregation over active beliefs.
+  v0.10 records `system.pressure` from activity and resource-pressure beliefs.
 - `proposal_reviewed` and `inquiry_resolved` are terminal: at most one review
   per proposal and one resolution per inquiry, enforced before the event is
   written.
