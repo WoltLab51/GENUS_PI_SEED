@@ -45,6 +45,8 @@ own events and projections are written.
 - `ledger.py` stores and reads immutable events.
 - `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
+- `query.py` reads projections and ledger events to explain state without
+  writing events.
 
 Supported local metrics in v0.6 are CPU percent, memory percent, disk percent,
 activity, and temperature. Disk and temperature are threshold/revision training

@@ -27,6 +27,10 @@ genus observe-disk
 genus observe-activity
 genus observe-temperature
 genus observe-all
+genus ask "was glaubst du"
+genus ask "status"
+genus explain belief 1
+genus why proposal 1
 genus beliefs show
 genus proposals list
 genus proposals list --all
@@ -48,6 +52,16 @@ v0.6 extends the local, offline habitat with disk, activity, and temperature
 observations. Disk and temperature currently use the same threshold/revision
 mechanic as CPU and memory. Activity is binary and creates or supersedes a
 belief immediately without waiting for the three-reading threshold window.
+
+## Query Layer
+
+v0.7 adds deterministic read-only queries. Query commands explain current state
+from projections and ledger events; they do not write events.
+
+- `genus ask "was glaubst du"` lists active beliefs.
+- `genus ask "status"` summarizes event and projection counts.
+- `genus explain belief <id>` shows supporting and contradicting evidence.
+- `genus why proposal <id>` shows the source event and source belief chain.
 
 ## Automatic Collection With Cron
 

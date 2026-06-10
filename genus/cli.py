@@ -5,7 +5,18 @@ import os
 
 import click
 
-from genus import db, event_router, inquiries, integrity, ledger, projection, proposals, reactors, sensor
+from genus import (
+    db,
+    event_router,
+    inquiries,
+    integrity,
+    ledger,
+    projection,
+    proposals,
+    query,
+    reactors,
+    sensor,
+)
 
 
 def get_conn():
@@ -108,6 +119,47 @@ def observe_all() -> None:
             _print_observation_result("TMP", temperature, result)
 
         _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
+@main.command("ask")
+@click.argument("question", nargs=-1, required=True)
+def ask_command(question: tuple[str, ...]) -> None:
+    conn = get_conn()
+    try:
+        response = query.ask(conn, " ".join(question))
+        _print_ask_response(response)
+    finally:
+        conn.close()
+
+
+@main.group(name="explain")
+def explain_group() -> None:
+    pass
+
+
+@explain_group.command("belief")
+@click.argument("belief_id", type=int)
+def explain_belief_command(belief_id: int) -> None:
+    conn = get_conn()
+    try:
+        _print_belief_explanation(query.explain_belief(conn, belief_id))
+    finally:
+        conn.close()
+
+
+@main.group(name="why")
+def why_group() -> None:
+    pass
+
+
+@why_group.command("proposal")
+@click.argument("proposal_id", type=int)
+def why_proposal_command(proposal_id: int) -> None:
+    conn = get_conn()
+    try:
+        _print_proposal_explanation(query.explain_proposal(conn, proposal_id))
     finally:
         conn.close()
 
@@ -290,6 +342,105 @@ def _format_metric_value(metric_key: str, value: float) -> str:
     if metric_key == "system.temperature":
         return f"{float(value):.1f}C"
     return f"{float(value):.1f}"
+
+
+def _print_ask_response(response: dict) -> None:
+    click.echo(f"[ASK] {response['answer']}")
+    if response["kind"] == "active_beliefs":
+        for belief in response["beliefs"]:
+            click.echo(
+                f"[BLF] #{belief['id']} {belief['claim_key']}={belief['claim_value']} "
+                f"state={belief['state']} confidence={belief['confidence']:.3f}"
+            )
+    elif response["kind"] == "pending_proposals":
+        for proposal in response["proposals"]:
+            click.echo(
+                f"[PRP] #{proposal['id']} {proposal['proposal_type']} "
+                f"{proposal['claim_key']}={proposal['claim_value']} "
+                f"state={proposal['state']}"
+            )
+    elif response["kind"] == "open_inquiries":
+        for inquiry in response["inquiries"]:
+            click.echo(
+                f"[INQ] #{inquiry['id']} {inquiry['inquiry_type']} "
+                f"{inquiry['claim_key']} state={inquiry['state']} "
+                f"question={inquiry['question_key']}"
+            )
+    elif response["kind"] == "status":
+        for key, value in response["status"].items():
+            click.echo(f"{key}: {value}")
+    elif response["kind"] == "unknown":
+        click.echo("Supported fixed queries:")
+        for pattern in response["supported"]:
+            click.echo(f"- genus {pattern}")
+
+
+def _print_belief_explanation(explanation: dict) -> None:
+    belief = explanation["belief"]
+    click.echo(
+        f"BELIEF #{belief['id']} {belief['claim_key']}={belief['claim_value']} "
+        f"state={belief['state']}"
+    )
+    click.echo(
+        f"confidence={belief['confidence']:.3f} supporting={belief['supporting']} "
+        f"contradicting={belief['contradicting']}"
+    )
+    click.echo(f"derivation={belief['derivation']}")
+    if explanation["created_by"] is not None:
+        event = explanation["created_by"]
+        click.echo(f"created_by: #{event['id']} {event['event_type']}")
+
+    click.echo("supporting_evidence:")
+    _print_evidence_chain(explanation["supporting_evidence"])
+    click.echo("contradicting_evidence:")
+    _print_evidence_chain(explanation["contradicting_evidence"])
+    click.echo("transition_events:")
+    _print_event_list(explanation["transition_events"])
+
+
+def _print_proposal_explanation(explanation: dict) -> None:
+    proposal = explanation["proposal"]
+    payload = json.loads(proposal["payload"])
+    click.echo(
+        f"PROPOSAL #{proposal['id']} {proposal['proposal_type']} "
+        f"{proposal['claim_key']}={proposal['claim_value']} state={proposal['state']}"
+    )
+    click.echo(f"reason={payload.get('description', '')}")
+    proposal_event = explanation["proposal_event"]
+    if proposal_event is not None:
+        click.echo(f"proposal_event: #{proposal_event['id']} {proposal_event['event_type']}")
+    source_event = explanation["source_event"]
+    click.echo(f"source_event: #{source_event['id']} {source_event['event_type']}")
+    if explanation["source_belief"] is not None:
+        click.echo("source_belief:")
+        _print_belief_explanation(explanation["source_belief"])
+
+
+def _print_evidence_chain(events: list[dict]) -> None:
+    if not events:
+        click.echo("- none")
+        return
+    for event in events:
+        payload = event["payload"]
+        metric_key = payload.get("metric_key", "?")
+        metric_value = payload.get("metric_value", "?")
+        line = f"- #{event['id']} {event['event_type']} {metric_key}={metric_value}"
+        observation = event.get("observation")
+        if observation is not None:
+            obs_payload = observation["payload"]
+            line += (
+                f" via observation #{observation['id']} "
+                f"source={obs_payload.get('source')}"
+            )
+        click.echo(line)
+
+
+def _print_event_list(events: list[dict]) -> None:
+    if not events:
+        click.echo("- none")
+        return
+    for event in events:
+        click.echo(f"- #{event['id']} {event['event_type']}")
 
 
 def _state_snapshot(conn) -> dict:

@@ -43,10 +43,11 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.6)
+## Wo wir stehen (v0.7)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
-Disk/Activity/Temperature-Sensor · CLI · Replay · Integrity · append-only Trigger
+Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
+append-only Trigger
 **Gelb:** Proposal (kein Review) · Inquiry (nie resolved)
 **Rot:** alles Übrige der Karte
 
@@ -92,6 +93,10 @@ Maschinerie nicht-leer. Material ist die Grundlage von allem Weiteren.
 ---
 
 ## v0.7 — Query-Schicht · *GENUS spricht aus seinem Zustand*
+
+**Status:** umgesetzt. `ask`, `explain belief` und `why proposal` lesen aus
+Projektionen und Ledger, schreiben keine Events und zeigen Herkunftsketten für
+Beliefs und Proposals.
 
 **Warum jetzt:** Sobald Material da ist, baust du die Lampe, mit der du jeden
 folgenden Core inspizierst. GENUS beantwortet "was glaubst du, und warum?"

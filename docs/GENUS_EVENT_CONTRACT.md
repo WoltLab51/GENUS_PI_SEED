@@ -32,3 +32,5 @@ are rebuildable.
   contradiction only; it is not emitted for `belief_confirmed`.
 - `inquiry_created` is emitted for contradictions only; it is not an action and
   does not resolve itself automatically.
+- Query commands are read-only. They do not emit events and do not rebuild
+  projections.
