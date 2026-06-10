@@ -1,6 +1,6 @@
 # GENUS_PI_SEED_v0 — CPU Belief Loop Spec
 
-> Version: 0.7.0
+> Version: 0.8.0
 > Target: Raspberry Pi 5 / ThinkPad X1, Python 3.11+
 > Purpose: Prove GENUS is real. Not a demo. A working epistemological system.
 

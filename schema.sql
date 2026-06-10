@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS proposal_log (
     source_event   INTEGER REFERENCES event_log(id),
     payload        TEXT    NOT NULL,
     state          TEXT    NOT NULL DEFAULT 'pending',
+    decision       TEXT,
+    reviewed_at    TEXT,
     created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
@@ -60,6 +62,7 @@ CREATE TABLE IF NOT EXISTS inquiry_log (
     payload        TEXT    NOT NULL,
     state          TEXT    NOT NULL DEFAULT 'open',
     created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    answer         TEXT,
     resolved_at    TEXT
 );
 

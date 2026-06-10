@@ -52,5 +52,9 @@ def apply_event(conn, event) -> None:
         projection.apply_belief_superseded(conn, payload)
     elif event_type == "proposal_created":
         proposals.apply_proposal_created(conn, payload)
+    elif event_type == "proposal_reviewed":
+        proposals.apply_proposal_reviewed(conn, payload)
     elif event_type == "inquiry_created":
         inquiries.apply_inquiry_created(conn, payload)
+    elif event_type == "inquiry_resolved":
+        inquiries.apply_inquiry_resolved(conn, payload)

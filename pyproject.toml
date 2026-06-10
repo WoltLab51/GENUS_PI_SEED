@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "0.7.0"
-description = "GENUS PI SEED v0.7 query layer"
+version = "0.8.0"
+description = "GENUS PI SEED v0.8 proposal and inquiry lifecycle"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

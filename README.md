@@ -34,7 +34,9 @@ genus why proposal 1
 genus beliefs show
 genus proposals list
 genus proposals list --all
+genus proposals review 1 --accept --note "makes sense"
 genus inquiries list
+genus inquiries resolve 1 --answer "Backup lief"
 genus replay
 genus integrity check
 genus ledger tail --n 20
@@ -62,6 +64,19 @@ from projections and ledger events; they do not write events.
 - `genus ask "status"` summarizes event and projection counts.
 - `genus explain belief <id>` shows supporting and contradicting evidence.
 - `genus why proposal <id>` shows the source event and source belief chain.
+
+## Proposal And Inquiry Lifecycle
+
+v0.8 adds the first event-backed human governance actions:
+
+- `genus proposals review <id> --accept|--reject [--note "..."]`
+- `genus inquiries resolve <id> --answer "..."`
+
+Reviews and resolutions are terminal. A second review or resolve attempt fails.
+Accepting a proposal does not execute anything; `Proposal != Change` is still a
+hard rule. Existing databases get the new projection columns automatically on
+startup; run `genus replay` after upgrading to rebuild projections from the
+ledger.
 
 ## Automatic Collection With Cron
 

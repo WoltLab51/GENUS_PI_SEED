@@ -8,6 +8,10 @@ from genus import ledger
 PROPOSAL_TYPE = "ResourceProposal"
 LOAD_CLAIM_KEY = "system.load"
 HIGH_CLAIM_VALUE = "high"
+PENDING = "pending"
+ACCEPTED = "accepted"
+REJECTED = "rejected"
+DECISIONS = {ACCEPTED, REJECTED}
 
 
 def create_proposal(
@@ -68,7 +72,8 @@ def list_proposals(conn, include_all: bool = False) -> list[dict]:
         rows = conn.execute("SELECT * FROM proposal_log ORDER BY id").fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM proposal_log WHERE state = 'pending' ORDER BY id"
+            "SELECT * FROM proposal_log WHERE state = ? ORDER BY id",
+            (PENDING,),
         ).fetchall()
     return [dict(row) for row in rows]
 
@@ -145,6 +150,26 @@ def record_proposal_created_event(
     return event_id
 
 
+def record_proposal_reviewed_event(
+    conn, proposal_id: int, decision: str, note: str = ""
+) -> int:
+    proposal = get_proposal(conn, proposal_id)
+    if proposal["state"] != PENDING:
+        raise ValueError("already reviewed")
+    if decision not in DECISIONS:
+        raise ValueError("decision must be accepted or rejected")
+
+    event_payload = {
+        "proposal_id": proposal_id,
+        "decision": decision,
+        "note": note,
+    }
+    event_id = ledger.append(conn, "proposal_reviewed", event_payload)
+    event_payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+    apply_proposal_reviewed(conn, event_payload)
+    return event_id
+
+
 def proposal_payload_for_sustained_high(claim_key: str = LOAD_CLAIM_KEY) -> dict:
     return {
         "description": f"{claim_key} is sustained high. Investigate resource pressure.",
@@ -175,3 +200,29 @@ def apply_proposal_created(conn, payload: dict) -> int:
         proposal_id=int(payload["proposal_id"]),
         created_at=payload.get("_event_created_at"),
     )
+
+
+def apply_proposal_reviewed(conn, payload: dict) -> None:
+    decision = payload["decision"]
+    if decision not in DECISIONS:
+        raise ValueError("decision must be accepted or rejected")
+    conn.execute(
+        """
+        UPDATE proposal_log
+        SET state = ?,
+            decision = ?,
+            reviewed_at = COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        WHERE id = ?
+        """,
+        (decision, decision, payload.get("_event_created_at"), int(payload["proposal_id"])),
+    )
+
+
+def get_proposal(conn, proposal_id: int):
+    row = conn.execute(
+        "SELECT * FROM proposal_log WHERE id = ?",
+        (proposal_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"proposal not found: {proposal_id}")
+    return row

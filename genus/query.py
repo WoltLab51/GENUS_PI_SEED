@@ -133,6 +133,7 @@ def explain_proposal(conn, proposal_id: int) -> dict:
     return {
         "proposal": dict(proposal),
         "proposal_event": _find_proposal_event(conn, proposal_id),
+        "review_event": _find_proposal_review_event(conn, proposal_id),
         "source_event": _event_with_observation(conn, int(proposal["source_event"])),
         "source_belief": (
             explain_belief(conn, int(source_belief_id))
@@ -228,6 +229,20 @@ def _find_proposal_event(conn, proposal_id: int) -> dict | None:
         WHERE event_type = 'proposal_created'
           AND json_extract(payload, '$.proposal_id') = ?
         ORDER BY id
+        LIMIT 1
+        """,
+        (proposal_id,),
+    ).fetchone()
+    return _event_dict(row) if row is not None else None
+
+
+def _find_proposal_review_event(conn, proposal_id: int) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT * FROM event_log
+        WHERE event_type = 'proposal_reviewed'
+          AND json_extract(payload, '$.proposal_id') = ?
+        ORDER BY id DESC
         LIMIT 1
         """,
         (proposal_id,),

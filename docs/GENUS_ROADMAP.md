@@ -43,12 +43,12 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.7)
+## Wo wir stehen (v0.8)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
-append-only Trigger
-**Gelb:** Proposal (kein Review) · Inquiry (nie resolved)
+append-only Trigger · Proposal Review · Inquiry Resolve
+**Gelb:** Experience fehlt · State fehlt · Governance Policy fehlt
 **Rot:** alles Übrige der Karte
 
 ---
@@ -123,6 +123,10 @@ ist der erste Moment, in dem GENUS sich lebendig anfühlt, lange vor dem LLM.
 ---
 
 ## v0.8 — Proposal/Inquiry Lifecycle · *erster Governance-Akt*
+
+**Status:** umgesetzt. `proposal_reviewed` und `inquiry_resolved` sind
+event-backed, terminal und replay-stabil. Akzeptierte Proposals führen nichts
+aus; `Proposal ≠ Change` bleibt als Test bewiesen.
 
 **Warum jetzt:** Mit Query siehst du jetzt, wie sich offene Proposals und
 Inquiries stauen — das Schließen wird sichtbar nötig. Der Moment, in dem ein

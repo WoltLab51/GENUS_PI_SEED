@@ -198,12 +198,49 @@ def proposals_list(include_all: bool) -> None:
     try:
         rows = proposals.list_proposals(conn, include_all=include_all)
         click.echo("PROPOSALS" if include_all else "PENDING PROPOSALS")
-        click.echo("id  type              claim_key    claim_value  state    created_at")
-        for row in rows:
+        if include_all:
             click.echo(
-                f"{row['id']:<3} {row['proposal_type']:<17} {row['claim_key']:<12} "
-                f"{row['claim_value']:<12} {row['state']:<8} {row['created_at']}"
+                "id  type              claim_key    claim_value  state     "
+                "decision  reviewed_at"
             )
+        else:
+            click.echo("id  type              claim_key    claim_value  state    created_at")
+        for row in rows:
+            if include_all:
+                click.echo(
+                    f"{row['id']:<3} {row['proposal_type']:<17} "
+                    f"{row['claim_key']:<12} {row['claim_value']:<12} "
+                    f"{row['state']:<9} {row['decision'] or '-':<9} "
+                    f"{row['reviewed_at'] or '-'}"
+                )
+            else:
+                click.echo(
+                    f"{row['id']:<3} {row['proposal_type']:<17} "
+                    f"{row['claim_key']:<12} {row['claim_value']:<12} "
+                    f"{row['state']:<8} {row['created_at']}"
+                )
+    finally:
+        conn.close()
+
+
+@proposals_group.command("review")
+@click.argument("proposal_id", type=int)
+@click.option("--accept", "decision", flag_value="accepted", default=None)
+@click.option("--reject", "decision", flag_value="rejected")
+@click.option("--note", default="")
+def proposals_review(proposal_id: int, decision: str | None, note: str) -> None:
+    if decision is None:
+        raise click.ClickException("--accept or --reject required")
+    conn = get_conn()
+    try:
+        try:
+            proposals.record_proposal_reviewed_event(conn, proposal_id, decision, note)
+            conn.commit()
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"[GOV] proposal {proposal_id} {decision}")
+        if note:
+            click.echo(f"[GOV] note: {note}")
     finally:
         conn.close()
 
@@ -269,12 +306,28 @@ def inquiries_list(include_all: bool) -> None:
     try:
         rows = inquiries.list_inquiries(conn, include_all=include_all)
         click.echo("INQUIRIES" if include_all else "OPEN INQUIRIES")
-        click.echo("id  type          claim_key      state  question_key")
+        click.echo("id  type          claim_key      state     question_key")
         for row in rows:
             click.echo(
                 f"{row['id']:<3} {row['inquiry_type']:<13} {row['claim_key']:<14} "
-                f"{row['state']:<6} {row['question_key']}"
+                f"{row['state']:<9} {row['question_key']}"
             )
+    finally:
+        conn.close()
+
+
+@inquiries_group.command("resolve")
+@click.argument("inquiry_id", type=int)
+@click.option("--answer", required=True)
+def inquiries_resolve(inquiry_id: int, answer: str) -> None:
+    conn = get_conn()
+    try:
+        try:
+            inquiries.record_inquiry_resolved_event(conn, inquiry_id, answer)
+            conn.commit()
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"[GOV] inquiry {inquiry_id} resolved")
     finally:
         conn.close()
 
@@ -406,9 +459,20 @@ def _print_proposal_explanation(explanation: dict) -> None:
         f"{proposal['claim_key']}={proposal['claim_value']} state={proposal['state']}"
     )
     click.echo(f"reason={payload.get('description', '')}")
+    if proposal["decision"] is not None:
+        click.echo(
+            f"review: {proposal['decision']} reviewed_at={proposal['reviewed_at']}"
+        )
     proposal_event = explanation["proposal_event"]
     if proposal_event is not None:
         click.echo(f"proposal_event: #{proposal_event['id']} {proposal_event['event_type']}")
+    review_event = explanation["review_event"]
+    if review_event is not None:
+        review_payload = review_event["payload"]
+        click.echo(
+            f"review_event: #{review_event['id']} {review_event['event_type']} "
+            f"decision={review_payload['decision']} note={review_payload['note']}"
+        )
     source_event = explanation["source_event"]
     click.echo(f"source_event: #{source_event['id']} {source_event['event_type']}")
     if explanation["source_belief"] is not None:
@@ -458,7 +522,7 @@ def _state_snapshot(conn) -> dict:
     proposal_rows = conn.execute(
         """
         SELECT id, proposal_type, claim_key, claim_value, source_belief,
-               source_event, payload, state
+               source_event, payload, state, decision, reviewed_at
         FROM proposal_log
         ORDER BY id
         """
@@ -466,7 +530,7 @@ def _state_snapshot(conn) -> dict:
     inquiry_rows = conn.execute(
         """
         SELECT id, inquiry_type, claim_key, source_belief, source_event,
-               question_key, payload, state, resolved_at
+               question_key, payload, state, answer, resolved_at
         FROM inquiry_log
         ORDER BY id
         """

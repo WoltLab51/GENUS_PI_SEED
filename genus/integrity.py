@@ -39,6 +39,7 @@ REQUIRED_EVENT_KEYS = {
         "payload",
         "reason",
     },
+    "proposal_reviewed": {"proposal_id", "decision", "note"},
     "inquiry_created": {
         "inquiry_id",
         "inquiry_type",
@@ -49,6 +50,7 @@ REQUIRED_EVENT_KEYS = {
         "payload",
         "state",
     },
+    "inquiry_resolved": {"inquiry_id", "answer"},
 }
 
 
@@ -101,8 +103,18 @@ def validate_schema(conn) -> list[str]:
         row["name"]
         for row in conn.execute("PRAGMA table_info(belief_projection)").fetchall()
     ]
+    proposal_columns = [
+        row["name"] for row in conn.execute("PRAGMA table_info(proposal_log)").fetchall()
+    ]
+    inquiry_columns = [
+        row["name"] for row in conn.execute("PRAGMA table_info(inquiry_log)").fetchall()
+    ]
     if "confidence" in belief_columns:
         issues.append("belief_projection must not store confidence")
+    if not {"decision", "reviewed_at"}.issubset(proposal_columns):
+        issues.append("proposal_log missing lifecycle columns")
+    if "answer" not in inquiry_columns:
+        issues.append("inquiry_log missing answer column")
 
     empty_derivations = conn.execute(
         """
@@ -122,6 +134,8 @@ def validate_event_contract(conn) -> list[str]:
     ids = [row["id"] for row in rows]
     if ids and ids != list(range(ids[0], ids[-1] + 1)):
         issues.append("event_log ids are not contiguous")
+    reviewed_proposals = set()
+    resolved_inquiries = set()
 
     for row in rows:
         event_type = row["event_type"]
@@ -146,6 +160,20 @@ def validate_event_contract(conn) -> list[str]:
             "derivation"
         ):
             issues.append(f"event {row['id']} {event_type} has empty derivation")
+        if event_type == "proposal_reviewed":
+            proposal_id = payload["proposal_id"]
+            if payload["decision"] not in {"accepted", "rejected"}:
+                issues.append(f"event {row['id']} proposal_reviewed has invalid decision")
+            if proposal_id in reviewed_proposals:
+                issues.append(f"proposal {proposal_id} reviewed more than once")
+            reviewed_proposals.add(proposal_id)
+        if event_type == "inquiry_resolved":
+            inquiry_id = payload["inquiry_id"]
+            if not str(payload["answer"]).strip():
+                issues.append(f"event {row['id']} inquiry_resolved has empty answer")
+            if inquiry_id in resolved_inquiries:
+                issues.append(f"inquiry {inquiry_id} resolved more than once")
+            resolved_inquiries.add(inquiry_id)
     return issues
 
 
@@ -181,7 +209,7 @@ def snapshot_projections(conn) -> dict:
         for row in conn.execute(
             """
             SELECT id, proposal_type, claim_key, claim_value, source_belief,
-                   source_event, payload, state, created_at
+                   source_event, payload, state, decision, reviewed_at, created_at
             FROM proposal_log
             ORDER BY id
             """
@@ -192,7 +220,7 @@ def snapshot_projections(conn) -> dict:
         for row in conn.execute(
             """
             SELECT id, inquiry_type, claim_key, source_belief, source_event,
-                   question_key, payload, state, created_at, resolved_at
+                   question_key, payload, state, answer, created_at, resolved_at
             FROM inquiry_log
             ORDER BY id
             """

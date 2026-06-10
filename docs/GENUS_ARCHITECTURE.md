@@ -16,10 +16,11 @@ it currently believes, and keeps every important state change replayable.
   output or external answer is never knowledge by itself.
 - **Belief is not truth:** Beliefs have lifecycle states such as `active` and
   `superseded`. They are never stored as `true`.
-- **Proposal is not action:** Proposals create attention and review work. They
-  do not execute changes.
+- **Proposal is not action:** Proposals create attention and review work.
+  Reviews are event-backed human acts, but they do not execute changes.
 - **Inquiry is not action:** Inquiries name open uncertainty. They ask what
-  should be clarified, but do not execute changes.
+  should be clarified. Resolution is event-backed, but does not execute
+  changes.
 
 ## Layer Model
 
@@ -40,8 +41,10 @@ own events and projections are written.
 - `rules.py` detects threshold and binary belief-transition conditions for
   supported metrics.
 - `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
-- `proposals.py` coordinates `proposal_created` events and `proposal_log` rows.
-- `inquiries.py` coordinates `inquiry_created` events and `inquiry_log` rows.
+- `proposals.py` coordinates `proposal_created` and `proposal_reviewed` events
+  with `proposal_log` rows.
+- `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
+  with `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
 - `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.

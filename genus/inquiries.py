@@ -7,6 +7,8 @@ from genus import ledger
 
 INQUIRY_TYPE = "CauseInquiry"
 QUESTION_KEY = "cause.changed_state"
+OPEN = "open"
+RESOLVED = "resolved"
 
 
 def create_inquiry(
@@ -112,7 +114,7 @@ def record_inquiry_created_event(
         "source_event": source_event,
         "question_key": question_key,
         "payload": payload,
-        "state": "open",
+        "state": OPEN,
     }
     event_id = ledger.append(conn, "inquiry_created", event_payload)
     event_payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
@@ -134,11 +136,57 @@ def apply_inquiry_created(conn, payload: dict) -> int:
     )
 
 
+def record_inquiry_resolved_event(conn, inquiry_id: int, answer: str) -> int:
+    inquiry = get_inquiry(conn, inquiry_id)
+    if inquiry["state"] != OPEN:
+        raise ValueError("already resolved")
+    if not answer.strip():
+        raise ValueError("answer must not be empty")
+
+    event_payload = {
+        "inquiry_id": inquiry_id,
+        "answer": answer,
+    }
+    event_id = ledger.append(conn, "inquiry_resolved", event_payload)
+    event_payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+    apply_inquiry_resolved(conn, event_payload)
+    return event_id
+
+
+def apply_inquiry_resolved(conn, payload: dict) -> None:
+    conn.execute(
+        """
+        UPDATE inquiry_log
+        SET state = ?,
+            answer = ?,
+            resolved_at = COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        WHERE id = ?
+        """,
+        (
+            RESOLVED,
+            payload["answer"],
+            payload.get("_event_created_at"),
+            int(payload["inquiry_id"]),
+        ),
+    )
+
+
 def list_inquiries(conn, include_all: bool = False) -> list[dict]:
     if include_all:
         rows = conn.execute("SELECT * FROM inquiry_log ORDER BY id").fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM inquiry_log WHERE state = 'open' ORDER BY id"
+            "SELECT * FROM inquiry_log WHERE state = ? ORDER BY id",
+            (OPEN,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_inquiry(conn, inquiry_id: int):
+    row = conn.execute(
+        "SELECT * FROM inquiry_log WHERE id = ?",
+        (inquiry_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"inquiry not found: {inquiry_id}")
+    return row
