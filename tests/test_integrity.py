@@ -95,12 +95,16 @@ def test_validate_event_contract_accepts_experience_recorded(conn):
         "experience_recorded",
         {
             "experience_id": 1,
-            "experience_key": "activity_hourly_rhythm:system.activity:14:active",
-            "experience_type": "ActivityHourlyRhythm",
+            "experience_key": "activity_daily_rhythm:system.activity:active",
+            "experience_type": "ActivityDailyRhythm",
             "subject_key": "system.activity",
-            "pattern": {"hour_utc": 14, "value": "active", "count": 3},
+            "pattern": {
+                "hours_utc": [14],
+                "value": "active",
+                "count": 3,
+            },
             "supporting_events": [1, 2, 3],
-            "derivation": "rule:activity_hourly_rhythm_v1",
+            "derivation": "rule:activity_daily_rhythm_v1",
             "summary": "system.activity is repeatedly active around 14:00 UTC",
         },
     )

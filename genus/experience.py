@@ -1,24 +1,36 @@
 from __future__ import annotations
 
 import json
+from collections import Counter, defaultdict
 
 from genus import ledger, proposals
 
 
 ACTIVITY_METRIC_KEY = "system.activity"
-DERIVATION = "rule:activity_hourly_rhythm_v1"
-EXPERIENCE_TYPE = "ActivityHourlyRhythm"
+DERIVATION = "rule:activity_daily_rhythm_v1"
+EXPERIENCE_TYPE = "ActivityDailyRhythm"
 PROPOSAL_TYPE = "ExperienceProposal"
 MIN_SUPPORT = 3
+MIN_BUCKET_RATIO = 0.75
+MIN_GLOBAL_CONTRAST = 0.25
+MAX_PROPOSALS_PER_SCAN = 1
 
 
 def scan(conn) -> list[dict]:
     recorded: list[dict] = []
-    for candidate in _activity_hourly_rhythm_candidates(conn):
+    proposals_created = 0
+    for candidate in _activity_daily_rhythm_candidates(conn):
         if experience_exists(conn, candidate["experience_key"]):
             continue
         experience_event_id = record_experience_event(conn, candidate)
-        proposal_event_id = record_experience_proposal(conn, candidate, experience_event_id)
+        proposal_event_id = None
+        if proposals_created < MAX_PROPOSALS_PER_SCAN:
+            proposal_event_id = record_experience_proposal(
+                conn,
+                candidate,
+                experience_event_id,
+            )
+            proposals_created += 1
         recorded.append(
             {
                 "experience_event_id": experience_event_id,
@@ -54,7 +66,7 @@ def record_experience_proposal(conn, candidate: dict, experience_event_id: int) 
         proposal_id=proposals.next_proposal_id(conn),
         proposal_type=PROPOSAL_TYPE,
         claim_key=candidate["subject_key"],
-        claim_value="hourly_rhythm",
+        claim_value="daily_rhythm",
         source_belief=None,
         source_event=experience_event_id,
         payload={
@@ -156,49 +168,77 @@ def next_experience_id(conn) -> int:
     return int(row["max_id"]) + 1
 
 
-def _activity_hourly_rhythm_candidates(conn) -> list[dict]:
+def _activity_daily_rhythm_candidates(conn) -> list[dict]:
     rows = conn.execute(
         """
         SELECT
-            hour_utc,
-            activity_value,
-            COUNT(*) AS count,
-            json_group_array(id) AS supporting_events
-        FROM (
-            SELECT
-                id,
-                CAST(strftime('%H', created_at) AS INTEGER) AS hour_utc,
-                CASE
-                    WHEN CAST(json_extract(payload, '$.metric_value') AS REAL) >= 1.0
-                    THEN 'active'
-                    ELSE 'idle'
-                END AS activity_value
-            FROM event_log
-            WHERE event_type = 'evidence_recorded'
-              AND json_extract(payload, '$.metric_key') = ?
-            ORDER BY id
-        )
-        GROUP BY hour_utc, activity_value
-        HAVING COUNT(*) >= ?
-        ORDER BY hour_utc, activity_value
+            id,
+            CAST(strftime('%H', created_at) AS INTEGER) AS hour_utc,
+            CASE
+                WHEN CAST(json_extract(payload, '$.metric_value') AS REAL) >= 1.0
+                THEN 'active'
+                ELSE 'idle'
+            END AS activity_value
+        FROM event_log
+        WHERE event_type = 'evidence_recorded'
+          AND json_extract(payload, '$.metric_key') = ?
+        ORDER BY id
         """,
-        (ACTIVITY_METRIC_KEY, MIN_SUPPORT),
+        (ACTIVITY_METRIC_KEY,),
     ).fetchall()
+    if not rows:
+        return []
+
+    global_counts: Counter[str] = Counter()
+    hourly_counts: dict[int, Counter[str]] = defaultdict(Counter)
+    hourly_events: dict[tuple[int, str], list[int]] = defaultdict(list)
+    for row in rows:
+        value = row["activity_value"]
+        hour = int(row["hour_utc"])
+        global_counts[value] += 1
+        hourly_counts[hour][value] += 1
+        hourly_events[(hour, value)].append(int(row["id"]))
+
+    total_observations = sum(global_counts.values())
+    contrasting_hours: dict[str, list[dict]] = defaultdict(list)
+    for hour in sorted(hourly_counts):
+        hour_total = sum(hourly_counts[hour].values())
+        for value, count in hourly_counts[hour].items():
+            if count < MIN_SUPPORT:
+                continue
+            bucket_ratio = count / hour_total
+            global_ratio = global_counts[value] / total_observations
+            contrast = bucket_ratio - global_ratio
+            if bucket_ratio < MIN_BUCKET_RATIO or contrast < MIN_GLOBAL_CONTRAST:
+                continue
+            contrasting_hours[value].append(
+                {
+                    "hour_utc": hour,
+                    "count": count,
+                    "bucket_ratio": round(bucket_ratio, 3),
+                    "global_ratio": round(global_ratio, 3),
+                    "contrast": round(contrast, 3),
+                    "supporting_events": hourly_events[(hour, value)],
+                }
+            )
 
     candidates = []
-    for row in rows:
-        hour = int(row["hour_utc"])
-        value = row["activity_value"]
-        count = int(row["count"])
-        supporting_events = json.loads(row["supporting_events"])
-        experience_key = (
-            f"activity_hourly_rhythm:{ACTIVITY_METRIC_KEY}:{hour:02d}:{value}"
-        )
+    for value in sorted(contrasting_hours):
+        hours = contrasting_hours[value]
+        supporting_events = [
+            event_id
+            for hour_data in hours
+            for event_id in hour_data["supporting_events"]
+        ]
+        total_count = sum(hour_data["count"] for hour_data in hours)
+        hours_utc = [hour_data["hour_utc"] for hour_data in hours]
+        experience_key = f"activity_daily_rhythm:{ACTIVITY_METRIC_KEY}:{value}"
         pattern = {
             "bucket": "hour_of_day_utc",
-            "hour_utc": hour,
             "value": value,
-            "count": count,
+            "hours_utc": hours_utc,
+            "count": total_count,
+            "contrasting_hours": hours,
         }
         candidates.append(
             {
@@ -209,9 +249,14 @@ def _activity_hourly_rhythm_candidates(conn) -> list[dict]:
                 "supporting_events": supporting_events,
                 "derivation": DERIVATION,
                 "summary": (
-                    f"{ACTIVITY_METRIC_KEY} is repeatedly {value} around "
-                    f"{hour:02d}:00 UTC ({count} observations)"
+                    f"{ACTIVITY_METRIC_KEY} is disproportionately {value} "
+                    f"during UTC hour(s) {_format_hours(hours_utc)} "
+                    f"({total_count} contrasting observations)"
                 ),
             }
         )
     return candidates
+
+
+def _format_hours(hours: list[int]) -> str:
+    return ", ".join(f"{hour:02d}:00" for hour in hours)

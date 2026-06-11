@@ -61,10 +61,10 @@ Supported local metrics in v0.6 are CPU percent, memory percent, disk percent,
 activity, and temperature. Disk and temperature are threshold/revision training
 in v0.6; activity is binary and changes belief immediately.
 
-v0.9 adds the first Experience detector: repeated `system.activity` evidence in
-the same UTC hour is recorded as an `ActivityHourlyRhythm`. Experience records
-are projections from `experience_recorded` events and may create review-only
-`ExperienceProposal` rows.
+v0.9 adds the first Experience detector: contrasted `system.activity` hours are
+recorded as an `ActivityDailyRhythm`. Experience records are projections from
+`experience_recorded` events and may create review-only `ExperienceProposal`
+rows.
 
 v0.10 adds the first State vector: `system.pressure` is derived from active
 activity and resource-pressure beliefs. State rows are projections from

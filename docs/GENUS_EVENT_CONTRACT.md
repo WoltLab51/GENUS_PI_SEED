@@ -42,7 +42,8 @@ are rebuildable.
 - `inquiry_created` is emitted for contradictions only; it is not an action and
   does not resolve itself automatically.
 - `experience_recorded` is emitted by deterministic ledger aggregation. The
-  first v0.9 detector records repeated activity in the same UTC hour.
+  first v0.9 detector records contrasted activity hours instead of raw sample
+  frequency.
 - An experience may create an `ExperienceProposal`, but the proposal is still
   review work only and does not execute changes.
 - `state_changed` is emitted by deterministic aggregation over active beliefs.

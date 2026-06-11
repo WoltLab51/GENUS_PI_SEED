@@ -87,8 +87,8 @@ ledger.
 ## Experience Core
 
 v0.9 adds deterministic first learning from the ledger. `genus experience scan`
-aggregates existing `event_log` evidence and records repeated activity in the
-same UTC hour as an `ActivityHourlyRhythm` experience.
+aggregates existing `event_log` evidence and records contrasted activity hours
+as an `ActivityDailyRhythm` experience.
 
 - `experience_recorded` is the durable event.
 - `experience_log` is a rebuildable projection.
@@ -120,13 +120,19 @@ crontab -e
 
 ```cron
 */5 * * * * cd /path/to/GENUS_PI_SEED && .venv/bin/genus observe-all >> ~/.genus/cron.log 2>&1
+*/5 * * * * cd /path/to/GENUS_PI_SEED && .venv/bin/genus state refresh >> ~/.genus/cron.log 2>&1
 ```
 
 With an explicit database path:
 
 ```cron
 */5 * * * * cd /path/to/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus observe-all >> /home/pi/.genus/cron.log 2>&1
+*/5 * * * * cd /path/to/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus state refresh >> /home/pi/.genus/cron.log 2>&1
 ```
+
+Run `genus experience scan` manually or from a slower daily cron. It looks for
+contrasting activity rhythms, not raw sample frequency, and creates at most one
+review proposal per scan.
 
 ## Quality Checks
 

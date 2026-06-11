@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v0.5) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v0.10) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -155,8 +155,13 @@ Governance-Akt und bereitet die spätere Governance-Schicht vor.
 
 **Status:** umgesetzt. `experience_recorded` ist im Contract und in Integrity.
 `experience_log` ist eine rebuildbare Projektion. Der erste Detector erkennt
-wiederkehrende `system.activity`-Häufungen in derselben UTC-Stunde und erzeugt
-bei neuer Experience einen review-only `ExperienceProposal`.
+kontrastierende `system.activity`-Stunden statt bloßer Cron-Häufungen und
+erzeugt pro Scan höchstens einen review-only `ExperienceProposal`.
+
+**Bekannte Schuld:** Experiences haben noch keinen Lebenszyklus. Ein späterer
+Schritt muss `experience_confirmed`/`experience_invalidated` oder eine
+gleichwertige Relevanz-Mechanik einführen, damit alte Erfahrungen nicht
+epistemisch einfrieren.
 
 **Warum jetzt:** Jetzt gibt es Material (Muster sind da) *und* Query (du kannst
 sie sehen). Zeitliche Verdichtung über den Ledger: aus "Disk um 14:03 hoch"
@@ -187,6 +192,8 @@ Zeitfenster.
 `state_projection` ist eine rebuildbare Projektion. Der erste StateVector
 leitet `system.pressure` aus aktiven Activity- und Ressourcen-Beliefs ab und
 ist über `genus state show`, `genus explain state` und Query inspizierbar.
+Im Dauerbetrieb wird State bewusst per `genus state refresh` nach den Sensoren
+aktualisiert; `observe-all` bleibt reine Beobachtung.
 
 **Warum jetzt:** Mit 4–5 Belief-Typen ist Aggregation endlich nicht-trivial.
 Mehrere Beliefs → ein `StateVector` (z.B. `aktiv + CPU hoch + Disk wächst`
