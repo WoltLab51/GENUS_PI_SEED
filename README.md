@@ -1,6 +1,6 @@
 # GENUS_PI_SEED
 
-GENUS PI SEED v0 is a minimal system belief loop:
+GENUS PI SEED is a deterministic, ledger-first system belief loop:
 
 - observations and evidence are separate immutable ledger events
 - beliefs are derived projections, not source-of-truth rows
@@ -39,6 +39,9 @@ genus experience scan
 genus experience show
 genus state refresh
 genus state show
+genus maturation scan
+genus rules list
+genus rules activate 2
 genus proposals list
 genus proposals list --all
 genus proposals review 1 --accept --note "makes sense"
@@ -130,6 +133,25 @@ human override is supplied.
 Blocked reviews still commit their governance audit events and leave the
 proposal pending. Accepted proposals remain review decisions only:
 `Proposal != Change`.
+
+## Maturation v1
+
+v1.0 closes the first deterministic metabolism loop. `genus maturation scan`
+turns confirmed `ActivityDailyRhythm` experiences into pending `RuleProposal`
+records. Accepting that proposal still activates nothing. A second, governed
+human act is required:
+
+- `rule_proposed` records the learned deterministic rule candidate.
+- `rule_activated` records the second human gate and projects an active rule.
+- `rule_projection` is rebuildable from `rule_activated` events.
+- `genus rules activate <proposal_id>` requires an accepted `RuleProposal`.
+- Active `activity_expectation_v1` rules only create `ExpectationInquiry`
+  records on deviations; they never change beliefs or execute actions.
+- `genus explain rule <id>` shows the active rule, source proposal,
+  `rule_proposed` event, and source experience.
+
+This keeps `Proposal != Change` hard at the exact point where GENUS starts
+compiling experience into behavior.
 
 ## Automatic Collection With Cron
 

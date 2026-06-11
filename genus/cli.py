@@ -13,6 +13,7 @@ from genus import (
     inquiries,
     integrity,
     ledger,
+    maturation,
     projection,
     proposals,
     query,
@@ -172,6 +173,16 @@ def explain_state_command(state_id: int) -> None:
         conn.close()
 
 
+@explain_group.command("rule")
+@click.argument("rule_id", type=int)
+def explain_rule_command(rule_id: int) -> None:
+    conn = get_conn()
+    try:
+        _print_rule_explanation(query.explain_rule(conn, rule_id))
+    finally:
+        conn.close()
+
+
 @main.group(name="why")
 def why_group() -> None:
     pass
@@ -239,6 +250,16 @@ def governance_group() -> None:
     pass
 
 
+@main.group(name="maturation")
+def maturation_group() -> None:
+    pass
+
+
+@main.group(name="rules")
+def rules_group() -> None:
+    pass
+
+
 @experience_group.command("scan")
 def experience_scan() -> None:
     conn = get_conn()
@@ -279,6 +300,29 @@ def experience_show() -> None:
         conn.close()
 
 
+@maturation_group.command("scan")
+def maturation_scan() -> None:
+    conn = get_conn()
+    try:
+        try:
+            rows = maturation.scan(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        if not rows:
+            click.echo("[MAT] no new rule candidates")
+            return
+        click.echo(f"[MAT] proposed {len(rows)} rule(s)")
+        for row in rows:
+            click.echo(
+                f"[MAT] rule_proposed {row['rule_key']} -> "
+                f"RuleProposal #{row['proposal_id']}"
+            )
+    finally:
+        conn.close()
+
+
 @state_group.command("refresh")
 def state_refresh() -> None:
     conn = get_conn()
@@ -313,6 +357,49 @@ def state_show() -> None:
                 f"{row['state_value']:<12} {row['derivation']}"
             )
             click.echo(f"    reason: {row['reason']}")
+    finally:
+        conn.close()
+
+
+@rules_group.command("list")
+@click.option("--all", "include_all", is_flag=True)
+def rules_list(include_all: bool) -> None:
+    conn = get_conn()
+    try:
+        rows = maturation.list_rules(conn, active_only=not include_all)
+        click.echo("RULES" if include_all else "ACTIVE RULES")
+        click.echo("id  type                       subject          status    source  rule_key")
+        for row in rows:
+            click.echo(
+                f"{row['id']:<3} {row['rule_type']:<26} "
+                f"{row['subject_key']:<16} {row['status']:<9} "
+                f"#{row['source_proposal']:<6} {row['rule_key']}"
+            )
+            click.echo(f"    spec: {json.dumps(row['spec'], sort_keys=True)}")
+    finally:
+        conn.close()
+
+
+@rules_group.command("activate")
+@click.argument("proposal_id", type=int)
+@click.option("--override", is_flag=True, default=False)
+def rules_activate(proposal_id: int, override: bool) -> None:
+    conn = get_conn()
+    try:
+        try:
+            verdict = maturation.activate_rule(conn, proposal_id, override)
+            conn.commit()
+        except ValueError as exc:
+            conn.rollback()
+            raise click.ClickException(str(exc)) from exc
+        if verdict["decision"] == governance.BLOCKED:
+            click.echo(f"[GOV] BLOCKED by {verdict['blocked_by']}: {verdict['reason']}")
+            raise click.exceptions.Exit(1)
+        override_text = " (override)" if verdict["override"] else ""
+        click.echo(
+            f"[GOV] decision #{verdict['decision_id']} allowed{override_text}"
+        )
+        click.echo(f"[MAT] rule {verdict['rule_key']} activated")
     finally:
         conn.close()
 
@@ -423,6 +510,7 @@ def replay_command() -> None:
         click.echo("[REPLAY] Rebuilding state_projection...")
         click.echo("[REPLAY] Rebuilding experience_log...")
         click.echo("[REPLAY] Rebuilding proposal_log...")
+        click.echo("[REPLAY] Rebuilding rule_projection...")
         summary = event_router.replay(conn)
         after = _state_snapshot(conn)
         click.echo(
@@ -430,7 +518,8 @@ def replay_command() -> None:
             f"{summary['proposals']} proposal(s), {summary['inquiries']} inquiry(s), "
             f"{summary['experiences']} experience(s), "
             f"{summary['active_states']} active state(s), "
-            f"{summary['governance_decisions']} governance decision(s)"
+            f"{summary['governance_decisions']} governance decision(s), "
+            f"{summary['active_rules']} active rule(s)"
         )
         if before == after:
             click.echo("[REPLAY] State matches current projection")
@@ -457,7 +546,8 @@ def integrity_check() -> None:
                 f"proposals={result['proposals']} inquiries={result['inquiries']} "
                 f"experiences={result['experiences']} "
                 f"active_states={result['active_states']} "
-                f"governance_decisions={result['governance_decisions']}"
+                f"governance_decisions={result['governance_decisions']} "
+                f"active_rules={result['active_rules']}"
             )
             return
         for issue in result["issues"]:
@@ -611,6 +701,12 @@ def _print_ask_response(response: dict) -> None:
                 f"{row['target_type']}:{row['target_id']} "
                 f"decision={row['decision']} override={row['override']}"
             )
+    elif response["kind"] == "rules":
+        for row in response["rules"]:
+            click.echo(
+                f"[RULE] #{row['id']} {row['rule_type']} "
+                f"{row['subject_key']} {row['rule_key']}"
+            )
     elif response["kind"] == "status":
         for key, value in response["status"].items():
             click.echo(f"{key}: {value}")
@@ -670,6 +766,9 @@ def _print_proposal_explanation(explanation: dict) -> None:
     if explanation["source_belief"] is not None:
         click.echo("source_belief:")
         _print_belief_explanation(explanation["source_belief"])
+    if explanation.get("source_experience") is not None:
+        click.echo("source_experience:")
+        _print_experience_explanation(explanation["source_experience"])
 
 
 def _print_experience_explanation(explanation: dict) -> None:
@@ -738,6 +837,30 @@ def _print_decision_explanation(explanation: dict) -> None:
     _print_event_payload_list(explanation["constraint_events"])
     click.echo("policy_evaluated:")
     _print_event_payload_list(explanation["policy_events"])
+
+
+def _print_rule_explanation(explanation: dict) -> None:
+    rule = explanation["rule"]
+    click.echo(
+        f"RULE #{rule['id']} {rule['rule_type']} {rule['rule_key']} "
+        f"status={rule['status']}"
+    )
+    click.echo(f"subject={rule['subject_key']} derivation={rule['derivation']}")
+    click.echo(f"spec={json.dumps(rule['spec'], sort_keys=True)}")
+    rule_event = explanation["rule_event"]
+    if rule_event is not None:
+        click.echo(f"rule_event: #{rule_event['id']} {rule_event['event_type']}")
+    proposal = explanation["source_proposal"]
+    click.echo(
+        f"source_proposal: #{proposal['id']} {proposal['proposal_type']} "
+        f"state={proposal['state']}"
+    )
+    proposed = explanation["rule_proposed_event"]
+    click.echo(f"rule_proposed_event: #{proposed['id']} {proposed['event_type']}")
+    source_experience = explanation["source_experience"]
+    if source_experience is not None:
+        click.echo("source_experience:")
+        _print_experience_explanation(source_experience)
 
 
 def _print_evidence_chain(events: list[dict]) -> None:
@@ -846,6 +969,14 @@ def _state_snapshot(conn) -> dict:
         ORDER BY id
         """
     ).fetchall()
+    rule_rows = conn.execute(
+        """
+        SELECT id, rule_key, rule_type, subject_key, spec, status,
+               source_proposal, derivation
+        FROM rule_projection
+        ORDER BY id
+        """
+    ).fetchall()
     return {
         "beliefs": beliefs,
         "proposals": [dict(row) for row in proposal_rows],
@@ -853,6 +984,7 @@ def _state_snapshot(conn) -> dict:
         "experiences": [dict(row) for row in experience_rows],
         "states": [dict(row) for row in state_rows],
         "governance": [dict(row) for row in governance_rows],
+        "rules": [dict(row) for row in rule_rows],
     }
 
 

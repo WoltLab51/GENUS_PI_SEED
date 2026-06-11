@@ -60,6 +60,24 @@ REQUIRED_EVENT_KEYS = {
         "components",
         "reason",
     },
+    "rule_proposed": {
+        "rule_key",
+        "rule_type",
+        "subject_key",
+        "spec",
+        "source_experience",
+        "derivation",
+        "summary",
+    },
+    "rule_activated": {
+        "rule_id",
+        "rule_key",
+        "rule_type",
+        "subject_key",
+        "spec",
+        "source_proposal",
+        "derivation",
+    },
     "policy_evaluated": {
         "decision_id",
         "policy_key",
@@ -130,6 +148,7 @@ def check(conn) -> dict:
         "experiences": replay_summary["experiences"],
         "active_states": replay_summary["active_states"],
         "governance_decisions": replay_summary["governance_decisions"],
+        "active_rules": replay_summary["active_rules"],
     }
 
 
@@ -171,6 +190,10 @@ def validate_schema(conn) -> list[str]:
     governance_columns = [
         row["name"]
         for row in conn.execute("PRAGMA table_info(governance_log)").fetchall()
+    ]
+    rule_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(rule_projection)").fetchall()
     ]
     if "confidence" in belief_columns:
         issues.append("belief_projection must not store confidence")
@@ -214,6 +237,18 @@ def validate_schema(conn) -> list[str]:
         issues.append("governance_log missing required columns")
     if "confidence" in governance_columns:
         issues.append("governance_log must not store confidence")
+    if not {
+        "rule_key",
+        "rule_type",
+        "subject_key",
+        "spec",
+        "status",
+        "source_proposal",
+        "derivation",
+    }.issubset(rule_columns):
+        issues.append("rule_projection missing required columns")
+    if "confidence" in rule_columns:
+        issues.append("rule_projection must not store confidence")
 
     empty_derivations = conn.execute(
         """
@@ -242,6 +277,15 @@ def validate_schema(conn) -> list[str]:
     ).fetchone()["count"]
     if empty_state_derivations:
         issues.append("state_projection contains empty derivation")
+    empty_rule_derivations = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM rule_projection
+        WHERE derivation IS NULL OR TRIM(derivation) = ''
+        """
+    ).fetchone()["count"]
+    if empty_rule_derivations:
+        issues.append("rule_projection contains empty derivation")
     return issues
 
 
@@ -253,6 +297,7 @@ def validate_event_contract(conn) -> list[str]:
         issues.append("event_log ids are not contiguous")
     reviewed_proposals = set()
     resolved_inquiries = set()
+    activated_rule_keys = set()
 
     for row in rows:
         event_type = row["event_type"]
@@ -281,6 +326,15 @@ def validate_event_contract(conn) -> list[str]:
             issues.append(f"event {row['id']} experience_recorded has empty derivation")
         if event_type == "state_changed" and not payload.get("derivation"):
             issues.append(f"event {row['id']} state_changed has empty derivation")
+        if event_type == "rule_proposed" and not payload.get("derivation"):
+            issues.append(f"event {row['id']} rule_proposed has empty derivation")
+        if event_type == "rule_activated":
+            if not payload.get("derivation"):
+                issues.append(f"event {row['id']} rule_activated has empty derivation")
+            rule_key = payload["rule_key"]
+            if rule_key in activated_rule_keys:
+                issues.append(f"rule {rule_key} activated more than once")
+            activated_rule_keys.add(rule_key)
         if event_type == "constraint_checked":
             if payload["result"] not in {"pass", "violation"}:
                 issues.append(f"event {row['id']} constraint_checked has invalid result")
@@ -290,7 +344,7 @@ def validate_event_contract(conn) -> list[str]:
         if event_type == "governance_decision":
             if payload["decision"] not in {"allowed", "blocked"}:
                 issues.append(f"event {row['id']} governance_decision has invalid decision")
-            if payload["action"] != "proposal.review":
+            if payload["action"] not in {"proposal.review", "rule.activate"}:
                 issues.append(f"event {row['id']} governance_decision has invalid action")
         if event_type == "proposal_reviewed":
             proposal_id = payload["proposal_id"]
@@ -392,6 +446,17 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
+    rules = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, rule_key, rule_type, subject_key, spec, status,
+                   source_proposal, derivation, created_at
+            FROM rule_projection
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
     return {
         "beliefs": beliefs,
         "proposals": proposals,
@@ -399,4 +464,5 @@ def snapshot_projections(conn) -> dict:
         "experiences": experiences,
         "states": states,
         "governance": governance,
+        "rules": rules,
     }

@@ -9,10 +9,11 @@ it currently believes, and keeps every important state change replayable.
   ordered.
 - **Projection-only state:** Tables such as `belief_projection`,
   `state_projection`, `experience_log`, `proposal_log`, `inquiry_log`, and
-  `governance_log` are derived views. They may be cleared and rebuilt by
-  replay.
-- **Deterministic first:** v0.x processing is synchronous and ordered. Parallel
-  workers are out of scope until replay and idempotency rules are explicit.
+  `governance_log`, and `rule_projection` are derived views. They may be
+  cleared and rebuilt by replay.
+- **Deterministic first:** current processing is synchronous and ordered.
+  Parallel workers are out of scope until replay and idempotency rules are
+  explicit.
 - **No magic knowledge:** Confidence is calculated at read time. A language
   output or external answer is never knowledge by itself.
 - **Belief is not truth:** Beliefs have lifecycle states such as `active` and
@@ -24,13 +25,17 @@ it currently believes, and keeps every important state change replayable.
   changes.
 - **Policy is not decision:** Policies and constraints are evaluated as audit
   events. The durable outcome is a separate `governance_decision` event.
+- **Review is not activation:** Accepting a `RuleProposal` documents human
+  agreement. Activating the rule is a second governed act that changes future
+  deterministic behavior.
 
 ## Layer Model
 
 ```text
 Observation -> Evidence -> Rules -> Beliefs -> State -> Governance
-                                  \-> Contradictions -> Proposals/Inquiries
-                     \-> Experience -> Proposals
+                    ^             \-> Contradictions -> Proposals/Inquiries
+                    |-> Active Rules -> Expectation Inquiries
+                     \-> Experience -> RuleProposal -> Human -> Active Rule
        \______________________________________________________________/
                               Event Ledger
 ```
@@ -53,8 +58,10 @@ own events and projections are written.
 - `state.py` derives deterministic state vectors from active beliefs and
   coordinates `state_changed` events with `state_projection` rows.
 - `governance.py` evaluates kernel constraints and policies around proposal
-  review, writes governance audit events, and projects `governance_decision`
-  rows.
+  review and rule activation, writes governance audit events, and projects
+  `governance_decision` rows.
+- `maturation.py` turns recorded experiences into `RuleProposal` rows and
+  activates accepted rule proposals through a second governed human act.
 - `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
   with `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
@@ -82,6 +89,13 @@ policy, `policy:pressure_guard_v1`, blocks accepting proposals while
 `system.pressure=elevated` unless the human passes `--override`. Audit events
 remain in the ledger, while `governance_log` is rebuilt from
 `governance_decision` events.
+
+v1.0 adds Maturation v1. `ActivityDailyRhythm` experiences can propose
+`activity_expectation_v1` rules. Accepted `RuleProposal` rows do not activate
+anything by themselves; `genus rules activate` is a separate governed event
+that writes `rule_activated` and rebuilds into `rule_projection`. In v1.0 an
+active rule may only create an `ExpectationInquiry` when new activity evidence
+deviates from the learned expectation.
 
 ## Document Family
 

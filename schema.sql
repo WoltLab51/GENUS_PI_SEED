@@ -100,6 +100,21 @@ CREATE TABLE IF NOT EXISTS state_projection (
 CREATE INDEX IF NOT EXISTS idx_state_projection_key_status
 ON state_projection(state_key, status);
 
+CREATE TABLE IF NOT EXISTS rule_projection (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_key         TEXT    NOT NULL UNIQUE,
+    rule_type        TEXT    NOT NULL,
+    subject_key      TEXT    NOT NULL,
+    spec             TEXT    NOT NULL,
+    status           TEXT    NOT NULL DEFAULT 'active',
+    source_proposal  INTEGER REFERENCES proposal_log(id),
+    derivation       TEXT    NOT NULL,
+    created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rule_projection_type_status
+ON rule_projection(rule_type, status);
+
 CREATE TABLE IF NOT EXISTS governance_log (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     action          TEXT    NOT NULL,

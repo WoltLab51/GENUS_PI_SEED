@@ -110,7 +110,7 @@
 <div class="wrap">
 
   <header>
-    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v0.11</small></h1>
+    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v1.0</small></h1>
     <div class="legend">
       <div class="li"><span class="dot b"></span><div><b>Gebaut &amp; getestet</b><br><span>läuft im Code, durch Tests gedeckt</span></div></div>
       <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, aber unvollständig</span></div></div>
@@ -158,7 +158,7 @@
       <div class="cell"><div class="ch"><span class="mini v"></span>Graph Core</div><div class="cd">Beziehungen zwischen Beliefs</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Scheduler Core</div><div class="cd">Priorisierung, Reihenfolge</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Worker Interface</div><div class="cd">Ausführung über Worker</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Maturation Core</div><div class="cd">Reifung, Anpassung, Evolution</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Maturation Core</div><div class="cd">Experience → RuleProposal → aktive Regel</div></div>
       <div class="cell"><div class="ch"><span class="mini p"></span>Monitoring Core</div><div class="cd">5 lokale Sensoren gebaut</div></div>
     </div>
   </div>
@@ -184,12 +184,13 @@
     <span class="rule ok">Model Output ≠ Knowledge</span>
     <span class="rule ok">Proposal ≠ Change</span>
     <span class="rule ok">Policy ≠ Decision</span>
+    <span class="rule ok">Review ≠ Activation</span>
     <span class="rule">Transition ≠ Action</span>
   </div>
 
   <div class="foot">
     grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen, aber unvollständig &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    nächste ehrliche Schicht: Maturation v1 (= Erfahrung wird Regel)
+    deterministischer Kern grün — nächste Phase: Antizipation (Phase A) / Model-Vertrag-Spike
   </div>
 
 </div>

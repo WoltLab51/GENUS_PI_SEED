@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v0.11) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v1.0) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,13 +43,13 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.11)
+## Wo wir stehen (v1.0)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
-State Core · Governance v1
-**Gelb:** Maturation Core fehlt
+State Core · Governance v1 · Maturation v1
+**Gelb:** deterministischer Kern grün; nächste Phase noch offen
 **Rot:** alles Übrige der Karte
 
 ---
@@ -256,6 +256,18 @@ Era). Es bleibt auf der Karte, aber nicht im 1.0-Pfad.*
 
 ## v1.0 — Maturation v1 · *Erfahrung wird Regel · Kern grün*
 
+**Status:** umgesetzt. Eine bestätigte `ActivityDailyRhythm`-Experience kann
+eine `activity_expectation_v1`-Regel vorschlagen. Die Regel wird erst nach zwei
+getrennten menschlichen Toren wirksam: `proposal_reviewed` akzeptiert den
+`RuleProposal`, `rule_activated` aktiviert ihn über einen zweiten Governance-
+Entscheid. Die Wirkung bleibt bewusst klein: Abweichungen erzeugen nur
+`ExpectationInquiry`, keine Belief-Änderung und keine Aktion.
+
+**Bekannte Schuld:** Regeln haben in v1.0 keinen Deaktivierungs- oder
+Revisions-Lifecycle. Das gehört mit dem Experience-Lifecycle in eine spätere
+Maturation+-Schicht. Weitere Regel-Arten wie Threshold-Tuning sind ebenfalls
+spätere Arbeit.
+
 **Warum das die 1.0 ist:** Der deterministische Stoffwechsel läuft Ende zu
 Ende: wahrnehmen → belegen → glauben → Zustand → regeln → vorschlagen →
 lernen. Schlussstein:
@@ -270,12 +282,12 @@ ohne unkontrollierbarer zu werden.
 **Neue Events:** `rule_proposed`, `rule_activated`
 
 **Definition of Done:**
-- [ ] wiederkehrendes Muster erzeugt `rule_proposed`
-- [ ] menschliche Freigabe aktiviert die Regel (`rule_activated`)
-- [ ] aktivierte Regel wirkt deterministisch im nächsten Zyklus
-- [ ] ganze Pipeline Replay-stabil
-- [ ] **Kern-Pipeline der Karte ist grün**
-- [ ] Wachstumsregel ✓
+- [x] wiederkehrendes Muster erzeugt `rule_proposed`
+- [x] menschliche Freigabe aktiviert die Regel (`rule_activated`)
+- [x] aktivierte Regel wirkt deterministisch im nächsten Zyklus
+- [x] ganze Pipeline Replay-stabil
+- [x] **Kern-Pipeline der Karte ist grün**
+- [x] Wachstumsregel ✓
 
 ---
 

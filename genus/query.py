@@ -3,7 +3,15 @@ from __future__ import annotations
 import json
 import string
 
-from genus import experience, governance, inquiries, projection, proposals, state
+from genus import (
+    experience,
+    governance,
+    inquiries,
+    maturation,
+    projection,
+    proposals,
+    state,
+)
 
 
 BELIEF_PATTERNS = (
@@ -51,6 +59,12 @@ GOVERNANCE_PATTERNS = (
     "policy",
     "policies",
 )
+RULE_PATTERNS = (
+    "rules",
+    "rule",
+    "regeln",
+    "regel",
+)
 STATUS_PATTERNS = (
     "status",
     "summary",
@@ -64,6 +78,7 @@ SUPPORTED_PATTERNS = (
     'ask "welche muster"',
     'ask "zustand"',
     'ask "governance"',
+    'ask "regeln"',
 )
 
 
@@ -117,6 +132,14 @@ def ask(conn, question: str) -> dict:
             "answer": f"{len(rows)} governance decision(s)",
             "governance_decisions": rows,
         }
+    if _matches(normalized, RULE_PATTERNS):
+        rows = maturation.list_rules(conn)
+        return {
+            "kind": "rules",
+            "question": question,
+            "answer": f"{len(rows)} active rule(s)",
+            "rules": rows,
+        }
     if _matches(normalized, STATUS_PATTERNS):
         return {
             "kind": "status",
@@ -159,6 +182,9 @@ def status(conn) -> dict:
     governance_count = conn.execute(
         "SELECT COUNT(*) AS count FROM governance_log"
     ).fetchone()["count"]
+    active_rule_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM rule_projection WHERE status = 'active'"
+    ).fetchone()["count"]
     return {
         "events": int(event_count),
         "active_beliefs": int(active_count),
@@ -168,6 +194,7 @@ def status(conn) -> dict:
         "experiences": int(experience_count),
         "active_states": int(active_state_count),
         "governance_decisions": int(governance_count),
+        "active_rules": int(active_rule_count),
     }
 
 
@@ -192,14 +219,25 @@ def explain_belief(conn, belief_id: int) -> dict:
 def explain_proposal(conn, proposal_id: int) -> dict:
     proposal = _get_proposal(conn, proposal_id)
     source_belief_id = proposal["source_belief"]
+    source_event = _event_with_observation(conn, int(proposal["source_event"]))
+    source_experience_id = (
+        source_event["payload"].get("source_experience")
+        if source_event["event_type"] == "rule_proposed"
+        else None
+    )
     return {
         "proposal": dict(proposal),
         "proposal_event": _find_proposal_event(conn, proposal_id),
         "review_event": _find_proposal_review_event(conn, proposal_id),
-        "source_event": _event_with_observation(conn, int(proposal["source_event"])),
+        "source_event": source_event,
         "source_belief": (
             explain_belief(conn, int(source_belief_id))
             if source_belief_id is not None
+            else None
+        ),
+        "source_experience": (
+            explain_experience(conn, int(source_experience_id))
+            if source_experience_id is not None
             else None
         ),
     }
@@ -250,6 +288,26 @@ def explain_decision(conn, decision_id: int) -> dict:
             conn,
             decision_id,
             "policy_evaluated",
+        ),
+    }
+
+
+def explain_rule(conn, rule_id: int) -> dict:
+    row = maturation.get_rule(conn, rule_id)
+    rule = maturation.rule_dict(row)
+    source_proposal = _get_proposal(conn, int(rule["source_proposal"]))
+    rule_event = _find_rule_activated_event(conn, rule_id)
+    rule_proposed_event = _event_with_observation(conn, int(source_proposal["source_event"]))
+    source_experience_id = rule_proposed_event["payload"].get("source_experience")
+    return {
+        "rule": rule,
+        "rule_event": rule_event,
+        "source_proposal": dict(source_proposal),
+        "rule_proposed_event": rule_proposed_event,
+        "source_experience": (
+            explain_experience(conn, int(source_experience_id))
+            if source_experience_id is not None
+            else None
         ),
     }
 
@@ -430,6 +488,20 @@ def _find_governance_audit_events(
         (event_type, decision_id),
     ).fetchall()
     return [_event_dict(row) for row in rows]
+
+
+def _find_rule_activated_event(conn, rule_id: int) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT * FROM event_log
+        WHERE event_type = 'rule_activated'
+          AND json_extract(payload, '$.rule_id') = ?
+        ORDER BY id
+        LIMIT 1
+        """,
+        (rule_id,),
+    ).fetchone()
+    return _event_dict(row) if row is not None else None
 
 
 def _get_proposal(conn, proposal_id: int):

@@ -306,6 +306,15 @@ def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
         projection.apply_belief_superseded(conn, superseded_payload)
         written.append("belief_superseded")
 
+    if metric_key == ACTIVITY_METRIC_KEY:
+        written.extend(
+            _check_activity_expectations(
+                conn,
+                evidence_id=event_id,
+                observed_value=new_value,
+            )
+        )
+
     return written
 
 
@@ -330,3 +339,68 @@ def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY, n: int = WIN
             }
         )
     return evidence
+
+
+def _check_activity_expectations(
+    conn,
+    evidence_id: int,
+    observed_value: str,
+) -> list[str]:
+    from genus import maturation
+
+    hour_row = conn.execute(
+        """
+        SELECT CAST(strftime('%H', created_at) AS INTEGER) AS hour_utc
+        FROM event_log
+        WHERE id = ?
+        """,
+        (evidence_id,),
+    ).fetchone()
+    if hour_row is None or hour_row["hour_utc"] is None:
+        return []
+
+    current = projection.active_belief(conn, RULES[ACTIVITY_METRIC_KEY]["claim_key"])
+    if current is None:
+        return []
+
+    written: list[str] = []
+    for rule in maturation.active_expectations_for_hour(conn, int(hour_row["hour_utc"])):
+        expected_value = rule["spec"]["expected_value"]
+        if expected_value == observed_value:
+            continue
+        if _expectation_inquiry_exists(conn, evidence_id, rule["rule_key"]):
+            continue
+        inquiries.record_inquiry_created_event(
+            conn,
+            inquiry_id=inquiries.next_inquiry_id(conn),
+            inquiry_type="ExpectationInquiry",
+            claim_key=rule["subject_key"],
+            source_belief=int(current["id"]),
+            source_event=evidence_id,
+            question_key="expectation.deviation",
+            payload={
+                "rule_key": rule["rule_key"],
+                "rule_id": rule["id"],
+                "hour_utc": rule["spec"]["hour_utc"],
+                "expected": expected_value,
+                "observed": observed_value,
+                "evidence_id": evidence_id,
+            },
+        )
+        written.append("inquiry_created")
+    return written
+
+
+def _expectation_inquiry_exists(conn, evidence_id: int, rule_key: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM event_log
+        WHERE event_type = 'inquiry_created'
+          AND json_extract(payload, '$.source_event') = ?
+          AND json_extract(payload, '$.payload.rule_key') = ?
+        LIMIT 1
+        """,
+        (evidence_id, rule_key),
+    ).fetchone()
+    return row is not None

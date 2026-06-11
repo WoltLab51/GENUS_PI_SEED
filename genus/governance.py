@@ -6,6 +6,7 @@ from genus import ledger, state
 
 
 ACTION_PROPOSAL_REVIEW = "proposal.review"
+ACTION_RULE_ACTIVATE = "rule.activate"
 TARGET_PROPOSAL = "proposal"
 ALLOWED = "allowed"
 BLOCKED = "blocked"
@@ -18,6 +19,8 @@ PENDING = "pending"
 DECISIONS = {ACCEPTED, REJECTED}
 CONSTRAINT_TERMINAL_REVIEW = "kernel:terminal_review_v1"
 CONSTRAINT_VALID_DECISION = "kernel:valid_decision_v1"
+CONSTRAINT_RULE_SOURCE_ACCEPTED = "kernel:rule_source_accepted_v1"
+CONSTRAINT_RULE_SINGLE_ACTIVATION = "kernel:rule_single_activation_v1"
 POLICY_PRESSURE_GUARD = "policy:pressure_guard_v1"
 KERNEL_CONSTRAINTS = (CONSTRAINT_TERMINAL_REVIEW, CONSTRAINT_VALID_DECISION)
 POLICIES = (POLICY_PRESSURE_GUARD,)
@@ -32,7 +35,14 @@ def evaluate_proposal_review(
     decision_id = next_decision_id(conn)
     constraint_results = _evaluate_kernel_constraints(conn, proposal_id, decision)
     for result in constraint_results:
-        _record_constraint_checked(conn, decision_id, proposal_id, result)
+        _record_constraint_checked(
+            conn,
+            decision_id,
+            ACTION_PROPOSAL_REVIEW,
+            TARGET_PROPOSAL,
+            proposal_id,
+            result,
+        )
 
     violations = [result for result in constraint_results if result["result"] == VIOLATION]
     if violations:
@@ -44,6 +54,8 @@ def evaluate_proposal_review(
             override=override,
             policy_results=[],
             reason=reason,
+            action=ACTION_PROPOSAL_REVIEW,
+            target_type=TARGET_PROPOSAL,
             target_id=proposal_id,
         )
         return {
@@ -59,7 +71,14 @@ def evaluate_proposal_review(
 
     policy_results = _evaluate_policies(conn, proposal_id, decision)
     for result in policy_results:
-        _record_policy_evaluated(conn, decision_id, proposal_id, result)
+        _record_policy_evaluated(
+            conn,
+            decision_id,
+            ACTION_PROPOSAL_REVIEW,
+            TARGET_PROPOSAL,
+            proposal_id,
+            result,
+        )
 
     blocked_policies = [
         result for result in policy_results if result["result"] == POLICY_BLOCK
@@ -84,6 +103,8 @@ def evaluate_proposal_review(
         override=override,
         policy_results=policy_results,
         reason=reason,
+        action=ACTION_PROPOSAL_REVIEW,
+        target_type=TARGET_PROPOSAL,
         target_id=proposal_id,
     )
     return {
@@ -94,6 +115,71 @@ def evaluate_proposal_review(
         "reason": reason,
         "override": override,
         "policy_results": policy_results,
+        "constraint_results": constraint_results,
+    }
+
+
+def evaluate_rule_activation(
+    conn,
+    proposal_id: int,
+    override: bool = False,
+) -> dict:
+    decision_id = next_decision_id(conn)
+    constraint_results = _evaluate_rule_activation_constraints(conn, proposal_id)
+    for result in constraint_results:
+        _record_constraint_checked(
+            conn,
+            decision_id,
+            ACTION_RULE_ACTIVATE,
+            TARGET_PROPOSAL,
+            proposal_id,
+            result,
+        )
+
+    violations = [result for result in constraint_results if result["result"] == VIOLATION]
+    if violations:
+        reason = violations[0]["reason"]
+        _record_governance_decision(
+            conn,
+            decision_id=decision_id,
+            decision=BLOCKED,
+            override=override,
+            policy_results=[],
+            reason=reason,
+            action=ACTION_RULE_ACTIVATE,
+            target_type=TARGET_PROPOSAL,
+            target_id=proposal_id,
+        )
+        return {
+            "decision_id": decision_id,
+            "decision": BLOCKED,
+            "kernel": True,
+            "blocked_by": violations[0]["constraint_key"],
+            "reason": reason,
+            "override": override,
+            "policy_results": [],
+            "constraint_results": constraint_results,
+        }
+
+    _record_governance_decision(
+        conn,
+        decision_id=decision_id,
+        decision=ALLOWED,
+        override=override,
+        policy_results=[],
+        reason="governance checks passed",
+        action=ACTION_RULE_ACTIVATE,
+        target_type=TARGET_PROPOSAL,
+        target_id=proposal_id,
+    )
+    return {
+        "decision_id": decision_id,
+        "decision": ALLOWED,
+        "kernel": False,
+        "blocked_by": None,
+        "reason": "governance checks passed",
+        "override": override,
+        "policy_results": [],
         "constraint_results": constraint_results,
     }
 
@@ -207,6 +293,59 @@ def _evaluate_kernel_constraints(conn, proposal_id: int, decision: str) -> list[
     ]
 
 
+def _evaluate_rule_activation_constraints(conn, proposal_id: int) -> list[dict]:
+    from genus import maturation
+
+    proposal = conn.execute(
+        "SELECT proposal_type, state, payload FROM proposal_log WHERE id = ?",
+        (proposal_id,),
+    ).fetchone()
+    rule_key = None
+    if proposal is None:
+        source_result = VIOLATION
+        source_reason = "proposal not found"
+    elif proposal["proposal_type"] != maturation.PROPOSAL_TYPE:
+        source_result = VIOLATION
+        source_reason = "proposal is not a RuleProposal"
+    elif proposal["state"] != ACCEPTED:
+        source_result = VIOLATION
+        source_reason = "RuleProposal must be accepted before activation"
+    else:
+        payload = json.loads(proposal["payload"])
+        rule_key = payload.get("rule_key")
+        source_result = PASS
+        source_reason = "RuleProposal is accepted"
+
+    if rule_key is None and proposal is not None:
+        try:
+            rule_key = json.loads(proposal["payload"]).get("rule_key")
+        except json.JSONDecodeError:
+            rule_key = None
+
+    if not rule_key:
+        activation_result = VIOLATION
+        activation_reason = "rule_key unavailable"
+    elif _rule_activated(conn, rule_key):
+        activation_result = VIOLATION
+        activation_reason = "rule_key already activated"
+    else:
+        activation_result = PASS
+        activation_reason = "rule_key is not activated"
+
+    return [
+        {
+            "constraint_key": CONSTRAINT_RULE_SOURCE_ACCEPTED,
+            "result": source_result,
+            "reason": source_reason,
+        },
+        {
+            "constraint_key": CONSTRAINT_RULE_SINGLE_ACTIVATION,
+            "result": activation_result,
+            "reason": activation_reason,
+        },
+    ]
+
+
 def _evaluate_policies(conn, proposal_id: int, decision: str) -> list[dict]:
     active_pressure = state.active_state(conn, state.STATE_KEY)
     if decision != ACCEPTED:
@@ -232,7 +371,9 @@ def _evaluate_policies(conn, proposal_id: int, decision: str) -> list[dict]:
 def _record_constraint_checked(
     conn,
     decision_id: int,
-    proposal_id: int,
+    action: str,
+    target_type: str,
+    target_id: int,
     result: dict,
 ) -> int:
     return ledger.append(
@@ -241,9 +382,9 @@ def _record_constraint_checked(
         {
             "decision_id": decision_id,
             "constraint_key": result["constraint_key"],
-            "action": ACTION_PROPOSAL_REVIEW,
-            "target_type": TARGET_PROPOSAL,
-            "target_id": proposal_id,
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
             "result": result["result"],
             "reason": result["reason"],
         },
@@ -253,7 +394,9 @@ def _record_constraint_checked(
 def _record_policy_evaluated(
     conn,
     decision_id: int,
-    proposal_id: int,
+    action: str,
+    target_type: str,
+    target_id: int,
     result: dict,
 ) -> int:
     return ledger.append(
@@ -262,9 +405,9 @@ def _record_policy_evaluated(
         {
             "decision_id": decision_id,
             "policy_key": result["policy_key"],
-            "action": ACTION_PROPOSAL_REVIEW,
-            "target_type": TARGET_PROPOSAL,
-            "target_id": proposal_id,
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
             "result": result["result"],
             "reason": result["reason"],
         },
@@ -278,12 +421,14 @@ def _record_governance_decision(
     override: bool,
     policy_results: list[dict],
     reason: str,
+    action: str,
+    target_type: str,
     target_id: int,
 ) -> int:
     payload = {
         "decision_id": decision_id,
-        "action": ACTION_PROPOSAL_REVIEW,
-        "target_type": TARGET_PROPOSAL,
+        "action": action,
+        "target_type": target_type,
         "target_id": target_id,
         "decision": decision,
         "override": bool(override),
@@ -294,6 +439,26 @@ def _record_governance_decision(
     payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
     apply_governance_decision(conn, payload)
     return event_id
+
+
+def _rule_activated(conn, rule_key: str) -> bool:
+    projection_row = conn.execute(
+        "SELECT 1 FROM rule_projection WHERE rule_key = ? LIMIT 1",
+        (rule_key,),
+    ).fetchone()
+    if projection_row is not None:
+        return True
+    event_row = conn.execute(
+        """
+        SELECT 1
+        FROM event_log
+        WHERE event_type = 'rule_activated'
+          AND json_extract(payload, '$.rule_key') = ?
+        LIMIT 1
+        """,
+        (rule_key,),
+    ).fetchone()
+    return event_row is not None
 
 
 def _json(value) -> str:

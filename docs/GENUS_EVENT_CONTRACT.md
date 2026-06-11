@@ -19,6 +19,8 @@ are rebuildable.
 | `proposal_reviewed` | `proposal_id`, `decision`, `note` | Human via CLI | Mark proposal accepted/rejected |
 | `experience_recorded` | `experience_id`, `experience_key`, `experience_type`, `subject_key`, `pattern`, `supporting_events`, `derivation`, `summary` | Experience | Insert experience row |
 | `state_changed` | `state_id`, `state_key`, `state_value`, `previous_state_id`, `derivation`, `supporting_beliefs`, `components`, `reason` | State | Insert active state row and supersede previous state |
+| `rule_proposed` | `rule_key`, `rule_type`, `subject_key`, `spec`, `source_experience`, `derivation`, `summary` | Maturation | Audit only; source event for RuleProposal |
+| `rule_activated` | `rule_id`, `rule_key`, `rule_type`, `subject_key`, `spec`, `source_proposal`, `derivation` | Maturation | Insert active rule row |
 | `constraint_checked` | `decision_id`, `constraint_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
 | `policy_evaluated` | `decision_id`, `policy_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
 | `governance_decision` | `decision_id`, `action`, `target_type`, `target_id`, `decision`, `override`, `policy_results`, `reason` | Governance | Insert governance decision row |
@@ -29,14 +31,16 @@ are rebuildable.
 
 - `event_log` must never be updated or deleted.
 - `replay()` may clear `belief_projection`, `state_projection`,
-  `experience_log`, `proposal_log`, `inquiry_log`, and `governance_log`, but
-  never changes `event_log`.
+  `experience_log`, `proposal_log`, `inquiry_log`, `governance_log`, and
+  `rule_projection`, but never changes `event_log`.
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
 - `experience_log.derivation` is required and `experience_log` has no
   `confidence` column.
 - `state_projection.derivation` is required and `state_projection` has no
+  `confidence` column.
+- `rule_projection.derivation` is required and `rule_projection` has no
   `confidence` column.
 - Proposal creation is event-backed: `proposal_created` is written before
   `proposal_log` is projected.
@@ -61,6 +65,16 @@ are rebuildable.
   is recorded in `governance_decision`.
 - A blocked governance decision is still durable and committed. It leaves the
   target proposal pending.
+- `rule_proposed` is emitted by deterministic maturation over recorded
+  experiences. It becomes the `source_event` of its `RuleProposal`.
+- Accepting a `RuleProposal` activates nothing. Rule activation is a separate,
+  governed, event-backed human act.
+- `rule_activated` requires an accepted `RuleProposal` and is terminal per
+  `rule_key`; a rule key may be activated at most once.
+- Active v1.0 rules may only create `ExpectationInquiry` records. They never
+  change beliefs and never execute actions.
+- Replay applies `rule_activated` events into `rule_projection`; it does not
+  rescan experiences and does not re-evaluate active rule effects.
 - `proposal_reviewed` and `inquiry_resolved` are terminal: at most one review
   per proposal and one resolution per inquiry, enforced before the event is
   written.
