@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v0.10) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v0.11) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,13 +43,13 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v0.10)
+## Wo wir stehen (v0.11)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
-State Core
-**Gelb:** Governance Policy fehlt
+State Core · Governance v1
+**Gelb:** Maturation Core fehlt
 **Rot:** alles Übrige der Karte
 
 ---
@@ -216,6 +216,13 @@ Mehrere Beliefs → ein `StateVector` (z.B. `aktiv + CPU hoch + Disk wächst`
 
 ## v0.11 — Governance v1 · *Policy + Constraint greifen*
 
+**Status:** umgesetzt. Proposal-Reviews laufen durch eine Governance-Schicht.
+Kernel-Constraints blockieren ungültige oder nicht-pending Reviews und sind
+nicht overridebar. `policy:pressure_guard_v1` blockiert Accept-Reviews bei
+`system.pressure=elevated`, außer der Mensch setzt explizit `--override`.
+Jede Entscheidung ist event-backed und über `genus governance list` sowie
+`genus why decision` inspizierbar.
+
 **Warum jetzt:** Jetzt existiert ein Zustand zum Bewerten und genug
 Proposal-Vielfalt zum Regeln. Governance kann zum ersten Mal wirklich
 eingreifen statt nur dokumentiert zu sein — der Querschnitt der Karte bekommt
@@ -226,18 +233,19 @@ seinen Anker.
 **Neue Events:** `policy_evaluated`, `constraint_checked`, `governance_decision`
 
 **Scope:**
-- **Policy Store:** Regeln *wer / welche Aktion / unter welcher Bedingung /
-  welche Freigabe*
-- **Constraint Enforcement:** ein Proposal bei hohem State-Druck oder hohem
-  Risiko darf nicht ohne menschliche Freigabe `reviewed` werden
-- **Constitutional Kernel:** kleiner Satz harter Regeln (DNA als Code)
+- **Code-definierte Policy:** in v0.11 bewusst kein DB-Policy-Store; Policies
+  sind deterministische Code-Konstanten und später migrierbar
+- **Constraint Enforcement:** ein Proposal bei hohem State-Druck darf nicht
+  ohne explizites menschliches Override akzeptiert werden
+- **Constitutional Kernel:** kleiner Satz harter Regeln (pending target,
+  gültige Entscheidung), nicht overridebar
 - jede Entscheidung im Ledger → Audit & Trace wird grün
 
 **Definition of Done:**
-- [ ] mind. eine durchgesetzte Policy, nachweislich blockierend/erlaubend
-- [ ] jede Entscheidung im Ledger nachvollziehbar, über Query erklärbar
-- [ ] Replay-stabil, Integrity grün
-- [ ] Wachstumsregel ✓
+- [x] mind. eine durchgesetzte Policy, nachweislich blockierend/erlaubend
+- [x] jede Entscheidung im Ledger nachvollziehbar, über Query erklärbar
+- [x] Replay-stabil, Integrity grün
+- [x] Wachstumsregel ✓
 
 *Hinweis: **Transition Core** ("welche Veränderung wäre möglich") wird hier
 bewusst ausgelassen. Für ein System, das nur beobachtet und vorschlägt, ist

@@ -33,6 +33,7 @@ genus explain belief 1
 genus explain experience 1
 genus explain state 1
 genus why proposal 1
+genus why decision 1
 genus beliefs show
 genus experience scan
 genus experience show
@@ -41,6 +42,9 @@ genus state show
 genus proposals list
 genus proposals list --all
 genus proposals review 1 --accept --note "makes sense"
+genus proposals review 1 --accept --override --note "override under pressure"
+genus governance list
+genus governance list --target proposal:1
 genus inquiries list
 genus inquiries resolve 1 --answer "Backup lief"
 genus replay
@@ -108,6 +112,24 @@ when the vector changes.
 - `genus state show` lists active states.
 - `genus explain state <id>` shows the state event and supporting beliefs.
 - `genus ask "zustand"` exposes active states through the query layer.
+
+## Governance v1
+
+v0.11 adds event-backed governance for proposal review. Kernel constraints are
+hard and never overrideable; policies can block a decision unless an explicit
+human override is supplied.
+
+- `constraint_checked` records non-overrideable kernel checks.
+- `policy_evaluated` records overrideable policy checks.
+- `governance_decision` is the durable allowed/blocked decision event.
+- `governance_log` is a rebuildable projection of decision events only.
+- `policy:pressure_guard_v1` blocks accepting a proposal while
+  `system.pressure=elevated`, unless `--override` is passed.
+- Inquiry resolution is deliberately ungoverned in v0.11.
+
+Blocked reviews still commit their governance audit events and leave the
+proposal pending. Accepted proposals remain review decisions only:
+`Proposal != Change`.
 
 ## Automatic Collection With Cron
 

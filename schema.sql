@@ -99,3 +99,18 @@ CREATE TABLE IF NOT EXISTS state_projection (
 
 CREATE INDEX IF NOT EXISTS idx_state_projection_key_status
 ON state_projection(state_key, status);
+
+CREATE TABLE IF NOT EXISTS governance_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    action          TEXT    NOT NULL,
+    target_type     TEXT    NOT NULL,
+    target_id       INTEGER NOT NULL,
+    decision        TEXT    NOT NULL,
+    override        INTEGER NOT NULL DEFAULT 0,
+    policy_results  TEXT    NOT NULL DEFAULT '[]',
+    reason          TEXT    NOT NULL,
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_governance_log_target
+ON governance_log(target_type, target_id);

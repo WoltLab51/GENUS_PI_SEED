@@ -110,7 +110,7 @@
 <div class="wrap">
 
   <header>
-    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v0.10</small></h1>
+    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v0.11</small></h1>
     <div class="legend">
       <div class="li"><span class="dot b"></span><div><b>Gebaut &amp; getestet</b><br><span>läuft im Code, durch Tests gedeckt</span></div></div>
       <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, aber unvollständig</span></div></div>
@@ -130,7 +130,7 @@
     <div class="core built"><span class="stat"></span><div class="num">3</div><h3>Belief Core</h3><div class="q">Was hält GENUS aktuell für plausibel?</div><div class="out">belief_projection</div></div>
     <div class="core built"><span class="stat"></span><div class="num">4</div><h3>State Core</h3><div class="q">Welcher Gesamtzustand entsteht aus vielen Beliefs?</div><div class="out">state_projection</div></div>
     <div class="core vision"><span class="stat"></span><div class="num">5</div><h3>Transition Core</h3><div class="q">Welche Veränderung wäre möglich?</div><div class="out">— nicht gebaut</div></div>
-    <div class="core vision"><span class="stat"></span><div class="num">6</div><h3>Constraint Core</h3><div class="q">Darf diese Veränderung überhaupt weiter?</div><div class="out">— nicht gebaut</div></div>
+    <div class="core partial"><span class="stat"></span><div class="num">6</div><h3>Constraint Core</h3><div class="q">Darf diese Veränderung überhaupt weiter?</div><div class="out">constraint_checked · governance_log</div></div>
     <div class="core built"><span class="stat"></span><div class="num">7</div><h3>Proposal Core</h3><div class="q">Was wird vorgeschlagen — und reviewt?</div><div class="out">proposal_log · review</div></div>
     <div class="core built"><span class="stat"></span><div class="num">8</div><h3>Ledger Core</h3><div class="q">Was ist nachweislich passiert?</div><div class="out">event_log · replay</div></div>
     <div class="core built"><span class="stat"></span><div class="num">9</div><h3>Experience Core</h3><div class="q">Welche Muster wiederholen sich über Zeit?</div><div class="out">experience_log</div></div>
@@ -140,11 +140,11 @@
   <div class="section-label">Querschnitt: Governance &amp; Sicherheit</div>
   <div class="layer cross">
     <div class="grid g6">
-      <div class="cell"><div class="ch"><span class="mini v"></span>Constitutional Kernel</div><div class="cd">Grundregeln, Werte, Hard Boundaries</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Constitutional Kernel</div><div class="cd">Kernel-Constraints für Reviews</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Authority Matrix</div><div class="cd">Wer darf was, wo, wann?</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Room System</div><div class="cd">Kontexte, Räume, Zugriffsgrenzen</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Policy Engine</div><div class="cd">Regeln, Guards, Verträge</div></div>
-      <div class="cell"><div class="ch"><span class="mini p"></span>Audit &amp; Trace</div><div class="cd">Ledger + Integrity-Check vorhanden</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Policy Engine</div><div class="cd">pressure_guard_v1 als erster Guard</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Audit &amp; Trace</div><div class="cd">Ledger + Governance Trace grün</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Identity Core</div><div class="cd">Wer ist GENUS?</div></div>
     </div>
   </div>
@@ -183,13 +183,13 @@
     <span class="rule ok">Ledger ≠ Memory</span>
     <span class="rule ok">Model Output ≠ Knowledge</span>
     <span class="rule ok">Proposal ≠ Change</span>
-    <span class="rule">Policy ≠ Decision</span>
+    <span class="rule ok">Policy ≠ Decision</span>
     <span class="rule">Transition ≠ Action</span>
   </div>
 
   <div class="foot">
     grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen, aber unvollständig &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    nächste ehrliche Schicht: Governance v1 (= Policy + Constraint greifen)
+    nächste ehrliche Schicht: Maturation v1 (= Erfahrung wird Regel)
   </div>
 
 </div>

@@ -8,8 +8,9 @@ it currently believes, and keeps every important state change replayable.
 - **Ledger-first:** `event_log` is the source of truth. It is append-only and
   ordered.
 - **Projection-only state:** Tables such as `belief_projection`,
-  `state_projection`, `experience_log`, `proposal_log`, and `inquiry_log` are
-  derived views. They may be cleared and rebuilt by replay.
+  `state_projection`, `experience_log`, `proposal_log`, `inquiry_log`, and
+  `governance_log` are derived views. They may be cleared and rebuilt by
+  replay.
 - **Deterministic first:** v0.x processing is synchronous and ordered. Parallel
   workers are out of scope until replay and idempotency rules are explicit.
 - **No magic knowledge:** Confidence is calculated at read time. A language
@@ -21,11 +22,13 @@ it currently believes, and keeps every important state change replayable.
 - **Inquiry is not action:** Inquiries name open uncertainty. They ask what
   should be clarified. Resolution is event-backed, but does not execute
   changes.
+- **Policy is not decision:** Policies and constraints are evaluated as audit
+  events. The durable outcome is a separate `governance_decision` event.
 
 ## Layer Model
 
 ```text
-Observation -> Evidence -> Rules -> Beliefs -> State
+Observation -> Evidence -> Rules -> Beliefs -> State -> Governance
                                   \-> Contradictions -> Proposals/Inquiries
                      \-> Experience -> Proposals
        \______________________________________________________________/
@@ -49,6 +52,9 @@ own events and projections are written.
   coordinates `experience_recorded` events with `experience_log` rows.
 - `state.py` derives deterministic state vectors from active beliefs and
   coordinates `state_changed` events with `state_projection` rows.
+- `governance.py` evaluates kernel constraints and policies around proposal
+  review, writes governance audit events, and projects `governance_decision`
+  rows.
 - `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
   with `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
@@ -69,6 +75,13 @@ rows.
 v0.10 adds the first State vector: `system.pressure` is derived from active
 activity and resource-pressure beliefs. State rows are projections from
 `state_changed` events and are not truth rows.
+
+v0.11 adds Governance v1 around proposal review. Kernel constraints block
+invalid or non-pending review attempts and cannot be overridden. The first
+policy, `policy:pressure_guard_v1`, blocks accepting proposals while
+`system.pressure=elevated` unless the human passes `--override`. Audit events
+remain in the ledger, while `governance_log` is rebuilt from
+`governance_decision` events.
 
 ## Document Family
 

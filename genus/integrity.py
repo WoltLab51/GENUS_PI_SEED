@@ -60,6 +60,34 @@ REQUIRED_EVENT_KEYS = {
         "components",
         "reason",
     },
+    "policy_evaluated": {
+        "decision_id",
+        "policy_key",
+        "action",
+        "target_type",
+        "target_id",
+        "result",
+        "reason",
+    },
+    "constraint_checked": {
+        "decision_id",
+        "constraint_key",
+        "action",
+        "target_type",
+        "target_id",
+        "result",
+        "reason",
+    },
+    "governance_decision": {
+        "decision_id",
+        "action",
+        "target_type",
+        "target_id",
+        "decision",
+        "override",
+        "policy_results",
+        "reason",
+    },
     "inquiry_created": {
         "inquiry_id",
         "inquiry_type",
@@ -101,6 +129,7 @@ def check(conn) -> dict:
         "inquiries": replay_summary["inquiries"],
         "experiences": replay_summary["experiences"],
         "active_states": replay_summary["active_states"],
+        "governance_decisions": replay_summary["governance_decisions"],
     }
 
 
@@ -139,6 +168,10 @@ def validate_schema(conn) -> list[str]:
         row["name"]
         for row in conn.execute("PRAGMA table_info(state_projection)").fetchall()
     ]
+    governance_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(governance_log)").fetchall()
+    ]
     if "confidence" in belief_columns:
         issues.append("belief_projection must not store confidence")
     if not {"decision", "reviewed_at"}.issubset(proposal_columns):
@@ -169,6 +202,18 @@ def validate_schema(conn) -> list[str]:
         issues.append("state_projection missing required columns")
     if "confidence" in state_columns:
         issues.append("state_projection must not store confidence")
+    if not {
+        "action",
+        "target_type",
+        "target_id",
+        "decision",
+        "override",
+        "policy_results",
+        "reason",
+    }.issubset(governance_columns):
+        issues.append("governance_log missing required columns")
+    if "confidence" in governance_columns:
+        issues.append("governance_log must not store confidence")
 
     empty_derivations = conn.execute(
         """
@@ -236,6 +281,17 @@ def validate_event_contract(conn) -> list[str]:
             issues.append(f"event {row['id']} experience_recorded has empty derivation")
         if event_type == "state_changed" and not payload.get("derivation"):
             issues.append(f"event {row['id']} state_changed has empty derivation")
+        if event_type == "constraint_checked":
+            if payload["result"] not in {"pass", "violation"}:
+                issues.append(f"event {row['id']} constraint_checked has invalid result")
+        if event_type == "policy_evaluated":
+            if payload["result"] not in {"pass", "block"}:
+                issues.append(f"event {row['id']} policy_evaluated has invalid result")
+        if event_type == "governance_decision":
+            if payload["decision"] not in {"allowed", "blocked"}:
+                issues.append(f"event {row['id']} governance_decision has invalid decision")
+            if payload["action"] != "proposal.review":
+                issues.append(f"event {row['id']} governance_decision has invalid action")
         if event_type == "proposal_reviewed":
             proposal_id = payload["proposal_id"]
             if payload["decision"] not in {"accepted", "rejected"}:
@@ -325,10 +381,22 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
+    governance = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, action, target_type, target_id, decision, override,
+                   policy_results, reason, created_at
+            FROM governance_log
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
     return {
         "beliefs": beliefs,
         "proposals": proposals,
         "inquiries": inquiries,
         "experiences": experiences,
         "states": states,
+        "governance": governance,
     }

@@ -9,6 +9,7 @@ from genus import (
     db,
     event_router,
     experience,
+    governance,
     inquiries,
     integrity,
     ledger,
@@ -186,6 +187,16 @@ def why_proposal_command(proposal_id: int) -> None:
         conn.close()
 
 
+@why_group.command("decision")
+@click.argument("decision_id", type=int)
+def why_decision_command(decision_id: int) -> None:
+    conn = get_conn()
+    try:
+        _print_decision_explanation(query.explain_decision(conn, decision_id))
+    finally:
+        conn.close()
+
+
 @main.group()
 def beliefs() -> None:
     pass
@@ -220,6 +231,11 @@ def experience_group() -> None:
 
 @main.group(name="state")
 def state_group() -> None:
+    pass
+
+
+@main.group(name="governance")
+def governance_group() -> None:
     pass
 
 
@@ -338,19 +354,58 @@ def proposals_list(include_all: bool) -> None:
 @click.option("--accept", "decision", flag_value="accepted", default=None)
 @click.option("--reject", "decision", flag_value="rejected")
 @click.option("--note", default="")
-def proposals_review(proposal_id: int, decision: str | None, note: str) -> None:
+@click.option("--override", is_flag=True, default=False)
+def proposals_review(
+    proposal_id: int,
+    decision: str | None,
+    note: str,
+    override: bool,
+) -> None:
     if decision is None:
         raise click.ClickException("--accept or --reject required")
     conn = get_conn()
     try:
         try:
-            proposals.record_proposal_reviewed_event(conn, proposal_id, decision, note)
+            verdict = proposals.review_proposal_governed(
+                conn,
+                proposal_id,
+                decision,
+                note,
+                override,
+            )
             conn.commit()
         except ValueError as exc:
+            conn.rollback()
             raise click.ClickException(str(exc)) from exc
+        if verdict["decision"] == governance.BLOCKED:
+            click.echo(f"[GOV] BLOCKED by {verdict['blocked_by']}: {verdict['reason']}")
+            raise click.exceptions.Exit(1)
+        override_text = " (override)" if verdict["override"] else ""
+        click.echo(
+            f"[GOV] decision #{verdict['decision_id']} allowed{override_text}"
+        )
         click.echo(f"[GOV] proposal {proposal_id} {decision}")
         if note:
             click.echo(f"[GOV] note: {note}")
+    finally:
+        conn.close()
+
+
+@governance_group.command("list")
+@click.option("--target", default=None, help="Filter like proposal:3")
+def governance_list(target: str | None) -> None:
+    conn = get_conn()
+    try:
+        target_type, target_id = _parse_governance_target(target)
+        rows = governance.list_decisions(conn, target_type, target_id)
+        click.echo("GOVERNANCE DECISIONS")
+        click.echo("id  action           target       decision  override  reason")
+        for row in rows:
+            click.echo(
+                f"{row['id']:<3} {row['action']:<16} "
+                f"{row['target_type']}:{row['target_id']:<7} "
+                f"{row['decision']:<9} {str(row['override']):<9} {row['reason']}"
+            )
     finally:
         conn.close()
 
@@ -374,7 +429,8 @@ def replay_command() -> None:
             f"[REPLAY] Result: {summary['active_beliefs']} active belief(s), "
             f"{summary['proposals']} proposal(s), {summary['inquiries']} inquiry(s), "
             f"{summary['experiences']} experience(s), "
-            f"{summary['active_states']} active state(s)"
+            f"{summary['active_states']} active state(s), "
+            f"{summary['governance_decisions']} governance decision(s)"
         )
         if before == after:
             click.echo("[REPLAY] State matches current projection")
@@ -400,7 +456,8 @@ def integrity_check() -> None:
                 f"active_beliefs={result['active_beliefs']} "
                 f"proposals={result['proposals']} inquiries={result['inquiries']} "
                 f"experiences={result['experiences']} "
-                f"active_states={result['active_states']}"
+                f"active_states={result['active_states']} "
+                f"governance_decisions={result['governance_decisions']}"
             )
             return
         for issue in result["issues"]:
@@ -547,6 +604,13 @@ def _print_ask_response(response: dict) -> None:
                 f"[STATE] #{row['id']} {row['state_key']}={row['state_value']} "
                 f"reason={row['reason']}"
             )
+    elif response["kind"] == "governance_decisions":
+        for row in response["governance_decisions"]:
+            click.echo(
+                f"[GOV] #{row['id']} {row['action']} "
+                f"{row['target_type']}:{row['target_id']} "
+                f"decision={row['decision']} override={row['override']}"
+            )
     elif response["kind"] == "status":
         for key, value in response["status"].items():
             click.echo(f"{key}: {value}")
@@ -656,6 +720,26 @@ def _print_state_explanation(explanation: dict) -> None:
         )
 
 
+def _print_decision_explanation(explanation: dict) -> None:
+    decision = explanation["decision"]
+    click.echo(
+        f"DECISION #{decision['id']} {decision['action']} "
+        f"{decision['target_type']}:{decision['target_id']} "
+        f"decision={decision['decision']} override={decision['override']}"
+    )
+    click.echo(f"reason={decision['reason']}")
+    governance_event = explanation["governance_event"]
+    if governance_event is not None:
+        click.echo(
+            f"governance_event: #{governance_event['id']} "
+            f"{governance_event['event_type']}"
+        )
+    click.echo("constraint_checked:")
+    _print_event_payload_list(explanation["constraint_events"])
+    click.echo("policy_evaluated:")
+    _print_event_payload_list(explanation["policy_events"])
+
+
 def _print_evidence_chain(events: list[dict]) -> None:
     if not events:
         click.echo("- none")
@@ -681,6 +765,33 @@ def _print_event_list(events: list[dict]) -> None:
         return
     for event in events:
         click.echo(f"- #{event['id']} {event['event_type']}")
+
+
+def _print_event_payload_list(events: list[dict]) -> None:
+    if not events:
+        click.echo("- none")
+        return
+    for event in events:
+        payload = event["payload"]
+        key = payload.get("constraint_key") or payload.get("policy_key") or "?"
+        click.echo(
+            f"- #{event['id']} {event['event_type']} {key} "
+            f"result={payload.get('result')} reason={payload.get('reason')}"
+        )
+
+
+def _parse_governance_target(target: str | None) -> tuple[str | None, int | None]:
+    if target is None:
+        return None, None
+    if ":" not in target:
+        raise click.ClickException("--target must look like proposal:<id>")
+    target_type, raw_id = target.split(":", 1)
+    if target_type != "proposal":
+        raise click.ClickException("only proposal:<id> targets are supported")
+    try:
+        return target_type, int(raw_id)
+    except ValueError as exc:
+        raise click.ClickException("target id must be an integer") from exc
 
 
 def _state_snapshot(conn) -> dict:
@@ -727,12 +838,21 @@ def _state_snapshot(conn) -> dict:
         ORDER BY id
         """
     ).fetchall()
+    governance_rows = conn.execute(
+        """
+        SELECT id, action, target_type, target_id, decision, override,
+               policy_results, reason
+        FROM governance_log
+        ORDER BY id
+        """
+    ).fetchall()
     return {
         "beliefs": beliefs,
         "proposals": [dict(row) for row in proposal_rows],
         "inquiries": [dict(row) for row in inquiry_rows],
         "experiences": [dict(row) for row in experience_rows],
         "states": [dict(row) for row in state_rows],
+        "governance": [dict(row) for row in governance_rows],
     }
 
 

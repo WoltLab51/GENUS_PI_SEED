@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import string
 
-from genus import experience, inquiries, projection, proposals, state
+from genus import experience, governance, inquiries, projection, proposals, state
 
 
 BELIEF_PATTERNS = (
@@ -43,6 +43,14 @@ STATE_PATTERNS = (
     "pressure",
     "druck",
 )
+GOVERNANCE_PATTERNS = (
+    "governance",
+    "entscheidungen",
+    "decisions",
+    "decision",
+    "policy",
+    "policies",
+)
 STATUS_PATTERNS = (
     "status",
     "summary",
@@ -55,6 +63,7 @@ SUPPORTED_PATTERNS = (
     'ask "was ist offen"',
     'ask "welche muster"',
     'ask "zustand"',
+    'ask "governance"',
 )
 
 
@@ -100,6 +109,14 @@ def ask(conn, question: str) -> dict:
             "answer": f"{len(rows)} active state(s)",
             "states": rows,
         }
+    if _matches(normalized, GOVERNANCE_PATTERNS):
+        rows = governance.list_decisions(conn)
+        return {
+            "kind": "governance_decisions",
+            "question": question,
+            "answer": f"{len(rows)} governance decision(s)",
+            "governance_decisions": rows,
+        }
     if _matches(normalized, STATUS_PATTERNS):
         return {
             "kind": "status",
@@ -139,6 +156,9 @@ def status(conn) -> dict:
     active_state_count = conn.execute(
         "SELECT COUNT(*) AS count FROM state_projection WHERE status = 'active'"
     ).fetchone()["count"]
+    governance_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM governance_log"
+    ).fetchone()["count"]
     return {
         "events": int(event_count),
         "active_beliefs": int(active_count),
@@ -147,6 +167,7 @@ def status(conn) -> dict:
         "open_inquiries": int(inquiry_count),
         "experiences": int(experience_count),
         "active_states": int(active_state_count),
+        "governance_decisions": int(governance_count),
     }
 
 
@@ -212,6 +233,24 @@ def explain_state(conn, state_id: int) -> dict:
             )
             for belief_id in supporting_ids
         ],
+    }
+
+
+def explain_decision(conn, decision_id: int) -> dict:
+    row = governance.get_decision(conn, decision_id)
+    return {
+        "decision": governance.decision_dict(row),
+        "governance_event": _find_governance_decision_event(conn, decision_id),
+        "constraint_events": _find_governance_audit_events(
+            conn,
+            decision_id,
+            "constraint_checked",
+        ),
+        "policy_events": _find_governance_audit_events(
+            conn,
+            decision_id,
+            "policy_evaluated",
+        ),
     }
 
 
@@ -360,6 +399,37 @@ def _find_state_event(conn, state_id: int) -> dict | None:
         (state_id,),
     ).fetchone()
     return _event_dict(row) if row is not None else None
+
+
+def _find_governance_decision_event(conn, decision_id: int) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT * FROM event_log
+        WHERE event_type = 'governance_decision'
+          AND json_extract(payload, '$.decision_id') = ?
+        ORDER BY id
+        LIMIT 1
+        """,
+        (decision_id,),
+    ).fetchone()
+    return _event_dict(row) if row is not None else None
+
+
+def _find_governance_audit_events(
+    conn,
+    decision_id: int,
+    event_type: str,
+) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT * FROM event_log
+        WHERE event_type = ?
+          AND json_extract(payload, '$.decision_id') = ?
+        ORDER BY id
+        """,
+        (event_type, decision_id),
+    ).fetchall()
+    return [_event_dict(row) for row in rows]
 
 
 def _get_proposal(conn, proposal_id: int):

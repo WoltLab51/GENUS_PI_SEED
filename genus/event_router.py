@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 
-from genus import experience, inquiries, projection, proposals, state
+from genus import experience, governance, inquiries, projection, proposals, state
 
 
 def replay(conn) -> dict:
     events = conn.execute("SELECT * FROM event_log ORDER BY id").fetchall()
+    conn.execute("DELETE FROM governance_log")
     conn.execute("DELETE FROM inquiry_log")
     conn.execute("DELETE FROM proposal_log")
     conn.execute("DELETE FROM experience_log")
@@ -16,6 +17,7 @@ def replay(conn) -> dict:
         """
         DELETE FROM sqlite_sequence
         WHERE name IN (
+            'governance_log',
             'inquiry_log',
             'proposal_log',
             'experience_log',
@@ -43,6 +45,9 @@ def replay(conn) -> dict:
     state_count = conn.execute(
         "SELECT COUNT(*) AS count FROM state_projection WHERE status = 'active'"
     ).fetchone()["count"]
+    governance_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM governance_log"
+    ).fetchone()["count"]
     conn.commit()
     return {
         "events": len(events),
@@ -51,6 +56,7 @@ def replay(conn) -> dict:
         "inquiries": int(inquiry_count),
         "experiences": int(experience_count),
         "active_states": int(state_count),
+        "governance_decisions": int(governance_count),
     }
 
 
@@ -74,6 +80,8 @@ def apply_event(conn, event) -> None:
         experience.apply_experience_recorded(conn, payload)
     elif event_type == "state_changed":
         state.apply_state_changed(conn, payload)
+    elif event_type == "governance_decision":
+        governance.apply_governance_decision(conn, payload)
     elif event_type == "inquiry_created":
         inquiries.apply_inquiry_created(conn, payload)
     elif event_type == "inquiry_resolved":

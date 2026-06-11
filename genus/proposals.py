@@ -170,6 +170,28 @@ def record_proposal_reviewed_event(
     return event_id
 
 
+def review_proposal_governed(
+    conn,
+    proposal_id: int,
+    decision: str,
+    note: str = "",
+    override: bool = False,
+) -> dict:
+    from genus import governance
+
+    verdict = governance.evaluate_proposal_review(
+        conn,
+        proposal_id,
+        decision,
+        override,
+    )
+    if verdict["decision"] == governance.BLOCKED:
+        return verdict
+    event_id = record_proposal_reviewed_event(conn, proposal_id, decision, note)
+    verdict["review_event_id"] = event_id
+    return verdict
+
+
 def proposal_payload_for_sustained_high(claim_key: str = LOAD_CLAIM_KEY) -> dict:
     return {
         "description": f"{claim_key} is sustained high. Investigate resource pressure.",

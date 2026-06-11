@@ -19,6 +19,9 @@ are rebuildable.
 | `proposal_reviewed` | `proposal_id`, `decision`, `note` | Human via CLI | Mark proposal accepted/rejected |
 | `experience_recorded` | `experience_id`, `experience_key`, `experience_type`, `subject_key`, `pattern`, `supporting_events`, `derivation`, `summary` | Experience | Insert experience row |
 | `state_changed` | `state_id`, `state_key`, `state_value`, `previous_state_id`, `derivation`, `supporting_beliefs`, `components`, `reason` | State | Insert active state row and supersede previous state |
+| `constraint_checked` | `decision_id`, `constraint_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
+| `policy_evaluated` | `decision_id`, `policy_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
+| `governance_decision` | `decision_id`, `action`, `target_type`, `target_id`, `decision`, `override`, `policy_results`, `reason` | Governance | Insert governance decision row |
 | `inquiry_created` | `inquiry_id`, `inquiry_type`, `claim_key`, `source_belief`, `source_event`, `question_key`, `payload`, `state` | Inquiries | Insert inquiry row |
 | `inquiry_resolved` | `inquiry_id`, `answer` | Human via CLI | Mark inquiry resolved |
 
@@ -26,8 +29,8 @@ are rebuildable.
 
 - `event_log` must never be updated or deleted.
 - `replay()` may clear `belief_projection`, `state_projection`,
-  `experience_log`, `proposal_log`, and `inquiry_log`, but never changes
-  `event_log`.
+  `experience_log`, `proposal_log`, `inquiry_log`, and `governance_log`, but
+  never changes `event_log`.
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
@@ -48,8 +51,19 @@ are rebuildable.
   review work only and does not execute changes.
 - `state_changed` is emitted by deterministic aggregation over active beliefs.
   v0.10 records `system.pressure` from activity and resource-pressure beliefs.
+- Governance checks write all `constraint_checked` events, then all
+  `policy_evaluated` events, then exactly one `governance_decision` event.
+- `constraint_checked` and `policy_evaluated` are audit-only. Replay projects
+  only `governance_decision` into `governance_log`.
+- Kernel constraints are never overrideable. v0.11 requires an existing pending
+  proposal and a valid review decision before a proposal review can continue.
+- Policies are overrideable only when the CLI passes `--override`; the override
+  is recorded in `governance_decision`.
+- A blocked governance decision is still durable and committed. It leaves the
+  target proposal pending.
 - `proposal_reviewed` and `inquiry_resolved` are terminal: at most one review
   per proposal and one resolution per inquiry, enforced before the event is
   written.
+- Inquiry resolution is deliberately ungoverned in v0.11.
 - Query commands are read-only. They do not emit events and do not rebuild
   projections.
