@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.0) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v1.0.1) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,12 +43,12 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v1.0)
+## Wo wir stehen (v1.0.1)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
-State Core · Governance v1 · Maturation v1
+State Core · Governance v1 · Maturation v1 · CI · Ledger Audit
 **Gelb:** deterministischer Kern grün; nächste Phase noch offen
 **Rot:** alles Übrige der Karte
 
@@ -287,6 +287,25 @@ ohne unkontrollierbarer zu werden.
 - [x] aktivierte Regel wirkt deterministisch im nächsten Zyklus
 - [x] ganze Pipeline Replay-stabil
 - [x] **Kern-Pipeline der Karte ist grün**
+- [x] Wachstumsregel ✓
+
+---
+
+## v1.0.1 — Ledger Audit + CI · *Kern absichern*
+
+**Status:** umgesetzt. GitHub Actions führt Tests, Replay, Integrity und die
+Import-Greps aus. `GENUS_LEDGER_AUDIT.md` dokumentiert die aktuelle Grenze:
+append-only und replay-stabil, aber noch nicht manipulations-evident gegen
+vollen lokalen DB-Zugriff. Ein Negativtest stellt sicher, dass kaputte
+Event-Payloads `integrity.check()` scheitern lassen.
+
+**Warum hier:** Nach dem geschlossenen v1.0-Kreis wird nicht sofort größer
+gebaut, sondern das grüne Fundament reproduzierbar abgesichert.
+
+**Definition of Done:**
+- [x] CI läuft für `main` und Pull Requests
+- [x] Audit-Report beschreibt Bedrohungsmodell und v1.1-Sealing-Pfad
+- [x] Negativtest für kaputtes Event im Integrity-Check
 - [x] Wachstumsregel ✓
 
 ---

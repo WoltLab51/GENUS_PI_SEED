@@ -16,6 +16,8 @@ The project documentation lives in `docs/`.
 - `docs/GENUS_ROADMAP.md` defines the next build steps and growth gates.
 - `docs/GENUS_ARCHITECTURE.md` and `docs/GENUS_EVENT_CONTRACT.md` are the
   current technical contracts.
+- `docs/GENUS_LEDGER_AUDIT.md` documents the current ledger integrity boundary
+  and the recommended sealing path.
 - `docs/GENUS_SENSOR_PRINCIPLE.md` defines the boundary for future sensors.
 
 ## Commands
@@ -181,8 +183,11 @@ review proposal per scan.
 ## Quality Checks
 
 ```bash
-pytest
+python -m pytest
 genus replay
+genus integrity check
 grep -r "anthropic|openai|ollama" genus/
 grep -r "requests|httpx|aiohttp|urllib.request" genus/
 ```
+
+GitHub Actions runs the same quality gate on `main` and pull requests.

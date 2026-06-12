@@ -49,6 +49,22 @@ def test_integrity_check_detects_projection_drift_without_rebuilding_live_db(con
     assert drifted_after == drifted_before
 
 
+def test_integrity_check_rejects_known_broken_event(conn):
+    payload = json.dumps({"manipuliert": True}, sort_keys=True, separators=(",", ":"))
+    conn.execute(
+        "INSERT INTO event_log (event_type, payload) VALUES (?, ?)",
+        ("observation_created", payload),
+    )
+
+    result = integrity.check(conn)
+
+    assert result["ok"] is False
+    assert any(
+        "observation_created missing keys" in issue
+        for issue in result["issues"]
+    )
+
+
 def test_validate_event_contract_detects_missing_required_key(conn):
     ledger.append(conn, "observation_created", {"source": "mock", "unit": "percent"})
 
