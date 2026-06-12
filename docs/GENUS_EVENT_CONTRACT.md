@@ -4,6 +4,9 @@ All events are stored in `event_log` with a non-empty `event_type`, valid JSON
 `payload`, and append-only ordering. Events are the durable record; projections
 are rebuildable.
 
+External ledger anchors are JSON artifacts, not events. They never appear in
+`event_log` and have no replay effect.
+
 ## Event Types
 
 | Event type | Required payload keys | Producer | Replay effect |
@@ -80,8 +83,14 @@ are rebuildable.
   rescan experiences and does not re-evaluate active rule effects.
 - `ledger_epoch_opened` pins a genesis digest over the unsealed legacy prefix.
   Replay ignores it as a projection event, but Integrity verifies it.
-- Local sealing detects accidental corruption and lazy tampering. Adaptive
-  local re-sealing and tail truncation require an external anchor to detect.
+- Local sealing detects accidental corruption and lazy tampering.
+- A `genus-ledger-anchor-v1` artifact witnesses one `core_id`, one
+  `head_event_id`, the head event timestamp, and the seal at that head.
+- Anchor creation is read-only. It must not write `event_log`, update
+  projections, or call external services.
+- An anchor protects only the prefix up to its `head_event_id`. Adaptive
+  re-sealing or truncation after that point remains unproven until a later
+  anchor exists.
 - `proposal_reviewed` and `inquiry_resolved` are terminal: at most one review
   per proposal and one resolution per inquiry, enforced before the event is
   written.

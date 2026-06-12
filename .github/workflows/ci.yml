@@ -58,6 +58,18 @@ jobs:
           GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
         run: genus ledger verify
 
+      - name: Create offline ledger anchor
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+          GENUS_CORE_ID: ci-core
+        run: genus ledger anchor create --out ${{ runner.temp }}/genus-anchor.json
+
+      - name: Verify offline ledger anchor
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+          GENUS_CORE_ID: ci-core
+        run: genus ledger anchor verify ${{ runner.temp }}/genus-anchor.json
+
       - name: Check integrity after sealing
         env:
           GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3

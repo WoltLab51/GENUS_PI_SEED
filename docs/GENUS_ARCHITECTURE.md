@@ -10,6 +10,8 @@ it currently believes, and keeps every important state change replayable.
 - **Sealed epochs:** After `ledger_epoch_opened`, new events carry a local
   `prev_seal`/`seal` chain. This detects non-resealed tampering, but external
   anchoring is required for adaptive local attackers.
+- **External witnesses:** Offline anchor artifacts can witness a specific seal
+  head for a specific `core_id` without writing a new ledger event.
 - **Projection-only state:** Tables such as `belief_projection`,
   `state_projection`, `experience_log`, `proposal_log`, `inquiry_log`, and
   `governance_log`, and `rule_projection` are derived views. They may be
@@ -70,6 +72,8 @@ own events and projections are written.
 - `ledger.py` stores and reads immutable events.
 - `sealing.py` opens a local sealing epoch, computes event seals, verifies the
   chain, and exposes the current ledger head for future external anchors.
+- `anchor.py` exports and verifies offline JSON anchors for a sealed ledger
+  head. Anchor creation is read-only and has no replay effect.
 - `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
 - `query.py` reads projections and ledger events to explain state without
@@ -106,6 +110,11 @@ v1.1 adds local Ledger Sealing. A `ledger_epoch_opened` event pins the legacy
 prefix with a genesis digest, and subsequent events carry `prev_seal` and
 `seal`. Integrity verifies the chain, while `genus ledger head` exports the
 head for later external anchoring.
+
+v1.2 adds external Ledger Anchors as offline JSON artifacts. An anchor records
+`core_id`, `head_event_id`, `head_created_at`, and the current seal head without
+emitting an event. It protects only the prefix up to that head; events after the
+anchor require a later anchor to be externally witnessed.
 
 ## Document Family
 

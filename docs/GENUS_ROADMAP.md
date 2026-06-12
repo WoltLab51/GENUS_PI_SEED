@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.1) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v1.2) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,13 +43,14 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v1.1)
+## Wo wir stehen (v1.2)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
-State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing
-**Gelb:** externer Anchor fehlt
+State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
+External Ledger Anchors
+**Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 
 ---
@@ -331,6 +332,29 @@ ein eigener späterer Schritt.
 - [x] lazy Tampering wird erkannt
 - [x] adaptive lokale Re-Sealing-Grenze ist getestet und dokumentiert
 - [x] `genus ledger head` exportiert den Chain-Head
+- [x] Wachstumsregel ✓
+
+---
+
+## v1.2 — External Ledger Anchors · *extern bezeugbarer Head*
+
+**Status:** umgesetzt. `genus ledger anchor create` exportiert ein kanonisches
+Offline-JSON-Artefakt für den aktuellen Seal-Head. Das Artefakt enthält
+`core_id`, `head_event_id`, `head_created_at` und den Seal-Head. Es schreibt
+kein Event und verändert die DB nicht. `genus ledger anchor verify` prüft den
+verankerten Punkt gegen die lokale Chain.
+
+**Ehrliche Grenze:** Ein Anchor schützt den Prefix bis zu seinem
+`head_event_id`. Events danach sind gültige lokale Historie, aber erst ab einem
+späteren Anchor extern bezeugt. Deshalb ist die Anchor-Kadenz ein
+Sicherheitsparameter.
+
+**Definition of Done:**
+- [x] Anchor-Erzeugung ist read-only
+- [x] `core_id` ist Pflicht über `--core-id` oder `GENUS_CORE_ID`
+- [x] Verify erkennt Rewrites vor oder am Anchor-Head
+- [x] Verify bleibt grün für adaptive Änderungen nur nach dem Anchor
+- [x] CI erzeugt und verifiziert ein Offline-Anchor-Artefakt
 - [x] Wachstumsregel ✓
 
 ---

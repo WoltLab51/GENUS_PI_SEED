@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import click
 
 from genus import (
+    anchor,
     db,
     event_router,
     experience,
@@ -661,6 +663,62 @@ def ledger_verify() -> None:
         for issue in issues:
             click.echo(f"[SEAL] FAIL {issue}")
         raise click.ClickException("ledger verification failed")
+    finally:
+        conn.close()
+
+
+@ledger_group.group("anchor")
+def ledger_anchor_group() -> None:
+    pass
+
+
+@ledger_anchor_group.command("create")
+@click.option("--core-id", envvar="GENUS_CORE_ID")
+@click.option("--out", "out_path", type=click.Path(path_type=Path))
+def ledger_anchor_create(core_id: str | None, out_path: Path | None) -> None:
+    conn = get_conn()
+    try:
+        try:
+            artifact = anchor.create_anchor(conn, core_id)
+        except anchor.AnchorError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+        text = anchor.canonical_json(artifact)
+        if out_path is None:
+            click.echo(text)
+            return
+
+        target = out_path
+        if target.exists() and target.is_dir():
+            target = target / anchor.filename_for_anchor(artifact)
+        target.write_text(text + "\n", encoding="utf-8")
+        click.echo(f"[ANCHOR] wrote {target}")
+    finally:
+        conn.close()
+
+
+@ledger_anchor_group.command("verify")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--core-id", envvar="GENUS_CORE_ID")
+def ledger_anchor_verify(path: Path, core_id: str | None) -> None:
+    conn = get_conn()
+    try:
+        try:
+            artifact = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise click.ClickException(f"invalid anchor file: {exc}") from exc
+
+        issues = anchor.verify_anchor(conn, artifact, core_id=core_id)
+        if not issues:
+            click.echo(
+                f"[ANCHOR] OK core_id={artifact['core_id']} "
+                f"head_event_id={artifact['head_event_id']} head={artifact['head']}"
+            )
+            return
+
+        for issue in issues:
+            click.echo(f"[ANCHOR] FAIL {issue}")
+        raise click.ClickException("anchor verification failed")
     finally:
         conn.close()
 

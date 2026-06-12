@@ -17,7 +17,7 @@ The project documentation lives in `docs/`.
 - `docs/GENUS_ARCHITECTURE.md` and `docs/GENUS_EVENT_CONTRACT.md` are the
   current technical contracts.
 - `docs/GENUS_LEDGER_AUDIT.md` documents the current ledger integrity boundary
-  and the recommended sealing path.
+  and the recommended sealing and anchoring path.
 - `docs/GENUS_SENSOR_PRINCIPLE.md` defines the boundary for future sensors.
 
 ## Commands
@@ -58,6 +58,8 @@ genus ledger tail --n 20
 genus ledger seal-init
 genus ledger head
 genus ledger verify
+genus ledger anchor create --core-id pi-core
+genus ledger anchor verify /path/to/genus-anchor-pi-core-3-abc123def456.json
 ```
 
 The default SQLite database is `genus.sqlite3`. Override it with:
@@ -173,6 +175,27 @@ This detects accidental corruption and lazy tampering. A fully adaptive local
 attacker can still rewrite and re-seal without an external anchor; that boundary
 is documented in `docs/GENUS_LEDGER_AUDIT.md`.
 
+## External Ledger Anchors
+
+v1.2 adds offline JSON anchors for the current seal head. Creating an anchor is
+read-only: it writes no event, does not commit anything to the database, and
+does not call Git, GitHub, HTTP, or any external API.
+
+```bash
+GENUS_CORE_ID=pi-core genus ledger anchor create
+GENUS_CORE_ID=pi-core genus ledger anchor create --out /safe/place/anchors/
+GENUS_CORE_ID=pi-core genus ledger anchor verify /safe/place/anchors/genus-anchor-pi-core-3-abc123def456.json
+```
+
+`--core-id` can be used instead of `GENUS_CORE_ID`. The `core_id` is required so
+long-lived anchor files say which GENUS core they describe. If `--out` points to
+an existing directory, GENUS writes
+`genus-anchor-{core_id}-{head_event_id}-{head_prefix}.json`.
+
+An anchor protects the ledger prefix up to its `head_event_id`. Later events are
+valid local history, but they are not externally witnessed until the next anchor.
+To check a directory of anchors, run `genus ledger anchor verify` for each file.
+
 ## Automatic Collection With Cron
 
 GENUS does not need a daemon for the first Pi loop. Run all local sensors from
@@ -207,6 +230,8 @@ genus integrity check
 genus ledger seal-init
 genus ledger head
 genus ledger verify
+GENUS_CORE_ID=ci-core genus ledger anchor create --out /tmp/genus-anchor.json
+GENUS_CORE_ID=ci-core genus ledger anchor verify /tmp/genus-anchor.json
 grep -r "anthropic|openai|ollama" genus/
 grep -r "requests|httpx|aiohttp|urllib.request" genus/
 ```
