@@ -21,6 +21,7 @@ are rebuildable.
 | `state_changed` | `state_id`, `state_key`, `state_value`, `previous_state_id`, `derivation`, `supporting_beliefs`, `components`, `reason` | State | Insert active state row and supersede previous state |
 | `rule_proposed` | `rule_key`, `rule_type`, `subject_key`, `spec`, `source_experience`, `derivation`, `summary` | Maturation | Audit only; source event for RuleProposal |
 | `rule_activated` | `rule_id`, `rule_key`, `rule_type`, `subject_key`, `spec`, `source_proposal`, `derivation` | Maturation | Insert active rule row |
+| `ledger_epoch_opened` | `algo`, `genesis_digest`, `prefix_max_id`, `prefix_count` | Ledger sealing | Starts sealed epoch; no projection effect |
 | `constraint_checked` | `decision_id`, `constraint_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
 | `policy_evaluated` | `decision_id`, `policy_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
 | `governance_decision` | `decision_id`, `action`, `target_type`, `target_id`, `decision`, `override`, `policy_results`, `reason` | Governance | Insert governance decision row |
@@ -30,6 +31,8 @@ are rebuildable.
 ## Invariants
 
 - `event_log` must never be updated or deleted.
+- `event_log.prev_seal` and `event_log.seal` are append-time fields. Legacy
+  rows may be null; sealed rows must verify against the local chain.
 - `replay()` may clear `belief_projection`, `state_projection`,
   `experience_log`, `proposal_log`, `inquiry_log`, `governance_log`, and
   `rule_projection`, but never changes `event_log`.
@@ -75,6 +78,10 @@ are rebuildable.
   change beliefs and never execute actions.
 - Replay applies `rule_activated` events into `rule_projection`; it does not
   rescan experiences and does not re-evaluate active rule effects.
+- `ledger_epoch_opened` pins a genesis digest over the unsealed legacy prefix.
+  Replay ignores it as a projection event, but Integrity verifies it.
+- Local sealing detects accidental corruption and lazy tampering. Adaptive
+  local re-sealing and tail truncation require an external anchor to detect.
 - `proposal_reviewed` and `inquiry_resolved` are terminal: at most one review
   per proposal and one resolution per inquiry, enforced before the event is
   written.

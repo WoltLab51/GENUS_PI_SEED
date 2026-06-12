@@ -2,13 +2,27 @@ from __future__ import annotations
 
 import json
 
+from genus import sealing
+
 
 def append(conn, event_type: str, payload: dict) -> int:
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    cur = conn.execute(
-        "INSERT INTO event_log (event_type, payload) VALUES (?, ?)",
-        (event_type, serialized),
-    )
+    if event_type != sealing.EPOCH_EVENT and sealing.is_active(conn):
+        previous = sealing.previous_head(conn)
+        prev_seal = previous["seal"]
+        seal = sealing.compute_seal(prev_seal, event_type, serialized)
+        cur = conn.execute(
+            """
+            INSERT INTO event_log (event_type, payload, prev_seal, seal)
+            VALUES (?, ?, ?, ?)
+            """,
+            (event_type, serialized, prev_seal, seal),
+        )
+    else:
+        cur = conn.execute(
+            "INSERT INTO event_log (event_type, payload) VALUES (?, ?)",
+            (event_type, serialized),
+        )
     return int(cur.lastrowid)
 
 
@@ -41,4 +55,6 @@ def _event_dict(row) -> dict:
         "event_type": row["event_type"],
         "payload": json.loads(row["payload"]),
         "created_at": row["created_at"],
+        "prev_seal": row["prev_seal"],
+        "seal": row["seal"],
     }

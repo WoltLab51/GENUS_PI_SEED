@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.0.1) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v1.1) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,13 +43,13 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v1.0.1)
+## Wo wir stehen (v1.1)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
-State Core · Governance v1 · Maturation v1 · CI · Ledger Audit
-**Gelb:** deterministischer Kern grün; nächste Phase noch offen
+State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing
+**Gelb:** externer Anchor fehlt
 **Rot:** alles Übrige der Karte
 
 ---
@@ -306,6 +306,31 @@ gebaut, sondern das grüne Fundament reproduzierbar abgesichert.
 - [x] CI läuft für `main` und Pull Requests
 - [x] Audit-Report beschreibt Bedrohungsmodell und v1.1-Sealing-Pfad
 - [x] Negativtest für kaputtes Event im Integrity-Check
+- [x] Wachstumsregel ✓
+
+---
+
+## v1.1 — Ledger Sealing · *lokale Tamper Detection*
+
+**Status:** umgesetzt. `genus ledger seal-init` öffnet eine versiegelte Epoche
+per `ledger_epoch_opened` und Genesis-Digest über den Legacy-Prefix. Danach
+schreibt `ledger.append()` `prev_seal` und `seal` direkt beim Insert. Integrity
+prüft Prefix-Digest, Chain-Kontinuität und Seal-Gültigkeit. `genus ledger head`
+macht den aktuellen Kopf exportierbar.
+
+**Ehrliche Grenze:** Ohne externen Anchor erkennt GENUS versehentliche
+Korruption und nicht nachversiegelte Manipulation. Ein adaptiver lokaler
+Angreifer mit voller DB-Kontrolle kann History ändern und lokal neu versiegeln.
+Tail-Truncation ist lokal ebenfalls nicht beweisbar. Externe Anchors sind daher
+ein eigener späterer Schritt.
+
+**Definition of Done:**
+- [x] `ledger_epoch_opened` im Contract + Integrity
+- [x] bestehende Events bleiben unberührt
+- [x] neue Events nach Epoch tragen `prev_seal` und `seal`
+- [x] lazy Tampering wird erkannt
+- [x] adaptive lokale Re-Sealing-Grenze ist getestet und dokumentiert
+- [x] `genus ledger head` exportiert den Chain-Head
 - [x] Wachstumsregel ✓
 
 ---

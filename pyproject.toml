@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.0.1"
-description = "GENUS PI SEED v1.0.1 ledger audit hardening"
+version = "1.1.0"
+description = "GENUS PI SEED v1.1 ledger sealing"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

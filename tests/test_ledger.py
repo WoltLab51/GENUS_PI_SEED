@@ -65,6 +65,32 @@ def test_init_schema_adds_lifecycle_columns_to_existing_projection_tables():
     assert "answer" in inquiry_columns
 
 
+def test_init_schema_adds_sealing_columns_to_existing_event_log():
+    legacy = sqlite3.connect(":memory:")
+    legacy.row_factory = sqlite3.Row
+    legacy.executescript(
+        """
+        CREATE TABLE event_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT '2026-06-12T00:00:00.000Z'
+        );
+        INSERT INTO event_log (event_type, payload)
+        VALUES ('observation_created', '{"source":"legacy"}');
+        """
+    )
+
+    db.init_schema(legacy)
+    columns = {row["name"] for row in legacy.execute("PRAGMA table_info(event_log)")}
+    row = legacy.execute("SELECT prev_seal, seal FROM event_log WHERE id = 1").fetchone()
+    legacy.close()
+
+    assert {"prev_seal", "seal"}.issubset(columns)
+    assert row["prev_seal"] is None
+    assert row["seal"] is None
+
+
 def test_append_does_not_commit(conn):
     ledger.append(conn, "observation_created", {"source": "x"})
     conn.rollback()

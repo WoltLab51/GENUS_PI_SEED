@@ -43,6 +43,26 @@ jobs:
           GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
         run: genus integrity check
 
+      - name: Initialize ledger sealing
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: genus ledger seal-init
+
+      - name: Show ledger head
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: genus ledger head
+
+      - name: Verify ledger seal chain
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: genus ledger verify
+
+      - name: Check integrity after sealing
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: genus integrity check
+
       - name: Guard forbidden model imports
         run: |
           ! grep -R -n -E "anthropic|openai|ollama" genus

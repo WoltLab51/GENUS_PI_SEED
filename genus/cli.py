@@ -18,6 +18,7 @@ from genus import (
     proposals,
     query,
     reactors,
+    sealing,
     sensor,
     state,
 )
@@ -610,6 +611,56 @@ def ledger_tail(n: int) -> None:
                 f"{event['id']:<5} {event['event_type']:<24} "
                 f"{json.dumps(event['payload'], sort_keys=True)}"
             )
+    finally:
+        conn.close()
+
+
+@ledger_group.command("seal-init")
+def ledger_seal_init() -> None:
+    conn = get_conn()
+    try:
+        epoch_id = sealing.open_epoch(conn)
+        if epoch_id is None:
+            click.echo("[SEAL] already initialized")
+            return
+        conn.commit()
+        head = sealing.head(conn)
+        click.echo(f"[SEAL] epoch opened (event id={epoch_id})")
+        click.echo(f"[SEAL] head={head['seal']}")
+    finally:
+        conn.close()
+
+
+@ledger_group.command("head")
+def ledger_head() -> None:
+    conn = get_conn()
+    try:
+        head = sealing.head(conn)
+        if head is None:
+            click.echo("[SEAL] sealing not initialized (run: genus ledger seal-init)")
+            return
+        click.echo(f"[SEAL] algo={sealing.ALGO}")
+        click.echo(f"[SEAL] head_event_id={head['id']}")
+        click.echo(f"[SEAL] head={head['seal']}")
+    finally:
+        conn.close()
+
+
+@ledger_group.command("verify")
+def ledger_verify() -> None:
+    conn = get_conn()
+    try:
+        if not sealing.is_active(conn):
+            click.echo("[SEAL] sealing not initialized (run: genus ledger seal-init)")
+            return
+        issues = sealing.verify_chain(conn)
+        if not issues:
+            head = sealing.head(conn)
+            click.echo(f"[SEAL] OK chain intact, head={head['seal']}")
+            return
+        for issue in issues:
+            click.echo(f"[SEAL] FAIL {issue}")
+        raise click.ClickException("ledger verification failed")
     finally:
         conn.close()
 

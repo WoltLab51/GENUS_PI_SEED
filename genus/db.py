@@ -21,6 +21,10 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "proposal_log", "decision", "TEXT")
     _ensure_column(conn, "proposal_log", "reviewed_at", "TEXT")
     _ensure_column(conn, "inquiry_log", "answer", "TEXT")
+    # ADD COLUMN is append-compatible: it does not rewrite existing rows and
+    # does not fire the append-only UPDATE trigger. Legacy rows stay unsealed.
+    _ensure_column(conn, "event_log", "prev_seal", "TEXT")
+    _ensure_column(conn, "event_log", "seal", "TEXT")
     conn.commit()
 
 

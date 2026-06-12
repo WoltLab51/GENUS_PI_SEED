@@ -7,6 +7,9 @@ it currently believes, and keeps every important state change replayable.
 
 - **Ledger-first:** `event_log` is the source of truth. It is append-only and
   ordered.
+- **Sealed epochs:** After `ledger_epoch_opened`, new events carry a local
+  `prev_seal`/`seal` chain. This detects non-resealed tampering, but external
+  anchoring is required for adaptive local attackers.
 - **Projection-only state:** Tables such as `belief_projection`,
   `state_projection`, `experience_log`, `proposal_log`, `inquiry_log`, and
   `governance_log`, and `rule_projection` are derived views. They may be
@@ -65,6 +68,8 @@ own events and projections are written.
 - `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
   with `inquiry_log` rows.
 - `ledger.py` stores and reads immutable events.
+- `sealing.py` opens a local sealing epoch, computes event seals, verifies the
+  chain, and exposes the current ledger head for future external anchors.
 - `event_router.py` replays events into rebuildable projections.
 - `integrity.py` checks schema, event contracts, and replay stability.
 - `query.py` reads projections and ledger events to explain state without
@@ -96,6 +101,11 @@ anything by themselves; `genus rules activate` is a separate governed event
 that writes `rule_activated` and rebuilds into `rule_projection`. In v1.0 an
 active rule may only create an `ExpectationInquiry` when new activity evidence
 deviates from the learned expectation.
+
+v1.1 adds local Ledger Sealing. A `ledger_epoch_opened` event pins the legacy
+prefix with a genesis digest, and subsequent events carry `prev_seal` and
+`seal`. Integrity verifies the chain, while `genus ledger head` exports the
+head for later external anchoring.
 
 ## Document Family
 

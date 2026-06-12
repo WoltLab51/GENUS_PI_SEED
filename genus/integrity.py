@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from genus import event_router
+from genus import event_router, sealing
 from genus.db import init_schema
 
 
@@ -117,6 +117,12 @@ REQUIRED_EVENT_KEYS = {
         "state",
     },
     "inquiry_resolved": {"inquiry_id", "answer"},
+    "ledger_epoch_opened": {
+        "algo",
+        "genesis_digest",
+        "prefix_max_id",
+        "prefix_count",
+    },
 }
 
 
@@ -124,6 +130,7 @@ def check(conn) -> dict:
     issues = []
     issues.extend(validate_schema(conn))
     issues.extend(validate_event_contract(conn))
+    issues.extend(sealing.verify_chain(conn))
 
     event_log_before = snapshot_event_log(conn)
     projection_before = snapshot_projections(conn)
@@ -158,8 +165,10 @@ def replay_connection_from_events(events: list[dict]) -> sqlite3.Connection:
     init_schema(replay_conn)
     replay_conn.executemany(
         """
-        INSERT INTO event_log (id, event_type, payload, created_at)
-        VALUES (:id, :event_type, :payload, :created_at)
+        INSERT INTO event_log
+            (id, event_type, payload, created_at, prev_seal, seal)
+        VALUES
+            (:id, :event_type, :payload, :created_at, :prev_seal, :seal)
         """,
         events,
     )
@@ -169,6 +178,10 @@ def replay_connection_from_events(events: list[dict]) -> sqlite3.Connection:
 
 def validate_schema(conn) -> list[str]:
     issues = []
+    event_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(event_log)").fetchall()
+    ]
     belief_columns = [
         row["name"]
         for row in conn.execute("PRAGMA table_info(belief_projection)").fetchall()
@@ -195,6 +208,8 @@ def validate_schema(conn) -> list[str]:
         row["name"]
         for row in conn.execute("PRAGMA table_info(rule_projection)").fetchall()
     ]
+    if not {"prev_seal", "seal"}.issubset(event_columns):
+        issues.append("event_log missing sealing columns")
     if "confidence" in belief_columns:
         issues.append("belief_projection must not store confidence")
     if not {"decision", "reviewed_at"}.issubset(proposal_columns):
@@ -346,6 +361,32 @@ def validate_event_contract(conn) -> list[str]:
                 issues.append(f"event {row['id']} governance_decision has invalid decision")
             if payload["action"] not in {"proposal.review", "rule.activate"}:
                 issues.append(f"event {row['id']} governance_decision has invalid action")
+        if event_type == "ledger_epoch_opened":
+            if required is not None and not missing:
+                if payload["algo"] != sealing.ALGO:
+                    issues.append(
+                        f"event {row['id']} ledger_epoch_opened has invalid algo"
+                    )
+                if not isinstance(payload["genesis_digest"], str):
+                    issues.append(
+                        f"event {row['id']} ledger_epoch_opened has invalid genesis_digest"
+                    )
+                try:
+                    prefix_count = int(payload["prefix_count"])
+                    prefix_max_id = int(payload["prefix_max_id"])
+                except (TypeError, ValueError):
+                    issues.append(
+                        f"event {row['id']} ledger_epoch_opened has invalid prefix values"
+                    )
+                else:
+                    if prefix_count < 0:
+                        issues.append(
+                            f"event {row['id']} ledger_epoch_opened has invalid prefix_count"
+                        )
+                    if prefix_max_id < 0:
+                        issues.append(
+                            f"event {row['id']} ledger_epoch_opened has invalid prefix_max_id"
+                        )
         if event_type == "proposal_reviewed":
             proposal_id = payload["proposal_id"]
             if payload["decision"] not in {"accepted", "rejected"}:
@@ -370,9 +411,15 @@ def snapshot_event_log(conn) -> list[dict]:
             "event_type": row["event_type"],
             "payload": row["payload"],
             "created_at": row["created_at"],
+            "prev_seal": row["prev_seal"],
+            "seal": row["seal"],
         }
         for row in conn.execute(
-            "SELECT id, event_type, payload, created_at FROM event_log ORDER BY id"
+            """
+            SELECT id, event_type, payload, created_at, prev_seal, seal
+            FROM event_log
+            ORDER BY id
+            """
         ).fetchall()
     ]
 

@@ -55,6 +55,9 @@ genus inquiries resolve 1 --answer "Backup lief"
 genus replay
 genus integrity check
 genus ledger tail --n 20
+genus ledger seal-init
+genus ledger head
+genus ledger verify
 ```
 
 The default SQLite database is `genus.sqlite3`. Override it with:
@@ -155,6 +158,21 @@ human act is required:
 This keeps `Proposal != Change` hard at the exact point where GENUS starts
 compiling experience into behavior.
 
+## Ledger Sealing
+
+v1.1 adds local ledger sealing. `genus ledger seal-init` appends one
+`ledger_epoch_opened` event with a genesis digest over the legacy prefix. From
+that point on, new events carry `prev_seal` and `seal` in `event_log`.
+
+- `genus ledger head` prints the current seal head for later external anchoring.
+- `genus ledger verify` recomputes the local chain.
+- `genus integrity check` includes the same seal verification.
+- Existing events are not updated or backfilled.
+
+This detects accidental corruption and lazy tampering. A fully adaptive local
+attacker can still rewrite and re-seal without an external anchor; that boundary
+is documented in `docs/GENUS_LEDGER_AUDIT.md`.
+
 ## Automatic Collection With Cron
 
 GENUS does not need a daemon for the first Pi loop. Run all local sensors from
@@ -186,6 +204,9 @@ review proposal per scan.
 python -m pytest
 genus replay
 genus integrity check
+genus ledger seal-init
+genus ledger head
+genus ledger verify
 grep -r "anthropic|openai|ollama" genus/
 grep -r "requests|httpx|aiohttp|urllib.request" genus/
 ```

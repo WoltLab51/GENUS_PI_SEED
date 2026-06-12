@@ -2,7 +2,9 @@ CREATE TABLE IF NOT EXISTS event_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     event_type  TEXT    NOT NULL,
     payload     TEXT    NOT NULL,
-    created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    prev_seal   TEXT,
+    seal        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_log_type ON event_log(event_type);
