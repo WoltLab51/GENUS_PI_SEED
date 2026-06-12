@@ -221,6 +221,19 @@ Run `genus experience scan` manually or from a slower daily cron. It looks for
 contrasting activity rhythms, not raw sample frequency, and creates at most one
 review proposal per scan.
 
+## Pi Deployment
+
+Use the scripts in `deploy/` to update a Raspberry Pi without logging in and
+typing the full sequence by hand:
+
+```powershell
+.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core
+```
+
+The remote script fast-forwards `main`, installs the package, runs tests,
+checks integrity, verifies ledger sealing, exports an optional offline anchor,
+and refuses dirty working trees. See `deploy/README.md`.
+
 ## Quality Checks
 
 ```bash
