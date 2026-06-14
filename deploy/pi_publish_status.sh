@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$HOME/.genus/genus.sqlite3}"
 STATUS_REPO_DIR="${GENUS_STATUS_REPO_DIR:-$HOME/GENUS_PI_STATUS}"
-STATUS_REPO_URL="${GENUS_STATUS_REPO_URL:-git@github.com:WoltLab51/GENUS_PI_STATUS.git}"
+STATUS_REPO_URL="${GENUS_STATUS_REPO_URL:-git@github-genus-pi-status:WoltLab51/GENUS_PI_STATUS.git}"
 PUSH="${GENUS_STATUS_PUSH:-1}"
 
 if [ -z "${GENUS_CORE_ID:-}" ]; then

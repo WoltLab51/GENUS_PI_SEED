@@ -2,11 +2,11 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$HostName,
 
-    [string]$RepoDir = "/home/pi/GENUS_PI_SEED",
-    [string]$DbPath = "/home/pi/.genus/genus.sqlite3",
-    [string]$AnchorDir = "/home/pi/.genus/anchors",
-    [string]$StatusRepoDir = "/home/pi/GENUS_PI_STATUS",
-    [string]$StatusRepoUrl = "git@github.com:WoltLab51/GENUS_PI_STATUS.git",
+    [string]$RepoDir = "",
+    [string]$DbPath = "",
+    [string]$AnchorDir = "",
+    [string]$StatusRepoDir = "",
+    [string]$StatusRepoUrl = "git@github-genus-pi-status:WoltLab51/GENUS_PI_STATUS.git",
     [string]$CoreId = "",
     [string]$Branch = "main",
 
@@ -27,13 +27,25 @@ function Quote-Bash {
     return "$single" + $Value.Replace("$single", $escapedSingle) + "$single"
 }
 
-$envParts = @(
-    "GENUS_DEPLOY_BRANCH=$(Quote-Bash $Branch)",
-    "GENUS_DB_PATH=$(Quote-Bash $DbPath)",
-    "GENUS_ANCHOR_DIR=$(Quote-Bash $AnchorDir)",
-    "GENUS_STATUS_REPO_DIR=$(Quote-Bash $StatusRepoDir)",
-    "GENUS_STATUS_REPO_URL=$(Quote-Bash $StatusRepoUrl)"
-)
+$remoteRepoDir = '$HOME/GENUS_PI_SEED'
+if ($RepoDir.Trim().Length -gt 0) {
+    $remoteRepoDir = Quote-Bash $RepoDir
+}
+
+$envParts = @("GENUS_DEPLOY_BRANCH=$(Quote-Bash $Branch)")
+
+if ($DbPath.Trim().Length -gt 0) {
+    $envParts += "GENUS_DB_PATH=$(Quote-Bash $DbPath)"
+}
+if ($AnchorDir.Trim().Length -gt 0) {
+    $envParts += "GENUS_ANCHOR_DIR=$(Quote-Bash $AnchorDir)"
+}
+if ($StatusRepoDir.Trim().Length -gt 0) {
+    $envParts += "GENUS_STATUS_REPO_DIR=$(Quote-Bash $StatusRepoDir)"
+}
+if ($StatusRepoUrl.Trim().Length -gt 0) {
+    $envParts += "GENUS_STATUS_REPO_URL=$(Quote-Bash $StatusRepoUrl)"
+}
 
 if ($CoreId.Trim().Length -gt 0) {
     $envParts += "GENUS_CORE_ID=$(Quote-Bash $CoreId)"
@@ -49,7 +61,7 @@ if ($EnableStatusPublish) {
 }
 
 $envPrefix = $envParts -join " "
-$remoteCommand = "cd $(Quote-Bash $RepoDir) && $envPrefix ./deploy/pi_deploy.sh"
+$remoteCommand = "cd $remoteRepoDir && $envPrefix ./deploy/pi_deploy.sh"
 if ($InstallCron) {
     $remoteCommand += " && $envPrefix ./deploy/pi_install_cron.sh"
     if ($EnableStatusPublish) {

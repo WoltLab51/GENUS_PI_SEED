@@ -6,6 +6,7 @@ REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$HOME/.genus/logs}"
 STATUS_REPO_DIR="${GENUS_STATUS_REPO_DIR:-$HOME/GENUS_PI_STATUS}"
+STATUS_REPO_URL="${GENUS_STATUS_REPO_URL:-git@github-genus-pi-status:WoltLab51/GENUS_PI_STATUS.git}"
 CRON_BEGIN="# BEGIN GENUS_PI_SEED"
 CRON_END="# END GENUS_PI_SEED"
 
@@ -35,6 +36,7 @@ fi
     echo "GENUS_DB_PATH=$DB_PATH"
     echo "GENUS_LOG_DIR=$LOG_DIR"
     echo "GENUS_STATUS_REPO_DIR=$STATUS_REPO_DIR"
+    echo "GENUS_STATUS_REPO_URL=$STATUS_REPO_URL"
     if [ -n "${GENUS_CORE_ID:-}" ]; then
         echo "GENUS_CORE_ID=$GENUS_CORE_ID"
     fi

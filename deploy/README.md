@@ -15,8 +15,8 @@ No daemon, no web API, no automatic remote execution by GENUS itself:
 ```bash
 sudo apt update
 sudo apt install -y git python3 python3-venv
-git clone https://github.com/WoltLab51/GENUS_PI_SEED.git /home/pi/GENUS_PI_SEED
-cd /home/pi/GENUS_PI_SEED
+git clone https://github.com/WoltLab51/GENUS_PI_SEED.git "$HOME/GENUS_PI_SEED"
+cd "$HOME/GENUS_PI_SEED"
 GENUS_CORE_ID=pi-core ./deploy/pi_deploy.sh
 GENUS_CORE_ID=pi-core ./deploy/pi_install_cron.sh
 ```
@@ -29,7 +29,7 @@ the ID should name this specific GENUS core, not just a temporary hostname.
 From the local workstation:
 
 ```powershell
-.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core -InstallCron
+.\deploy\deploy_to_pi.ps1 -HostName ronny@pi.local -CoreId pi-core -InstallCron
 ```
 
 Run this command in Windows PowerShell on the workstation, not inside the SSH
@@ -40,10 +40,10 @@ Useful overrides:
 ```powershell
 .\deploy\deploy_to_pi.ps1 `
   -HostName pi@192.168.178.40 `
-  -RepoDir /home/pi/GENUS_PI_SEED `
-  -DbPath /home/pi/.genus/genus.sqlite3 `
-  -AnchorDir /home/pi/.genus/anchors `
-  -StatusRepoDir /home/pi/GENUS_PI_STATUS `
+  -RepoDir /home/ronny/GENUS_PI_SEED `
+  -DbPath /home/ronny/.genus/genus.sqlite3 `
+  -AnchorDir /home/ronny/.genus/anchors `
+  -StatusRepoDir /home/ronny/GENUS_PI_STATUS `
   -CoreId pi-core
 ```
 
@@ -52,14 +52,13 @@ Useful overrides:
 `pi_deploy.sh` can also be run directly over SSH:
 
 ```bash
-ssh pi@pi.local 'cd /home/pi/GENUS_PI_SEED && GENUS_CORE_ID=pi-core ./deploy/pi_deploy.sh'
+ssh ronny@pi.local 'cd "$HOME/GENUS_PI_SEED" && GENUS_CORE_ID=pi-core ./deploy/pi_deploy.sh'
 ```
 
 Environment knobs:
 
-- `GENUS_DB_PATH` defaults to `/home/pi/.genus/genus.sqlite3` when run as user
-  `pi`.
-- `GENUS_ANCHOR_DIR` defaults to `/home/pi/.genus/anchors`.
+- `GENUS_DB_PATH` defaults to `$HOME/.genus/genus.sqlite3`.
+- `GENUS_ANCHOR_DIR` defaults to `$HOME/.genus/anchors`.
 - `GENUS_DEPLOY_BRANCH` defaults to `main`.
 - `GENUS_DEPLOY_SKIP_TESTS=1` skips pytest.
 - `GENUS_DEPLOY_SKIP_ANCHOR=1` skips anchor export.
@@ -74,7 +73,7 @@ core ID, sensors, and forbidden-import guards.
 crontab:
 
 ```bash
-cd /home/pi/GENUS_PI_SEED
+cd "$HOME/GENUS_PI_SEED"
 GENUS_CORE_ID=pi-core ./deploy/pi_install_cron.sh
 ```
 
@@ -91,8 +90,8 @@ The script replaces only the block between `BEGIN GENUS_PI_SEED` and
 Logs:
 
 ```bash
-tail -f /home/pi/.genus/logs/cron.log
-tail -f /home/pi/.genus/logs/doctor.log
+tail -f "$HOME/.genus/logs/cron.log"
+tail -f "$HOME/.genus/logs/doctor.log"
 ```
 
 ## Status Repository
@@ -110,17 +109,36 @@ Published content:
 First set up write access from the Pi to GitHub, preferably with a repository
 deploy key that has write access only to `WoltLab51/GENUS_PI_STATUS`.
 
-Then publish manually:
+From Windows PowerShell on the workstation, create or reuse that Pi-side key:
+
+```powershell
+.\deploy\setup_pi_status_key.ps1 -HostName ronny@pi.local -CoreId pi-core
+```
+
+Copy the printed public key into GitHub:
+
+- repository: `WoltLab51/GENUS_PI_STATUS`
+- path: `Settings -> Deploy keys -> Add deploy key`
+- title: `pi-core status publisher`
+- required checkbox: `Allow write access`
+
+Then publish from Windows PowerShell:
+
+```powershell
+.\deploy\publish_pi_status.ps1 -HostName ronny@pi.local -CoreId pi-core
+```
+
+Or publish manually inside an SSH session:
 
 ```bash
-cd /home/pi/GENUS_PI_SEED
+cd "$HOME/GENUS_PI_SEED"
 GENUS_CORE_ID=pi-core ./deploy/pi_publish_status.sh
 ```
 
 To add daily status publishing to the GENUS cron block:
 
 ```bash
-cd /home/pi/GENUS_PI_SEED
+cd "$HOME/GENUS_PI_SEED"
 GENUS_CORE_ID=pi-core GENUS_ENABLE_STATUS_PUBLISH=1 ./deploy/pi_install_cron.sh
 ```
 
@@ -136,6 +154,6 @@ The cron script installs this routine automatically. The equivalent manual
 entries are:
 
 ```cron
-*/5 * * * * cd /home/pi/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus observe-all >> /home/pi/.genus/logs/cron.log 2>&1
-1-59/5 * * * * cd /home/pi/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus state refresh >> /home/pi/.genus/logs/cron.log 2>&1
+*/5 * * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus observe-all >> "$GENUS_LOG_DIR/cron.log" 2>&1
+1-59/5 * * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus state refresh >> "$GENUS_LOG_DIR/cron.log" 2>&1
 ```
