@@ -32,6 +32,10 @@ HOST_ALIAS=$hostAliasQuoted
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 
+case "`$KEY_PATH" in
+    "~/"*) KEY_PATH="`$HOME/`${KEY_PATH#~/}" ;;
+esac
+
 if [ ! -f "`$KEY_PATH" ]; then
     ssh-keygen -q -t ed25519 -f "`$KEY_PATH" -N "" -C "genus-pi-status@`$CORE_ID"
 fi
