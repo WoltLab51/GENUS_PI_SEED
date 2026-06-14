@@ -33,8 +33,9 @@ mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 
 case "`$KEY_PATH" in
-    "~/"*) KEY_PATH="`$HOME/`${KEY_PATH#~/}" ;;
+    "~/"*) KEY_PATH="`$HOME/`${KEY_PATH:2}" ;;
 esac
+mkdir -p "`$(dirname -- "`$KEY_PATH")"
 
 if [ ! -f "`$KEY_PATH" ]; then
     ssh-keygen -q -t ed25519 -f "`$KEY_PATH" -N "" -C "genus-pi-status@`$CORE_ID"
