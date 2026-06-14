@@ -65,6 +65,8 @@ fi
 cat "`$KEY_PATH.pub"
 "@
 
+$remoteScript = $remoteScript.Replace("`r`n", "`n").Replace("`r", "`n")
+
 Write-Host "[STATUS-KEY] preparing SSH key on $HostName"
 $publicKey = $remoteScript | ssh $HostName bash -s
 if ($LASTEXITCODE -ne 0) {
