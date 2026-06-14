@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.2.3"
-description = "GENUS PI SEED v1.2.3 Pi deploy helper fix"
+version = "1.2.4"
+description = "GENUS PI SEED v1.2.4 Windows deploy launchers"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

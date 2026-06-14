@@ -35,6 +35,13 @@ From the local workstation:
 Run this command in Windows PowerShell on the workstation, not inside the SSH
 session on the Pi. Inside SSH, use the `.sh` scripts directly.
 
+If Windows blocks `.ps1` script execution, use the matching `.cmd` launcher.
+It applies `-ExecutionPolicy Bypass` only to that one command:
+
+```powershell
+.\deploy\deploy_to_pi.cmd -HostName ronny@pi.local -CoreId pi-core -InstallCron
+```
+
 Useful overrides:
 
 ```powershell
@@ -115,6 +122,12 @@ From Windows PowerShell on the workstation, create or reuse that Pi-side key:
 .\deploy\setup_pi_status_key.ps1 -HostName ronny@pi.local -CoreId pi-core
 ```
 
+If PowerShell script execution is disabled:
+
+```powershell
+.\deploy\setup_pi_status_key.cmd -HostName ronny@pi.local -CoreId pi-core
+```
+
 Copy the printed public key into GitHub:
 
 - repository: `WoltLab51/GENUS_PI_STATUS`
@@ -126,6 +139,12 @@ Then publish from Windows PowerShell:
 
 ```powershell
 .\deploy\publish_pi_status.ps1 -HostName ronny@pi.local -CoreId pi-core
+```
+
+Or, if PowerShell script execution is disabled:
+
+```powershell
+.\deploy\publish_pi_status.cmd -HostName ronny@pi.local -CoreId pi-core
 ```
 
 Or publish manually inside an SSH session:
