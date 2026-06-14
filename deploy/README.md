@@ -18,6 +18,7 @@ sudo apt install -y git python3 python3-venv
 git clone https://github.com/WoltLab51/GENUS_PI_SEED.git /home/pi/GENUS_PI_SEED
 cd /home/pi/GENUS_PI_SEED
 GENUS_CORE_ID=pi-core ./deploy/pi_deploy.sh
+GENUS_CORE_ID=pi-core ./deploy/pi_install_cron.sh
 ```
 
 Use a stable `GENUS_CORE_ID`. Anchor files are long-lived witness artifacts, so
@@ -28,7 +29,7 @@ the ID should name this specific GENUS core, not just a temporary hostname.
 From the local workstation:
 
 ```powershell
-.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core
+.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core -InstallCron
 ```
 
 Useful overrides:
@@ -63,11 +64,39 @@ The script refuses to run on a dirty working tree and refuses non-fast-forward
 deploys. Its final `genus doctor` step reports database, integrity, sealing,
 core ID, sensors, and forbidden-import guards.
 
-## Routine Collection
+## Cron Installation
 
-After deployment, keep collection boring and explicit:
+`pi_install_cron.sh` installs an idempotent marked block in the current user's
+crontab:
+
+```bash
+cd /home/pi/GENUS_PI_SEED
+GENUS_CORE_ID=pi-core ./deploy/pi_install_cron.sh
+```
+
+Schedule:
+
+- every 5 minutes: `genus observe-all`
+- every 5 minutes, one minute later: `genus state refresh`
+- daily at 03:17: `genus experience scan`
+- daily at 03:27: `genus doctor`
+
+The script replaces only the block between `BEGIN GENUS_PI_SEED` and
+`END GENUS_PI_SEED`. Other crontab entries stay untouched.
+
+Logs:
+
+```bash
+tail -f /home/pi/.genus/logs/cron.log
+tail -f /home/pi/.genus/logs/doctor.log
+```
+
+## Manual Routine Collection
+
+The cron script installs this routine automatically. The equivalent manual
+entries are:
 
 ```cron
-*/5 * * * * cd /home/pi/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus observe-all >> /home/pi/.genus/cron.log 2>&1
-*/5 * * * * cd /home/pi/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus state refresh >> /home/pi/.genus/cron.log 2>&1
+*/5 * * * * cd /home/pi/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus observe-all >> /home/pi/.genus/logs/cron.log 2>&1
+1-59/5 * * * * cd /home/pi/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus state refresh >> /home/pi/.genus/logs/cron.log 2>&1
 ```

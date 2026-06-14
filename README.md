@@ -201,28 +201,23 @@ To check a directory of anchors, run `genus ledger anchor verify` for each file.
 
 ## Automatic Collection With Cron
 
-GENUS does not need a daemon for the first Pi loop. Run all local sensors from
-cron and keep the core UNIX-simple:
+GENUS does not need a daemon for the first Pi loop. Install the marked user
+crontab block from the repository:
 
 ```bash
-crontab -e
+cd /home/pi/GENUS_PI_SEED
+GENUS_CORE_ID=pi-core ./deploy/pi_install_cron.sh
 ```
 
-```cron
-*/5 * * * * cd /path/to/GENUS_PI_SEED && .venv/bin/genus observe-all >> ~/.genus/cron.log 2>&1
-*/5 * * * * cd /path/to/GENUS_PI_SEED && .venv/bin/genus state refresh >> ~/.genus/cron.log 2>&1
-```
+That block runs:
 
-With an explicit database path:
+- `genus observe-all` every 5 minutes
+- `genus state refresh` every 5 minutes, one minute later
+- `genus experience scan` daily
+- `genus doctor` daily
 
-```cron
-*/5 * * * * cd /path/to/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus observe-all >> /home/pi/.genus/cron.log 2>&1
-*/5 * * * * cd /path/to/GENUS_PI_SEED && GENUS_DB_PATH=/home/pi/.genus/genus.sqlite3 .venv/bin/genus state refresh >> /home/pi/.genus/cron.log 2>&1
-```
-
-Run `genus experience scan` manually or from a slower daily cron. It looks for
-contrasting activity rhythms, not raw sample frequency, and creates at most one
-review proposal per scan.
+Logs are written to `/home/pi/.genus/logs/cron.log` and
+`/home/pi/.genus/logs/doctor.log`.
 
 ## Pi Deployment
 
@@ -230,7 +225,7 @@ Use the scripts in `deploy/` to update a Raspberry Pi without logging in and
 typing the full sequence by hand:
 
 ```powershell
-.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core
+.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core -InstallCron
 ```
 
 The remote script fast-forwards `main`, installs the package, runs tests,

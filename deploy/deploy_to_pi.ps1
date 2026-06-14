@@ -9,7 +9,8 @@ param(
     [string]$Branch = "main",
 
     [switch]$SkipTests,
-    [switch]$SkipAnchor
+    [switch]$SkipAnchor,
+    [switch]$InstallCron
 )
 
 Set-StrictMode -Version Latest
@@ -39,7 +40,11 @@ if ($SkipAnchor) {
     $envParts += "GENUS_DEPLOY_SKIP_ANCHOR=1"
 }
 
-$remoteCommand = "cd $(Quote-Bash $RepoDir) && " + ($envParts -join " ") + " ./deploy/pi_deploy.sh"
+$envPrefix = $envParts -join " "
+$remoteCommand = "cd $(Quote-Bash $RepoDir) && $envPrefix ./deploy/pi_deploy.sh"
+if ($InstallCron) {
+    $remoteCommand += " && $envPrefix ./deploy/pi_install_cron.sh"
+}
 
 Write-Host "[DEPLOY] ssh $HostName"
 ssh $HostName $remoteCommand
