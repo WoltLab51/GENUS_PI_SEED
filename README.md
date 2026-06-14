@@ -29,6 +29,7 @@ genus observe-disk
 genus observe-activity
 genus observe-temperature
 genus observe-all
+genus doctor
 genus ask "was glaubst du"
 genus ask "status"
 genus explain belief 1
@@ -232,12 +233,14 @@ typing the full sequence by hand:
 
 The remote script fast-forwards `main`, installs the package, runs tests,
 checks integrity, verifies ledger sealing, exports an optional offline anchor,
-and refuses dirty working trees. See `deploy/README.md`.
+prints a final `genus doctor` report, and refuses dirty working trees. See
+`deploy/README.md`.
 
 ## Quality Checks
 
 ```bash
 python -m pytest
+genus doctor
 genus replay
 genus integrity check
 genus ledger seal-init

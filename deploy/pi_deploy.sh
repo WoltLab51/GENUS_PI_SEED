@@ -88,4 +88,7 @@ echo "[DEPLOY] replay check"
 echo "[DEPLOY] final integrity check"
 .venv/bin/genus integrity check
 
+echo "[DEPLOY] doctor check"
+.venv/bin/genus doctor
+
 echo "[DEPLOY] done"

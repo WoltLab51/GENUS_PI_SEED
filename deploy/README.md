@@ -8,6 +8,7 @@ No daemon, no web API, no automatic remote execution by GENUS itself:
 - The Pi pulls `main` by fast-forward only.
 - The Pi runs tests before accepting the deploy.
 - The Pi verifies integrity, sealing, replay, and optionally exports an anchor.
+- The Pi prints a final `genus doctor` report.
 
 ## First Pi Setup
 
@@ -59,7 +60,8 @@ Environment knobs:
 - `GENUS_DEPLOY_SKIP_ANCHOR=1` skips anchor export.
 
 The script refuses to run on a dirty working tree and refuses non-fast-forward
-deploys.
+deploys. Its final `genus doctor` step reports database, integrity, sealing,
+core ID, sensors, and forbidden-import guards.
 
 ## Routine Collection
 

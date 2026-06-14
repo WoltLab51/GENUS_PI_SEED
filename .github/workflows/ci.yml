@@ -75,6 +75,12 @@ jobs:
           GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
         run: genus integrity check
 
+      - name: Run doctor
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+          GENUS_CORE_ID: ci-core
+        run: genus doctor
+
       - name: Guard forbidden model imports
         run: |
           ! grep -R -n -E "anthropic|openai|ollama" genus

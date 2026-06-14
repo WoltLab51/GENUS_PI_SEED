@@ -9,6 +9,7 @@ import click
 from genus import (
     anchor,
     db,
+    doctor as doctor_checks,
     event_router,
     experience,
     governance,
@@ -33,6 +34,24 @@ def get_conn():
 @click.group()
 def main() -> None:
     pass
+
+
+@main.command("doctor")
+def doctor() -> None:
+    db_path = os.environ.get("GENUS_DB_PATH", "genus.sqlite3")
+    conn = get_conn()
+    try:
+        checks = doctor_checks.run(
+            conn,
+            db_path=db_path,
+            core_id=os.environ.get("GENUS_CORE_ID"),
+        )
+        for check in checks:
+            click.echo(f"[{check.status}] {check.name}: {check.detail}")
+        if doctor_checks.has_failures(checks):
+            raise click.ClickException("doctor found failing checks")
+    finally:
+        conn.close()
 
 
 @main.command("observe-cpu")
