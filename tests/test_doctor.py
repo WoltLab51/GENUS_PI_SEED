@@ -18,6 +18,7 @@ def test_doctor_exits_zero_with_warnings_and_writes_no_events(
     conn,
 ):
     monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    monkeypatch.delenv("GENUS_CORE_ID", raising=False)
     _patch_sensors(monkeypatch)
 
     result = CliRunner().invoke(cli.main, ["doctor"])
