@@ -68,7 +68,7 @@ cat "`$KEY_PATH.pub"
 $remoteScript = $remoteScript.Replace("`r`n", "`n").Replace("`r", "`n")
 
 Write-Host "[STATUS-KEY] preparing SSH key on $HostName"
-$publicKey = $remoteScript | ssh $HostName bash -s
+$publicKey = $remoteScript | ssh $HostName "tr -d '\r' | bash -s"
 if ($LASTEXITCODE -ne 0) {
     throw "Remote key setup failed with exit code $LASTEXITCODE"
 }
