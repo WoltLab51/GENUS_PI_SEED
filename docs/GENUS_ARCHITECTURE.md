@@ -125,6 +125,8 @@ anchor require a later anchor to be externally witnessed.
 - `GENUS_PHYSIK.md`, `GENUS_ANTIZIPATION.md`, and
   `GENUS_VISUAL_THINKING.md` preserve later-stage concepts without pulling
   them into the current core.
+- `parked/` holds non-canonical sketches. Nothing there is build input until
+  promoted into a canonical document.
 
 ## Growth Rule
 

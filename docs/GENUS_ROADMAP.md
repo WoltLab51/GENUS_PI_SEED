@@ -453,7 +453,9 @@ Diese gelten über alle Versionen, ohne Ausnahme:
 
 Und eine Projekt-Regel, die das Bauen schützt: **keine neuen
 Konzeptdokumente zwischen zwei Builds.** Bestehende Dokumente pflegen: ja.
-Neue erst nach dem nächsten gemergten Roadmap-Schritt.
+Neue erst nach dem nächsten gemergten Roadmap-Schritt. Skizzen dürfen in
+`docs/parked/` liegen, sind dort aber ausdrücklich nicht kanonisch und kein
+Build-Input.
 
 ---
 

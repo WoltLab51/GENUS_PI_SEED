@@ -19,6 +19,8 @@ The project documentation lives in `docs/`.
 - `docs/GENUS_LEDGER_AUDIT.md` documents the current ledger integrity boundary
   and the recommended sealing and anchoring path.
 - `docs/GENUS_SENSOR_PRINCIPLE.md` defines the boundary for future sensors.
+- `docs/parked/` holds non-canonical sketches and ideas that are not build
+  input until promoted into the roadmap or another canonical document.
 
 ## Commands
 
