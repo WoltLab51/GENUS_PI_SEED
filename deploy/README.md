@@ -144,6 +144,11 @@ Then publish from Windows PowerShell:
 .\deploy\publish_pi_status.ps1 -HostName ronny@pi.local -CoreId pi-core
 ```
 
+The Pi synchronizes its local `GENUS_PI_STATUS` checkout to `origin/main`
+before each publish. That repository is treated as generated exchange output,
+so failed prior publishes or manual redactions on GitHub do not create a
+long-lived divergent local branch.
+
 Or, if PowerShell script execution is disabled:
 
 ```powershell

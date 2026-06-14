@@ -23,6 +23,15 @@ if [ ! -d "$STATUS_REPO_DIR/.git" ]; then
     echo "[STATUS] cloning $STATUS_REPO_URL -> $STATUS_REPO_DIR"
     mkdir -p "$(dirname "$STATUS_REPO_DIR")"
     git clone "$STATUS_REPO_URL" "$STATUS_REPO_DIR"
+else
+    echo "[STATUS] syncing status repo with origin/main"
+    git -C "$STATUS_REPO_DIR" fetch origin main
+    if git -C "$STATUS_REPO_DIR" rev-parse --verify origin/main >/dev/null 2>&1; then
+        # GENUS_PI_STATUS is a generated exchange repo. Start each publish from
+        # the remote head so manual redactions or previous failed pushes do not
+        # leave the Pi on a divergent local commit.
+        git -C "$STATUS_REPO_DIR" reset --hard origin/main
+    fi
 fi
 
 mkdir -p \
