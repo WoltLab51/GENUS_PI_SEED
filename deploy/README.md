@@ -91,6 +91,9 @@ Schedule:
 - daily at 03:17: `genus experience scan`
 - daily at 03:27: `genus doctor`
 
+Every scheduled job writes a UTC `[TICK] ...` line before it runs. Those lines
+make the cron rhythm visible in the logs without opening the database.
+
 The script replaces only the block between `BEGIN GENUS_PI_SEED` and
 `END GENUS_PI_SEED`. Other crontab entries stay untouched.
 
@@ -181,6 +184,6 @@ The cron script installs this routine automatically. The equivalent manual
 entries are:
 
 ```cron
-*/5 * * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus observe-all >> "$GENUS_LOG_DIR/cron.log" 2>&1
-1-59/5 * * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus state refresh >> "$GENUS_LOG_DIR/cron.log" 2>&1
+*/5 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] observe-all $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus observe-all >> "$GENUS_LOG_DIR/cron.log" 2>&1
+1-59/5 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] state-refresh $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus state refresh >> "$GENUS_LOG_DIR/cron.log" 2>&1
 ```

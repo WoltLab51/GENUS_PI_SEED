@@ -40,12 +40,12 @@ fi
     if [ -n "${GENUS_CORE_ID:-}" ]; then
         echo "GENUS_CORE_ID=$GENUS_CORE_ID"
     fi
-    echo '*/5 * * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus observe-all >> "$GENUS_LOG_DIR/cron.log" 2>&1'
-    echo '1-59/5 * * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus state refresh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
-    echo '17 3 * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
-    echo '27 3 * * * cd "$GENUS_REPO_DIR" && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
+    echo '*/5 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] observe-all $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus observe-all >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    echo '1-59/5 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] state-refresh $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus state refresh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    echo '27 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] doctor $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/doctor.log" 2>&1 && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
     if [ "${GENUS_ENABLE_STATUS_PUBLISH:-0}" = "1" ]; then
-        echo '37 3 * * * cd "$GENUS_REPO_DIR" && ./deploy/pi_publish_status.sh >> "$GENUS_LOG_DIR/status.log" 2>&1'
+        echo '37 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] status-publish $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/status.log" 2>&1 && ./deploy/pi_publish_status.sh >> "$GENUS_LOG_DIR/status.log" 2>&1'
     fi
     echo "$CRON_END"
 } >> "$tmp_new"
