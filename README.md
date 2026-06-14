@@ -219,6 +219,10 @@ That block runs:
 Logs are written to `/home/pi/.genus/logs/cron.log` and
 `/home/pi/.genus/logs/doctor.log`.
 
+For off-device exchange, `deploy/pi_publish_status.sh` can publish anchors and
+health summaries to `WoltLab51/GENUS_PI_STATUS`. It never uploads the SQLite
+database.
+
 ## Pi Deployment
 
 Use the scripts in `deploy/` to update a Raspberry Pi without logging in and

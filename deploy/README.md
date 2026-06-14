@@ -32,6 +32,9 @@ From the local workstation:
 .\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core -InstallCron
 ```
 
+Run this command in Windows PowerShell on the workstation, not inside the SSH
+session on the Pi. Inside SSH, use the `.sh` scripts directly.
+
 Useful overrides:
 
 ```powershell
@@ -40,6 +43,7 @@ Useful overrides:
   -RepoDir /home/pi/GENUS_PI_SEED `
   -DbPath /home/pi/.genus/genus.sqlite3 `
   -AnchorDir /home/pi/.genus/anchors `
+  -StatusRepoDir /home/pi/GENUS_PI_STATUS `
   -CoreId pi-core
 ```
 
@@ -89,6 +93,41 @@ Logs:
 ```bash
 tail -f /home/pi/.genus/logs/cron.log
 tail -f /home/pi/.genus/logs/doctor.log
+```
+
+## Status Repository
+
+`GENUS_PI_STATUS` is the intended off-device exchange repository for anchors
+and health summaries. It must not receive the SQLite database.
+
+Published content:
+
+- `anchors/*.json` - offline ledger anchors
+- `status/<core_id>/latest.json` - structured counts, seal head, recent event
+  metadata, and integrity result
+- `doctor/<core_id>/latest.txt` - human-readable doctor report
+
+First set up write access from the Pi to GitHub, preferably with a repository
+deploy key that has write access only to `WoltLab51/GENUS_PI_STATUS`.
+
+Then publish manually:
+
+```bash
+cd /home/pi/GENUS_PI_SEED
+GENUS_CORE_ID=pi-core ./deploy/pi_publish_status.sh
+```
+
+To add daily status publishing to the GENUS cron block:
+
+```bash
+cd /home/pi/GENUS_PI_SEED
+GENUS_CORE_ID=pi-core GENUS_ENABLE_STATUS_PUBLISH=1 ./deploy/pi_install_cron.sh
+```
+
+From Windows PowerShell:
+
+```powershell
+.\deploy\deploy_to_pi.ps1 -HostName ronny@pi.local -CoreId pi-core -InstallCron -EnableStatusPublish
 ```
 
 ## Manual Routine Collection

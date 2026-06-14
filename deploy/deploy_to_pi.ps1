@@ -5,12 +5,15 @@ param(
     [string]$RepoDir = "/home/pi/GENUS_PI_SEED",
     [string]$DbPath = "/home/pi/.genus/genus.sqlite3",
     [string]$AnchorDir = "/home/pi/.genus/anchors",
+    [string]$StatusRepoDir = "/home/pi/GENUS_PI_STATUS",
+    [string]$StatusRepoUrl = "git@github.com:WoltLab51/GENUS_PI_STATUS.git",
     [string]$CoreId = "",
     [string]$Branch = "main",
 
     [switch]$SkipTests,
     [switch]$SkipAnchor,
-    [switch]$InstallCron
+    [switch]$InstallCron,
+    [switch]$EnableStatusPublish
 )
 
 Set-StrictMode -Version Latest
@@ -27,7 +30,9 @@ function Quote-Bash {
 $envParts = @(
     "GENUS_DEPLOY_BRANCH=$(Quote-Bash $Branch)",
     "GENUS_DB_PATH=$(Quote-Bash $DbPath)",
-    "GENUS_ANCHOR_DIR=$(Quote-Bash $AnchorDir)"
+    "GENUS_ANCHOR_DIR=$(Quote-Bash $AnchorDir)",
+    "GENUS_STATUS_REPO_DIR=$(Quote-Bash $StatusRepoDir)",
+    "GENUS_STATUS_REPO_URL=$(Quote-Bash $StatusRepoUrl)"
 )
 
 if ($CoreId.Trim().Length -gt 0) {
@@ -39,11 +44,17 @@ if ($SkipTests) {
 if ($SkipAnchor) {
     $envParts += "GENUS_DEPLOY_SKIP_ANCHOR=1"
 }
+if ($EnableStatusPublish) {
+    $envParts += "GENUS_ENABLE_STATUS_PUBLISH=1"
+}
 
 $envPrefix = $envParts -join " "
 $remoteCommand = "cd $(Quote-Bash $RepoDir) && $envPrefix ./deploy/pi_deploy.sh"
 if ($InstallCron) {
     $remoteCommand += " && $envPrefix ./deploy/pi_install_cron.sh"
+    if ($EnableStatusPublish) {
+        $remoteCommand += " && $envPrefix ./deploy/pi_publish_status.sh"
+    }
 }
 
 Write-Host "[DEPLOY] ssh $HostName"
