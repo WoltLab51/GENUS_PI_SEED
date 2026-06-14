@@ -16,6 +16,8 @@ The project documentation lives in `docs/`.
 - `docs/GENUS_ROADMAP.md` defines the next build steps and growth gates.
 - `docs/GENUS_ARCHITECTURE.md` and `docs/GENUS_EVENT_CONTRACT.md` are the
   current technical contracts.
+- `docs/GENUS_ARCHITECTURE.md#change-trust` defines how GENUS treats updates:
+  a change earns trust only after deterministic gates and observed runtime.
 - `docs/GENUS_LEDGER_AUDIT.md` documents the current ledger integrity boundary
   and the recommended sealing and anchoring path.
 - `docs/GENUS_SENSOR_PRINCIPLE.md` defines the boundary for future sensors.

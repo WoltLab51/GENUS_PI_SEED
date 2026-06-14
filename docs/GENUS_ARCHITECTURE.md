@@ -33,6 +33,9 @@ it currently believes, and keeps every important state change replayable.
 - **Review is not activation:** Accepting a `RuleProposal` documents human
   agreement. Activating the rule is a second governed act that changes future
   deterministic behavior.
+- **Update is not trust:** A code change or deploy is a proposal about GENUS,
+  not a trusted change. Trust is earned only after verification and observed
+  runtime evidence.
 
 ## Layer Model
 
@@ -47,6 +50,34 @@ Observation -> Evidence -> Rules -> Beliefs -> State -> Governance
 
 Every layer consumes events and writes new events. Projections are updated from
 those events so the current state can always be reconstructed.
+
+## Change Trust
+
+GENUS applies its own epistemic discipline to GENUS itself. A new version is
+not trusted at merge time. It starts as a proposal about the system.
+
+Verification gates provide regression evidence:
+
+- tests are green
+- `genus replay` matches current projections
+- `genus integrity check` is clean
+- `genus ledger verify` is clean when sealing is active
+- `genus doctor` reports the expected operating state
+
+These gates prove that existing history and contracts survived the change. They
+do not, by themselves, prove that new behavior is mature. New behavior earns
+trust the same way a belief does: by collecting repeated supporting evidence in
+real operation. A single green deploy is supporting evidence; stable runtime,
+fresh anchors, growing event counts, quiet logs, and repeated clean status
+reports increase confidence.
+
+Operationally:
+
+- no change is trusted immediately
+- every change must pass the deterministic gate before deploy
+- every deployed change must be observed in runtime before it is treated as
+  mature
+- public witnesses prove only what they actually witness, never more
 
 ## Reactor Direction
 
@@ -138,3 +169,4 @@ New capabilities must answer these questions before being added:
 - Is confidence calculated rather than stored?
 - Does the change avoid LLM, web, worker, and HTTP dependencies unless a later
   version explicitly permits them?
+- What runtime evidence will show that the new behavior is actually working?

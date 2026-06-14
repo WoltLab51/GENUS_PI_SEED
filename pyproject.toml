@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.2.10"
-description = "GENUS PI SEED v1.2.10 sync status repo before publish"
+version = "1.2.11"
+description = "GENUS PI SEED v1.2.11 document change trust principle"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
