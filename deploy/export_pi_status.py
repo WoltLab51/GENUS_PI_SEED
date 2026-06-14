@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,7 +43,10 @@ def main() -> int:
                 "active_rules": check["active_rules"],
             },
             "sealing": _seal_summary(head),
-            "latest_events": _latest_events(conn),
+            "privacy": {
+                "profile": "public-minimal-v1",
+                "redacted": ["local_paths", "raw_doctor", "latest_events"],
+            },
         }
     finally:
         conn.close()
@@ -68,26 +70,6 @@ def _seal_summary(head: dict | None) -> dict:
         "head_created_at": head["created_at"],
         "head": head["seal"],
     }
-
-
-def _latest_events(conn: sqlite3.Connection) -> list[dict]:
-    rows = conn.execute(
-        """
-        SELECT id, event_type, created_at, seal
-        FROM event_log
-        ORDER BY id DESC
-        LIMIT 10
-        """
-    ).fetchall()
-    return [
-        {
-            "id": int(row["id"]),
-            "event_type": row["event_type"],
-            "created_at": row["created_at"],
-            "seal": row["seal"],
-        }
-        for row in reversed(rows)
-    ]
 
 
 def _now_utc() -> str:

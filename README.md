@@ -220,8 +220,8 @@ Logs are written to `/home/pi/.genus/logs/cron.log` and
 `/home/pi/.genus/logs/doctor.log`.
 
 For off-device exchange, `deploy/pi_publish_status.sh` can publish anchors and
-health summaries to `WoltLab51/GENUS_PI_STATUS`. It never uploads the SQLite
-database.
+a minimal public health summary to `WoltLab51/GENUS_PI_STATUS`. It never uploads
+the SQLite database, local paths, raw doctor output, or recent event timelines.
 
 ## Pi Deployment
 

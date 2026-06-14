@@ -27,14 +27,15 @@ fi
 
 mkdir -p \
     "$STATUS_REPO_DIR/anchors" \
-    "$STATUS_REPO_DIR/status/$SAFE_CORE_ID" \
-    "$STATUS_REPO_DIR/doctor/$SAFE_CORE_ID"
+    "$STATUS_REPO_DIR/status/$SAFE_CORE_ID"
+
+if [ -d "$STATUS_REPO_DIR/doctor/$SAFE_CORE_ID" ]; then
+    echo "[STATUS] removing legacy public doctor report"
+    rm -rf "$STATUS_REPO_DIR/doctor/$SAFE_CORE_ID"
+fi
 
 echo "[STATUS] exporting anchor"
 .venv/bin/genus ledger anchor create --out "$STATUS_REPO_DIR/anchors"
-
-echo "[STATUS] exporting doctor report"
-.venv/bin/genus doctor > "$STATUS_REPO_DIR/doctor/$SAFE_CORE_ID/latest.txt"
 
 echo "[STATUS] exporting structured status"
 .venv/bin/python "$SCRIPT_DIR/export_pi_status.py" \
@@ -49,7 +50,8 @@ if [ -z "$(git config --get user.email || true)" ]; then
     git config user.email "genus-pi@users.noreply.github.com"
 fi
 
-git add anchors "doctor/$SAFE_CORE_ID" "status/$SAFE_CORE_ID"
+git add anchors "status/$SAFE_CORE_ID"
+git add -A "doctor/$SAFE_CORE_ID" 2>/dev/null || true
 
 if git diff --cached --quiet; then
     echo "[STATUS] no changes to commit"

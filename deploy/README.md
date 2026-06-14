@@ -109,9 +109,12 @@ and health summaries. It must not receive the SQLite database.
 Published content:
 
 - `anchors/*.json` - offline ledger anchors
-- `status/<core_id>/latest.json` - structured counts, seal head, recent event
-  metadata, and integrity result
-- `doctor/<core_id>/latest.txt` - human-readable doctor report
+- `status/<core_id>/latest.json` - structured counts, seal head, and integrity
+  result
+
+The public status export intentionally omits local filesystem paths, raw
+`genus doctor` output, and recent event timelines. Keep the SQLite database and
+local logs private on the Pi.
 
 First set up write access from the Pi to GitHub, preferably with a repository
 deploy key that has write access only to `WoltLab51/GENUS_PI_STATUS`.
