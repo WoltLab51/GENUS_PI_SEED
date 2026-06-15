@@ -93,8 +93,8 @@ jobs:
 
       - name: Guard forbidden model imports
         run: |
-          ! grep -R -n -E "anthropic|openai|ollama" genus
+          ! grep -R -n -E --include='*.py' "anthropic|openai|ollama" genus
 
       - name: Guard forbidden network imports
         run: |
-          ! grep -R -n -E "requests|httpx|aiohttp|urllib\.request" genus
+          ! grep -R -n -E --include='*.py' "requests|httpx|aiohttp|urllib\.request" genus

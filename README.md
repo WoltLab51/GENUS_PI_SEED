@@ -281,8 +281,8 @@ genus ledger verify
 GENUS_CORE_ID=ci-core genus ledger anchor create --out /tmp/genus-anchor.json
 GENUS_CORE_ID=ci-core genus ledger anchor verify /tmp/genus-anchor.json
 genus operation network-check --status ok --target 192.168.178.1
-grep -r "anthropic|openai|ollama" genus/
-grep -r "requests|httpx|aiohttp|urllib.request" genus/
+grep -R -n -E --include='*.py' "anthropic|openai|ollama" genus/
+grep -R -n -E --include='*.py' "requests|httpx|aiohttp|urllib.request" genus/
 ```
 
 GitHub Actions runs the same quality gate on `main` and pull requests.
