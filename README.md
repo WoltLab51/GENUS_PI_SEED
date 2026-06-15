@@ -82,6 +82,14 @@ observations. Disk and temperature currently use the same threshold/revision
 mechanic as CPU and memory. Activity is binary and creates or supersedes a
 belief immediately without waiting for the three-reading threshold window.
 
+## Confidence Decay
+
+v1.5 changes confidence from raw event counts plus a latest-evidence decay gate
+to time-weighted evidence counting. Each supporting or contradicting evidence
+event contributes `2^(-age / H)` at read time, using a per-claim halflife. This
+keeps long-running beliefs from becoming sticky only because old confirmations
+accumulated. Confidence is still never stored in the database.
+
 ## Query Layer
 
 v0.7 adds deterministic read-only queries. Query commands explain current state

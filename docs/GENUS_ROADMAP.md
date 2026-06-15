@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.4) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v1.5) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,13 +43,14 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v1.4)
+## Wo wir stehen (v1.5)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
-External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance
+External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance ·
+Confidence Decay v2
 **Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 
@@ -402,6 +403,27 @@ Fehlschlägen und außerhalb des Governance-Cooldown-Fensters erlaubt.
 
 ---
 
+## v1.5 — Confidence Decay v2 · *alte Evidenz wird leichter*
+
+**Status:** umgesetzt. Confidence wird weiterhin ausschließlich zur Lesezeit
+berechnet, aber nicht mehr aus rohen Counts plus jüngstem Evidence-Alter. Jede
+stützende und widersprechende Evidence zählt jetzt zeitgewichtet:
+`2^(-age / H)`.
+
+**Warum:** Lang bestätigte Beliefs sollen nicht nur wegen alter Akkumulation
+klebrig werden. Ein frischer Widerspruch muss sichtbar Gewicht haben, ohne die
+Ledger-Historie zu löschen.
+
+**Definition of Done:**
+- [x] keine Schema-Änderung, keine gespeicherte Confidence
+- [x] Halbwertszeiten liegen zentral in `confidence.py`
+- [x] Projektion übergibt Einzel-Zeitstempel aller Evidence-Events
+- [x] Sättigung, frischer Widerspruch und alter Evidence-Zerfall getestet
+- [x] Recovery-/Cooldown-Pfade bleiben unabhängig von Confidence
+- [x] Wachstumsregel ✓
+
+---
+
 # Phase 2 — Mehr Material, noch deterministisch
 
 ---
@@ -465,6 +487,7 @@ DETERMINISTISCH (kein LLM)
   v1.2   External Anchors     → externer Head-Zeuge
   v1.3   Self-Operation       → GENUS beobachtet seinen Betrieb
   v1.4   Self-Healing         → Reparatur nur mit Governance
+  v1.5   Confidence Decay     → alte Evidence wird leichter
 
 MEHR MATERIAL (noch deterministisch)
   v1.x   Struktur-Material    → GENUS beobachtet deine Arbeit

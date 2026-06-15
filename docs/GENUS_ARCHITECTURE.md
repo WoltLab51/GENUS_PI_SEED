@@ -19,8 +19,9 @@ it currently believes, and keeps every important state change replayable.
 - **Deterministic first:** current processing is synchronous and ordered.
   Parallel workers are out of scope until replay and idempotency rules are
   explicit.
-- **No magic knowledge:** Confidence is calculated at read time. A language
-  output or external answer is never knowledge by itself.
+- **No magic knowledge:** Confidence is calculated at read time from
+  time-weighted supporting and contradicting evidence. A language output or
+  external answer is never knowledge by itself.
 - **Belief is not truth:** Beliefs have lifecycle states such as `active` and
   `superseded`. They are never stored as `true`.
 - **Proposal is not action:** Proposals create attention and review work.

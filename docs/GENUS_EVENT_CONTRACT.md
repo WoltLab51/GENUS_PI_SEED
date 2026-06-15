@@ -45,6 +45,8 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
+- Confidence is calculated at read time from the `created_at` timestamps of
+  supporting and contradicting evidence events. It has no replay side effect.
 - `experience_log.derivation` is required and `experience_log` has no
   `confidence` column.
 - `state_projection.derivation` is required and `state_projection` has no

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Iterable
 
 from genus.confidence import calculate_confidence
@@ -171,7 +170,8 @@ def list_active_beliefs(conn) -> list[dict]:
 def belief_with_confidence(conn, row) -> dict:
     supporting = json_list(row["supporting_events"])
     contradicting = json_list(row["contradicting_events"])
-    latest_age = latest_supporting_age_seconds(conn, supporting)
+    supporting_times = evidence_created_at_times(conn, supporting)
+    contradicting_times = evidence_created_at_times(conn, contradicting)
     return {
         "id": row["id"],
         "claim_key": row["claim_key"],
@@ -181,30 +181,27 @@ def belief_with_confidence(conn, row) -> dict:
         "supporting": len(supporting),
         "contradicting": len(contradicting),
         "confidence": calculate_confidence(
-            len(supporting),
-            len(contradicting),
-            latest_age,
+            supporting_times,
+            contradicting_times,
+            claim_key=row["claim_key"],
         ),
     }
 
 
-def latest_supporting_age_seconds(conn, supporting_events: list[int]) -> float:
-    if not supporting_events:
-        return 0.0
-    placeholders = ",".join("?" for _ in supporting_events)
-    row = conn.execute(
-        f"SELECT MAX(created_at) AS latest FROM event_log WHERE id IN ({placeholders})",
-        supporting_events,
-    ).fetchone()
-    if row is None or row["latest"] is None:
-        return 0.0
-    latest = _parse_timestamp(row["latest"])
-    return max(0.0, (datetime.now(timezone.utc) - latest).total_seconds())
-
-
-def _parse_timestamp(value: str) -> datetime:
-    normalized = value.rstrip("Z")
-    return datetime.fromisoformat(normalized).replace(tzinfo=timezone.utc)
+def evidence_created_at_times(conn, event_ids: list[int]) -> list[str]:
+    if not event_ids:
+        return []
+    placeholders = ",".join("?" for _ in event_ids)
+    rows = conn.execute(
+        f"""
+        SELECT created_at
+        FROM event_log
+        WHERE id IN ({placeholders})
+        ORDER BY id
+        """,
+        event_ids,
+    ).fetchall()
+    return [row["created_at"] for row in rows]
 
 
 def next_belief_id(conn) -> int:
