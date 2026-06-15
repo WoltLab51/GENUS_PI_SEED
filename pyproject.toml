@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.4.0"
-description = "GENUS PI SEED v1.4.0 self-operation and governed recovery"
+version = "1.4.1"
+description = "GENUS PI SEED v1.4.1 governed reboot cooldown"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

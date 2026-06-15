@@ -80,7 +80,8 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   rebuildable belief derived from `operation_check_recorded` events.
 - Operation recovery is governed before execution. `restart_network` is allowed
   after a failed gateway check; `reboot` is blocked until the configured
-  repeated-failure threshold is reached.
+  repeated-failure threshold is reached and no reboot recovery attempt is inside
+  the governance cooldown window.
 - Operation recovery results are explicit events. Replay rebuilds the recovery
   attempt and then applies the terminal result to `operation_log`.
 - `rule_proposed` is emitted by deterministic maturation over recorded

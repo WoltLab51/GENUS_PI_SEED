@@ -387,13 +387,14 @@ Recovery nach Kernel-Constraint und Policy erlaubt ist.
 
 **Policy:** `restart_network` ist nach einem fehlgeschlagenen Gateway-Check
 erlaubt. `reboot` ist erst nach mindestens drei aufeinanderfolgenden
-Fehlschlägen erlaubt.
+Fehlschlägen und außerhalb des Governance-Cooldown-Fensters erlaubt.
 
 **Neue Events:** `operation_recovery_attempted`, `operation_recovery_result`
 
 **Definition of Done:**
 - [x] Recovery wird als `operation.recovery` durch Governance bewertet
 - [x] Reboot ist bis zur Fehler-Schwelle blockiert
+- [x] Reboot-Wiederholung wird durch Governance-Cooldown blockiert
 - [x] Recovery-Ergebnis wird event-backed dokumentiert
 - [x] systemd-Timer und Windows-Installer liegen in `deploy/`
 - [x] volle Testsuite grün

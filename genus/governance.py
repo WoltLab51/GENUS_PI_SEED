@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from genus import ledger, state
 
@@ -26,12 +27,14 @@ CONSTRAINT_RULE_SINGLE_ACTIVATION = "kernel:rule_single_activation_v1"
 CONSTRAINT_OPERATION_RECOVERY_ACTION = "kernel:operation_recovery_action_v1"
 POLICY_PRESSURE_GUARD = "policy:pressure_guard_v1"
 POLICY_REBOOT_AFTER_FAILURES = "policy:reboot_after_failures_v1"
+POLICY_REBOOT_COOLDOWN = "policy:reboot_cooldown_v1"
 KERNEL_CONSTRAINTS = (CONSTRAINT_TERMINAL_REVIEW, CONSTRAINT_VALID_DECISION)
 POLICIES = (POLICY_PRESSURE_GUARD,)
 RECOVERY_RESTART_NETWORK = "restart_network"
 RECOVERY_REBOOT = "reboot"
 RECOVERY_ACTIONS = {RECOVERY_RESTART_NETWORK, RECOVERY_REBOOT}
 RECOVERY_REBOOT_MIN_FAILURES = 3
+RECOVERY_REBOOT_COOLDOWN_SECONDS = 3600
 
 
 def evaluate_proposal_review(
@@ -236,7 +239,7 @@ def evaluate_operation_recovery(
             "constraint_results": constraint_results,
         }
 
-    policy_results = _evaluate_operation_recovery_policies(action, failures)
+    policy_results = _evaluate_operation_recovery_policies(conn, action, failures)
     for result in policy_results:
         _record_policy_evaluated(
             conn,
@@ -486,26 +489,90 @@ def _evaluate_policies(conn, proposal_id: int, decision: str) -> list[dict]:
     ]
 
 
-def _evaluate_operation_recovery_policies(action: str, failures: int) -> list[dict]:
+def _evaluate_operation_recovery_policies(
+    conn,
+    action: str,
+    failures: int,
+) -> list[dict]:
     if action != RECOVERY_REBOOT:
-        result = PASS
-        reason = "reboot guard only applies to reboot recovery"
+        threshold_result = PASS
+        threshold_reason = "reboot guard only applies to reboot recovery"
     elif int(failures) >= RECOVERY_REBOOT_MIN_FAILURES:
-        result = PASS
-        reason = "network failure threshold reached"
+        threshold_result = PASS
+        threshold_reason = "network failure threshold reached"
     else:
-        result = POLICY_BLOCK
-        reason = (
+        threshold_result = POLICY_BLOCK
+        threshold_reason = (
             "reboot recovery requires at least "
             f"{RECOVERY_REBOOT_MIN_FAILURES} consecutive failures"
         )
+    cooldown_result = _evaluate_reboot_cooldown(conn, action)
     return [
         {
             "policy_key": POLICY_REBOOT_AFTER_FAILURES,
-            "result": result,
-            "reason": reason,
-        }
+            "result": threshold_result,
+            "reason": threshold_reason,
+        },
+        cooldown_result,
     ]
+
+
+def _evaluate_reboot_cooldown(conn, action: str) -> dict:
+    if action != RECOVERY_REBOOT:
+        return {
+            "policy_key": POLICY_REBOOT_COOLDOWN,
+            "result": PASS,
+            "reason": "reboot cooldown only applies to reboot recovery",
+        }
+
+    recent = _latest_reboot_recovery_attempt(conn)
+    if recent is None:
+        return {
+            "policy_key": POLICY_REBOOT_COOLDOWN,
+            "result": PASS,
+            "reason": "no prior reboot recovery attempt recorded",
+        }
+
+    last_reboot_at = _parse_event_time(recent["created_at"])
+    elapsed_seconds = (_utc_now() - last_reboot_at).total_seconds()
+    if elapsed_seconds >= RECOVERY_REBOOT_COOLDOWN_SECONDS:
+        return {
+            "policy_key": POLICY_REBOOT_COOLDOWN,
+            "result": PASS,
+            "reason": "reboot cooldown elapsed",
+        }
+
+    remaining = int(RECOVERY_REBOOT_COOLDOWN_SECONDS - elapsed_seconds)
+    return {
+        "policy_key": POLICY_REBOOT_COOLDOWN,
+        "result": POLICY_BLOCK,
+        "reason": f"reboot recovery cooldown active for {remaining} more second(s)",
+    }
+
+
+def _latest_reboot_recovery_attempt(conn):
+    return conn.execute(
+        """
+        SELECT id, created_at
+        FROM event_log
+        WHERE event_type = 'operation_recovery_attempted'
+          AND json_extract(payload, '$.action') = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (RECOVERY_REBOOT,),
+    ).fetchone()
+
+
+def _parse_event_time(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _record_constraint_checked(

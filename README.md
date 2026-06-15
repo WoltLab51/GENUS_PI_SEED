@@ -218,7 +218,8 @@ genus ask "betrieb"
 
 Recovery is policy-gated before the operating system does anything.
 `restart_network` is allowed after a failed gateway check; `reboot` is blocked
-until at least three consecutive failures.
+until at least three consecutive failures and no prior reboot recovery attempt
+is inside the governance cooldown window.
 
 ## Automatic Collection With Cron
 
@@ -249,6 +250,8 @@ For headless Pi resilience, install the optional systemd network watchdog:
 The watchdog logs to `/home/pi/.genus/logs/network-watchdog.log`, records
 operation events in GENUS, restarts the network stack on early failures, and
 reboots only after the governed repeated-failure threshold.
+Repeated reboots are rate-limited by the core governance policy, not only by the
+shell script.
 
 For off-device exchange, `deploy/pi_publish_status.sh` can publish anchors and
 a minimal public health summary to `WoltLab51/GENUS_PI_STATUS`. It never uploads

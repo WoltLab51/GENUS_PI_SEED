@@ -114,7 +114,8 @@ records the unstable network belief and a governed recovery attempt.
 Recovery policy:
 
 - first failures: restart the active network service
-- after 3 consecutive failures: schedule a reboot
+- after 3 consecutive failures: schedule a reboot only if the governance
+  cooldown allows it
 - every recovery attempt and result is written to the ledger
 
 Install it from Windows PowerShell:

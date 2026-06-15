@@ -109,6 +109,32 @@ def test_reboot_recovery_blocked_until_failure_threshold(conn):
     ).fetchone()["count"] == 1
 
 
+def test_reboot_recovery_is_rate_limited_by_governance(conn):
+    first = operation.record_network_check(
+        conn,
+        operation.STATUS_FAIL,
+        "192.168.178.1",
+        failures=3,
+        action=operation.ACTION_REBOOT,
+    )
+    second = operation.record_network_check(
+        conn,
+        operation.STATUS_FAIL,
+        "192.168.178.1",
+        failures=4,
+        action=operation.ACTION_REBOOT,
+    )
+
+    assert first["recovery"]["verdict"]["decision"] == governance.ALLOWED
+    assert second["recovery"]["verdict"]["decision"] == governance.BLOCKED
+    assert second["recovery"]["verdict"]["blocked_by"] == governance.POLICY_REBOOT_COOLDOWN
+    assert second["recovery"]["attempt_event_id"] is None
+    assert conn.execute(
+        "SELECT COUNT(*) AS count FROM event_log WHERE event_type = ?",
+        (operation.RECOVERY_ATTEMPT_EVENT,),
+    ).fetchone()["count"] == 1
+
+
 def test_recovery_action_requires_failed_check(conn):
     try:
         operation.record_network_check(
