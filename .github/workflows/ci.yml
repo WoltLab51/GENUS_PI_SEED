@@ -81,6 +81,16 @@ jobs:
           GENUS_CORE_ID: ci-core
         run: genus doctor
 
+      - name: Record operation check
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: genus operation network-check --status ok --target ci-gateway
+
+      - name: Check integrity after operation check
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: genus integrity check
+
       - name: Guard forbidden model imports
         run: |
           ! grep -R -n -E "anthropic|openai|ollama" genus

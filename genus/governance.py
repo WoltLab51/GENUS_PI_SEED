@@ -7,7 +7,9 @@ from genus import ledger, state
 
 ACTION_PROPOSAL_REVIEW = "proposal.review"
 ACTION_RULE_ACTIVATE = "rule.activate"
+ACTION_OPERATION_RECOVERY = "operation.recovery"
 TARGET_PROPOSAL = "proposal"
+TARGET_OPERATION_RECOVERY = "operation_recovery"
 ALLOWED = "allowed"
 BLOCKED = "blocked"
 PASS = "pass"
@@ -21,9 +23,15 @@ CONSTRAINT_TERMINAL_REVIEW = "kernel:terminal_review_v1"
 CONSTRAINT_VALID_DECISION = "kernel:valid_decision_v1"
 CONSTRAINT_RULE_SOURCE_ACCEPTED = "kernel:rule_source_accepted_v1"
 CONSTRAINT_RULE_SINGLE_ACTIVATION = "kernel:rule_single_activation_v1"
+CONSTRAINT_OPERATION_RECOVERY_ACTION = "kernel:operation_recovery_action_v1"
 POLICY_PRESSURE_GUARD = "policy:pressure_guard_v1"
+POLICY_REBOOT_AFTER_FAILURES = "policy:reboot_after_failures_v1"
 KERNEL_CONSTRAINTS = (CONSTRAINT_TERMINAL_REVIEW, CONSTRAINT_VALID_DECISION)
 POLICIES = (POLICY_PRESSURE_GUARD,)
+RECOVERY_RESTART_NETWORK = "restart_network"
+RECOVERY_REBOOT = "reboot"
+RECOVERY_ACTIONS = {RECOVERY_RESTART_NETWORK, RECOVERY_REBOOT}
+RECOVERY_REBOOT_MIN_FAILURES = 3
 
 
 def evaluate_proposal_review(
@@ -180,6 +188,100 @@ def evaluate_rule_activation(
         "reason": "governance checks passed",
         "override": override,
         "policy_results": [],
+        "constraint_results": constraint_results,
+    }
+
+
+def evaluate_operation_recovery(
+    conn,
+    recovery_id: int,
+    action: str,
+    failures: int,
+    override: bool = False,
+) -> dict:
+    decision_id = next_decision_id(conn)
+    constraint_results = _evaluate_operation_recovery_constraints(action)
+    for result in constraint_results:
+        _record_constraint_checked(
+            conn,
+            decision_id,
+            ACTION_OPERATION_RECOVERY,
+            TARGET_OPERATION_RECOVERY,
+            recovery_id,
+            result,
+        )
+
+    violations = [result for result in constraint_results if result["result"] == VIOLATION]
+    if violations:
+        reason = violations[0]["reason"]
+        _record_governance_decision(
+            conn,
+            decision_id=decision_id,
+            decision=BLOCKED,
+            override=override,
+            policy_results=[],
+            reason=reason,
+            action=ACTION_OPERATION_RECOVERY,
+            target_type=TARGET_OPERATION_RECOVERY,
+            target_id=recovery_id,
+        )
+        return {
+            "decision_id": decision_id,
+            "decision": BLOCKED,
+            "kernel": True,
+            "blocked_by": violations[0]["constraint_key"],
+            "reason": reason,
+            "override": override,
+            "policy_results": [],
+            "constraint_results": constraint_results,
+        }
+
+    policy_results = _evaluate_operation_recovery_policies(action, failures)
+    for result in policy_results:
+        _record_policy_evaluated(
+            conn,
+            decision_id,
+            ACTION_OPERATION_RECOVERY,
+            TARGET_OPERATION_RECOVERY,
+            recovery_id,
+            result,
+        )
+
+    blocked_policies = [
+        result for result in policy_results if result["result"] == POLICY_BLOCK
+    ]
+    if blocked_policies and not override:
+        verdict = BLOCKED
+        reason = blocked_policies[0]["reason"]
+        blocked_by = blocked_policies[0]["policy_key"]
+    else:
+        verdict = ALLOWED
+        blocked_by = blocked_policies[0]["policy_key"] if blocked_policies else None
+        reason = (
+            f"override accepted for {blocked_by}"
+            if blocked_policies and override
+            else "governance checks passed"
+        )
+
+    _record_governance_decision(
+        conn,
+        decision_id=decision_id,
+        decision=verdict,
+        override=override,
+        policy_results=policy_results,
+        reason=reason,
+        action=ACTION_OPERATION_RECOVERY,
+        target_type=TARGET_OPERATION_RECOVERY,
+        target_id=recovery_id,
+    )
+    return {
+        "decision_id": decision_id,
+        "decision": verdict,
+        "kernel": False,
+        "blocked_by": blocked_by,
+        "reason": reason,
+        "override": override,
+        "policy_results": policy_results,
         "constraint_results": constraint_results,
     }
 
@@ -346,6 +448,22 @@ def _evaluate_rule_activation_constraints(conn, proposal_id: int) -> list[dict]:
     ]
 
 
+def _evaluate_operation_recovery_constraints(action: str) -> list[dict]:
+    if action in RECOVERY_ACTIONS:
+        result = PASS
+        reason = "recovery action is valid"
+    else:
+        result = VIOLATION
+        reason = "recovery action must be restart_network or reboot"
+    return [
+        {
+            "constraint_key": CONSTRAINT_OPERATION_RECOVERY_ACTION,
+            "result": result,
+            "reason": reason,
+        }
+    ]
+
+
 def _evaluate_policies(conn, proposal_id: int, decision: str) -> list[dict]:
     active_pressure = state.active_state(conn, state.STATE_KEY)
     if decision != ACCEPTED:
@@ -362,6 +480,28 @@ def _evaluate_policies(conn, proposal_id: int, decision: str) -> list[dict]:
     return [
         {
             "policy_key": POLICY_PRESSURE_GUARD,
+            "result": result,
+            "reason": reason,
+        }
+    ]
+
+
+def _evaluate_operation_recovery_policies(action: str, failures: int) -> list[dict]:
+    if action != RECOVERY_REBOOT:
+        result = PASS
+        reason = "reboot guard only applies to reboot recovery"
+    elif int(failures) >= RECOVERY_REBOOT_MIN_FAILURES:
+        result = PASS
+        reason = "network failure threshold reached"
+    else:
+        result = POLICY_BLOCK
+        reason = (
+            "reboot recovery requires at least "
+            f"{RECOVERY_REBOOT_MIN_FAILURES} consecutive failures"
+        )
+    return [
+        {
+            "policy_key": POLICY_REBOOT_AFTER_FAILURES,
             "result": result,
             "reason": reason,
         }

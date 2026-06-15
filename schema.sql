@@ -117,6 +117,22 @@ CREATE TABLE IF NOT EXISTS rule_projection (
 CREATE INDEX IF NOT EXISTS idx_rule_projection_type_status
 ON rule_projection(rule_type, status);
 
+CREATE TABLE IF NOT EXISTS operation_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    operation_type  TEXT    NOT NULL,
+    check_key       TEXT    NOT NULL,
+    status          TEXT    NOT NULL,
+    target          TEXT    NOT NULL,
+    payload         TEXT    NOT NULL,
+    derivation      TEXT    NOT NULL,
+    source_event    INTEGER REFERENCES event_log(id),
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    last_updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_log_check
+ON operation_log(check_key, status);
+
 CREATE TABLE IF NOT EXISTS governance_log (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     action          TEXT    NOT NULL,

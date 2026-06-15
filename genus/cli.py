@@ -17,6 +17,7 @@ from genus import (
     integrity,
     ledger,
     maturation,
+    operation,
     projection,
     proposals,
     query,
@@ -272,6 +273,11 @@ def governance_group() -> None:
     pass
 
 
+@main.group(name="operation")
+def operation_group() -> None:
+    pass
+
+
 @main.group(name="maturation")
 def maturation_group() -> None:
     pass
@@ -519,6 +525,136 @@ def governance_list(target: str | None) -> None:
         conn.close()
 
 
+@operation_group.command("network-check")
+@click.option(
+    "--status",
+    "status_value",
+    required=True,
+    type=click.Choice([operation.STATUS_OK, operation.STATUS_FAIL]),
+)
+@click.option("--target", required=True)
+@click.option("--failures", default=0, show_default=True, type=int)
+@click.option(
+    "--action",
+    type=click.Choice([operation.ACTION_RESTART_NETWORK, operation.ACTION_REBOOT]),
+    default=None,
+)
+@click.option("--detail", default="")
+@click.option("--json", "as_json", is_flag=True)
+def operation_network_check(
+    status_value: str,
+    target: str,
+    failures: int,
+    action: str | None,
+    detail: str,
+    as_json: bool,
+) -> None:
+    conn = get_conn()
+    try:
+        try:
+            result = operation.record_network_check(
+                conn,
+                status=status_value,
+                target=target,
+                failures=failures,
+                action=action,
+                detail=detail,
+            )
+            conn.commit()
+        except ValueError as exc:
+            conn.rollback()
+            raise click.ClickException(str(exc)) from exc
+        if as_json:
+            click.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return
+        click.echo(
+            f"[OP] network.gateway {status_value} target={target} "
+            f"event={result['check_event_id']} failures={failures}"
+        )
+        belief = result["belief"]
+        click.echo(
+            f"[BLF] system.network={belief['claim_value']} "
+            f"{belief['event_type']} belief={belief['belief_id']}"
+        )
+        recovery = result["recovery"]
+        if recovery is not None:
+            verdict = recovery["verdict"]
+            click.echo(
+                f"[GOV] recovery {verdict['decision']} action={action} "
+                f"recovery_id={recovery['recovery_id']} reason={verdict['reason']}"
+            )
+    finally:
+        conn.close()
+
+
+@operation_group.command("recovery-result")
+@click.option("--recovery-id", required=True, type=int)
+@click.option(
+    "--result",
+    "result_value",
+    required=True,
+    type=click.Choice(
+        [
+            operation.RECOVERY_SUCCEEDED,
+            operation.RECOVERY_FAILED,
+            operation.RECOVERY_SCHEDULED,
+        ]
+    ),
+)
+@click.option("--detail", default="")
+@click.option("--json", "as_json", is_flag=True)
+def operation_recovery_result(
+    recovery_id: int,
+    result_value: str,
+    detail: str,
+    as_json: bool,
+) -> None:
+    conn = get_conn()
+    try:
+        try:
+            event_id = operation.record_recovery_result(
+                conn,
+                recovery_id=recovery_id,
+                result=result_value,
+                detail=detail,
+            )
+            conn.commit()
+        except ValueError as exc:
+            conn.rollback()
+            raise click.ClickException(str(exc)) from exc
+        result = {
+            "recovery_id": recovery_id,
+            "result": result_value,
+            "event_id": event_id,
+        }
+        if as_json:
+            click.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return
+        click.echo(
+            f"[OP] recovery {recovery_id} {result_value} event={event_id}"
+        )
+    finally:
+        conn.close()
+
+
+@operation_group.command("list")
+@click.option("--n", default=20, show_default=True, type=int)
+def operation_list(n: int) -> None:
+    conn = get_conn()
+    try:
+        rows = operation.list_operations(conn, limit=n)
+        click.echo("OPERATIONS")
+        click.echo("id  type      check_key        status     target")
+        for row in rows:
+            click.echo(
+                f"{row['id']:<3} {row['operation_type']:<9} "
+                f"{row['check_key']:<16} {row['status']:<10} {row['target']}"
+            )
+            click.echo(f"    payload: {json.dumps(row['payload'], sort_keys=True)}")
+    finally:
+        conn.close()
+
+
 @main.command("replay")
 def replay_command() -> None:
     conn = get_conn()
@@ -533,6 +669,7 @@ def replay_command() -> None:
         click.echo("[REPLAY] Rebuilding experience_log...")
         click.echo("[REPLAY] Rebuilding proposal_log...")
         click.echo("[REPLAY] Rebuilding rule_projection...")
+        click.echo("[REPLAY] Rebuilding operation_log...")
         summary = event_router.replay(conn)
         after = _state_snapshot(conn)
         click.echo(
@@ -541,6 +678,7 @@ def replay_command() -> None:
             f"{summary['experiences']} experience(s), "
             f"{summary['active_states']} active state(s), "
             f"{summary['governance_decisions']} governance decision(s), "
+            f"{summary['operations']} operation(s), "
             f"{summary['active_rules']} active rule(s)"
         )
         if before == after:
@@ -569,6 +707,7 @@ def integrity_check() -> None:
                 f"experiences={result['experiences']} "
                 f"active_states={result['active_states']} "
                 f"governance_decisions={result['governance_decisions']} "
+                f"operations={result['operations']} "
                 f"active_rules={result['active_rules']}"
             )
             return
@@ -835,6 +974,12 @@ def _print_ask_response(response: dict) -> None:
                 f"[RULE] #{row['id']} {row['rule_type']} "
                 f"{row['subject_key']} {row['rule_key']}"
             )
+    elif response["kind"] == "operations":
+        for row in response["operations"]:
+            click.echo(
+                f"[OP] #{row['id']} {row['operation_type']} "
+                f"{row['check_key']} status={row['status']}"
+            )
     elif response["kind"] == "status":
         for key, value in response["status"].items():
             click.echo(f"{key}: {value}")
@@ -1037,8 +1182,10 @@ def _parse_governance_target(target: str | None) -> tuple[str | None, int | None
     if ":" not in target:
         raise click.ClickException("--target must look like proposal:<id>")
     target_type, raw_id = target.split(":", 1)
-    if target_type != "proposal":
-        raise click.ClickException("only proposal:<id> targets are supported")
+    if target_type not in {"proposal", "operation_recovery"}:
+        raise click.ClickException(
+            "only proposal:<id> and operation_recovery:<id> targets are supported"
+        )
     try:
         return target_type, int(raw_id)
     except ValueError as exc:
@@ -1097,6 +1244,14 @@ def _state_snapshot(conn) -> dict:
         ORDER BY id
         """
     ).fetchall()
+    operation_rows = conn.execute(
+        """
+        SELECT id, operation_type, check_key, status, target, payload,
+               derivation, source_event
+        FROM operation_log
+        ORDER BY id
+        """
+    ).fetchall()
     rule_rows = conn.execute(
         """
         SELECT id, rule_key, rule_type, subject_key, spec, status,
@@ -1112,6 +1267,7 @@ def _state_snapshot(conn) -> dict:
         "experiences": [dict(row) for row in experience_rows],
         "states": [dict(row) for row in state_rows],
         "governance": [dict(row) for row in governance_rows],
+        "operations": [dict(row) for row in operation_rows],
         "rules": [dict(row) for row in rule_rows],
     }
 

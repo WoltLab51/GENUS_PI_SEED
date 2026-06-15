@@ -8,6 +8,7 @@ from genus import (
     governance,
     inquiries,
     maturation,
+    operation,
     projection,
     proposals,
     state,
@@ -65,6 +66,14 @@ RULE_PATTERNS = (
     "regeln",
     "regel",
 )
+OPERATION_PATTERNS = (
+    "operation",
+    "operations",
+    "betrieb",
+    "watchdog",
+    "netzwerk",
+    "network",
+)
 STATUS_PATTERNS = (
     "status",
     "summary",
@@ -79,6 +88,7 @@ SUPPORTED_PATTERNS = (
     'ask "zustand"',
     'ask "governance"',
     'ask "regeln"',
+    'ask "betrieb"',
 )
 
 
@@ -140,6 +150,14 @@ def ask(conn, question: str) -> dict:
             "answer": f"{len(rows)} active rule(s)",
             "rules": rows,
         }
+    if _matches(normalized, OPERATION_PATTERNS):
+        rows = operation.list_operations(conn)
+        return {
+            "kind": "operations",
+            "question": question,
+            "answer": f"{len(rows)} operation record(s)",
+            "operations": rows,
+        }
     if _matches(normalized, STATUS_PATTERNS):
         return {
             "kind": "status",
@@ -185,6 +203,9 @@ def status(conn) -> dict:
     active_rule_count = conn.execute(
         "SELECT COUNT(*) AS count FROM rule_projection WHERE status = 'active'"
     ).fetchone()["count"]
+    operation_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM operation_log"
+    ).fetchone()["count"]
     return {
         "events": int(event_count),
         "active_beliefs": int(active_count),
@@ -194,6 +215,7 @@ def status(conn) -> dict:
         "experiences": int(experience_count),
         "active_states": int(active_state_count),
         "governance_decisions": int(governance_count),
+        "operations": int(operation_count),
         "active_rules": int(active_rule_count),
     }
 

@@ -55,6 +55,8 @@ genus proposals review 1 --accept --note "makes sense"
 genus proposals review 1 --accept --override --note "override under pressure"
 genus governance list
 genus governance list --target proposal:1
+genus operation network-check --status ok --target 192.168.178.1
+genus operation list
 genus inquiries list
 genus inquiries resolve 1 --answer "Backup lief"
 genus replay
@@ -201,6 +203,23 @@ An anchor protects the ledger prefix up to its `head_event_id`. Later events are
 valid local history, but they are not externally witnessed until the next anchor.
 To check a directory of anchors, run `genus ledger anchor verify` for each file.
 
+## Self-Operation And Recovery
+
+v1.3/v1.4 add deterministic self-operation checks and governed recovery. The
+first supported check is `network.gateway`, projected into `operation_log` and
+the normal belief `system.network=healthy|unstable`.
+
+```bash
+genus operation network-check --status ok --target 192.168.178.1
+genus operation network-check --status fail --target 192.168.178.1 --failures 1 --action restart_network
+genus operation list
+genus ask "betrieb"
+```
+
+Recovery is policy-gated before the operating system does anything.
+`restart_network` is allowed after a failed gateway check; `reboot` is blocked
+until at least three consecutive failures.
+
 ## Automatic Collection With Cron
 
 GENUS does not need a daemon for the first Pi loop. Install the marked user
@@ -220,6 +239,16 @@ That block runs:
 
 Logs are written to `/home/pi/.genus/logs/cron.log` and
 `/home/pi/.genus/logs/doctor.log`.
+
+For headless Pi resilience, install the optional systemd network watchdog:
+
+```powershell
+.\deploy\install_pi_network_watchdog.cmd -HostName ronny@Pi -CoreId pi-core
+```
+
+The watchdog logs to `/home/pi/.genus/logs/network-watchdog.log`, records
+operation events in GENUS, restarts the network stack on early failures, and
+reboots only after the governed repeated-failure threshold.
 
 For off-device exchange, `deploy/pi_publish_status.sh` can publish anchors and
 a minimal public health summary to `WoltLab51/GENUS_PI_STATUS`. It never uploads
@@ -251,6 +280,7 @@ genus ledger head
 genus ledger verify
 GENUS_CORE_ID=ci-core genus ledger anchor create --out /tmp/genus-anchor.json
 GENUS_CORE_ID=ci-core genus ledger anchor verify /tmp/genus-anchor.json
+genus operation network-check --status ok --target 192.168.178.1
 grep -r "anthropic|openai|ollama" genus/
 grep -r "requests|httpx|aiohttp|urllib.request" genus/
 ```

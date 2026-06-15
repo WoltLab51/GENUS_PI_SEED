@@ -106,6 +106,31 @@ REQUIRED_EVENT_KEYS = {
         "policy_results",
         "reason",
     },
+    "operation_check_recorded": {
+        "operation_id",
+        "check_key",
+        "status",
+        "target",
+        "payload",
+        "derivation",
+    },
+    "operation_recovery_attempted": {
+        "recovery_id",
+        "check_key",
+        "action",
+        "target",
+        "failures",
+        "reason",
+        "derivation",
+    },
+    "operation_recovery_result": {
+        "recovery_id",
+        "result",
+        "action",
+        "target",
+        "detail",
+        "derivation",
+    },
     "inquiry_created": {
         "inquiry_id",
         "inquiry_type",
@@ -155,6 +180,7 @@ def check(conn) -> dict:
         "experiences": replay_summary["experiences"],
         "active_states": replay_summary["active_states"],
         "governance_decisions": replay_summary["governance_decisions"],
+        "operations": replay_summary["operations"],
         "active_rules": replay_summary["active_rules"],
     }
 
@@ -203,6 +229,10 @@ def validate_schema(conn) -> list[str]:
     governance_columns = [
         row["name"]
         for row in conn.execute("PRAGMA table_info(governance_log)").fetchall()
+    ]
+    operation_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(operation_log)").fetchall()
     ]
     rule_columns = [
         row["name"]
@@ -253,6 +283,19 @@ def validate_schema(conn) -> list[str]:
     if "confidence" in governance_columns:
         issues.append("governance_log must not store confidence")
     if not {
+        "operation_type",
+        "check_key",
+        "status",
+        "target",
+        "payload",
+        "derivation",
+        "source_event",
+        "last_updated_at",
+    }.issubset(operation_columns):
+        issues.append("operation_log missing required columns")
+    if "confidence" in operation_columns:
+        issues.append("operation_log must not store confidence")
+    if not {
         "rule_key",
         "rule_type",
         "subject_key",
@@ -301,6 +344,15 @@ def validate_schema(conn) -> list[str]:
     ).fetchone()["count"]
     if empty_rule_derivations:
         issues.append("rule_projection contains empty derivation")
+    empty_operation_derivations = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM operation_log
+        WHERE derivation IS NULL OR TRIM(derivation) = ''
+        """
+    ).fetchone()["count"]
+    if empty_operation_derivations:
+        issues.append("operation_log contains empty derivation")
     return issues
 
 
@@ -359,8 +411,47 @@ def validate_event_contract(conn) -> list[str]:
         if event_type == "governance_decision":
             if payload["decision"] not in {"allowed", "blocked"}:
                 issues.append(f"event {row['id']} governance_decision has invalid decision")
-            if payload["action"] not in {"proposal.review", "rule.activate"}:
+            if payload["action"] not in {
+                "proposal.review",
+                "rule.activate",
+                "operation.recovery",
+            }:
                 issues.append(f"event {row['id']} governance_decision has invalid action")
+            if payload["target_type"] not in {"proposal", "operation_recovery"}:
+                issues.append(
+                    f"event {row['id']} governance_decision has invalid target_type"
+                )
+        if event_type == "operation_check_recorded":
+            if payload["status"] not in {"ok", "fail"}:
+                issues.append(
+                    f"event {row['id']} operation_check_recorded has invalid status"
+                )
+            if not payload.get("derivation"):
+                issues.append(
+                    f"event {row['id']} operation_check_recorded has empty derivation"
+                )
+            if not payload.get("target"):
+                issues.append(
+                    f"event {row['id']} operation_check_recorded has empty target"
+                )
+        if event_type == "operation_recovery_attempted":
+            if payload["action"] not in {"restart_network", "reboot"}:
+                issues.append(
+                    f"event {row['id']} operation_recovery_attempted has invalid action"
+                )
+            if not payload.get("derivation"):
+                issues.append(
+                    f"event {row['id']} operation_recovery_attempted has empty derivation"
+                )
+        if event_type == "operation_recovery_result":
+            if payload["result"] not in {"succeeded", "failed", "scheduled"}:
+                issues.append(
+                    f"event {row['id']} operation_recovery_result has invalid result"
+                )
+            if not payload.get("derivation"):
+                issues.append(
+                    f"event {row['id']} operation_recovery_result has empty derivation"
+                )
         if event_type == "ledger_epoch_opened":
             if required is not None and not missing:
                 if payload["algo"] != sealing.ALGO:
@@ -493,6 +584,17 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
+    operations = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, operation_type, check_key, status, target, payload,
+                   derivation, source_event, created_at, last_updated_at
+            FROM operation_log
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
     rules = [
         dict(row)
         for row in conn.execute(
@@ -511,5 +613,6 @@ def snapshot_projections(conn) -> dict:
         "experiences": experiences,
         "states": states,
         "governance": governance,
+        "operations": operations,
         "rules": rules,
     }

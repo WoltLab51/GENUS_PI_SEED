@@ -7,6 +7,7 @@ from genus import (
     governance,
     inquiries,
     maturation,
+    operation,
     projection,
     proposals,
     state,
@@ -17,6 +18,7 @@ def replay(conn) -> dict:
     events = conn.execute("SELECT * FROM event_log ORDER BY id").fetchall()
     conn.execute("DELETE FROM rule_projection")
     conn.execute("DELETE FROM governance_log")
+    conn.execute("DELETE FROM operation_log")
     conn.execute("DELETE FROM inquiry_log")
     conn.execute("DELETE FROM proposal_log")
     conn.execute("DELETE FROM experience_log")
@@ -28,6 +30,7 @@ def replay(conn) -> dict:
         WHERE name IN (
             'rule_projection',
             'governance_log',
+            'operation_log',
             'inquiry_log',
             'proposal_log',
             'experience_log',
@@ -58,6 +61,9 @@ def replay(conn) -> dict:
     governance_count = conn.execute(
         "SELECT COUNT(*) AS count FROM governance_log"
     ).fetchone()["count"]
+    operation_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM operation_log"
+    ).fetchone()["count"]
     active_rule_count = conn.execute(
         "SELECT COUNT(*) AS count FROM rule_projection WHERE status = 'active'"
     ).fetchone()["count"]
@@ -70,6 +76,7 @@ def replay(conn) -> dict:
         "experiences": int(experience_count),
         "active_states": int(state_count),
         "governance_decisions": int(governance_count),
+        "operations": int(operation_count),
         "active_rules": int(active_rule_count),
     }
 
@@ -96,6 +103,14 @@ def apply_event(conn, event) -> None:
         state.apply_state_changed(conn, payload)
     elif event_type == "governance_decision":
         governance.apply_governance_decision(conn, payload)
+    elif event_type == "operation_check_recorded":
+        payload["_source_event"] = event["id"]
+        operation.apply_operation_check_recorded(conn, payload)
+    elif event_type == "operation_recovery_attempted":
+        payload["_source_event"] = event["id"]
+        operation.apply_operation_recovery_attempted(conn, payload)
+    elif event_type == "operation_recovery_result":
+        operation.apply_operation_recovery_result(conn, payload)
     elif event_type == "rule_activated":
         maturation.apply_rule_activated(conn, payload)
     elif event_type == "inquiry_created":

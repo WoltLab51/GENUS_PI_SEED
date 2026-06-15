@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.2) bis zum Zielsystem der Architektur-Karte.
+> Vom heutigen Stand (v1.4) bis zum Zielsystem der Architektur-Karte.
 > Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -43,13 +43,13 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v1.2)
+## Wo wir stehen (v1.4)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
-External Ledger Anchors
+External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance
 **Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 
@@ -359,6 +359,48 @@ Sicherheitsparameter.
 
 ---
 
+## v1.3 — Self-Operation Evidence · *GENUS beobachtet seinen Betrieb*
+
+**Status:** umgesetzt. GENUS kann deterministische Betriebschecks als eigene
+Events schreiben. Der erste Check ist `network.gateway`: erreichbar oder nicht
+erreichbar. Daraus entsteht der normale Belief `system.network=healthy` oder
+`system.network=unstable`.
+
+**Neue Events:** `operation_check_recorded`
+
+**Neue Projektion:** `operation_log`
+
+**Definition of Done:**
+- [x] Netzwerk-Checks sind event-backed
+- [x] `operation_log` ist Replay-stabil
+- [x] `system.network` ist ein normaler Belief ohne gespeicherte Confidence
+- [x] `genus operation list` und `genus ask "betrieb"` lesen den Zustand
+- [x] Wachstumsregel ✓
+
+---
+
+## v1.4 — Self-Healing Governance · *Reparatur nur mit Policy*
+
+**Status:** umgesetzt. Ein systemd-Timer kann auf dem Pi das Default-Gateway
+prüfen und bei Ausfall eine Recovery anstoßen. GENUS entscheidet vorher, ob die
+Recovery nach Kernel-Constraint und Policy erlaubt ist.
+
+**Policy:** `restart_network` ist nach einem fehlgeschlagenen Gateway-Check
+erlaubt. `reboot` ist erst nach mindestens drei aufeinanderfolgenden
+Fehlschlägen erlaubt.
+
+**Neue Events:** `operation_recovery_attempted`, `operation_recovery_result`
+
+**Definition of Done:**
+- [x] Recovery wird als `operation.recovery` durch Governance bewertet
+- [x] Reboot ist bis zur Fehler-Schwelle blockiert
+- [x] Recovery-Ergebnis wird event-backed dokumentiert
+- [x] systemd-Timer und Windows-Installer liegen in `deploy/`
+- [x] volle Testsuite grün
+- [x] Wachstumsregel ✓
+
+---
+
 # Phase 2 — Mehr Material, noch deterministisch
 
 ---
@@ -418,6 +460,10 @@ DETERMINISTISCH (kein LLM)
   v0.10  State                → Gesamtzustand
   v0.11  Governance           → Policy + Constraint greifen
   v1.0   Maturation           → Erfahrung wird Regel · KARTE-KERN GRÜN
+  v1.1   Ledger Sealing       → lokale Hash-Kette
+  v1.2   External Anchors     → externer Head-Zeuge
+  v1.3   Self-Operation       → GENUS beobachtet seinen Betrieb
+  v1.4   Self-Healing         → Reparatur nur mit Governance
 
 MEHR MATERIAL (noch deterministisch)
   v1.x   Struktur-Material    → GENUS beobachtet deine Arbeit

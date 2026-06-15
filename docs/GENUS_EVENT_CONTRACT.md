@@ -28,6 +28,9 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 | `constraint_checked` | `decision_id`, `constraint_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
 | `policy_evaluated` | `decision_id`, `policy_key`, `action`, `target_type`, `target_id`, `result`, `reason` | Governance | Audit only |
 | `governance_decision` | `decision_id`, `action`, `target_type`, `target_id`, `decision`, `override`, `policy_results`, `reason` | Governance | Insert governance decision row |
+| `operation_check_recorded` | `operation_id`, `check_key`, `status`, `target`, `payload`, `derivation` | Operation | Insert operation check row |
+| `operation_recovery_attempted` | `recovery_id`, `check_key`, `action`, `target`, `failures`, `reason`, `derivation` | Operation | Insert operation recovery row |
+| `operation_recovery_result` | `recovery_id`, `result`, `action`, `target`, `detail`, `derivation` | Operation | Update operation recovery row |
 | `inquiry_created` | `inquiry_id`, `inquiry_type`, `claim_key`, `source_belief`, `source_event`, `question_key`, `payload`, `state` | Inquiries | Insert inquiry row |
 | `inquiry_resolved` | `inquiry_id`, `answer` | Human via CLI | Mark inquiry resolved |
 
@@ -38,7 +41,7 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   rows may be null; sealed rows must verify against the local chain.
 - `replay()` may clear `belief_projection`, `state_projection`,
   `experience_log`, `proposal_log`, `inquiry_log`, `governance_log`, and
-  `rule_projection`, but never changes `event_log`.
+  `operation_log`, and `rule_projection`, but never changes `event_log`.
 - `belief_projection.derivation` is required for every belief event that creates
   a belief.
 - `belief_projection` has no `confidence` column.
@@ -47,6 +50,8 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 - `state_projection.derivation` is required and `state_projection` has no
   `confidence` column.
 - `rule_projection.derivation` is required and `rule_projection` has no
+  `confidence` column.
+- `operation_log.derivation` is required and `operation_log` has no
   `confidence` column.
 - Proposal creation is event-backed: `proposal_created` is written before
   `proposal_log` is projected.
@@ -71,6 +76,13 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   is recorded in `governance_decision`.
 - A blocked governance decision is still durable and committed. It leaves the
   target proposal pending.
+- Operation checks record self-operation evidence. `system.network` is a normal
+  rebuildable belief derived from `operation_check_recorded` events.
+- Operation recovery is governed before execution. `restart_network` is allowed
+  after a failed gateway check; `reboot` is blocked until the configured
+  repeated-failure threshold is reached.
+- Operation recovery results are explicit events. Replay rebuilds the recovery
+  attempt and then applies the terminal result to `operation_log`.
 - `rule_proposed` is emitted by deterministic maturation over recorded
   experiences. It becomes the `source_event` of its `RuleProposal`.
 - Accepting a `RuleProposal` activates nothing. Rule activation is a separate,

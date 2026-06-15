@@ -14,7 +14,7 @@ it currently believes, and keeps every important state change replayable.
   head for a specific `core_id` without writing a new ledger event.
 - **Projection-only state:** Tables such as `belief_projection`,
   `state_projection`, `experience_log`, `proposal_log`, `inquiry_log`, and
-  `governance_log`, and `rule_projection` are derived views. They may be
+  `governance_log`, `operation_log`, and `rule_projection` are derived views. They may be
   cleared and rebuilt by replay.
 - **Deterministic first:** current processing is synchronous and ordered.
   Parallel workers are out of scope until replay and idempotency rules are
@@ -44,6 +44,7 @@ Observation -> Evidence -> Rules -> Beliefs -> State -> Governance
                     ^             \-> Contradictions -> Proposals/Inquiries
                     |-> Active Rules -> Expectation Inquiries
                      \-> Experience -> RuleProposal -> Human -> Active Rule
+Operation Checks -> Operation Evidence -> Network Belief -> Governed Recovery
        \______________________________________________________________/
                               Event Ledger
 ```
@@ -94,8 +95,10 @@ own events and projections are written.
 - `state.py` derives deterministic state vectors from active beliefs and
   coordinates `state_changed` events with `state_projection` rows.
 - `governance.py` evaluates kernel constraints and policies around proposal
-  review and rule activation, writes governance audit events, and projects
+  review, rule activation, and operation recovery, writes governance audit events, and projects
   `governance_decision` rows.
+- `operation.py` records self-operation checks and recovery attempts, projects
+  `operation_log`, and derives the `system.network` belief from network checks.
 - `maturation.py` turns recorded experiences into `RuleProposal` rows and
   activates accepted rule proposals through a second governed human act.
 - `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
@@ -146,6 +149,16 @@ v1.2 adds external Ledger Anchors as offline JSON artifacts. An anchor records
 `core_id`, `head_event_id`, `head_created_at`, and the current seal head without
 emitting an event. It protects only the prefix up to that head; events after the
 anchor require a later anchor to be externally witnessed.
+
+v1.3 adds Self-Operation Evidence. The Pi can record deterministic checks about
+its own operating condition, starting with `network.gateway`. Those checks are
+normal events and can create or update the `system.network` belief. The current
+operation view is rebuildable in `operation_log`.
+
+v1.4 adds the first Self-Healing Governance. A systemd timer outside GENUS may
+restart the network stack or reboot the Pi, but only after GENUS records a
+governed `operation.recovery` decision. The operating system performs the
+action; GENUS records the reason, the allowed/blocked decision, and the result.
 
 ## Document Family
 

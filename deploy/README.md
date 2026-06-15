@@ -104,6 +104,34 @@ tail -f "$HOME/.genus/logs/cron.log"
 tail -f "$HOME/.genus/logs/doctor.log"
 ```
 
+## Network Watchdog
+
+`pi_install_network_watchdog.sh` installs a root-owned systemd timer that checks
+the Pi default gateway every five minutes. The check itself is recorded in
+GENUS as `operation_check_recorded`. If the gateway is unreachable, GENUS first
+records the unstable network belief and a governed recovery attempt.
+
+Recovery policy:
+
+- first failures: restart the active network service
+- after 3 consecutive failures: schedule a reboot
+- every recovery attempt and result is written to the ledger
+
+Install it from Windows PowerShell:
+
+```powershell
+.\deploy\install_pi_network_watchdog.cmd -HostName ronny@Pi -CoreId pi-core
+```
+
+The installer uses `sudo` on the Pi and may ask for the Pi password. Check it
+with:
+
+```bash
+systemctl status genus-network-watchdog.timer
+tail -f "$HOME/.genus/logs/network-watchdog.log"
+GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" "$HOME/GENUS_PI_SEED/.venv/bin/genus" operation list
+```
+
 ## Status Repository
 
 `GENUS_PI_STATUS` is the intended off-device exchange repository for anchors
