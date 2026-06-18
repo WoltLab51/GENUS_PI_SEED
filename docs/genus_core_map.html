@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GENUS CORE — Reifegrad-Karte</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0a0d12;
@@ -33,7 +30,7 @@
       radial-gradient(900px 500px at 85% 0%, rgba(224,85,107,.05), transparent 60%),
       var(--bg);
     color:var(--txt);
-    font-family:'IBM Plex Sans',sans-serif;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     padding:34px 30px 40px;
     -webkit-font-smoothing:antialiased;
   }
@@ -42,7 +39,7 @@
   /* header */
   header{display:flex;justify-content:space-between;align-items:flex-start;gap:30px;margin-bottom:24px;flex-wrap:wrap}
   h1{font-size:34px;font-weight:700;letter-spacing:-.5px;line-height:1}
-  h1 small{display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:var(--txt-dim);letter-spacing:3px;margin-top:8px}
+  h1 small{display:block;font-family:"Consolas","Liberation Mono",monospace;font-size:12px;font-weight:500;color:var(--txt-dim);letter-spacing:3px;margin-top:8px}
 
   .legend{display:flex;gap:18px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
   .legend .li{display:flex;align-items:center;gap:9px;font-size:12px}
@@ -55,10 +52,10 @@
 
   /* principle */
   .principle{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:26px;text-align:center}
-  .principle .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--txt-faint);margin-bottom:7px}
+  .principle .k{font-family:"Consolas","Liberation Mono",monospace;font-size:10px;letter-spacing:3px;color:var(--txt-faint);margin-bottom:7px}
   .principle p{font-size:16px;color:var(--txt);font-weight:500;font-style:italic}
 
-  .section-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--txt-dim);margin:0 0 13px 2px;text-transform:uppercase}
+  .section-label{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;letter-spacing:3px;color:var(--txt-dim);margin:0 0 13px 2px;text-transform:uppercase}
 
   /* pipeline */
   .pipeline{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin-bottom:8px}
@@ -70,13 +67,13 @@
   .core.built{background:var(--built-bg);border-color:var(--built-line)}
   .core.partial{background:var(--partial-bg);border-color:var(--partial-line)}
   .core.vision{background:var(--vision-bg);border-color:var(--vision-line)}
-  .core .num{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid currentColor;margin-bottom:9px}
+  .core .num{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;font-weight:600;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid currentColor;margin-bottom:9px}
   .core.built .num{color:var(--built)}
   .core.partial .num{color:var(--partial)}
   .core.vision .num{color:var(--vision)}
   .core h3{font-size:12.5px;font-weight:700;line-height:1.15;letter-spacing:.2px;margin-bottom:7px}
   .core .q{font-size:10.5px;color:var(--txt-dim);line-height:1.35;flex:1}
-  .core .out{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--txt-faint);margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
+  .core .out{font-family:"Consolas","Liberation Mono",monospace;font-size:9px;color:var(--txt-faint);margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
   .core .stat{position:absolute;top:11px;right:10px;width:8px;height:8px;border-radius:50%}
   .core.built .stat{background:var(--built);box-shadow:0 0 8px var(--built-line)}
   .core.partial .stat{background:var(--partial);box-shadow:0 0 8px var(--partial-line)}
@@ -99,10 +96,10 @@
   /* dna */
   .dna{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 18px;margin-top:18px}
   .dna .title{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13px;padding-right:6px}
-  .rule{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--txt-dim);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:6px 11px}
+  .rule{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;color:var(--txt-dim);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:6px 11px}
   .rule.ok{color:var(--built);border-color:var(--built-line)}
 
-  .foot{margin-top:20px;font-size:11px;color:var(--txt-faint);font-family:'IBM Plex Mono',monospace;text-align:center;line-height:1.7}
+  .foot{margin-top:20px;font-size:11px;color:var(--txt-faint);font-family:"Consolas","Liberation Mono",monospace;text-align:center;line-height:1.7}
   .arrow-row{display:flex;justify-content:center;margin:2px 0 18px;color:var(--txt-faint);font-size:14px;letter-spacing:6px}
 </style>
 </head>
@@ -110,7 +107,7 @@
 <div class="wrap">
 
   <header>
-    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v1.2</small></h1>
+    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v1.5</small></h1>
     <div class="legend">
       <div class="li"><span class="dot b"></span><div><b>Gebaut &amp; getestet</b><br><span>läuft im Code, durch Tests gedeckt</span></div></div>
       <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, aber unvollständig</span></div></div>
@@ -127,12 +124,12 @@
   <div class="pipeline">
     <div class="core built"><span class="stat"></span><div class="num">1</div><h3>Observation Core</h3><div class="q">Was wurde wahrgenommen?</div><div class="out">observation_created</div></div>
     <div class="core built"><span class="stat"></span><div class="num">2</div><h3>Evidence Core</h3><div class="q">Was ist belegbar? Woher stammt es?</div><div class="out">evidence_recorded</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">3</div><h3>Belief Core</h3><div class="q">Was hält GENUS aktuell für plausibel?</div><div class="out">belief_projection</div></div>
+    <div class="core built"><span class="stat"></span><div class="num">3</div><h3>Belief Core</h3><div class="q">Was hält GENUS aktuell für plausibel?</div><div class="out">belief_projection · confidence decay</div></div>
     <div class="core built"><span class="stat"></span><div class="num">4</div><h3>State Core</h3><div class="q">Welcher Gesamtzustand entsteht aus vielen Beliefs?</div><div class="out">state_projection</div></div>
     <div class="core vision"><span class="stat"></span><div class="num">5</div><h3>Transition Core</h3><div class="q">Welche Veränderung wäre möglich?</div><div class="out">— nicht gebaut</div></div>
-    <div class="core partial"><span class="stat"></span><div class="num">6</div><h3>Constraint Core</h3><div class="q">Darf diese Veränderung überhaupt weiter?</div><div class="out">constraint_checked · governance_log</div></div>
+    <div class="core built"><span class="stat"></span><div class="num">6</div><h3>Constraint Core</h3><div class="q">Darf diese Veränderung überhaupt weiter?</div><div class="out">constraint_checked · policy_evaluated</div></div>
     <div class="core built"><span class="stat"></span><div class="num">7</div><h3>Proposal Core</h3><div class="q">Was wird vorgeschlagen — und reviewt?</div><div class="out">proposal_log · review</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">8</div><h3>Ledger Core</h3><div class="q">Was ist nachweislich passiert?</div><div class="out">event_log · replay</div></div>
+    <div class="core built"><span class="stat"></span><div class="num">8</div><h3>Ledger Core</h3><div class="q">Was ist nachweislich passiert?</div><div class="out">event_log · seals · anchors</div></div>
     <div class="core built"><span class="stat"></span><div class="num">9</div><h3>Experience Core</h3><div class="q">Welche Muster wiederholen sich über Zeit?</div><div class="out">experience_log</div></div>
   </div>
   <div class="arrow-row">↓</div>
@@ -140,11 +137,11 @@
   <div class="section-label">Querschnitt: Governance &amp; Sicherheit</div>
   <div class="layer cross">
     <div class="grid g6">
-      <div class="cell"><div class="ch"><span class="mini p"></span>Constitutional Kernel</div><div class="cd">Kernel-Constraints für Reviews</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Constitutional Kernel</div><div class="cd">Constraints für Review, Regeln, Recovery</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Authority Matrix</div><div class="cd">Wer darf was, wo, wann?</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Room System</div><div class="cd">Kontexte, Räume, Zugriffsgrenzen</div></div>
-      <div class="cell"><div class="ch"><span class="mini p"></span>Policy Engine</div><div class="cd">pressure_guard_v1 als erster Guard</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Audit &amp; Trace</div><div class="cd">Ledger + Governance + Anchors grün</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Policy Engine</div><div class="cd">pressure + reboot guards gebaut</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Audit &amp; Trace</div><div class="cd">Ledger + Governance + Anchors + CI</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Identity Core</div><div class="cd">Wer ist GENUS?</div></div>
     </div>
   </div>
@@ -159,7 +156,7 @@
       <div class="cell"><div class="ch"><span class="mini v"></span>Scheduler Core</div><div class="cd">Priorisierung, Reihenfolge</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Worker Interface</div><div class="cd">Ausführung über Worker</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Maturation Core</div><div class="cd">Experience → RuleProposal → aktive Regel</div></div>
-      <div class="cell"><div class="ch"><span class="mini p"></span>Monitoring Core</div><div class="cd">5 lokale Sensoren gebaut</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Monitoring Core</div><div class="cd">5 Sensoren + network.gateway</div></div>
     </div>
   </div>
   <div class="arrow-row">↓</div>
@@ -167,10 +164,10 @@
   <div class="section-label">Infrastruktur &amp; Runtime</div>
   <div class="layer">
     <div class="grid g5">
-      <div class="cell"><div class="ch"><span class="mini p"></span>Habitat</div><div class="cd">X1 lokal · Pi 5 als Ziel</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Habitat</div><div class="cd">X1 lokal · Pi live</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Database Layer</div><div class="cd">SQLite · append-only Ledger</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>CLI / Runtime</div><div class="cd">Click · synchron · deterministisch</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Network Layer</div><div class="cd">bewusst leer in v0 (kein HTTP)</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Network Layer</div><div class="cd">Kern ohne HTTP · Status via deploy</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Test &amp; Integrity</div><div class="cd">pytest · replay · contract checks</div></div>
     </div>
   </div>
@@ -190,7 +187,7 @@
 
   <div class="foot">
     grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen, aber unvollständig &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    deterministischer Kern grün — nächste Schicht: mehr Struktur-Material
+    deterministischer Kern grün — nächste Schicht: Struktur-Material
   </div>
 
 </div>

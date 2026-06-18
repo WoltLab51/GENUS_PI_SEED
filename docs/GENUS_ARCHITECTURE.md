@@ -163,15 +163,21 @@ action; GENUS records the reason, the allowed/blocked decision, and the result.
 
 ## Document Family
 
+- `docs/README.md` defines the documentation shelves and authority levels.
 - `GENUS_GESAMTBILD.md` synthesizes the whole project direction.
-- `GENUS_ROADMAP.md` defines the build order and next-step discipline.
-- `GENUS_GRUNDAUSBILDUNG.md` maps local sensors to epistemic training forms.
-- `GENUS_SENSOR_PRINCIPLE.md` defines what sensors may and may not do.
+- `GENUS_ROADMAP.md`, `GENUS_EVENT_CONTRACT.md`, and
+  `GENUS_LEDGER_AUDIT.md` define current build contracts together with this
+  architecture document.
+- `genus_core_map.html` is the visual maturity map for the current architecture.
+- `GENUS_GRUNDAUSBILDUNG.md` and `GENUS_SENSOR_PRINCIPLE.md` are supporting
+  doctrine for material and sensor boundaries.
 - `GENUS_PHYSIK.md`, `GENUS_ANTIZIPATION.md`, and
   `GENUS_VISUAL_THINKING.md` preserve later-stage concepts without pulling
   them into the current core.
 - `parked/` holds non-canonical sketches. Nothing there is build input until
   promoted into a canonical document.
+- `archive/` holds historical prompts and superseded specs. It is never current
+  authority.
 
 ## Growth Rule
 

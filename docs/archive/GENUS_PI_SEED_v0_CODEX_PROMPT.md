@@ -13,7 +13,7 @@ Copy this prompt verbatim into Codex. Do not paraphrase.
 
 You are implementing GENUS_PI_SEED_v0: a minimal Python CLI that proves an epistemological system is real.
 
-**Read the full spec first:** `GENUS_PI_SEED_v0_CPU_BELIEF_LOOP_SPEC.md`
+**Read the full spec first:** `docs/archive/GENUS_PI_SEED_v0_CPU_BELIEF_LOOP_SPEC.md`
 
 Implement it completely. Every section. Do not skip anything.
 

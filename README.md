@@ -12,17 +12,14 @@ GENUS PI SEED is a deterministic, ledger-first system belief loop:
 
 The project documentation lives in `docs/`.
 
+- `docs/README.md` explains which documents are canonical, supporting,
+  future-facing, parked, or archived.
 - `docs/GENUS_GESAMTBILD.md` is the navigation document for the overall goal.
-- `docs/GENUS_ROADMAP.md` defines the next build steps and growth gates.
-- `docs/GENUS_ARCHITECTURE.md` and `docs/GENUS_EVENT_CONTRACT.md` are the
-  current technical contracts.
+- `docs/GENUS_ROADMAP.md`, `docs/GENUS_ARCHITECTURE.md`,
+  `docs/GENUS_EVENT_CONTRACT.md`, and `docs/GENUS_LEDGER_AUDIT.md` are the
+  current build contracts.
 - `docs/GENUS_ARCHITECTURE.md#change-trust` defines how GENUS treats updates:
   a change earns trust only after deterministic gates and observed runtime.
-- `docs/GENUS_LEDGER_AUDIT.md` documents the current ledger integrity boundary
-  and the recommended sealing and anchoring path.
-- `docs/GENUS_SENSOR_PRINCIPLE.md` defines the boundary for future sensors.
-- `docs/parked/` holds non-canonical sketches and ideas that are not build
-  input until promoted into the roadmap or another canonical document.
 
 ## Commands
 

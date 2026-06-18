@@ -144,6 +144,10 @@ kein Eingangstor.
 
 ## Die Dokumenten-Familie
 
+Die aktuelle Regalordnung und Autoritaet der Dokumente steht in
+`README.md` in diesem Ordner. Dieses Gesamtbild bleibt Synthese und Navigation,
+nicht die Quelle fuer technische Einzelvertraege.
+
 ```
 GENUS_GESAMTBILD.md        dieses Dokument — Synthese & Navigation (oben)
 │
