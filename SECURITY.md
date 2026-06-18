@@ -2,14 +2,15 @@
 
 ## Supported Versions
 
-GENUS_PI_SEED ist ein pre-1.0-Projekt. Unterstützt wird jeweils nur der
-aktuelle Stand von `main`; ältere Zwischenstände werden nicht separat
-gepflegt.
+GENUS_PI_SEED ist ein fruehes, lokales Python/SQLite-Projekt. Unterstuetzt
+wird jeweils nur der aktuelle Stand von `main`; aeltere Zwischenstaende werden
+nicht separat gepflegt.
 
 ## Scope
 
-Der aktuelle v0.x-Umfang ist eine lokale Python/SQLite-CLI. Das System darf
-keine LLM-, HTTP-, Web- oder Worker-Abhängigkeiten verwenden. Besonders
+Der aktuelle Umfang ist eine lokale Python/SQLite-CLI mit deterministischem
+Ledger, Projektionen, Offline-Anchors und Pi-Self-Operation. Das System darf
+keine LLM-, HTTP-, Web- oder Worker-Abhaengigkeiten verwenden. Besonders
 kritische Invarianten sind:
 
 - `event_log` ist append-only.

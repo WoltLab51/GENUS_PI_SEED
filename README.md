@@ -39,6 +39,7 @@ genus ask "status"
 genus explain belief 1
 genus explain experience 1
 genus explain state 1
+genus explain rule 1
 genus why proposal 1
 genus why decision 1
 genus beliefs show
@@ -56,6 +57,7 @@ genus proposals review 1 --accept --override --note "override under pressure"
 genus governance list
 genus governance list --target proposal:1
 genus operation network-check --status ok --target 192.168.178.1
+genus operation recovery-result --recovery-id 1 --result succeeded
 genus operation list
 genus inquiries list
 genus inquiries resolve 1 --answer "Backup lief"
@@ -220,6 +222,7 @@ the normal belief `system.network=healthy|unstable`.
 ```bash
 genus operation network-check --status ok --target 192.168.178.1
 genus operation network-check --status fail --target 192.168.178.1 --failures 1 --action restart_network
+genus operation recovery-result --recovery-id 1 --result succeeded
 genus operation list
 genus ask "betrieb"
 ```

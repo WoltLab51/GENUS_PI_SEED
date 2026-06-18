@@ -1,6 +1,6 @@
 # GENUS Ledger Audit
 
-Stand: v1.2
+Stand: v1.5
 
 ## Ergebnis
 
@@ -96,7 +96,7 @@ den Seal an exakt diesem Punkt. Die lokale DB darf danach weitergewachsen sein.
 Der Betrieb fuer mehrere Anchors ist absichtlich einfach: alle Anchor-Dateien
 werden einzeln verifiziert, z.B. per Shell-Schleife ueber ein Anchor-Verzeichnis.
 
-## CI-Haertung In v1.0.1
+## CI-Haertung In v1.5
 
 Der CI-Workflow prueft:
 
@@ -109,6 +109,10 @@ Der CI-Workflow prueft:
   `genus ledger verify` und `integrity check` nach Sealing
 - seit v1.2: `genus ledger anchor create` und `genus ledger anchor verify`
   gegen ein temporaeres Offline-Artefakt
+- seit v1.3/v1.4: `genus operation network-check` als deterministischen
+  Self-Operation-Smoke-Test
+- seit v1.5: zeitgewichtete Confidence-Berechnung bleibt reine Lesezeitlogik
+  und speichert weiterhin keine Confidence-Spalten
 
 Zusaetzlich gibt es einen Negativtest: ein bekannt kaputtes
 `observation_created`-Event muss `integrity.check()` fehlschlagen lassen. Damit
