@@ -76,6 +76,7 @@ def process_observation(conn, observation_id: int) -> list[dict]:
     ]
     events.extend({"event_type": event_type} for event_type in rules.apply_threshold(conn, metric_key))
     events.extend({"event_type": event_type} for event_type in rules.apply_trend(conn, metric_key))
+    events.extend({"event_type": event_type} for event_type in rules.apply_correlation(conn, metric_key))
     return events
 
 

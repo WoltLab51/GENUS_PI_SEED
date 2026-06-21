@@ -52,10 +52,11 @@ Hängt meist mit CPU zusammen — aber nicht immer. Temp hoch *ohne* CPU-Last is
 eine echte Auffälligkeit. **Übt State** (zwei Sensoren ergeben einen
 Gesamtzustand) **und Widerspruch** (der einen Proposal verdient). Lehrt GENUS,
 in Beziehungen statt in isolierten Werten zu denken.
-**Stand heute (verifiziert):** Temperatur läuft ebenfalls nur über die
-*Threshold*-Regel (`system.temperature = high/normal`). Die CPU-Temp-**Korrelation**
-(Temp hoch ohne CPU = Auffälligkeit) ist **noch nicht gebaut** — die
-Korrelations-Erkenntnisform ist offen.
+**Stand heute (verifiziert):** **gebaut.** Neben dem Threshold-Belief
+(`system.temperature = high/normal`) gibt es jetzt `system.thermal = anomalous/normal`
+(`rule:thermal_correlation_v1`): „Temp hoch *während* CPU *nicht* hoch" = Anomalie.
+**Self-kalibriert** — beide „hoch"-Schwellen sind die eigenen Perzentile des Pi,
+keine Vorgabe. Erster kreuz-metrischer Belief (liest Temp *und* CPU).
 
 ### Prozess-Ereignisse — *Seltenheit / diskrete Ereignisse*
 Ein Prozess startet, stürzt ab, ein Gerät wird verbunden, Hoch-/Runterfahren.
@@ -106,19 +107,19 @@ Subjekt, nicht in einer neuen Form.
 | CPU, Memory (`system.load`, `system.memory`) | Schwellwert + Revision | ✅ geübt |
 | Aktiv/Idle (`system.activity`) | Rhythmus | ✅ geübt (Experience-Detektor) |
 | Disk (`system.disk`, `disk.trend`) | Trend (steigt/fällt/stabil) | ✅ **geübt** (`disk.trend`, neben dem Threshold-Belief) |
-| Temperatur (`system.temperature`) | Korrelation + Widerspruch | ⚠️ nur Threshold — **Korrelation offen** |
+| Temperatur (`system.temperature`, `system.thermal`) | Korrelation + Widerspruch | ✅ **geübt** (`system.thermal`, self-kalibriert) |
 | Prozess-Ereignisse | Seltenheit / diskret | ❌ **nicht gebaut** |
 | Selbstbeobachtung (Ledger) | Selbstreflexion | ❌ **nicht gebaut** |
 | `system.network`, `system.clock` | Self-Operation (Schwellwert/binär) | ✅ gebaut (seit Urplan) |
 | `repo.activity`, `repo.churn` | Rhythmus/Intensität (deine Arbeit) | ✅ gebaut (neue Kategorie) |
 
-**Ehrliche Bilanz:** Geübt sind heute **Schwellwert**, **Rhythmus** und — neu —
-**Trend** (`disk.trend`), auf mehreren Subjekten (Maschine, Betrieb, deine
-Arbeit). Noch offen sind **Korrelation** und **Seltenheit**. Der ursprüngliche
-Satz „decken jede deterministische Erkenntnisform ab" war Plan, nicht Stand. Die
-zwei verbleibenden Lücken zu füllen ist die nächste Vertiefungs-Arbeit — *neue
-Belief-Typen*, nicht mehr Sensoren —, einer nach dem anderen. Alles offline,
-kein Byte aus dem Internet.
+**Ehrliche Bilanz:** Geübt sind heute **Schwellwert**, **Rhythmus**, **Trend**
+(`disk.trend`) und **Korrelation** (`system.thermal`), auf mehreren Subjekten
+(Maschine, Betrieb, deine Arbeit). **Noch offen: nur Seltenheit** (diskrete
+Ereignisse). Der ursprüngliche Satz „decken jede deterministische Erkenntnisform
+ab" war Plan, nicht Stand — jetzt fehlt zum Abschluss nur noch *eine* Form.
+Alles offline, kein Byte aus dem Internet, und die neuen Schwellen sind
+self-kalibriert (eigene Perzentile, keine Vorgabe).
 
 ---
 
@@ -145,8 +146,8 @@ fragen — nicht alle auf einmal.
 
 **Erst lokal komplett, dann nach außen.** Die Grundausbildung ist über die
 *Erkenntnisformen* definiert, nicht über eine feste Sensor-Zahl — und sie ist
-**noch nicht abgeschlossen**: Korrelation und Seltenheit fehlen (Trend ist
-seit `disk.trend` geübt). Erst wenn
+**noch nicht abgeschlossen**: nur noch Seltenheit fehlt (Trend ist seit
+`disk.trend` geübt, Korrelation seit `system.thermal`). Erst wenn
 alle deterministischen Erkenntnisformen geübt sind, kommt der erste externe
 Sensor — und der naheliegende ist nicht Wetter, sondern **Markt**, weil er direkt
 auf Antizipation und Trading zuläuft. Wir stehen also bewusst *vor* dieser Tür.

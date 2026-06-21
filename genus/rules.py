@@ -43,6 +43,13 @@ TREND_WINDOW = 24
 TREND_RISING = "rising"
 TREND_STABLE = "stable"
 TREND_FALLING = "falling"
+THERMAL_CORRELATION_DERIVATION = "rule:thermal_correlation_v1"
+# Form, not magnitude: "high = top quartile of this core's own readings", judged
+# only after a week of own history. What counts as hot/busy is never preset.
+THERMAL_PERCENTILE = 75
+THERMAL_MIN_SAMPLES = 7
+THERMAL_ANOMALOUS = "anomalous"
+THERMAL_NORMAL = "normal"
 
 RULES = {
     CPU_METRIC_KEY: {
@@ -113,6 +120,28 @@ TREND_RULES = {
         "claim_key": "disk.trend",
         "derivation": DISK_TREND_DERIVATION,
         "window": TREND_WINDOW,
+    },
+}
+
+# Cross-metric: temperature read against CPU. "anomalous" = temperature high
+# while CPU is not — both "high" thresholds are this core's own percentiles,
+# never imposed. Trains the correlation form the Grundausbildung asks for.
+CORRELATION_RULES = {
+    TEMPERATURE_METRIC_KEY: {
+        "claim_key": "system.thermal",
+        "anomalous_value": THERMAL_ANOMALOUS,
+        "normal_value": THERMAL_NORMAL,
+        "derivation": THERMAL_CORRELATION_DERIVATION,
+        "primary": {
+            "metric": TEMPERATURE_METRIC_KEY,
+            "percentile": THERMAL_PERCENTILE,
+            "min_samples": THERMAL_MIN_SAMPLES,
+        },
+        "secondary": {
+            "metric": CPU_METRIC_KEY,
+            "percentile": THERMAL_PERCENTILE,
+            "min_samples": THERMAL_MIN_SAMPLES,
+        },
     },
 }
 
@@ -401,13 +430,56 @@ def apply_trend(conn, metric_key: str) -> list[str]:
     else:
         new_value = TREND_STABLE
 
-    return _record_trend_belief(conn, rule, new_value, event_ids)
+    return _record_value_belief(
+        conn, rule["claim_key"], rule["derivation"], new_value, event_ids
+    )
 
 
-def _record_trend_belief(conn, rule: dict, new_value: str, event_ids: list[int]) -> list[str]:
-    claim_key = rule["claim_key"]
-    derivation = rule["derivation"]
-    latest_event = event_ids[-1]
+def apply_correlation(conn, metric_key: str) -> list[str]:
+    rule = CORRELATION_RULES.get(metric_key)
+    if rule is None:
+        return []
+
+    primary = _latest_evidence_window(conn, rule["primary"]["metric"], n=1)
+    secondary = _latest_evidence_window(conn, rule["secondary"]["metric"], n=1)
+    if not primary or not secondary:
+        return []
+
+    primary_value = float(primary[0]["metric_value"])
+    primary_event = int(primary[0]["id"])
+    secondary_value = float(secondary[0]["metric_value"])
+    secondary_event = int(secondary[0]["id"])
+
+    primary_threshold = _calibrated_threshold(conn, rule["primary"], primary_event)
+    secondary_threshold = _calibrated_threshold(conn, rule["secondary"], secondary_event)
+    if primary_threshold is None or secondary_threshold is None:
+        # Not enough lived history on one side to know what "high" is — withhold.
+        return []
+
+    primary_high = primary_value > primary_threshold
+    secondary_high = secondary_value > secondary_threshold
+    new_value = (
+        rule["anomalous_value"]
+        if primary_high and not secondary_high
+        else rule["normal_value"]
+    )
+    return _record_value_belief(
+        conn,
+        rule["claim_key"],
+        rule["derivation"],
+        new_value,
+        [secondary_event, primary_event],
+    )
+
+
+def _record_value_belief(
+    conn,
+    claim_key: str,
+    derivation: str,
+    new_value: str,
+    supporting_events: list[int],
+) -> list[str]:
+    latest_event = supporting_events[-1]
     current = projection.active_belief(conn, claim_key)
     written: list[str] = []
 
@@ -421,7 +493,7 @@ def _record_trend_belief(conn, rule: dict, new_value: str, event_ids: list[int])
                 "claim_key": claim_key,
                 "claim_value": new_value,
                 "derivation": derivation,
-                "supporting_events": event_ids,
+                "supporting_events": supporting_events,
             },
         )
         projection.apply_belief_created(
@@ -431,7 +503,7 @@ def _record_trend_belief(conn, rule: dict, new_value: str, event_ids: list[int])
                 "claim_key": claim_key,
                 "claim_value": new_value,
                 "derivation": derivation,
-                "supporting_events": event_ids,
+                "supporting_events": supporting_events,
                 "_event_created_at": ledger.event_created_at(conn, belief_event_id),
             },
         )
@@ -462,7 +534,7 @@ def _record_trend_belief(conn, rule: dict, new_value: str, event_ids: list[int])
             "claim_key": claim_key,
             "claim_value": new_value,
             "derivation": derivation,
-            "supporting_events": event_ids,
+            "supporting_events": supporting_events,
             "reason": f"{claim_key}_changed_to_{new_value}",
         }
         superseded_event_id = ledger.append(conn, "belief_superseded", superseded_payload)
