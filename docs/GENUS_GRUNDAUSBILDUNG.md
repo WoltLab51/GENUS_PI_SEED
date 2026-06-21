@@ -87,7 +87,8 @@ Betrieb).
 
 ### Struktur-Material — *GENUS beobachtet deine Arbeit*
 `repo.commits_per_day → repo.activity` (binär, Rhythmus) und
-`repo.lines_changed_per_day → repo.churn` (binär mit Schwelle, Intensität).
+`repo.lines_changed_per_day → repo.churn` (binär, Intensität — **self-kalibriert**:
+„heavy" relativ zur *eigenen* Churn-Verteilung des Pi, keine Vorgabe-Zahl).
 **Neue Kategorie:** erstmals beobachtet GENUS *dich*, nicht die Maschine —
 gemessen von der Membran auf dem X1, in den Pi-Kern gespeist. **Privacy-Grenze:**
 nur **Zähler & Rhythmen**, nie Inhalte (keine Commit-Texte, Diffs, Dateinamen).

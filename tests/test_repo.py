@@ -1,8 +1,10 @@
 import json
+import sqlite3
 
 from click.testing import CliRunner
 
-from genus import cli, event_router, integrity, reactors, sensor
+from genus import cli, event_router, integrity, reactors, rules, sensor
+from genus.db import init_schema
 
 
 def _observe(conn, commits, measured_on="x1"):
@@ -15,6 +17,13 @@ def _observe_churn(conn, lines, measured_on="x1"):
     return reactors.observe_repo_lines_reading(
         conn, sensor.repo_lines_reading(lines, measured_on)
     )
+
+
+def _fresh_conn():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_schema(conn)
+    return conn
 
 
 def test_repo_commits_creates_active_belief(conn):
@@ -97,23 +106,68 @@ def test_observe_repo_cli_rejects_negative(monkeypatch, cli_conn):
     assert result.exit_code != 0
 
 
-def test_repo_churn_heavy_at_or_above_threshold(conn):
-    _observe_churn(conn, 300)
+def test_repo_churn_withholds_until_enough_history(conn):
+    # During burn-in GENUS has no sense of its own "normal" yet, so it withholds
+    # the heavy/light judgment entirely — no imposed default.
+    for _ in range(rules.REPO_CHURN_MIN_SAMPLES):
+        _observe_churn(conn, 50)
 
     belief = conn.execute(
         "SELECT * FROM belief_projection WHERE claim_key = 'repo.churn'"
+    ).fetchone()
+    assert belief is None
+
+
+def test_repo_churn_heavy_relative_to_own_history(conn):
+    for _ in range(rules.REPO_CHURN_MIN_SAMPLES + 1):
+        _observe_churn(conn, 20)   # establishes a small "normal"
+    _observe_churn(conn, 500)      # well above this core's own distribution
+
+    belief = conn.execute(
+        "SELECT * FROM belief_projection "
+        "WHERE claim_key = 'repo.churn' AND state = 'active'"
     ).fetchone()
     assert belief["claim_value"] == "heavy"
     assert belief["derivation"] == "rule:repo_churn_binary_v1"
 
 
-def test_repo_churn_light_below_threshold(conn):
-    _observe_churn(conn, 50)
+def test_repo_churn_light_relative_to_own_history(conn):
+    for _ in range(rules.REPO_CHURN_MIN_SAMPLES + 1):
+        _observe_churn(conn, 800)  # establishes a large "normal"
+    _observe_churn(conn, 100)      # small for this core
 
     belief = conn.execute(
-        "SELECT * FROM belief_projection WHERE claim_key = 'repo.churn'"
+        "SELECT * FROM belief_projection "
+        "WHERE claim_key = 'repo.churn' AND state = 'active'"
     ).fetchone()
     assert belief["claim_value"] == "light"
+
+
+def test_repo_churn_is_relative_not_absolute():
+    # The killer test: the same value is heavy for one core and light for
+    # another, decided only by each core's own lived history — proof that the
+    # threshold is never an imposed constant.
+    low = _fresh_conn()
+    high = _fresh_conn()
+    for _ in range(rules.REPO_CHURN_MIN_SAMPLES + 1):
+        _observe_churn(low, 10)
+        _observe_churn(high, 1000)
+    _observe_churn(low, 100)   # huge for the low core
+    _observe_churn(high, 100)  # tiny for the high core
+
+    low_belief = low.execute(
+        "SELECT claim_value FROM belief_projection "
+        "WHERE claim_key = 'repo.churn' AND state = 'active'"
+    ).fetchone()
+    high_belief = high.execute(
+        "SELECT claim_value FROM belief_projection "
+        "WHERE claim_key = 'repo.churn' AND state = 'active'"
+    ).fetchone()
+    low.close()
+    high.close()
+
+    assert low_belief["claim_value"] == "heavy"
+    assert high_belief["claim_value"] == "light"
 
 
 def test_repo_commits_threshold_default_unchanged(conn):
@@ -141,21 +195,30 @@ def test_observe_repo_records_commits_and_churn(monkeypatch, cli_conn, conn):
     )
 
     assert result.exit_code == 0
+    # Commits drive repo.activity immediately (presence is binary >= 1)...
     activity = conn.execute(
         "SELECT claim_value FROM belief_projection "
         "WHERE claim_key = 'repo.activity' AND state = 'active'"
     ).fetchone()
-    churn = conn.execute(
-        "SELECT claim_value FROM belief_projection "
-        "WHERE claim_key = 'repo.churn' AND state = 'active'"
-    ).fetchone()
     assert activity["claim_value"] == "active"
-    assert churn["claim_value"] == "heavy"
+    # ...churn is recorded as evidence, but on a cold core the belief withholds
+    # until there is enough lived history to know what is heavy.
+    churn_evidence = conn.execute(
+        "SELECT 1 FROM event_log WHERE event_type = 'evidence_recorded' "
+        "AND json_extract(payload, '$.metric_key') = 'repo.lines_changed_per_day'"
+    ).fetchone()
+    assert churn_evidence is not None
+    churn_belief = conn.execute(
+        "SELECT 1 FROM belief_projection WHERE claim_key = 'repo.churn'"
+    ).fetchone()
+    assert churn_belief is None
 
 
 def test_repo_both_metrics_replay_stable(conn):
     _observe(conn, 4)
-    _observe_churn(conn, 500)
+    for _ in range(rules.REPO_CHURN_MIN_SAMPLES + 1):
+        _observe_churn(conn, 50)
+    _observe_churn(conn, 900)   # forms a heavy churn belief against own history
     before = integrity.snapshot_projections(conn)
 
     event_router.replay(conn)

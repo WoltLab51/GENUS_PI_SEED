@@ -50,7 +50,7 @@ Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
 External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance ·
-Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material (repo.commits_per_day, repo.lines_changed_per_day) · Disk-Trend (disk.trend)
+Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material (repo.commits_per_day, repo.lines_changed_per_day) · Disk-Trend (disk.trend) · Self-Kalibrierung v1 (repo.churn aus eigener Verteilung)
 **Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 
@@ -460,9 +460,10 @@ Observation → der Belief altert nur (Konfidenz zerfällt). Ein echter Lauf mit
 **Neue Sensoren:**
 - `repo.commits_per_day` — Commits der letzten 24 h, binär:
   `repo.activity = active` (≥1) / `quiet` (0).
-- `repo.lines_changed_per_day` — Summe geänderter Zeilen (24 h), binär mit
-  konfigurierbarer Schwelle: `repo.churn = heavy` (≥ 300) / `light`. Die Schwelle
-  ist ein bewusst unkalibrierter Startwert, später aus Ledger-Daten justierbar.
+- `repo.lines_changed_per_day` — Summe geänderter Zeilen (24 h), binär:
+  `repo.churn = heavy` / `light`. **Keine Vorgabe-Schwelle:** „heavy" wird zur
+  Lesezeit aus der *eigenen* Churn-Verteilung des Pi bestimmt (Perzentil über
+  bisherige Evidenz) und enthält sich, bis genug eigene Geschichte da ist.
 Beide Halbwertszeit 1 Tag (träge Klasse). Der binäre Regel-Typ wurde dafür um
 eine optionale Schwelle erweitert (Default 1.0 → bestehende Sensoren unverändert).
 **Neue Events:** keine neuen Typen — `observation_created` + `evidence_recorded`,

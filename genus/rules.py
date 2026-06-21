@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from genus import inquiries, ledger, projection, proposals
 
 
@@ -19,7 +21,11 @@ ACTIVITY_METRIC_KEY = "system.activity"
 TEMPERATURE_METRIC_KEY = "system.temperature"
 REPO_COMMITS_METRIC_KEY = "repo.commits_per_day"
 REPO_LINES_METRIC_KEY = "repo.lines_changed_per_day"
-REPO_CHURN_HEAVY_THRESHOLD = 300.0
+# No imposed magnitude for "heavy": it is judged against this core's own lived
+# churn distribution. These two are *form*, not magnitude — "heavy = top
+# quartile" and "judge only after a week of own history", not "heavy = N lines".
+REPO_CHURN_PERCENTILE = 75
+REPO_CHURN_MIN_SAMPLES = 7
 CLAIM_KEY = "system.load"
 HIGH_VALUE = "high"
 NORMAL_VALUE = "normal"
@@ -86,7 +92,11 @@ RULES = {
     },
     REPO_LINES_METRIC_KEY: {
         "type": "binary",
-        "threshold": REPO_CHURN_HEAVY_THRESHOLD,
+        "calibration": {
+            "metric": REPO_LINES_METRIC_KEY,
+            "percentile": REPO_CHURN_PERCENTILE,
+            "min_samples": REPO_CHURN_MIN_SAMPLES,
+        },
         "active_value": "heavy",
         "idle_value": "light",
         "claim_key": "repo.churn",
@@ -279,8 +289,18 @@ def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
     event_id = int(latest["id"])
     claim_key = rule["claim_key"]
     derivation = rule["derivation"]
-    threshold = rule.get("threshold", 1.0)
-    new_value = rule["active_value"] if value >= threshold else rule["idle_value"]
+    calibration = rule.get("calibration")
+    if calibration is not None:
+        # No imposed magnitude: "heavy" is judged against this core's own lived
+        # distribution, computed at read time from prior evidence.
+        threshold = _calibrated_threshold(conn, calibration, event_id)
+        if threshold is None:
+            # Not enough lived history yet to know what is heavy — withhold.
+            return []
+        new_value = rule["active_value"] if value > threshold else rule["idle_value"]
+    else:
+        threshold = rule.get("threshold", 1.0)
+        new_value = rule["active_value"] if value >= threshold else rule["idle_value"]
     current = projection.active_belief(conn, claim_key)
     written: list[str] = []
 
@@ -473,6 +493,37 @@ def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY, n: int = WIN
             }
         )
     return evidence
+
+
+def _calibrated_threshold(conn, calibration: dict, before_event_id: int):
+    """This core's own threshold, learned from its lived ledger — never imposed.
+
+    Returns the chosen percentile of all prior evidence values for the
+    calibration metric, or None when there is not yet enough history to judge.
+    Read-time and causal (only events before this one), so the recorded belief
+    stays deterministic and replay-stable.
+    """
+    rows = conn.execute(
+        """
+        SELECT json_extract(payload, '$.metric_value') AS metric_value
+        FROM event_log
+        WHERE event_type = 'evidence_recorded'
+          AND json_extract(payload, '$.metric_key') = ?
+          AND id < ?
+        ORDER BY id
+        """,
+        (calibration["metric"], before_event_id),
+    ).fetchall()
+    if len(rows) < calibration["min_samples"]:
+        return None
+    values = sorted(float(row["metric_value"]) for row in rows)
+    return _percentile(values, calibration["percentile"])
+
+
+def _percentile(sorted_values: list[float], percentile: float) -> float:
+    rank = math.ceil(percentile / 100.0 * len(sorted_values))
+    index = min(max(rank, 1), len(sorted_values)) - 1
+    return sorted_values[index]
 
 
 def _check_activity_expectations(

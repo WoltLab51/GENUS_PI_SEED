@@ -77,10 +77,12 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   fed in via `observe-repo`: counts measured off-device (the membrane), never git
   contents. They reuse `observation_created` + `evidence_recorded` (no new types)
   and drive binary beliefs `repo.activity` (`active`/`quiet`) and `repo.churn`
-  (`heavy`/`light`, configurable threshold). The `observation_created` payload
-  carries `measured_on` provenance. A missing measurement records nothing (the
-  belief ages); only a real run reports the quiet/light state. Absence is not
-  quiet.
+  (`heavy`/`light`). `repo.churn` has **no imposed threshold**: heavy is judged
+  against this core's own lived churn distribution (a read-time percentile over
+  prior evidence — causal, so the belief stays replay-stable), and it withholds
+  until there is enough history. The `observation_created` payload carries
+  `measured_on` provenance. A missing measurement records nothing (the belief
+  ages); only a real run reports the quiet/light state. Absence is not quiet.
 - Governance checks write all `constraint_checked` events, then all
   `policy_evaluated` events, then exactly one `governance_decision` event.
 - `constraint_checked` and `policy_evaluated` are audit-only. Replay projects
