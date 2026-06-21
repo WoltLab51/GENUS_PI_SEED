@@ -40,9 +40,10 @@ zweiten Belief-Art. Gewollt.
 Füllstand wächst langsam und monoton, mit gelegentlichen Sprüngen (Backups,
 Downloads). **Übt einen neuen Belief-Typ:** nicht "high/normal", sondern
 "steigt / stabil / fällt". Eine ganz andere Erkenntnisform als Schwellwert.
-**Stand heute (verifiziert):** Disk läuft noch über die *Threshold*-Regel
-(`system.disk = high/normal`), exakt wie CPU. Der Trend-Belief ist **noch nicht
-gebaut** — die Trend-Erkenntnisform ist offen.
+**Stand heute (verifiziert):** **gebaut.** Disk speist jetzt *zwei* Beliefs:
+weiterhin `system.disk = high/normal` (Threshold) **und** neu
+`disk.trend = rising/stable/falling` (Trend über ein Fenster, `rule:disk_trend_v1`).
+Erste Form jenseits high/normal — genau die vom Material erzwungene Bereicherung.
 
 ### Temperatur — *Korrelation + Widerspruch*
 Hängt meist mit CPU zusammen — aber nicht immer. Temp hoch *ohne* CPU-Last ist
@@ -101,20 +102,20 @@ Subjekt, nicht in einer neuen Form.
 | --- | --- | --- |
 | CPU, Memory (`system.load`, `system.memory`) | Schwellwert + Revision | ✅ geübt |
 | Aktiv/Idle (`system.activity`) | Rhythmus | ✅ geübt (Experience-Detektor) |
-| Disk (`system.disk`) | Trend (steigt/fällt/stabil) | ⚠️ nur Threshold — **Trend offen** |
+| Disk (`system.disk`, `disk.trend`) | Trend (steigt/fällt/stabil) | ✅ **geübt** (`disk.trend`, neben dem Threshold-Belief) |
 | Temperatur (`system.temperature`) | Korrelation + Widerspruch | ⚠️ nur Threshold — **Korrelation offen** |
 | Prozess-Ereignisse | Seltenheit / diskret | ❌ **nicht gebaut** |
 | Selbstbeobachtung (Ledger) | Selbstreflexion | ❌ **nicht gebaut** |
 | `system.network`, `system.clock` | Self-Operation (Schwellwert/binär) | ✅ gebaut (seit Urplan) |
 | `repo.activity`, `repo.churn` | Rhythmus/Intensität (deine Arbeit) | ✅ gebaut (neue Kategorie) |
 
-**Ehrliche Bilanz:** Geübt sind heute **Schwellwert** und **Rhythmus** —
-gründlich, und auf mehreren Subjekten (Maschine, Betrieb, deine Arbeit). Aber
-drei versprochene Formen sind **noch offen: Trend, Korrelation, Seltenheit**.
-Der ursprüngliche Satz „decken jede deterministische Erkenntnisform ab" war
-Plan, nicht Stand. Diese drei Lücken zu füllen ist die nächste Vertiefungs-Arbeit
-— *neue Belief-Typen*, nicht mehr Sensoren —, und zwar einer nach dem anderen.
-Alles offline, kein Byte aus dem Internet.
+**Ehrliche Bilanz:** Geübt sind heute **Schwellwert**, **Rhythmus** und — neu —
+**Trend** (`disk.trend`), auf mehreren Subjekten (Maschine, Betrieb, deine
+Arbeit). Noch offen sind **Korrelation** und **Seltenheit**. Der ursprüngliche
+Satz „decken jede deterministische Erkenntnisform ab" war Plan, nicht Stand. Die
+zwei verbleibenden Lücken zu füllen ist die nächste Vertiefungs-Arbeit — *neue
+Belief-Typen*, nicht mehr Sensoren —, einer nach dem anderen. Alles offline,
+kein Byte aus dem Internet.
 
 ---
 
@@ -141,7 +142,8 @@ fragen — nicht alle auf einmal.
 
 **Erst lokal komplett, dann nach außen.** Die Grundausbildung ist über die
 *Erkenntnisformen* definiert, nicht über eine feste Sensor-Zahl — und sie ist
-**noch nicht abgeschlossen**: Trend, Korrelation und Seltenheit fehlen. Erst wenn
+**noch nicht abgeschlossen**: Korrelation und Seltenheit fehlen (Trend ist
+seit `disk.trend` geübt). Erst wenn
 alle deterministischen Erkenntnisformen geübt sind, kommt der erste externe
 Sensor — und der naheliegende ist nicht Wetter, sondern **Markt**, weil er direkt
 auf Antizipation und Trading zuläuft. Wir stehen also bewusst *vor* dieser Tür.

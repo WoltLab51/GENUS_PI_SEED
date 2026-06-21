@@ -16,6 +16,8 @@ HALFLIFE_SECONDS_BY_CLAIM_KEY = {
     # should keep its weight until the next one, not decay within the hour.
     "repo.activity": 86400.0,
     "repo.churn": 86400.0,
+    # Disk fill is inert; its trend changes over hours/days, not minutes.
+    "disk.trend": 86400.0,
 }
 FALLBACK_HALFLIFE_SECONDS = 1800.0
 

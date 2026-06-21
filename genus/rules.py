@@ -30,6 +30,12 @@ ACTIVITY_DERIVATION = "rule:activity_binary_v1"
 TEMPERATURE_DERIVATION = "rule:temperature_threshold_v1"
 REPO_ACTIVITY_DERIVATION = "rule:repo_activity_binary_v1"
 REPO_CHURN_DERIVATION = "rule:repo_churn_binary_v1"
+DISK_TREND_DERIVATION = "rule:disk_trend_v1"
+TREND_WINDOW = 24
+TREND_EPSILON = 1.0
+TREND_RISING = "rising"
+TREND_STABLE = "stable"
+TREND_FALLING = "falling"
 
 RULES = {
     CPU_METRIC_KEY: {
@@ -85,6 +91,18 @@ RULES = {
         "idle_value": "light",
         "claim_key": "repo.churn",
         "derivation": REPO_CHURN_DERIVATION,
+    },
+}
+
+# A metric may feed more than one belief: TREND_RULES run alongside RULES and
+# read the same evidence stream to judge direction over a window, a belief type
+# beyond high/normal and binary. A metric can appear in both registries.
+TREND_RULES = {
+    DISK_METRIC_KEY: {
+        "claim_key": "disk.trend",
+        "derivation": DISK_TREND_DERIVATION,
+        "window": TREND_WINDOW,
+        "epsilon": TREND_EPSILON,
     },
 }
 
@@ -335,6 +353,101 @@ def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
                 observed_value=new_value,
             )
         )
+
+    return written
+
+
+def apply_trend(conn, metric_key: str) -> list[str]:
+    rule = TREND_RULES.get(metric_key)
+    if rule is None:
+        return []
+
+    window = _latest_evidence_window(conn, metric_key, n=rule["window"])
+    if len(window) < rule["window"]:
+        # A trend needs a full window before it judges direction.
+        return []
+
+    values = [float(row["metric_value"]) for row in window]
+    event_ids = [int(row["id"]) for row in window]
+    net = values[-1] - values[0]
+    epsilon = rule["epsilon"]
+    if net > epsilon:
+        new_value = TREND_RISING
+    elif net < -epsilon:
+        new_value = TREND_FALLING
+    else:
+        new_value = TREND_STABLE
+
+    return _record_trend_belief(conn, rule, new_value, event_ids)
+
+
+def _record_trend_belief(conn, rule: dict, new_value: str, event_ids: list[int]) -> list[str]:
+    claim_key = rule["claim_key"]
+    derivation = rule["derivation"]
+    latest_event = event_ids[-1]
+    current = projection.active_belief(conn, claim_key)
+    written: list[str] = []
+
+    if current is None:
+        belief_id = projection.next_belief_id(conn)
+        belief_event_id = ledger.append(
+            conn,
+            "belief_created",
+            {
+                "belief_id": belief_id,
+                "claim_key": claim_key,
+                "claim_value": new_value,
+                "derivation": derivation,
+                "supporting_events": event_ids,
+            },
+        )
+        projection.apply_belief_created(
+            conn,
+            {
+                "belief_id": belief_id,
+                "claim_key": claim_key,
+                "claim_value": new_value,
+                "derivation": derivation,
+                "supporting_events": event_ids,
+                "_event_created_at": ledger.event_created_at(conn, belief_event_id),
+            },
+        )
+        written.append("belief_created")
+    elif current["claim_value"] == new_value:
+        confirmation_event_id = ledger.append(
+            conn,
+            "belief_confirmed",
+            {
+                "belief_id": int(current["id"]),
+                "new_supporting_event": latest_event,
+            },
+        )
+        projection.apply_belief_confirmed(
+            conn,
+            {
+                "belief_id": int(current["id"]),
+                "new_supporting_event": latest_event,
+                "_event_created_at": ledger.event_created_at(conn, confirmation_event_id),
+            },
+        )
+        written.append("belief_confirmed")
+    else:
+        new_belief_id = projection.next_belief_id(conn)
+        superseded_payload = {
+            "old_belief_id": int(current["id"]),
+            "new_belief_id": new_belief_id,
+            "claim_key": claim_key,
+            "claim_value": new_value,
+            "derivation": derivation,
+            "supporting_events": event_ids,
+            "reason": f"{claim_key}_changed_to_{new_value}",
+        }
+        superseded_event_id = ledger.append(conn, "belief_superseded", superseded_payload)
+        superseded_payload["_event_created_at"] = ledger.event_created_at(
+            conn, superseded_event_id
+        )
+        projection.apply_belief_superseded(conn, superseded_payload)
+        written.append("belief_superseded")
 
     return written
 
