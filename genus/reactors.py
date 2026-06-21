@@ -25,6 +25,10 @@ def observe_temperature_reading(conn, reading: dict) -> dict:
     return observe_system_reading(conn, reading, rules.TEMPERATURE_METRIC_KEY)
 
 
+def observe_repo_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.REPO_COMMITS_METRIC_KEY)
+
+
 def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:
     try:
         payload = dict(reading)

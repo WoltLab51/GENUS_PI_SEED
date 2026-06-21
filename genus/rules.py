@@ -17,6 +17,7 @@ MEMORY_METRIC_KEY = "system.memory_percent"
 DISK_METRIC_KEY = "system.disk_percent"
 ACTIVITY_METRIC_KEY = "system.activity"
 TEMPERATURE_METRIC_KEY = "system.temperature"
+REPO_COMMITS_METRIC_KEY = "repo.commits_per_day"
 CLAIM_KEY = "system.load"
 HIGH_VALUE = "high"
 NORMAL_VALUE = "normal"
@@ -25,6 +26,7 @@ MEMORY_DERIVATION = "rule:memory_threshold_v1"
 DISK_DERIVATION = "rule:disk_threshold_v1"
 ACTIVITY_DERIVATION = "rule:activity_binary_v1"
 TEMPERATURE_DERIVATION = "rule:temperature_threshold_v1"
+REPO_ACTIVITY_DERIVATION = "rule:repo_activity_binary_v1"
 
 RULES = {
     CPU_METRIC_KEY: {
@@ -65,6 +67,13 @@ RULES = {
         "idle_value": "idle",
         "claim_key": "system.activity",
         "derivation": ACTIVITY_DERIVATION,
+    },
+    REPO_COMMITS_METRIC_KEY: {
+        "type": "binary",
+        "active_value": "active",
+        "idle_value": "quiet",
+        "claim_key": "repo.activity",
+        "derivation": REPO_ACTIVITY_DERIVATION,
     },
 }
 

@@ -72,6 +72,27 @@ def read_temperature() -> dict | None:
     return None
 
 
+def repo_commits_reading(
+    commits: int,
+    measured_on: str = "unknown",
+    window_hours: int = 24,
+) -> dict:
+    """Shape a structural reading from a commit count supplied by the membrane.
+
+    The core never runs ``git``: the count is measured off-device (the membrane)
+    and handed in. Only the count and its provenance travel — never commit
+    messages, diffs, or file names.
+    """
+    return {
+        "source": "git.commits_per_day",
+        "raw_value": float(commits),
+        "unit": "count",
+        "interval": 0.0,
+        "window_hours": int(window_hours),
+        "measured_on": measured_on or "unknown",
+    }
+
+
 def mock_cpu(value: float) -> dict:
     return {
         "source": "mock",

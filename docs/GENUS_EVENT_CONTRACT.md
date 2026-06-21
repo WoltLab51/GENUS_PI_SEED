@@ -68,6 +68,12 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   review work only and does not execute changes.
 - `state_changed` is emitted by deterministic aggregation over active beliefs.
   v0.10 records `system.pressure` from activity and resource-pressure beliefs.
+- `repo.commits_per_day` is structural material fed in via `observe-repo`: a
+  count measured off-device (the membrane), never git contents. It reuses
+  `observation_created` + `evidence_recorded` (no new types) and drives a binary
+  `repo.activity` belief (`active`/`quiet`). The `observation_created` payload
+  carries `measured_on` provenance. A missing measurement records nothing (the
+  belief ages); only a real run reports `quiet`. Absence of a run is not `quiet`.
 - Governance checks write all `constraint_checked` events, then all
   `policy_evaluated` events, then exactly one `governance_decision` event.
 - `constraint_checked` and `policy_evaluated` are audit-only. Replay projects

@@ -12,6 +12,9 @@ HALFLIFE_SECONDS_BY_CLAIM_KEY = {
     # Clock sync is an inert property: it flips rarely and then for a while, so
     # it belongs in the slow (disk) class, not the 30-minute network class.
     "system.clock": 86400.0,
+    # Commit rhythm is a daily/weekly pattern, also inert: one observation a day
+    # should keep its weight until the next one, not decay within the hour.
+    "repo.activity": 86400.0,
 }
 FALLBACK_HALFLIFE_SECONDS = 1800.0
 

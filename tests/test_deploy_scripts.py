@@ -25,6 +25,17 @@ def test_clock_check_probes_ntp_and_records_operation_event():
     assert "--status fail" in script
 
 
+def test_repo_membrane_counts_only_and_feeds_observe_repo():
+    script = (ROOT / "deploy" / "observe_repo_from_x1.sh").read_text(encoding="utf-8")
+
+    assert "observe-repo" in script
+    assert "--commits-per-day" in script
+    assert "--measured-on" in script
+    # counts only: git log must be reduced to a number, never sent as content
+    assert "wc -l" in script
+    assert "git -C" in script
+
+
 def test_network_watchdog_records_operation_events_and_governed_recovery():
     watchdog = (ROOT / "deploy" / "pi_network_watchdog.sh").read_text(
         encoding="utf-8"

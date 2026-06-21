@@ -133,9 +133,11 @@ def test_clock_shares_the_inert_disk_halflife():
 
     clock = calculate_confidence(old_supporting, [], "system.clock", now=now)
     disk = calculate_confidence(old_supporting, [], "system.disk", now=now)
+    repo = calculate_confidence(old_supporting, [], "repo.activity", now=now)
     network = calculate_confidence(old_supporting, [], "system.network", now=now)
 
     assert clock == disk      # same inert (one-day) class
+    assert repo == disk       # commit rhythm is inert too
     assert clock > network    # network's 30-minute half-life decays faster
 
 

@@ -151,6 +151,26 @@ GENUS_CORE_ID=pi-core ./deploy/pi_clock_check.sh
 GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" .venv/bin/genus operation list
 ```
 
+## Structure Material (commit rhythm)
+
+`observe_repo_from_x1.sh` is the first sensor that observes *your work* rather
+than the machine. It runs on the **workstation** (the X1), not the Pi: it counts
+commits in a time window and feeds only the **count** into the Pi's core over
+SSH (`genus observe-repo`). The count drives a binary `repo.activity` belief
+(`active`/`quiet`). `git log` is piped straight into `wc -l`, so only the number
+travels — never commit messages, diffs, or file names.
+
+Run it from the workstation (Git Bash):
+
+```bash
+GENUS_PI_HOST=ronny@pi.local ./deploy/observe_repo_from_x1.sh
+```
+
+Measuring on the X1 is deliberate: the Pi would only see its own pull cadence,
+not your work. If the X1 is off the script does not run and nothing is recorded
+— the belief just ages. Schedule it on the workstation (e.g. Windows Task
+Scheduler) for a daily rhythm; a missing day is "no measurement", not "quiet".
+
 ## Status Repository
 
 `GENUS_PI_STATUS` is the intended off-device exchange repository for anchors

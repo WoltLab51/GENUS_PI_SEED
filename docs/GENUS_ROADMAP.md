@@ -50,7 +50,7 @@ Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
 External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance ·
-Confidence Decay v2 · Clock-Sync Self-Check
+Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material v1 (repo.commits_per_day)
 **Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 
@@ -430,16 +430,45 @@ Ledger-Historie zu löschen.
 
 ## v1.x — Struktur-Material · *GENUS beobachtet deine Arbeit*
 
+**Status:** erster Sensor umgesetzt — `repo.commits_per_day`. Weitere
+Struktur-Sensoren (Datei-Kopplung, offene Issues, Coverage, Dateiaktivität)
+sind bewusst je *eigene* spätere Schritte, nicht dieser.
+
 **Warum hier:** Die ganze Maschinerie (Experience, State, Governance,
 Maturation) existiert schon. Jetzt fütterst du nur eine neue Materialquelle
 ein — kein Umbau nötig. GENUS beobachtet *dich*, nicht nur die Maschine.
 
-**Neue Sensoren (deterministisch):**
-- Repo: Commits/Tag, oft gemeinsam geänderte Dateien (versteckte Kopplung),
-  offene Issues, Test-Coverage über Zeit
-- Dateiaktivität: welche Ordner ändern sich wann, in welchem Rhythmus
+**Hängt ab von:** Material-/Reactor-Pattern (existiert), Query (zum
+Sichtbarmachen).
 
-**Neue Events:** nur neue Observation-/Evidence-Quellen, keine neuen Typen
+**Membran-Grenze:** Der Kern darf kein `git`/subprocess. Wie bei `network`/
+`clock` misst die Membran (`deploy/observe_repo_from_x1.sh` auf dem X1) und
+reicht über `genus observe-repo` nur die **Zahl** in den Pi-Kern. Bewusste
+Entscheidung: gemessen wird auf dem **X1** (dein echter Arbeits-Rhythmus), nicht
+auf dem Pi (das wäre nur die Pull-/Deploy-Kadenz). Damit speist erstmals ein
+*zweites Gerät* Observations in den Kern — die Provenance hält fest, woher.
+
+**Privacy-Grenze (Wächter-Regel):** ausschließlich **Zähler & Rhythmen**, nie
+Inhalte. `git log` wird sofort in `wc -l` gepiped; nur die Zahl verlässt den X1.
+Keine Commit-Messages, keine Diffs, keine Dateinamen.
+
+**Abwesenheit ≠ Ruhe:** Läuft der X1 nicht, läuft die Membran nicht → *keine*
+Observation → der Belief altert nur (Konfidenz zerfällt). Ein echter Lauf mit
+0 Commits ist dagegen eine beobachtete Ruhe (`quiet`). Der Kern leitet Ruhe
+*nie* aus Stille ab.
+
+**Neue Sensoren:** `repo.commits_per_day` — Commits der letzten 24 h, binär:
+`repo.activity = active` (≥1) / `quiet` (0). Halbwertszeit 1 Tag (träge Klasse).
+**Neue Events:** keine neuen Typen — `observation_created` + `evidence_recorded`,
+Belief über `RULES` (gespiegelt von `system.activity`).
+
+**Definition of Done:**
+- [x] `repo.commits_per_day` deterministisch, Replay-stabil, Integrity grün
+- [x] eigener `repo.activity`-Belief, Confidence berechnet (1-Tag-Halbwertszeit)
+- [x] Provenance (`measured_on`) im `observation_created`-Event
+- [x] Membran misst `git`, Kern bleibt rein (grep leer, kein subprocess in `genus/`)
+- [x] nur Zähler, keine Inhalte
+- [x] Wachstumsregel ✓
 
 ---
 
