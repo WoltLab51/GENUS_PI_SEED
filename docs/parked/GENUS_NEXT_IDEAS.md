@@ -142,3 +142,52 @@ read-time and replay-stable like the churn / trend / thermal calibrations.
 **Promote when:** Beliefs have accumulated enough flip history on the Pi for a
 stable rate estimate (needs burn-in). Pairs naturally with extending Experience
 to the new beliefs — both wait on lived material.
+
+## 9. Architecture Hardening Backlog (audit 2026-06-21, v1.6.0)
+
+From the v1.6.0 architecture audit, ordered by urgency.
+
+- **Bound `supporting_events` per belief (Tier 0 — promote now).** A belief
+  confirmed every tick (e.g. `system.activity`) accumulates every supporting
+  event id forever. This makes confidence O(n) per read and confirm O(n) per
+  write, and — critically — `evidence_created_at_times` builds `WHERE id IN (...)`
+  with one host parameter per event, so the query layer hits SQLite's parameter
+  ceiling (~32k) within months and raises "too many SQL variables". Fix: keep
+  only evidence within a window / N half-lives (older terms decay to ~0 anyway)
+  and track the displayed count separately. Read-time, replay-safe.
+- **`busy_timeout` + WAL (cheap).** `db.connect` sets neither; observe-all,
+  state refresh, clock-check, the root network watchdog, and the X1 membrane all
+  write the same SQLite from separate processes, so overlapping writes can raise
+  "database is locked" with no retry wait.
+- **Index `metric_key` (cheap).** Hot evidence queries filter
+  `json_extract(payload,'$.metric_key')`, which is unindexed; scans grow with the
+  ledger. A generated/extracted indexed column fixes it.
+- **Bound the self-calibration scan.** `_calibrated_threshold` (used by
+  `system.thermal`) scans all prior evidence for a metric every tick, unbounded.
+  Window it to recent N — also more honest (the current distribution).
+- **Snapshots / checkpoints for replay & integrity.** Replay and
+  `integrity.check` are O(n) over the whole ledger and run on every doctor,
+  deploy, and CI; the live ledger grows ~12k events/day. Pairs with item 1.
+- **Generalize the learning layer + experience/rule lifecycle.** Experience and
+  Maturation are hard-wired to `system.activity` hour-of-day; the new beliefs are
+  never learned from, and experiences/rules never expire. The eye->mind
+  deepening. Promote when there are weeks of burn-in for day-of-week and
+  cross-belief patterns.
+- **A performance/scale test as a CI guard.** Tests use tiny ledgers, so O(n)
+  and unbounded-growth issues stay invisible until they hurt.
+
+## 10. GENUS Observes Its Own Development
+
+**Idea:** Let GENUS hold its own open items — audit findings, decisions, debts —
+as its own beliefs/proposals/inquiries, instead of relying on docs plus
+discipline to keep them from being lost. The project governs itself with its own
+machinery: a finding becomes an inquiry, a decision a governed act, a fix a
+proposal that closes.
+
+**Why it matters:** It is the same self-reflection family the project keeps
+reaching for (self-observation, metacognition, self-calibration). It also turns
+"did this finding actually flow in?" into a checkable belief rather than a hope.
+
+**Promote when:** There is a self-observation / ledger-introspection capability
+to build on (pairs with item 8), and after the deterministic core's scaling
+backlog (item 9) is under control.

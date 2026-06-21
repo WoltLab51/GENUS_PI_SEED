@@ -24,6 +24,14 @@ it currently believes, and keeps every important state change replayable.
   external answer is never knowledge by itself.
 - **Belief is not truth:** Beliefs have lifecycle states such as `active` and
   `superseded`. They are never stored as `true`.
+- **Belief shape — single-valued, enriched additively:** a belief holds one
+  active `claim_value` per `claim_key` with read-time confidence. While material
+  is unambiguous, this loses nothing. Richer representations (a distribution over
+  values, competing hypotheses, relations between beliefs) arrive as *new* event
+  types when ambiguous or multi-valued material does (Model Era, belief graph),
+  never by reshaping existing belief events. Append-only keeps that enrichment
+  additive — the shape is a deliberate forward choice, not a one-way door.
+  *(Decided 2026-06-21.)*
 - **Proposal is not action:** Proposals create attention and review work.
   Reviews are event-backed human acts, but they do not execute changes.
 - **Inquiry is not action:** Inquiries name open uncertainty. They ask what
@@ -86,8 +94,9 @@ Operationally:
 Reactors decide when a transition is needed. Domain modules coordinate how their
 own events and projections are written.
 
-- `rules.py` detects threshold and binary belief-transition conditions for
-  supported metrics.
+- `rules.py` detects threshold, binary, trend, and correlation belief-transition
+  conditions. Magnitude thresholds for churn/trend/thermal are self-calibrated
+  from the core's own evidence distribution at read time, not preset.
 - `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` and `proposal_reviewed` events
   with `proposal_log` rows.
@@ -160,6 +169,20 @@ v1.4 adds the first Self-Healing Governance. A systemd timer outside GENUS may
 restart the network stack or reboot the Pi, but only after GENUS records a
 governed `operation.recovery` decision. The operating system performs the
 action; GENUS records the reason, the allowed/blocked decision, and the result.
+
+v1.5 adds Confidence Decay v2: each supporting and contradicting evidence event
+is weighted `2^(-age/H)` at read time with a per-claim half-life, so long-running
+beliefs are not sticky from old accumulation alone.
+
+v1.6 opens Phase 2. Self-operation gains `clock.sync` -> `system.clock`. The
+first structure material observes the human's work off-device (the X1 membrane):
+`repo.commits_per_day` -> `repo.activity` and `repo.lines_changed_per_day` ->
+`repo.churn`, counts only, with `measured_on` provenance. Two epistemic forms
+beyond threshold/binary appear: `disk.trend` (rising/stable/falling) and
+`system.thermal` (temperature-vs-CPU correlation). Magnitude thresholds become
+self-calibrated: `repo.churn`, `disk.trend`, and `system.thermal` judge against
+the core's own lived distribution at read time and withhold until they have
+enough history — no imposed magnitudes.
 
 ## Document Family
 
