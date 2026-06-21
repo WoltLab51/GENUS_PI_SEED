@@ -40,12 +40,19 @@ zweiten Belief-Art. Gewollt.
 Füllstand wächst langsam und monoton, mit gelegentlichen Sprüngen (Backups,
 Downloads). **Übt einen neuen Belief-Typ:** nicht "high/normal", sondern
 "steigt / stabil / fällt". Eine ganz andere Erkenntnisform als Schwellwert.
+**Stand heute (verifiziert):** Disk läuft noch über die *Threshold*-Regel
+(`system.disk = high/normal`), exakt wie CPU. Der Trend-Belief ist **noch nicht
+gebaut** — die Trend-Erkenntnisform ist offen.
 
 ### Temperatur — *Korrelation + Widerspruch*
 Hängt meist mit CPU zusammen — aber nicht immer. Temp hoch *ohne* CPU-Last ist
 eine echte Auffälligkeit. **Übt State** (zwei Sensoren ergeben einen
 Gesamtzustand) **und Widerspruch** (der einen Proposal verdient). Lehrt GENUS,
 in Beziehungen statt in isolierten Werten zu denken.
+**Stand heute (verifiziert):** Temperatur läuft ebenfalls nur über die
+*Threshold*-Regel (`system.temperature = high/normal`). Die CPU-Temp-**Korrelation**
+(Temp hoch ohne CPU = Auffälligkeit) ist **noch nicht gebaut** — die
+Korrelations-Erkenntnisform ist offen.
 
 ### Prozess-Ereignisse — *Seltenheit / diskrete Ereignisse*
 Ein Prozess startet, stürzt ab, ein Gerät wird verbunden, Hoch-/Runterfahren.
@@ -59,23 +66,55 @@ Beliefs, wie viele Proposals offen, wie viele Widersprüche. Material, das nur
 GENUS haben kann — kein anderes System beobachtet sich so. Übt mehrere Formen
 zugleich (Rhythmus der Aktivität, Trend des Wachstums) und ist die Grundlage
 dafür, dass GENUS irgendwann über sich selbst nachdenkt.
+**Stand heute (verifiziert):** **noch nicht gebaut.** Die Self-Operation-Checks
+(`network.gateway`, `clock.sync`) prüfen *Betrieb*, nicht das eigene Erkennen —
+das ist etwas anderes als Selbstreflexion über den Ledger.
+
+---
+
+## Seit dem Urplan dazugekommen (nicht in der Materialplanung von v0.6)
+
+Diese Sensoren existieren live, gehörten aber nicht zur ursprünglichen
+Grundausbildung — und der zweite Block sprengt sogar ihre Rahmen-Annahme
+("Maschine beobachtet Maschine, nichts Privates"):
+
+### Self-Operation — *GENUS beobachtet seinen Betrieb*
+`network.gateway → system.network` (v1.3) und `clock.sync → system.clock`. Echte
+rebuildbare Beliefs aus deterministischen Betriebs-Checks. Erkenntnisform:
+Schwellwert/binär — also schon abgedeckt, aber neues *Subjekt* (der eigene
+Betrieb).
+
+### Struktur-Material — *GENUS beobachtet deine Arbeit*
+`repo.commits_per_day → repo.activity` (binär, Rhythmus) und
+`repo.lines_changed_per_day → repo.churn` (binär mit Schwelle, Intensität).
+**Neue Kategorie:** erstmals beobachtet GENUS *dich*, nicht die Maschine —
+gemessen von der Membran auf dem X1, in den Pi-Kern gespeist. **Privacy-Grenze:**
+nur **Zähler & Rhythmen**, nie Inhalte (keine Commit-Texte, Diffs, Dateinamen).
+Erkenntnisform: Rhythmus — also bereits abgedeckt; der Wert liegt im neuen
+Subjekt, nicht in einer neuen Form.
 
 ---
 
 ## Überblick
 
-| Sensor | Erkenntnisform | Status |
+| Sensor | geplante Erkenntnisform | Stand heute (verifiziert) |
 | --- | --- | --- |
-| CPU, Memory | Schwellwert + Revision | vorhanden |
-| Aktiv/Idle | Rhythmus | übt Experience |
-| Disk | Trend (steigt/fällt/stabil) | neuer Belief-Typ |
-| Temperatur | Korrelation + Widerspruch | übt State |
-| Prozess-Ereignisse | Seltenheit / diskret | fordert Schema |
-| Selbstbeobachtung | alle + Selbstreflexion | nur GENUS kann das |
+| CPU, Memory (`system.load`, `system.memory`) | Schwellwert + Revision | ✅ geübt |
+| Aktiv/Idle (`system.activity`) | Rhythmus | ✅ geübt (Experience-Detektor) |
+| Disk (`system.disk`) | Trend (steigt/fällt/stabil) | ⚠️ nur Threshold — **Trend offen** |
+| Temperatur (`system.temperature`) | Korrelation + Widerspruch | ⚠️ nur Threshold — **Korrelation offen** |
+| Prozess-Ereignisse | Seltenheit / diskret | ❌ **nicht gebaut** |
+| Selbstbeobachtung (Ledger) | Selbstreflexion | ❌ **nicht gebaut** |
+| `system.network`, `system.clock` | Self-Operation (Schwellwert/binär) | ✅ gebaut (seit Urplan) |
+| `repo.activity`, `repo.churn` | Rhythmus/Intensität (deine Arbeit) | ✅ gebaut (neue Kategorie) |
 
-Zusammen decken sie **jede deterministische Erkenntnisform** ab — ohne ein
-einziges Byte aus dem Internet. GENUS kann seine komplette Grundausbildung auf
-einem einzigen Offline-Rechner absolvieren.
+**Ehrliche Bilanz:** Geübt sind heute **Schwellwert** und **Rhythmus** —
+gründlich, und auf mehreren Subjekten (Maschine, Betrieb, deine Arbeit). Aber
+drei versprochene Formen sind **noch offen: Trend, Korrelation, Seltenheit**.
+Der ursprüngliche Satz „decken jede deterministische Erkenntnisform ab" war
+Plan, nicht Stand. Diese drei Lücken zu füllen ist die nächste Vertiefungs-Arbeit
+— *neue Belief-Typen*, nicht mehr Sensoren —, und zwar einer nach dem anderen.
+Alles offline, kein Byte aus dem Internet.
 
 ---
 
@@ -100,10 +139,12 @@ fragen — nicht alle auf einmal.
 
 ## Reihenfolge & Grenzen
 
-**Erst lokal komplett, dann nach außen.** Die sechs Sensoren oben sind die
-ganze Grundausbildung. Erst wenn alle deterministischen Erkenntnisformen
-geübt sind, kommt der erste externe Sensor — und der naheliegende ist nicht
-Wetter, sondern **Markt**, weil er direkt auf Antizipation und Trading zuläuft.
+**Erst lokal komplett, dann nach außen.** Die Grundausbildung ist über die
+*Erkenntnisformen* definiert, nicht über eine feste Sensor-Zahl — und sie ist
+**noch nicht abgeschlossen**: Trend, Korrelation und Seltenheit fehlen. Erst wenn
+alle deterministischen Erkenntnisformen geübt sind, kommt der erste externe
+Sensor — und der naheliegende ist nicht Wetter, sondern **Markt**, weil er direkt
+auf Antizipation und Trading zuläuft. Wir stehen also bewusst *vor* dieser Tür.
 
 **Externe Sensoren brechen die HTTP-Regel nicht — sie verlegen sie.** Wenn es
 soweit ist, gehört HTTP nicht in den Kern (`genus/`, bleibt für immer
