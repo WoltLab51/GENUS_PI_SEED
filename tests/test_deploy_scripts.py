@@ -30,9 +30,11 @@ def test_repo_membrane_counts_only_and_feeds_observe_repo():
 
     assert "observe-repo" in script
     assert "--commits-per-day" in script
+    assert "--lines-changed" in script
     assert "--measured-on" in script
-    # counts only: git log must be reduced to a number, never sent as content
+    # counts only: git output must be reduced to numbers, never sent as content
     assert "wc -l" in script
+    assert "--numstat" in script
     assert "git -C" in script
 
 

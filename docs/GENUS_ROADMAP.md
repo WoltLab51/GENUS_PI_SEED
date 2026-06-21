@@ -50,7 +50,7 @@ Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
 External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance ·
-Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material v1 (repo.commits_per_day)
+Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material (repo.commits_per_day, repo.lines_changed_per_day)
 **Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 
@@ -430,9 +430,9 @@ Ledger-Historie zu löschen.
 
 ## v1.x — Struktur-Material · *GENUS beobachtet deine Arbeit*
 
-**Status:** erster Sensor umgesetzt — `repo.commits_per_day`. Weitere
-Struktur-Sensoren (Datei-Kopplung, offene Issues, Coverage, Dateiaktivität)
-sind bewusst je *eigene* spätere Schritte, nicht dieser.
+**Status:** zwei Sensoren umgesetzt — `repo.commits_per_day` (Anwesenheit) und
+`repo.lines_changed_per_day` (Intensität). Weitere (Datei-Kopplung, offene
+Issues, Coverage, Dateiaktivität) sind bewusst je *eigene* spätere Schritte.
 
 **Warum hier:** Die ganze Maschinerie (Experience, State, Governance,
 Maturation) existiert schon. Jetzt fütterst du nur eine neue Materialquelle
@@ -457,17 +457,24 @@ Observation → der Belief altert nur (Konfidenz zerfällt). Ein echter Lauf mit
 0 Commits ist dagegen eine beobachtete Ruhe (`quiet`). Der Kern leitet Ruhe
 *nie* aus Stille ab.
 
-**Neue Sensoren:** `repo.commits_per_day` — Commits der letzten 24 h, binär:
-`repo.activity = active` (≥1) / `quiet` (0). Halbwertszeit 1 Tag (träge Klasse).
+**Neue Sensoren:**
+- `repo.commits_per_day` — Commits der letzten 24 h, binär:
+  `repo.activity = active` (≥1) / `quiet` (0).
+- `repo.lines_changed_per_day` — Summe geänderter Zeilen (24 h), binär mit
+  konfigurierbarer Schwelle: `repo.churn = heavy` (≥ 300) / `light`. Die Schwelle
+  ist ein bewusst unkalibrierter Startwert, später aus Ledger-Daten justierbar.
+Beide Halbwertszeit 1 Tag (träge Klasse). Der binäre Regel-Typ wurde dafür um
+eine optionale Schwelle erweitert (Default 1.0 → bestehende Sensoren unverändert).
 **Neue Events:** keine neuen Typen — `observation_created` + `evidence_recorded`,
-Belief über `RULES` (gespiegelt von `system.activity`).
+Belief über `RULES` (gespiegelt von `system.activity`). `observe-repo` schreibt
+beide Beobachtungen in einem Aufruf; eine Membran, ein geplanter Task.
 
 **Definition of Done:**
-- [x] `repo.commits_per_day` deterministisch, Replay-stabil, Integrity grün
-- [x] eigener `repo.activity`-Belief, Confidence berechnet (1-Tag-Halbwertszeit)
+- [x] beide Sensoren deterministisch, Replay-stabil, Integrity grün
+- [x] `repo.activity` und `repo.churn` als Beliefs, Confidence berechnet (1 Tag)
 - [x] Provenance (`measured_on`) im `observation_created`-Event
 - [x] Membran misst `git`, Kern bleibt rein (grep leer, kein subprocess in `genus/`)
-- [x] nur Zähler, keine Inhalte
+- [x] nur Zähler, keine Inhalte/Dateinamen
 - [x] Wachstumsregel ✓
 
 ---

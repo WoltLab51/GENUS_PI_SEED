@@ -11,6 +11,12 @@ def _observe(conn, commits, measured_on="x1"):
     )
 
 
+def _observe_churn(conn, lines, measured_on="x1"):
+    return reactors.observe_repo_lines_reading(
+        conn, sensor.repo_lines_reading(lines, measured_on)
+    )
+
+
 def test_repo_commits_creates_active_belief(conn):
     _observe(conn, 3)
 
@@ -89,3 +95,71 @@ def test_observe_repo_cli_rejects_negative(monkeypatch, cli_conn):
     )
 
     assert result.exit_code != 0
+
+
+def test_repo_churn_heavy_at_or_above_threshold(conn):
+    _observe_churn(conn, 300)
+
+    belief = conn.execute(
+        "SELECT * FROM belief_projection WHERE claim_key = 'repo.churn'"
+    ).fetchone()
+    assert belief["claim_value"] == "heavy"
+    assert belief["derivation"] == "rule:repo_churn_binary_v1"
+
+
+def test_repo_churn_light_below_threshold(conn):
+    _observe_churn(conn, 50)
+
+    belief = conn.execute(
+        "SELECT * FROM belief_projection WHERE claim_key = 'repo.churn'"
+    ).fetchone()
+    assert belief["claim_value"] == "light"
+
+
+def test_repo_commits_threshold_default_unchanged(conn):
+    # The configurable threshold defaults to 1.0, so commit activity behaves as
+    # before: one commit is already "active".
+    _observe(conn, 1)
+
+    belief = conn.execute(
+        "SELECT * FROM belief_projection WHERE claim_key = 'repo.activity'"
+    ).fetchone()
+    assert belief["claim_value"] == "active"
+
+
+def test_observe_repo_records_commits_and_churn(monkeypatch, cli_conn, conn):
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+
+    result = CliRunner().invoke(
+        cli.main,
+        [
+            "observe-repo",
+            "--commits-per-day", "4",
+            "--lines-changed", "500",
+            "--measured-on", "x1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    activity = conn.execute(
+        "SELECT claim_value FROM belief_projection "
+        "WHERE claim_key = 'repo.activity' AND state = 'active'"
+    ).fetchone()
+    churn = conn.execute(
+        "SELECT claim_value FROM belief_projection "
+        "WHERE claim_key = 'repo.churn' AND state = 'active'"
+    ).fetchone()
+    assert activity["claim_value"] == "active"
+    assert churn["claim_value"] == "heavy"
+
+
+def test_repo_both_metrics_replay_stable(conn):
+    _observe(conn, 4)
+    _observe_churn(conn, 500)
+    before = integrity.snapshot_projections(conn)
+
+    event_router.replay(conn)
+    after = integrity.snapshot_projections(conn)
+
+    assert after == before
+    assert integrity.check(conn)["ok"] is True

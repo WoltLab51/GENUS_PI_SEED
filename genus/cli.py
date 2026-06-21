@@ -152,22 +152,35 @@ def observe_all() -> None:
 
 @main.command("observe-repo")
 @click.option("--commits-per-day", "commits", required=True, type=int)
+@click.option("--lines-changed", "lines", default=None, type=int)
 @click.option("--measured-on", default="unknown", show_default=True)
 @click.option("--window-hours", default=24, show_default=True, type=int)
-def observe_repo(commits: int, measured_on: str, window_hours: int) -> None:
-    """Record a structural observation of commit activity.
+def observe_repo(
+    commits: int,
+    lines: int | None,
+    measured_on: str,
+    window_hours: int,
+) -> None:
+    """Record structural observations of repo activity.
 
-    The count is measured by the membrane (off-device) and handed in here; the
-    core never runs git. A missing run records nothing, so the belief simply
-    ages — absence of a measurement is not an observation of quiet.
+    The counts are measured by the membrane (off-device) and handed in here; the
+    core never runs git. ``--lines-changed`` additionally records the day's churn
+    intensity. A missing run records nothing, so the beliefs simply age —
+    absence of a measurement is not an observation of quiet.
     """
     if commits < 0:
         raise click.ClickException("--commits-per-day must be >= 0")
-    reading = sensor.repo_commits_reading(commits, measured_on, window_hours)
+    if lines is not None and lines < 0:
+        raise click.ClickException("--lines-changed must be >= 0")
     conn = get_conn()
     try:
+        reading = sensor.repo_commits_reading(commits, measured_on, window_hours)
         result = reactors.observe_repo_reading(conn, reading)
         _print_observation_result("REPO", reading, result)
+        if lines is not None:
+            churn_reading = sensor.repo_lines_reading(lines, measured_on, window_hours)
+            churn_result = reactors.observe_repo_lines_reading(conn, churn_reading)
+            _print_observation_result("CHURN", churn_reading, churn_result)
         _print_active_belief_summary(conn)
     finally:
         conn.close()

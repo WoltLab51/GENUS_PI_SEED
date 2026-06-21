@@ -155,10 +155,11 @@ GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" .venv/bin/genus operation list
 
 `observe_repo_from_x1.sh` is the first sensor that observes *your work* rather
 than the machine. It runs on the **workstation** (the X1), not the Pi: it counts
-commits in a time window and feeds only the **count** into the Pi's core over
-SSH (`genus observe-repo`). The count drives a binary `repo.activity` belief
-(`active`/`quiet`). `git log` is piped straight into `wc -l`, so only the number
-travels — never commit messages, diffs, or file names.
+commits and changed lines in a time window and feeds only the **numbers** into
+the Pi's core over SSH (`genus observe-repo`). The counts drive two binary
+beliefs: `repo.activity` (`active`/`quiet`, presence of work) and `repo.churn`
+(`heavy`/`light`, intensity). `git log` is piped into `wc -l` / a summing `awk`,
+so only the numbers travel — never commit messages, diffs, or file names.
 
 Run it from the workstation (Git Bash):
 

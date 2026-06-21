@@ -77,15 +77,34 @@ def repo_commits_reading(
     measured_on: str = "unknown",
     window_hours: int = 24,
 ) -> dict:
-    """Shape a structural reading from a commit count supplied by the membrane.
+    return _structural_reading("git.commits_per_day", commits, measured_on, window_hours)
+
+
+def repo_lines_reading(
+    lines: int,
+    measured_on: str = "unknown",
+    window_hours: int = 24,
+) -> dict:
+    return _structural_reading(
+        "git.lines_changed_per_day", lines, measured_on, window_hours
+    )
+
+
+def _structural_reading(
+    source: str,
+    value: int,
+    measured_on: str,
+    window_hours: int,
+) -> dict:
+    """Shape a structural reading from a count supplied by the membrane.
 
     The core never runs ``git``: the count is measured off-device (the membrane)
     and handed in. Only the count and its provenance travel — never commit
     messages, diffs, or file names.
     """
     return {
-        "source": "git.commits_per_day",
-        "raw_value": float(commits),
+        "source": source,
+        "raw_value": float(value),
         "unit": "count",
         "interval": 0.0,
         "window_hours": int(window_hours),

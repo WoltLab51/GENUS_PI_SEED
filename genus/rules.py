@@ -18,6 +18,8 @@ DISK_METRIC_KEY = "system.disk_percent"
 ACTIVITY_METRIC_KEY = "system.activity"
 TEMPERATURE_METRIC_KEY = "system.temperature"
 REPO_COMMITS_METRIC_KEY = "repo.commits_per_day"
+REPO_LINES_METRIC_KEY = "repo.lines_changed_per_day"
+REPO_CHURN_HEAVY_THRESHOLD = 300.0
 CLAIM_KEY = "system.load"
 HIGH_VALUE = "high"
 NORMAL_VALUE = "normal"
@@ -27,6 +29,7 @@ DISK_DERIVATION = "rule:disk_threshold_v1"
 ACTIVITY_DERIVATION = "rule:activity_binary_v1"
 TEMPERATURE_DERIVATION = "rule:temperature_threshold_v1"
 REPO_ACTIVITY_DERIVATION = "rule:repo_activity_binary_v1"
+REPO_CHURN_DERIVATION = "rule:repo_churn_binary_v1"
 
 RULES = {
     CPU_METRIC_KEY: {
@@ -74,6 +77,14 @@ RULES = {
         "idle_value": "quiet",
         "claim_key": "repo.activity",
         "derivation": REPO_ACTIVITY_DERIVATION,
+    },
+    REPO_LINES_METRIC_KEY: {
+        "type": "binary",
+        "threshold": REPO_CHURN_HEAVY_THRESHOLD,
+        "active_value": "heavy",
+        "idle_value": "light",
+        "claim_key": "repo.churn",
+        "derivation": REPO_CHURN_DERIVATION,
     },
 }
 
@@ -250,7 +261,8 @@ def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
     event_id = int(latest["id"])
     claim_key = rule["claim_key"]
     derivation = rule["derivation"]
-    new_value = rule["active_value"] if value >= 1.0 else rule["idle_value"]
+    threshold = rule.get("threshold", 1.0)
+    new_value = rule["active_value"] if value >= threshold else rule["idle_value"]
     current = projection.active_belief(conn, claim_key)
     written: list[str] = []
 

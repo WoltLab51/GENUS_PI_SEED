@@ -15,6 +15,7 @@ HALFLIFE_SECONDS_BY_CLAIM_KEY = {
     # Commit rhythm is a daily/weekly pattern, also inert: one observation a day
     # should keep its weight until the next one, not decay within the hour.
     "repo.activity": 86400.0,
+    "repo.churn": 86400.0,
 }
 FALLBACK_HALFLIFE_SECONDS = 1800.0
 

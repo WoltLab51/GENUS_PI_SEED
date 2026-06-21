@@ -24,8 +24,15 @@ MEASURED_ON="${GENUS_MEASURED_ON:-$(hostname)}"
 # Count only. The text of git log never leaves this machine; we keep the line count.
 commits="$(git -C "$REPO_DIR" log --since="${WINDOW_HOURS} hours ago" --oneline | wc -l | tr -d '[:space:]')"
 
-echo "[REPO] $(date -u +%Y-%m-%dT%H:%M:%SZ) commits(${WINDOW_HOURS}h)=$commits measured_on=$MEASURED_ON"
+# Churn: sum of added+deleted lines over the window. --numstat carries file names
+# in column 3; awk reads only columns 1 and 2 and emits a single number, so file
+# names are never transmitted. Binary files show "-" and are skipped.
+lines="$(git -C "$REPO_DIR" log --since="${WINDOW_HOURS} hours ago" --numstat --pretty=tformat: \
+    | awk '{ if ($1 != "-") a += $1; if ($2 != "-") d += $2 } END { print a + d + 0 }')"
+
+echo "[REPO] $(date -u +%Y-%m-%dT%H:%M:%SZ) commits(${WINDOW_HOURS}h)=$commits lines=$lines measured_on=$MEASURED_ON"
 
 ssh -o BatchMode=yes -o ConnectTimeout=10 "$PI_HOST" \
     "cd '$PI_REPO' && GENUS_DB_PATH='$PI_DB' .venv/bin/genus observe-repo \
-        --commits-per-day $commits --measured-on '$MEASURED_ON' --window-hours $WINDOW_HOURS"
+        --commits-per-day $commits --lines-changed $lines \
+        --measured-on '$MEASURED_ON' --window-hours $WINDOW_HOURS"
