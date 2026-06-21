@@ -37,8 +37,9 @@ TEMPERATURE_DERIVATION = "rule:temperature_threshold_v1"
 REPO_ACTIVITY_DERIVATION = "rule:repo_activity_binary_v1"
 REPO_CHURN_DERIVATION = "rule:repo_churn_binary_v1"
 DISK_TREND_DERIVATION = "rule:disk_trend_v1"
+# TREND_WINDOW is form — the horizon the trend is asked over, not a magnitude.
+# The threshold for "a real move" is NOT preset: it is this core's own scatter.
 TREND_WINDOW = 24
-TREND_EPSILON = 1.0
 TREND_RISING = "rising"
 TREND_STABLE = "stable"
 TREND_FALLING = "falling"
@@ -112,7 +113,6 @@ TREND_RULES = {
         "claim_key": "disk.trend",
         "derivation": DISK_TREND_DERIVATION,
         "window": TREND_WINDOW,
-        "epsilon": TREND_EPSILON,
     },
 }
 
@@ -390,7 +390,10 @@ def apply_trend(conn, metric_key: str) -> list[str]:
     values = [float(row["metric_value"]) for row in window]
     event_ids = [int(row["id"]) for row in window]
     net = values[-1] - values[0]
-    epsilon = rule["epsilon"]
+    # No imposed magnitude: a move counts as a trend only when it is larger than
+    # this core's own scatter over the window. A quiet disk notices a small
+    # drift; a noisy one needs a bigger move to call it a trend.
+    epsilon = _stddev(values)
     if net > epsilon:
         new_value = TREND_RISING
     elif net < -epsilon:
@@ -524,6 +527,14 @@ def _percentile(sorted_values: list[float], percentile: float) -> float:
     rank = math.ceil(percentile / 100.0 * len(sorted_values))
     index = min(max(rank, 1), len(sorted_values)) - 1
     return sorted_values[index]
+
+
+def _stddev(values: list[float]) -> float:
+    n = len(values)
+    if n == 0:
+        return 0.0
+    mean = sum(values) / n
+    return math.sqrt(sum((value - mean) ** 2 for value in values) / n)
 
 
 def _check_activity_expectations(

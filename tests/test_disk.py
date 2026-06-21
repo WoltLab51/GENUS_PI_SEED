@@ -1,10 +1,20 @@
+import sqlite3
+
 from genus import event_router, integrity, rules
+from genus.db import init_schema
 from tests.conftest import observe_disk_value
 
 
 def _observe_disk_series(conn, values):
     for value in values:
         observe_disk_value(conn, value)
+
+
+def _fresh_conn():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_schema(conn)
+    return conn
 
 
 def test_high_disk_creates_belief(conn):
@@ -109,6 +119,30 @@ def test_disk_feeds_both_threshold_and_trend(conn):
     ).fetchone()
     assert disk["claim_value"] == "high"
     assert trend["claim_value"] == rules.TREND_RISING
+
+
+def test_disk_trend_threshold_is_relative_to_own_scatter():
+    # Same net change (+4) over the window, but a quiet disk calls it a rising
+    # trend while a noisy disk calls it stable — the sensitivity is each core's
+    # own scatter, never an imposed epsilon.
+    quiet = _fresh_conn()
+    noisy = _fresh_conn()
+    _observe_disk_series(quiet, [50.0] + [50.0, 54.0] * 11 + [54.0])
+    _observe_disk_series(noisy, [50.0] + [0.0, 100.0] * 11 + [54.0])
+
+    quiet_belief = quiet.execute(
+        "SELECT claim_value FROM belief_projection "
+        "WHERE claim_key = 'disk.trend' AND state = 'active'"
+    ).fetchone()
+    noisy_belief = noisy.execute(
+        "SELECT claim_value FROM belief_projection "
+        "WHERE claim_key = 'disk.trend' AND state = 'active'"
+    ).fetchone()
+    quiet.close()
+    noisy.close()
+
+    assert quiet_belief["claim_value"] == rules.TREND_RISING
+    assert noisy_belief["claim_value"] == rules.TREND_STABLE
 
 
 def test_disk_trend_is_replay_stable_and_integrity_passes(conn):

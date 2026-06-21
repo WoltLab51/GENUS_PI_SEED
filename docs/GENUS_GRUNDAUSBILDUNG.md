@@ -44,6 +44,8 @@ Downloads). **Übt einen neuen Belief-Typ:** nicht "high/normal", sondern
 weiterhin `system.disk = high/normal` (Threshold) **und** neu
 `disk.trend = rising/stable/falling` (Trend über ein Fenster, `rule:disk_trend_v1`).
 Erste Form jenseits high/normal — genau die vom Material erzwungene Bereicherung.
+Die Schwelle für „echte Bewegung" ist **self-kalibriert**: relativ zur eigenen
+Streuung des Pi über das Fenster, keine Vorgabe-ε.
 
 ### Temperatur — *Korrelation + Widerspruch*
 Hängt meist mit CPU zusammen — aber nicht immer. Temp hoch *ohne* CPU-Last ist
