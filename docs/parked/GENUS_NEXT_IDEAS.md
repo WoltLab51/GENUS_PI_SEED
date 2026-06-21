@@ -123,3 +123,22 @@ Events after the last anchor remain local-only until the next anchor.
 
 **Promote when:** Backup v1 or continuous Pi operation needs an operating
 procedure.
+
+## 8. Self-Calibrated Confidence Half-Lives (flip-rate)
+
+**Idea:** Replace the hardcoded `HALFLIFE_SECONDS_BY_CLAIM_KEY` constants with a
+half-life each belief derives from its own history: decay as fast as the belief
+actually changes. Concretely, set the half-life from the belief's own
+supersession (flip) rate — a belief that flips often forgets old evidence
+quickly, a stable one keeps it longer.
+
+**Why it matters:** The half-lives are the last imposed magnitude in the system
+(`confidence.py` already says `# TODO: aus Ledger-Daten kalibrieren`). A
+cadence-based half-life ("decay relative to how often you observe") was
+considered and **rejected**: it conflates observation frequency with how fast
+the truth changes. Flip-rate is the decided principle (2026-06-21), to stay
+read-time and replay-stable like the churn / trend / thermal calibrations.
+
+**Promote when:** Beliefs have accumulated enough flip history on the Pi for a
+stable rate estimate (needs burn-in). Pairs naturally with extending Experience
+to the new beliefs — both wait on lived material.
