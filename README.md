@@ -229,6 +229,26 @@ Recovery is policy-gated before the operating system does anything.
 until at least three consecutive failures and no prior reboot recovery attempt
 is inside the governance cooldown window.
 
+## Structure Material, New Forms, and Self-Calibration
+
+v1.6 opens Phase 2: GENUS observes more than the machine, and learns its own
+norms instead of being told them.
+
+- **Clock-sync self-check** (`clock.sync` -> `system.clock`), with a one-day
+  inert confidence half-life for the slow (disk-class) beliefs.
+- **Structure material** — the first sensor of *your work*, measured off-device
+  on the workstation and fed in over SSH (counts only, never contents):
+  `repo.commits_per_day` -> `repo.activity` and `repo.lines_changed_per_day` ->
+  `repo.churn`. See `deploy/observe_repo_from_x1.sh`.
+- **New epistemic forms beyond threshold/binary:** `disk.trend`
+  (rising/stable/falling) and `system.thermal` (temperature-vs-CPU correlation).
+- **Self-calibration:** these thresholds are no longer preset. `repo.churn`,
+  `disk.trend`, and `system.thermal` judge against this core's *own* lived
+  distribution at read time, and withhold judgment until they have enough
+  history. The only remaining preset magnitudes are the confidence half-lives.
+
+All deterministic, replay-stable, no new event types, no LLM.
+
 ## Automatic Collection With Cron
 
 GENUS does not need a daemon for the first Pi loop. Install the marked user

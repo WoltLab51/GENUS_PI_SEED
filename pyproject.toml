@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.5.0"
-description = "GENUS PI SEED v1.5.0 confidence decay v2"
+version = "1.6.0"
+description = "GENUS PI SEED v1.6.0 - Phase 2: structure material, trend & correlation, self-calibration"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
