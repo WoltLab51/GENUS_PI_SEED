@@ -125,6 +125,20 @@ def test_confidence_decreases_with_contradicting_evidence():
     assert lower < high
 
 
+def test_clock_shares_the_inert_disk_halflife():
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    # A few hours old: under network's 30-minute decay this is nearly gone,
+    # but system.clock is inert and keeps its weight like system.disk.
+    old_supporting = [now - timedelta(hours=3), now - timedelta(hours=4)]
+
+    clock = calculate_confidence(old_supporting, [], "system.clock", now=now)
+    disk = calculate_confidence(old_supporting, [], "system.disk", now=now)
+    network = calculate_confidence(old_supporting, [], "system.network", now=now)
+
+    assert clock == disk      # same inert (one-day) class
+    assert clock > network    # network's 30-minute half-life decays faster
+
+
 def test_confidence_is_not_stored(conn):
     columns = [
         row["name"]

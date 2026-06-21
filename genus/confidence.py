@@ -9,6 +9,9 @@ HALFLIFE_SECONDS_BY_CLAIM_KEY = {
     "system.activity": 1800.0,
     "system.network": 1800.0,
     "system.disk": 86400.0,
+    # Clock sync is an inert property: it flips rarely and then for a while, so
+    # it belongs in the slow (disk) class, not the 30-minute network class.
+    "system.clock": 86400.0,
 }
 FALLBACK_HALFLIFE_SECONDS = 1800.0
 
