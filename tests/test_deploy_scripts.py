@@ -9,10 +9,20 @@ def test_cron_installation_writes_timestamped_ticks():
 
     assert "[TICK] observe-all" in script
     assert "[TICK] state-refresh" in script
+    assert "[TICK] clock-check" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] status-publish" in script
     assert r"date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ" in script
+
+
+def test_clock_check_probes_ntp_and_records_operation_event():
+    script = (ROOT / "deploy" / "pi_clock_check.sh").read_text(encoding="utf-8")
+
+    assert "operation clock-check" in script
+    assert "NTPSynchronized" in script
+    assert "--status ok" in script
+    assert "--status fail" in script
 
 
 def test_network_watchdog_records_operation_events_and_governed_recovery():

@@ -133,6 +133,24 @@ tail -f "$HOME/.genus/logs/network-watchdog.log"
 GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" "$HOME/GENUS_PI_SEED/.venv/bin/genus" operation list
 ```
 
+## Clock Check
+
+`pi_clock_check.sh` probes whether the system clock is NTP-synchronized and
+records the result as self-operation evidence (`clock.sync`), driving a
+`system.clock` belief. The Pi 5 onboard RTC only survives a power loss with a
+coin cell on the RTC connector; without one, a boot before NTP catches up could
+write events with a stale clock. This check turns that risk into visible
+material: a fresh drop to `unsynchronized` raises one review-only proposal
+instead of silently corrupting the timestamps the temporal patterns depend on.
+
+The cron installer adds it automatically, every 15 minutes. Run it by hand with:
+
+```bash
+cd "$HOME/GENUS_PI_SEED"
+GENUS_CORE_ID=pi-core ./deploy/pi_clock_check.sh
+GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" .venv/bin/genus operation list
+```
+
 ## Status Repository
 
 `GENUS_PI_STATUS` is the intended off-device exchange repository for anchors

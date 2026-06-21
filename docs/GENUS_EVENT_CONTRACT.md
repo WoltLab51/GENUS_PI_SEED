@@ -80,6 +80,11 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   target proposal pending.
 - Operation checks record self-operation evidence. `system.network` is a normal
   rebuildable belief derived from `operation_check_recorded` events.
+- The `clock.sync` check reuses `operation_check_recorded` (no new event type).
+  `system.clock` is a normal rebuildable belief (`synchronized`/`unsynchronized`).
+  A fresh drop to `unsynchronized` raises one review-only `OperationProposal`; a
+  confirmed `unsynchronized` check does not. The clock check has no recovery
+  action.
 - Operation recovery is governed before execution. `restart_network` is allowed
   after a failed gateway check; `reboot` is blocked until the configured
   repeated-failure threshold is reached and no reboot recovery attempt is inside

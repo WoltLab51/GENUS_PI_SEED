@@ -587,6 +587,48 @@ def operation_network_check(
         conn.close()
 
 
+@operation_group.command("clock-check")
+@click.option(
+    "--status",
+    "status_value",
+    required=True,
+    type=click.Choice([operation.STATUS_OK, operation.STATUS_FAIL]),
+)
+@click.option("--detail", default="")
+@click.option("--json", "as_json", is_flag=True)
+def operation_clock_check(
+    status_value: str,
+    detail: str,
+    as_json: bool,
+) -> None:
+    conn = get_conn()
+    try:
+        try:
+            result = operation.record_clock_check(
+                conn,
+                status=status_value,
+                detail=detail,
+            )
+            conn.commit()
+        except ValueError as exc:
+            conn.rollback()
+            raise click.ClickException(str(exc)) from exc
+        if as_json:
+            click.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
+            return
+        click.echo(
+            f"[OP] clock.sync {status_value} target={operation.CLOCK_TARGET} "
+            f"event={result['check_event_id']}"
+        )
+        belief = result["belief"]
+        click.echo(
+            f"[BLF] system.clock={belief['claim_value']} "
+            f"{belief['event_type']} belief={belief['belief_id']}"
+        )
+    finally:
+        conn.close()
+
+
 @operation_group.command("recovery-result")
 @click.option("--recovery-id", required=True, type=int)
 @click.option(

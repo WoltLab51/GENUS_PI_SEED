@@ -192,3 +192,81 @@ def test_operation_query_and_cli(monkeypatch, cli_conn, conn):
     assert payload["belief"]["claim_value"] == operation.HEALTHY
     assert response["kind"] == "operations"
     assert response["operations"][0]["status"] == operation.STATUS_OK
+
+
+def test_clock_check_creates_synchronized_belief(conn):
+    result = operation.record_clock_check(
+        conn,
+        status=operation.STATUS_OK,
+        detail="ntp synchronized",
+    )
+
+    belief = conn.execute("SELECT * FROM belief_projection").fetchone()
+    operations = operation.list_operations(conn)
+
+    assert result["check_event_id"] == 1
+    assert belief["claim_key"] == operation.CLAIM_CLOCK
+    assert belief["claim_value"] == operation.SYNCHRONIZED
+    assert belief["derivation"] == operation.DERIVATION_CHECK
+    assert operations[0]["check_key"] == operation.CHECK_CLOCK_SYNC
+    assert operations[0]["status"] == operation.STATUS_OK
+    assert operations[0]["target"] == operation.CLOCK_TARGET
+    assert conn.execute("SELECT COUNT(*) AS count FROM proposal_log").fetchone()["count"] == 0
+
+
+def test_clock_unsync_supersedes_and_creates_one_proposal(conn):
+    operation.record_clock_check(conn, operation.STATUS_OK)
+    first_failure = operation.record_clock_check(conn, operation.STATUS_FAIL)
+    second_failure = operation.record_clock_check(conn, operation.STATUS_FAIL)
+
+    active = conn.execute(
+        "SELECT * FROM belief_projection WHERE claim_key = ? AND state = 'active'",
+        (operation.CLAIM_CLOCK,),
+    ).fetchone()
+    proposal_rows = proposals.list_proposals(conn)
+
+    assert first_failure["belief"]["event_type"] == "belief_superseded"
+    assert second_failure["belief"]["event_type"] == "belief_confirmed"
+    assert active["claim_value"] == operation.UNSYNCHRONIZED
+    assert len(proposal_rows) == 1
+    assert proposal_rows[0]["proposal_type"] == operation.PROPOSAL_TYPE
+    assert proposal_rows[0]["claim_key"] == operation.CLAIM_CLOCK
+
+
+def test_clock_check_creates_no_recovery(conn):
+    result = operation.record_clock_check(conn, operation.STATUS_FAIL)
+
+    assert "recovery" not in result
+    assert conn.execute(
+        "SELECT COUNT(*) AS count FROM event_log WHERE event_type = ?",
+        (operation.RECOVERY_ATTEMPT_EVENT,),
+    ).fetchone()["count"] == 0
+
+
+def test_clock_check_is_replay_stable_and_integrity_passes(conn):
+    operation.record_clock_check(conn, operation.STATUS_OK)
+    operation.record_clock_check(conn, operation.STATUS_FAIL)
+    before = integrity.snapshot_projections(conn)
+
+    summary = event_router.replay(conn)
+    after = integrity.snapshot_projections(conn)
+
+    assert after == before
+    assert summary["operations"] == 2
+    assert integrity.check(conn)["ok"] is True
+
+
+def test_clock_check_cli_and_query(monkeypatch, cli_conn, conn):
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+
+    result = CliRunner().invoke(
+        cli.main,
+        ["operation", "clock-check", "--status", "ok", "--json"],
+    )
+    payload = json.loads(result.output)
+    response = query.ask(conn, "betrieb")
+
+    assert result.exit_code == 0
+    assert payload["belief"]["claim_value"] == operation.SYNCHRONIZED
+    assert response["kind"] == "operations"
+    assert response["operations"][0]["check_key"] == operation.CHECK_CLOCK_SYNC
