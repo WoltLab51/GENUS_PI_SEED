@@ -77,6 +77,15 @@ characters or trust domains.
 **Why it matters:** A single governance bug should not bridge contexts that must
 stay isolated, especially child-facing and adult-facing domains.
 
+**First atom already exists (2026-06-21):** the `repo.commits_per_day` membrane
+runs on the X1 (a second machine) and feeds a provenance-stamped observation
+(`measured_on`) into the Pi core. That is the inter-core sensor principle in the
+small — a foreign machine is an eye, its contribution is an observation, not
+truth. The X1 is still only a sensor, not its own core. Full federation (the X1
+gets its own ledger and two cores exchange) can build the inter-core contract on
+this provenance pattern. The binding rule already holds: write nothing that
+assumes a single database.
+
 **Promote when:** Character systems, multi-user systems, or child/family
 contexts become active work.
 
