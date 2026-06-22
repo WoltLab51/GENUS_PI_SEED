@@ -440,22 +440,32 @@ def apply_correlation(conn, metric_key: str) -> list[str]:
     if rule is None:
         return []
 
-    primary = _latest_evidence_window(conn, rule["primary"]["metric"], n=1)
-    secondary = _latest_evidence_window(conn, rule["secondary"]["metric"], n=1)
-    if not primary or not secondary:
+    primary_window = _latest_evidence_window(conn, rule["primary"]["metric"], n=1)
+    secondary_window = _latest_evidence_window(conn, rule["secondary"]["metric"], n=1)
+    if not primary_window or not secondary_window:
         return []
 
-    primary_value = float(primary[0]["metric_value"])
-    primary_event = int(primary[0]["id"])
-    secondary_value = float(secondary[0]["metric_value"])
-    secondary_event = int(secondary[0]["id"])
+    primary_value = float(primary_window[0]["metric_value"])
+    primary_event = int(primary_window[0]["id"])
+    secondary_value = float(secondary_window[0]["metric_value"])
+    secondary_event = int(secondary_window[0]["id"])
 
     primary_threshold = _calibrated_threshold(conn, rule["primary"], primary_event)
-    secondary_threshold = _calibrated_threshold(conn, rule["secondary"], secondary_event)
-    if primary_threshold is None or secondary_threshold is None:
-        # Not enough lived history on one side to know what "high" is — withhold.
+    secondary_values = _prior_distribution(
+        conn, rule["secondary"]["metric"], secondary_event
+    )
+    if primary_threshold is None or len(secondary_values) < rule["secondary"]["min_samples"]:
+        # Not enough lived history yet to know what "high" is — withhold.
+        return []
+    # Premise of meaning: the correlation only says something if the driver
+    # (secondary) actually has a high regime to be decoupled from. With no spread
+    # — e.g. an always-idle CPU whose p75 == p25 — "secondary not high" is
+    # vacuously true and the verdict would be noise. Withhold rather than cry
+    # wolf. (The p75<=p25 test is revisable implementation; the principle is not.)
+    if _percentile(secondary_values, 75) <= _percentile(secondary_values, 25):
         return []
 
+    secondary_threshold = _percentile(secondary_values, rule["secondary"]["percentile"])
     primary_high = primary_value > primary_threshold
     secondary_high = secondary_value > secondary_threshold
     new_value = (
@@ -570,14 +580,9 @@ def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY, n: int = WIN
     return evidence
 
 
-def _calibrated_threshold(conn, calibration: dict, before_event_id: int):
-    """This core's own threshold, learned from its lived ledger — never imposed.
-
-    Returns the chosen percentile of all prior evidence values for the
-    calibration metric, or None when there is not yet enough history to judge.
-    Read-time and causal (only events before this one), so the recorded belief
-    stays deterministic and replay-stable.
-    """
+def _prior_distribution(conn, metric_key: str, before_event_id: int) -> list[float]:
+    """Sorted prior evidence values for a metric — causal (only events before this
+    one), the shared basis for read-time, replay-stable self-calibration."""
     rows = conn.execute(
         """
         SELECT json_extract(payload, '$.metric_value') AS metric_value
@@ -587,11 +592,21 @@ def _calibrated_threshold(conn, calibration: dict, before_event_id: int):
           AND id < ?
         ORDER BY id
         """,
-        (calibration["metric"], before_event_id),
+        (metric_key, before_event_id),
     ).fetchall()
-    if len(rows) < calibration["min_samples"]:
+    return sorted(float(row["metric_value"]) for row in rows)
+
+
+def _calibrated_threshold(conn, calibration: dict, before_event_id: int):
+    """This core's own threshold, learned from its lived ledger — never imposed.
+
+    Returns the chosen percentile of prior evidence for the calibration metric,
+    or None when there is not yet enough history to judge. Read-time and causal,
+    so the recorded belief stays deterministic and replay-stable.
+    """
+    values = _prior_distribution(conn, calibration["metric"], before_event_id)
+    if len(values) < calibration["min_samples"]:
         return None
-    values = sorted(float(row["metric_value"]) for row in rows)
     return _percentile(values, calibration["percentile"])
 
 

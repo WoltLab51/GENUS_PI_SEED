@@ -77,8 +77,11 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 - `system.thermal` (`anomalous`/`normal`) is a cross-metric belief: temperature
   read against CPU on each temperature observation. `anomalous` means temperature
   is high while CPU is not. Both "high" thresholds are the core's own percentiles
-  (no preset), and it withholds until both metrics have enough history. No new
-  event types; the decision is recorded in `belief_*` events, so replay is stable.
+  (no preset), and it withholds until both metrics have enough history **and** the
+  CPU actually varies — an idle CPU with no spread has no high regime to decouple
+  from, so a verdict would be vacuous (the "withhold when the premise of meaning
+  is missing" principle). No new event types; the decision is recorded in
+  `belief_*` events, so replay is stable.
 - `repo.commits_per_day` and `repo.lines_changed_per_day` are structural material
   fed in via `observe-repo`: counts measured off-device (the membrane), never git
   contents. They reuse `observation_created` + `evidence_recorded` (no new types)

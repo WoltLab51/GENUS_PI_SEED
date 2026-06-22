@@ -32,6 +32,15 @@ it currently believes, and keeps every important state change replayable.
   never by reshaping existing belief events. Append-only keeps that enrichment
   additive — the shape is a deliberate forward choice, not a one-way door.
   *(Decided 2026-06-21.)*
+- **Withhold when the premise of meaning is missing:** a relative or calibrated
+  judgment is only informative when its evidence carries the structure that gives
+  it meaning — enough history, and enough spread. A percentile or correlation over
+  a degenerate distribution (an always-idle CPU, a history dominated by one value)
+  says nothing, so the rule withholds rather than emit a vacuous verdict. Silence
+  is honest; crying wolf is not. The *principle* is fixed; how each rule meets it
+  is per-rule (one withholds, another re-chooses its reference population), and the
+  specific spread/threshold test is revisable implementation, not doctrine.
+  *(Decided 2026-06-22.)*
 - **Proposal is not action:** Proposals create attention and review work.
   Reviews are event-backed human acts, but they do not execute changes.
 - **Inquiry is not action:** Inquiries name open uncertainty. They ask what

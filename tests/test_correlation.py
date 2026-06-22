@@ -19,6 +19,18 @@ def _tick(conn, cpu, temp):
     observe_temperature_value(conn, temp)
 
 
+def _busy_idle_baseline(
+    conn, ticks, busy_cpu=70.0, idle_cpu=0.0, hot_temp=58.0, cool_temp=46.0
+):
+    # Establish a CPU distribution WITH spread (busy and idle regimes) plus a
+    # matching temperature spread, so the correlation has a premise to judge.
+    for i in range(ticks):
+        if i % 2 == 0:
+            _tick(conn, busy_cpu, hot_temp)
+        else:
+            _tick(conn, idle_cpu, cool_temp)
+
+
 def _thermal(conn):
     return conn.execute(
         "SELECT claim_value FROM belief_projection "
@@ -27,8 +39,21 @@ def _thermal(conn):
 
 
 def test_thermal_withholds_until_enough_history(conn):
-    for _ in range(rules.THERMAL_MIN_SAMPLES - 1):
-        _tick(conn, 50.0, 50.0)
+    # Fewer than min_samples ticks (even with real CPU spread) -> no judgment.
+    _busy_idle_baseline(conn, rules.THERMAL_MIN_SAMPLES - 1)
+
+    assert conn.execute(
+        "SELECT 1 FROM belief_projection WHERE claim_key = 'system.thermal'"
+    ).fetchone() is None
+
+
+def test_thermal_withholds_when_cpu_has_no_spread(conn):
+    # The premise-of-meaning guard: an always-idle CPU has no high regime to be
+    # decoupled from, so the correlation withholds however the temperature
+    # wanders. This is exactly the idle-Pi case the live burn-in revealed.
+    for _ in range(rules.THERMAL_MIN_SAMPLES + 4):
+        _tick(conn, 0.0, 50.0)
+    _tick(conn, 0.0, 90.0)   # hot, but the CPU never varies -> no verdict
 
     assert conn.execute(
         "SELECT 1 FROM belief_projection WHERE claim_key = 'system.thermal'"
@@ -36,33 +61,30 @@ def test_thermal_withholds_until_enough_history(conn):
 
 
 def test_thermal_anomalous_when_temp_high_and_cpu_not(conn):
-    for _ in range(rules.THERMAL_MIN_SAMPLES + 1):
-        _tick(conn, 50.0, 50.0)   # establishes a "normal" for both
-    _tick(conn, 10.0, 90.0)       # hot while the CPU is idle -> anomaly
+    _busy_idle_baseline(conn, rules.THERMAL_MIN_SAMPLES + 1)
+    _tick(conn, 0.0, 70.0)   # hot while the CPU is idle -> anomaly
 
     belief = _thermal(conn)
     assert belief["claim_value"] == rules.THERMAL_ANOMALOUS
 
 
 def test_thermal_normal_when_both_high(conn):
-    for _ in range(rules.THERMAL_MIN_SAMPLES + 1):
-        _tick(conn, 50.0, 50.0)
-    _tick(conn, 90.0, 90.0)       # hot but the CPU is busy too -> expected
+    _busy_idle_baseline(conn, rules.THERMAL_MIN_SAMPLES + 1)
+    _tick(conn, 90.0, 70.0)  # hot AND busy -> expected, normal
 
     belief = _thermal(conn)
     assert belief["claim_value"] == rules.THERMAL_NORMAL
 
 
 def test_thermal_high_is_relative_to_each_core():
-    # The same 80C reading is an anomaly for a normally-cool core and normal for
-    # a normally-hot one — "high" is each core's own percentile, never preset.
+    # Both cores have CPU spread; the same 60C reading is an anomaly for the
+    # normally-cool core and normal for the normally-hot one.
     cool = _fresh_conn()
     hot = _fresh_conn()
-    for _ in range(rules.THERMAL_MIN_SAMPLES + 1):
-        _tick(cool, 40.0, 40.0)   # this core normally runs cool
-        _tick(hot, 40.0, 90.0)    # this core normally runs hot
-    _tick(cool, 10.0, 80.0)
-    _tick(hot, 10.0, 80.0)
+    _busy_idle_baseline(cool, rules.THERMAL_MIN_SAMPLES + 1, hot_temp=40.0, cool_temp=35.0)
+    _busy_idle_baseline(hot, rules.THERMAL_MIN_SAMPLES + 1, hot_temp=92.0, cool_temp=85.0)
+    _tick(cool, 0.0, 60.0)
+    _tick(hot, 0.0, 60.0)
 
     cool_belief = _thermal(cool)
     hot_belief = _thermal(hot)
@@ -74,9 +96,8 @@ def test_thermal_high_is_relative_to_each_core():
 
 
 def test_thermal_correlation_is_replay_stable(conn):
-    for _ in range(rules.THERMAL_MIN_SAMPLES + 1):
-        _tick(conn, 50.0, 50.0)
-    _tick(conn, 10.0, 90.0)
+    _busy_idle_baseline(conn, rules.THERMAL_MIN_SAMPLES + 1)
+    _tick(conn, 0.0, 70.0)
     before = integrity.snapshot_projections(conn)
 
     event_router.replay(conn)
