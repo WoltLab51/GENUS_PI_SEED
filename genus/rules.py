@@ -497,6 +497,15 @@ def apply_correlation(conn, metric_key: str) -> list[str]:
     )
 
 
+# Observation-reactor registry: each reactor reacts to one new observation and
+# returns the belief-event types it wrote. process_observation iterates this, so a
+# new rule type is added by registering its reactor here, not by hand-writing
+# another pass — mirroring the cognition DETECTORS registry. The two registries
+# (per-observation reactors here, per-scan detectors in experience.py) are the one
+# uniform module pattern, for the eye and the mind.
+REACTORS = (apply_threshold, apply_trend, apply_correlation)
+
+
 def _record_value_belief(
     conn,
     claim_key: str,

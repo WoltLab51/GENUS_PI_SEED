@@ -104,8 +104,13 @@ Reactors decide when a transition is needed. Domain modules coordinate how their
 own events and projections are written.
 
 - `rules.py` detects threshold, binary, trend, and correlation belief-transition
-  conditions. Magnitude thresholds for churn/trend/thermal are self-calibrated
-  from the core's own evidence distribution at read time, not preset.
+  conditions. These are a single **observation-reactor registry** (`REACTORS`) of
+  uniform `(conn, metric_key) -> list[event_type]` modules; `process_observation`
+  iterates it, so a new rule type is added by registering a reactor, not by
+  hand-writing a pass. This mirrors the cognition `DETECTORS` registry — the eye
+  and the mind share one uniform module pattern. Magnitude thresholds for
+  churn/trend/thermal are self-calibrated from the core's own evidence
+  distribution at read time, not preset.
 - `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` and `proposal_reviewed` events
   with `proposal_log` rows.

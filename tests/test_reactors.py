@@ -25,10 +25,10 @@ def test_process_observation_rejects_non_observation_event(conn):
 
 
 def test_observe_rolls_back_partial_cycle_on_error(conn, monkeypatch):
-    def fail_threshold(*_args, **_kwargs):
+    def fail_reactor(*_args, **_kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(reactors.rules, "apply_threshold", fail_threshold)
+    monkeypatch.setattr(reactors.rules, "REACTORS", (fail_reactor,))
 
     with pytest.raises(RuntimeError, match="boom"):
         reactors.observe_cpu_reading(conn, mock_cpu(42.0))

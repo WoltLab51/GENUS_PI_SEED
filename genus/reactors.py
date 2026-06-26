@@ -78,9 +78,11 @@ def process_observation(conn, observation_id: int) -> list[dict]:
             "metric_value": payload["raw_value"],
         }
     ]
-    events.extend({"event_type": event_type} for event_type in rules.apply_threshold(conn, metric_key))
-    events.extend({"event_type": event_type} for event_type in rules.apply_trend(conn, metric_key))
-    events.extend({"event_type": event_type} for event_type in rules.apply_correlation(conn, metric_key))
+    # One uniform pass over the observation-reactor registry: each reactor is a
+    # (conn, metric_key) -> list[event_type] module. Adding a rule type means
+    # registering a reactor in rules.REACTORS, not adding a hand-written pass here.
+    for reactor in rules.REACTORS:
+        events.extend({"event_type": event_type} for event_type in reactor(conn, metric_key))
     return events
 
 
