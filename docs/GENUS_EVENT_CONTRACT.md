@@ -21,6 +21,7 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 | `proposal_created` | `proposal_id`, `proposal_type`, `claim_key`, `claim_value`, `source_belief`, `source_event`, `payload`, `reason` | Proposals | Insert proposal row |
 | `proposal_reviewed` | `proposal_id`, `decision`, `note` | Human via CLI | Mark proposal accepted/rejected |
 | `experience_recorded` | `experience_id`, `experience_key`, `experience_type`, `subject_key`, `pattern`, `supporting_events`, `derivation`, `summary` | Experience | Insert experience row |
+| `experience_recharacterized` | `experience_id`, `experience_key`, `pattern`, `supporting_events`, `summary`, `reason` | Experience | Update the experience row in place |
 | `state_changed` | `state_id`, `state_key`, `state_value`, `previous_state_id`, `derivation`, `supporting_beliefs`, `components`, `reason` | State | Insert active state row and supersede previous state |
 | `rule_proposed` | `rule_key`, `rule_type`, `subject_key`, `spec`, `source_experience`, `derivation`, `summary` | Maturation | Audit only; source event for RuleProposal |
 | `rule_activated` | `rule_id`, `rule_key`, `rule_type`, `subject_key`, `spec`, `source_proposal`, `derivation` | Maturation | Insert active rule row |
@@ -93,6 +94,13 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   population has spread (premise of meaning). It is recorded knowledge only and
   raises no proposal. Determinism is preserved by freezing the measure in the
   `experience_recorded` event; replay re-applies it and does not re-scan.
+- An experience is re-characterized in place when its characterization changes
+  (a belief that was `stable` later reads `volatile`): the scan emits
+  `experience_recharacterized`, which updates the existing row's `pattern`,
+  `supporting_events`, and `summary`. The `experience_key` stays unique (one row);
+  the full history of characterizations remains in `event_log`. Experiences
+  without a characterization (the activity rhythm) are recorded once and never
+  re-characterized. Replay re-applies the update deterministically.
 - An experience may create an `ExperienceProposal`, but the proposal is still
   review work only and does not execute changes.
 - `state_changed` is emitted by deterministic aggregation over active beliefs.

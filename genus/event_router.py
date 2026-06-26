@@ -99,6 +99,8 @@ def apply_event(conn, event) -> None:
         proposals.apply_proposal_reviewed(conn, payload)
     elif event_type == "experience_recorded":
         experience.apply_experience_recorded(conn, payload)
+    elif event_type == "experience_recharacterized":
+        experience.apply_experience_recharacterized(conn, payload)
     elif event_type == "state_changed":
         state.apply_state_changed(conn, payload)
     elif event_type == "governance_decision":

@@ -228,6 +228,73 @@ def test_stability_inquiry_is_deduped_across_scans():
     conn.close()
 
 
+def _rechar_count(conn):
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM event_log "
+        "WHERE event_type = 'experience_recharacterized'"
+    ).fetchone()["n"]
+
+
+def test_stability_recharacterizes_on_classification_change():
+    conn = _fresh()
+    ids = _Ids()
+    # two rock-stable anchors keep the population median low
+    _emit_lifecycle(conn, ids, "anchor.one", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "anchor.two", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "subject", confirms=20, flips=0)      # starts stable
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    assert _stability(conn, "subject")["classification"] == "stable"
+
+    for _ in range(25):  # the subject begins flipping a lot -> now volatile
+        _flip(conn, ids, "subject")
+    experience.scan(conn)
+
+    assert _stability(conn, "subject")["classification"] == "volatile"
+    # updated in place (experience_key is UNIQUE), not duplicated
+    rows = conn.execute(
+        "SELECT COUNT(*) AS n FROM experience_log WHERE subject_key = 'subject'"
+    ).fetchone()["n"]
+    assert rows == 1
+    assert _rechar_count(conn) == 1  # event-backed
+    conn.close()
+
+
+def test_no_recharacterization_when_classification_unchanged():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "anchor.one", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "subject", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    experience.scan(conn)  # nothing changed
+
+    assert _rechar_count(conn) == 0
+    conn.close()
+
+
+def test_recharacterization_is_replay_stable():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "anchor.one", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "anchor.two", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "subject", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    for _ in range(25):
+        _flip(conn, ids, "subject")
+    experience.scan(conn)
+    event_router.replay(conn)
+    before = integrity.snapshot_projections(conn)
+
+    event_router.replay(conn)
+    after = integrity.snapshot_projections(conn)
+
+    assert after == before
+    assert integrity.check(conn)["ok"] is True
+    conn.close()
+
+
 def test_stability_surprise_is_replay_stable():
     conn = _fresh()
     ids = _Ids()

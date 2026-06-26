@@ -35,7 +35,16 @@ def scan(conn) -> list[dict]:
     proposals_created = 0
     for detector in DETECTORS:
         for candidate in detector(conn):
-            if experience_exists(conn, candidate["experience_key"]):
+            existing = _active_experience(conn, candidate["experience_key"])
+            if existing is not None:
+                # The experience already exists; re-characterize it in place if its
+                # characterization changed (a belief that was stable now reads
+                # volatile), else leave it. Keeps self-knowledge current.
+                event_id = _maybe_recharacterize(conn, existing, candidate)
+                if event_id is not None:
+                    recorded.append(
+                        {"experience_event_id": event_id, "recharacterized": True, **candidate}
+                    )
                 continue
             experience_event_id = record_experience_event(conn, candidate)
             proposal_event_id = None
@@ -55,6 +64,62 @@ def scan(conn) -> list[dict]:
             )
     _raise_stability_surprises(conn)
     return recorded
+
+
+def _active_experience(conn, experience_key: str):
+    # experience_key is UNIQUE, so there is at most one row.
+    return conn.execute(
+        "SELECT * FROM experience_log WHERE experience_key = ?",
+        (experience_key,),
+    ).fetchone()
+
+
+def _maybe_recharacterize(conn, existing, candidate: dict):
+    # Re-characterize when the candidate's characterization differs from what is
+    # recorded. Candidates without a 'characterization' (e.g. the activity rhythm)
+    # never re-characterize, preserving the record-once behaviour. Returns the
+    # event id if it re-recorded, else None.
+    new_char = candidate.get("characterization")
+    if new_char is None:
+        return None
+    old_char = json.loads(existing["pattern"]).get("classification")
+    if new_char == old_char:
+        return None
+    return record_experience_recharacterized_event(conn, int(existing["id"]), candidate)
+
+
+def record_experience_recharacterized_event(conn, experience_id: int, candidate: dict) -> int:
+    payload = {
+        "experience_id": experience_id,
+        "experience_key": candidate["experience_key"],
+        "pattern": candidate["pattern"],
+        "supporting_events": candidate["supporting_events"],
+        "summary": candidate["summary"],
+        "reason": f"{candidate['subject_key']}_recharacterized",
+    }
+    event_id = ledger.append(conn, "experience_recharacterized", payload)
+    payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+    apply_experience_recharacterized(conn, payload)
+    return event_id
+
+
+def apply_experience_recharacterized(conn, payload: dict) -> None:
+    # Update the existing experience in place (experience_key stays unique). The
+    # full history of characterizations remains in event_log; the projection holds
+    # the current one. Replay re-applies this deterministically.
+    conn.execute(
+        """
+        UPDATE experience_log
+        SET pattern = ?, supporting_events = ?, summary = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(payload["pattern"], sort_keys=True, separators=(",", ":")),
+            json.dumps(payload["supporting_events"], sort_keys=True, separators=(",", ":")),
+            payload["summary"],
+            int(payload["experience_id"]),
+        ),
+    )
 
 
 def record_experience_event(conn, candidate: dict) -> int:
@@ -361,6 +426,8 @@ def _belief_stability_candidates(conn) -> list[dict]:
                     f"{updates} lifecycle updates; GENUS-median {median:.2f})"
                 ),
                 "proposable": False,
+                # re-characterize the experience if this verdict later changes
+                "characterization": classification,
             }
         )
     return candidates

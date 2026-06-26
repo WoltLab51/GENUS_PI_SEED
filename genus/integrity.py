@@ -50,6 +50,14 @@ REQUIRED_EVENT_KEYS = {
         "derivation",
         "summary",
     },
+    "experience_recharacterized": {
+        "experience_id",
+        "experience_key",
+        "pattern",
+        "supporting_events",
+        "summary",
+        "reason",
+    },
     "state_changed": {
         "state_id",
         "state_key",

@@ -241,6 +241,15 @@ seed table is only a fallback until a belief has enough tenure. This makes the
 self-reflection of v1.8 useful: the measured volatility now drives confidence,
 and every magnitude in the core is self-calibrated from lived data.
 
+v1.12 gives experiences a lifecycle so self-knowledge stays current. When a
+belief the `BeliefStability` experience characterized as stable later reads
+volatile (or vice versa), the scan re-characterizes the experience in place via
+`experience_recharacterized` — the `experience_key` stays unique, the full
+history of characterizations remains in `event_log`, and replay re-applies the
+update. The data layer is also hardened this phase: WAL + `busy_timeout` for the
+overlapping cron writers, a partial metric-key index, and a recency bound on the
+self-calibration scan.
+
 ## Document Family
 
 - `docs/README.md` defines the documentation shelves and authority levels.
