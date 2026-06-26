@@ -45,7 +45,12 @@ it currently believes, and keeps every important state change replayable.
   Reviews are event-backed human acts, but they do not execute changes.
 - **Inquiry is not action:** Inquiries name open uncertainty. They ask what
   should be clarified. Resolution is event-backed, but does not execute
-  changes.
+  changes. Because an inquiry is awareness, not action, it is raised **directly**
+  — a contradiction, or a reliably-stable belief that flips, raises one with no
+  governance. Standing up a persistent **active rule** that changes future
+  deterministic checking is the governed act instead (Review ≠ Activation).
+  Direct inquiries flag one-off anomalies; governed rules install lasting
+  expectations — complementary, not competing.
 - **Policy is not decision:** Policies and constraints are evaluated as audit
   events. The durable outcome is a separate `governance_decision` event.
 - **Review is not activation:** Accepting a `RuleProposal` documents human
