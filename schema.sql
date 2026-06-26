@@ -9,6 +9,13 @@ CREATE TABLE IF NOT EXISTS event_log (
 
 CREATE INDEX IF NOT EXISTS idx_event_log_type ON event_log(event_type);
 CREATE INDEX IF NOT EXISTS idx_event_log_created ON event_log(created_at);
+-- Evidence/metric lookups filter on event_type + the JSON metric_key; a partial
+-- expression index keeps the rule and experience scans off a full table scan.
+-- Partial on evidence_recorded (which always carries valid JSON), so the
+-- json_extract is never evaluated for other event types.
+CREATE INDEX IF NOT EXISTS idx_event_log_metric
+    ON event_log(json_extract(payload, '$.metric_key'))
+    WHERE event_type = 'evidence_recorded';
 
 CREATE TRIGGER IF NOT EXISTS prevent_event_log_update
 BEFORE UPDATE ON event_log

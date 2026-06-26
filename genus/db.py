@@ -17,6 +17,13 @@ def connect(path: str | Path = "genus.sqlite3") -> sqlite3.Connection:
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # Many short-lived processes (observe-all, state-refresh, the watchdog, the
+    # membranes) write the same ledger on overlapping ~5-minute cycles. busy_timeout
+    # makes a writer wait for a lock instead of failing with "database is locked";
+    # WAL lets readers proceed without blocking the single writer. Both are no-ops
+    # for the in-memory test databases.
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     _ensure_column(conn, "proposal_log", "decision", "TEXT")
     _ensure_column(conn, "proposal_log", "reviewed_at", "TEXT")
