@@ -258,6 +258,8 @@ self-calibration scan.
   `GENUS_LEDGER_AUDIT.md` define current build contracts together with this
   architecture document.
 - `genus_core_map.html` is the visual maturity map for the current architecture.
+- `genus_visual_atlas.html` is a self-contained visual atlas: nineteen focused
+  diagrams covering structure, flow, cognition, principles, and project maturity.
 - `GENUS_GRUNDAUSBILDUNG.md` and `GENUS_SENSOR_PRINCIPLE.md` are supporting
   doctrine for material and sensor boundaries.
 - `GENUS_PHYSIK.md`, `GENUS_ANTIZIPATION.md`, and
