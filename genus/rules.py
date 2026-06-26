@@ -595,9 +595,17 @@ def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY, n: int = WIN
     return evidence
 
 
+# Recency bound on the self-calibration scan: percentiles use the most recent
+# CALIBRATION_WINDOW prior values, not all of history. This keeps the scan
+# O(window) and lets "high"/"heavy" track current conditions instead of being
+# anchored to ancient readings. A structural recency bound, not an epistemic preset.
+CALIBRATION_WINDOW = 2000
+
+
 def _prior_distribution(conn, metric_key: str, before_event_id: int) -> list[float]:
-    """Sorted prior evidence values for a metric — causal (only events before this
-    one), the shared basis for read-time, replay-stable self-calibration."""
+    """Sorted recent prior evidence values for a metric — causal (only events
+    before this one), bounded to a recency window, the shared basis for read-time,
+    replay-stable self-calibration."""
     rows = conn.execute(
         """
         SELECT json_extract(payload, '$.metric_value') AS metric_value
@@ -605,9 +613,10 @@ def _prior_distribution(conn, metric_key: str, before_event_id: int) -> list[flo
         WHERE event_type = 'evidence_recorded'
           AND json_extract(payload, '$.metric_key') = ?
           AND id < ?
-        ORDER BY id
+        ORDER BY id DESC
+        LIMIT ?
         """,
-        (metric_key, before_event_id),
+        (metric_key, before_event_id, CALIBRATION_WINDOW),
     ).fetchall()
     return sorted(float(row["metric_value"]) for row in rows)
 
