@@ -147,14 +147,15 @@ to the new beliefs — both wait on lived material.
 
 From the v1.6.0 architecture audit, ordered by urgency.
 
-- **Bound `supporting_events` per belief (Tier 0 — promote now).** A belief
-  confirmed every tick (e.g. `system.activity`) accumulates every supporting
-  event id forever. This makes confidence O(n) per read and confirm O(n) per
-  write, and — critically — `evidence_created_at_times` builds `WHERE id IN (...)`
-  with one host parameter per event, so the query layer hits SQLite's parameter
-  ceiling (~32k) within months and raises "too many SQL variables". Fix: keep
-  only evidence within a window / N half-lives (older terms decay to ~0 anyway)
-  and track the displayed count separately. Read-time, replay-safe.
+- **Bound `supporting_events` per belief (Tier 0 — ✅ DONE v1.10.0).** A belief
+  confirmed every tick (e.g. `system.activity`) accumulated every supporting
+  event id forever, making confidence O(n) per read, confirm O(n) per write, and
+  — critically — `evidence_created_at_times` built `WHERE id IN (...)` with one
+  host parameter per event, heading for SQLite's ~32k ceiling within months.
+  **Resolved:** `projection._recent` bounds the list to `SUPPORTING_EVENTS_WINDOW`
+  (1024); the full history stays in `event_log`, replay re-applies it, confidence
+  is essentially unchanged (old terms decay to ~0). *Follow-up still open:* reduce
+  the **write volume** of redundant confirmations (a confidence-model change).
 - **`busy_timeout` + WAL (cheap).** `db.connect` sets neither; observe-all,
   state refresh, clock-check, the root network watchdog, and the X1 membrane all
   write the same SQLite from separate processes, so overlapping writes can raise

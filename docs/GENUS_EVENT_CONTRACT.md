@@ -47,6 +47,13 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 - `belief_projection` has no `confidence` column.
 - Confidence is calculated at read time from the `created_at` timestamps of
   supporting and contradicting evidence events. It has no replay side effect.
+- `belief_projection.supporting_events` and `contradicting_events` are bounded to
+  a recent window. The full evidence history always remains in `event_log`; the
+  projection keeps only the most recent ids. The bound is confidence-negligible
+  (evidence decays as `2^(-age/H)`, so older ids carry ~0) and replay re-applies
+  it deterministically, so the projection stays rebuildable. This keeps the
+  evidence-time lookup far under SQLite's parameter limit and makes each confirm
+  O(window) rather than O(n).
 - `experience_log.derivation` is required and `experience_log` has no
   `confidence` column.
 - `state_projection.derivation` is required and `state_projection` has no

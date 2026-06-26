@@ -223,6 +223,15 @@ contradiction inquiry, and resolves no change by itself). Re-characterizing a
 stale stability experience when a belief's volatility shifts (an experience
 lifecycle) remains a later step.
 
+v1.10 bounds the belief projection's evidence lists to a recent window. On an idle
+machine ~99% of events are confirmations of an unchanged state, which grew
+`supporting_events` without limit — a latent failure (SQLite's parameter ceiling)
+and an O(n) write per confirm. The full history stays in `event_log`; the
+projection keeps only the most recent ids. Because confidence weights evidence by
+`2^(-age/H)`, the dropped old ids carry ~0 and confidence is essentially
+unchanged. Reducing the *write volume* of redundant confirmations (a confidence
+model change) is a separate, later step.
+
 ## Document Family
 
 - `docs/README.md` defines the documentation shelves and authority levels.

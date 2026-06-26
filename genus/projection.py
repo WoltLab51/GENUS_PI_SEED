@@ -9,6 +9,21 @@ from genus.confidence import calculate_confidence
 ACTIVE = "active"
 SUPERSEDED = "superseded"
 
+# Structural bound on the projection's evidence lists. The full history always
+# stays in event_log; the projection keeps only the most recent ids. This keeps
+# the evidence-time lookup far under SQLite's parameter limit and makes each
+# confirm O(window) instead of O(n). It is confidence-negligible: confidence
+# weights evidence by 2^(-age/H), so events older than a few half-lives carry ~0,
+# and W/(W+1) saturates for confident beliefs. A structural cap, not an epistemic
+# threshold.
+SUPPORTING_EVENTS_WINDOW = 1024
+
+
+def _recent(ids: list[int]) -> list[int]:
+    if len(ids) > SUPPORTING_EVENTS_WINDOW:
+        return ids[-SUPPORTING_EVENTS_WINDOW:]
+    return ids
+
 
 def json_list(value: str | None) -> list[int]:
     if not value:
@@ -52,6 +67,7 @@ def create_belief(
 ) -> int:
     if not derivation:
         raise ValueError("derivation must not be empty")
+    supporting_events = _recent(list(supporting_events))
     if belief_id is not None:
         conn.execute(
             """
@@ -101,6 +117,7 @@ def confirm_belief(
     supporting = json_list(row["supporting_events"])
     if supporting_event not in supporting:
         supporting.append(supporting_event)
+    supporting = _recent(supporting)
     conn.execute(
         """
         UPDATE belief_projection
@@ -119,6 +136,7 @@ def weaken_belief(
     contradicting = json_list(row["contradicting_events"])
     if contradicting_event not in contradicting:
         contradicting.append(contradicting_event)
+    contradicting = _recent(contradicting)
     conn.execute(
         """
         UPDATE belief_projection
