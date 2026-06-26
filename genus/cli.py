@@ -207,6 +207,45 @@ def observe_weather(temp_outside: float, source: str) -> None:
         conn.close()
 
 
+def _atlas_facts() -> str:
+    """Derive the atlas's drift-prone facts from the code itself.
+
+    The visual atlas hand-draws stable principles, but its state-dependent facts
+    (sensors, reactors, detectors, the preset budget) should be a projection of
+    the code, not a snapshot that silently drifts. This renders them so the atlas
+    can be regenerated and a test can enforce currency.
+    """
+    import genus
+    from genus import constants, experience, rules
+
+    metric_keys = sorted({getattr(rules, n) for n in dir(rules) if n.endswith("_METRIC_KEY")})
+    reactors = [reactor.__name__ for reactor in rules.REACTORS]
+    detectors = [detector.__name__ for detector in experience.DETECTORS]
+    budget = sorted(n for n in dir(constants) if n.endswith("_THRESHOLD"))
+
+    return "\n".join(
+        [
+            "# GENUS Atlas — generierte Fakten",
+            "",
+            "> Aus dem Code erzeugt via `genus atlas-facts`. Nicht von Hand editieren —",
+            "> bei Code-Änderungen neu generieren; ein Test erzwingt die Aktualität.",
+            "",
+            f"- **Version:** {genus.__version__}",
+            f"- **Sensor-Metriken ({len(metric_keys)}):** " + ", ".join(metric_keys),
+            f"- **Beobachtungs-Reaktoren ({len(reactors)}):** " + ", ".join(reactors),
+            f"- **Kognitions-Detektoren ({len(detectors)}):** " + ", ".join(detectors),
+            f"- **Preset-Budget ({len(budget)} feste Schwellen):** " + ", ".join(budget),
+            "",
+        ]
+    )
+
+
+@main.command("atlas-facts")
+def atlas_facts_command() -> None:
+    """Print the atlas's drift-prone facts, derived from the code."""
+    click.echo(_atlas_facts())
+
+
 @main.command("ask")
 @click.argument("question", nargs=-1, required=True)
 def ask_command(question: tuple[str, ...]) -> None:

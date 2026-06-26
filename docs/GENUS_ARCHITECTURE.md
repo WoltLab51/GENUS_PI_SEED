@@ -273,6 +273,8 @@ self-calibration scan.
 - `genus_core_map.html` is the visual maturity map for the current architecture.
 - `genus_visual_atlas.html` is a self-contained visual atlas: nineteen focused
   diagrams covering structure, flow, cognition, principles, and project maturity.
+- `genus_atlas_facts.md` is generated from the code (`genus atlas-facts`): the
+  atlas's state-dependent facts as a projection, with a test enforcing currency.
 - `GENUS_GRUNDAUSBILDUNG.md` and `GENUS_SENSOR_PRINCIPLE.md` are supporting
   doctrine for material and sensor boundaries.
 - `GENUS_PHYSIK.md`, `GENUS_ANTIZIPATION.md`, and
