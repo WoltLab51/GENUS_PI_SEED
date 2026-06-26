@@ -59,8 +59,15 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   `proposal_log` is projected.
 - `proposal_created` is emitted for first sustained high and high-to-normal
   contradiction only; it is not emitted for `belief_confirmed`.
-- `inquiry_created` is emitted for contradictions only; it is not an action and
-  does not resolve itself automatically.
+- `inquiry_created` is emitted for contradictions and for self-reflection
+  surprises (a `StabilityInquiry`); it is not an action and does not resolve
+  itself automatically.
+- `StabilityInquiry` closes the expect-then-be-surprised loop: when a belief the
+  `BeliefStability` experience characterized as `stable` later supersedes, the
+  experience scan raises one inquiry per such flip (deduped by `source_event`).
+  A volatile belief flipping is expected and raises nothing. Like the
+  contradiction inquiry it is raised directly (ungoverned), and replay re-applies
+  the `inquiry_created` event rather than re-scanning.
 - `experience_recorded` is emitted by deterministic ledger aggregation. The
   first v0.9 detector records contrasted activity hours instead of raw sample
   frequency. Detectors are a registry of pure functions (`conn -> candidates`);

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 
-from genus import ledger, proposals
+from genus import inquiries, ledger, proposals
 
 
 ACTIVITY_METRIC_KEY = "system.activity"
@@ -20,6 +20,11 @@ MAX_PROPOSALS_PER_SCAN = 1
 BELIEF_STABILITY_TYPE = "BeliefStability"
 BELIEF_STABILITY_DERIVATION = "rule:belief_stability_v1"
 MIN_LIFECYCLE_UPDATES = 10  # premise of meaning: enough lifecycle to judge volatility
+
+# Closing the expect-then-be-surprised loop: a belief characterized as stable
+# that subsequently flips is a violated expectation.
+STABILITY_INQUIRY_TYPE = "StabilityInquiry"
+STABILITY_QUESTION_KEY = "stability.unexpected_flip"
 
 
 def scan(conn) -> list[dict]:
@@ -48,6 +53,7 @@ def scan(conn) -> list[dict]:
                     **candidate,
                 }
             )
+    _raise_stability_surprises(conn)
     return recorded
 
 
@@ -358,6 +364,71 @@ def _belief_stability_candidates(conn) -> list[dict]:
             }
         )
     return candidates
+
+
+def _raise_stability_surprises(conn) -> list[int]:
+    # Close the expect-then-be-surprised loop. A belief GENUS characterized as
+    # stable that flips AFTER that characterization is a violated expectation:
+    # raise one StabilityInquiry per such flip. A volatile belief flipping is no
+    # surprise, so only 'stable' experiences are watched. The frozen experience is
+    # the expectation; a later belief_superseded for the same claim is the
+    # falsification. One inquiry per flip event (deduped by source_event), so the
+    # detection is idempotent and replay re-applies the inquiry_created events.
+    raised: list[int] = []
+    stable = conn.execute(
+        """
+        SELECT subject_key, supporting_events
+        FROM experience_log
+        WHERE experience_type = ?
+          AND json_extract(pattern, '$.classification') = 'stable'
+        """,
+        (BELIEF_STABILITY_TYPE,),
+    ).fetchall()
+    for row in stable:
+        claim_key = row["subject_key"]
+        supporting = json.loads(row["supporting_events"])
+        as_of = max(supporting) if supporting else 0
+        flips = conn.execute(
+            """
+            SELECT id, payload
+            FROM event_log
+            WHERE event_type = 'belief_superseded'
+              AND json_extract(payload, '$.claim_key') = ?
+              AND id > ?
+            ORDER BY id
+            """,
+            (claim_key, as_of),
+        ).fetchall()
+        for flip in flips:
+            flip_id = int(flip["id"])
+            if _stability_inquiry_exists(conn, flip_id):
+                continue
+            payload = json.loads(flip["payload"])
+            inquiries.record_inquiry_created_event(
+                conn,
+                inquiry_id=inquiries.next_inquiry_id(conn),
+                inquiry_type=STABILITY_INQUIRY_TYPE,
+                claim_key=claim_key,
+                source_belief=int(payload["new_belief_id"]),
+                source_event=flip_id,
+                question_key=STABILITY_QUESTION_KEY,
+                payload={
+                    "expected": "stable",
+                    "observed": "flipped",
+                    "changed_to": payload.get("claim_value"),
+                    "review_recommended": True,
+                },
+            )
+            raised.append(flip_id)
+    return raised
+
+
+def _stability_inquiry_exists(conn, source_event: int) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM inquiry_log WHERE inquiry_type = ? AND source_event = ? LIMIT 1",
+        (STABILITY_INQUIRY_TYPE, source_event),
+    ).fetchone()
+    return row is not None
 
 
 def _median(values: list[float]) -> float:

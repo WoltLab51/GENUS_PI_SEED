@@ -57,6 +57,32 @@ def _emit_lifecycle(conn, ids: _Ids, claim_key: str, confirms: int, flips: int) 
     conn.commit()
 
 
+def _flip(conn, ids: _Ids, claim_key: str) -> None:
+    # A single fresh supersession for an existing belief lineage.
+    ledger.append(
+        conn,
+        "belief_superseded",
+        {
+            "old_belief_id": 0,
+            "new_belief_id": ids.next(),
+            "claim_key": claim_key,
+            "claim_value": "flipped",
+            "derivation": "rule:test",
+            "supporting_events": [],
+            "reason": "test",
+        },
+    )
+    conn.commit()
+
+
+def _stability_inquiries(conn, claim_key):
+    return conn.execute(
+        "SELECT * FROM inquiry_log "
+        "WHERE inquiry_type = 'StabilityInquiry' AND claim_key = ?",
+        (claim_key,),
+    ).fetchall()
+
+
 def _stability(conn, claim_key):
     row = conn.execute(
         "SELECT pattern, summary FROM experience_log "
@@ -151,3 +177,72 @@ def test_cognition_registry_holds_both_detectors():
     names = {detector.__name__ for detector in experience.DETECTORS}
     assert "_activity_daily_rhythm_candidates" in names
     assert "_belief_stability_candidates" in names
+
+
+def test_stable_belief_flip_raises_one_inquiry():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "alpha.stable", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)  # learns: alpha stable, beta volatile
+
+    _flip(conn, ids, "alpha.stable")  # a rock-stable belief unexpectedly flips
+    event_router.replay(conn)  # project the flipped belief (as the reactor would)
+    experience.scan(conn)
+
+    inquiries = _stability_inquiries(conn, "alpha.stable")
+    assert len(inquiries) == 1
+    payload = json.loads(inquiries[0]["payload"])
+    assert payload["expected"] == "stable"
+    assert payload["observed"] == "flipped"
+    conn.close()
+
+
+def test_volatile_belief_flip_raises_no_inquiry():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "alpha.stable", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+
+    _flip(conn, ids, "beta.volatile")  # a volatile belief flipping is expected
+    experience.scan(conn)
+
+    assert _stability_inquiries(conn, "beta.volatile") == []
+    conn.close()
+
+
+def test_stability_inquiry_is_deduped_across_scans():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "alpha.stable", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    _flip(conn, ids, "alpha.stable")
+    event_router.replay(conn)
+
+    experience.scan(conn)
+    experience.scan(conn)  # same flip must not raise a second inquiry
+
+    assert len(_stability_inquiries(conn, "alpha.stable")) == 1
+    conn.close()
+
+
+def test_stability_surprise_is_replay_stable():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "alpha.stable", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    _flip(conn, ids, "alpha.stable")
+    event_router.replay(conn)
+    experience.scan(conn)
+    event_router.replay(conn)
+    before = integrity.snapshot_projections(conn)
+
+    event_router.replay(conn)
+    after = integrity.snapshot_projections(conn)
+
+    assert after == before
+    assert integrity.check(conn)["ok"] is True
+    conn.close()

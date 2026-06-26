@@ -212,9 +212,16 @@ first new detector, `BeliefStability`, is the first experience about GENUS's *ow
 cognition*: it measures each belief's flip-rate from its lifecycle and judges it
 stable/volatile against the core's own population of flip-rates, withholding
 without enough history or spread. This is the embryo of anticipation: a learned
-expectation ("from situation x, expect y") that future evidence can falsify. v1.8
-records the learning only; raising an inquiry when a reliably-stable belief
-unexpectedly flips — closing the expect-then-be-surprised loop — is the next step.
+expectation ("from situation x, expect y") that future evidence can falsify.
+
+v1.9 closes that loop. When a belief the `BeliefStability` experience characterized
+as stable later flips, the experience scan raises a `StabilityInquiry` — the
+expectation falsified, the surprise made explicit ("a reliably-stable belief just
+changed — why?"). A volatile belief flipping is expected and raises nothing. The
+inquiry is an awareness signal, not an action (it is raised directly, like the
+contradiction inquiry, and resolves no change by itself). Re-characterizing a
+stale stability experience when a belief's volatility shifts (an experience
+lifecycle) remains a later step.
 
 ## Document Family
 
