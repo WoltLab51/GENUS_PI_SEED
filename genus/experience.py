@@ -15,29 +15,39 @@ MIN_BUCKET_RATIO = 0.75
 MIN_GLOBAL_CONTRAST = 0.25
 MAX_PROPOSALS_PER_SCAN = 1
 
+# BeliefStability: the first experience about GENUS's own cognition rather than a
+# sensor metric. It measures how volatile each belief is from its lifecycle.
+BELIEF_STABILITY_TYPE = "BeliefStability"
+BELIEF_STABILITY_DERIVATION = "rule:belief_stability_v1"
+MIN_LIFECYCLE_UPDATES = 10  # premise of meaning: enough lifecycle to judge volatility
+
 
 def scan(conn) -> list[dict]:
+    # The mind grows by registering detectors, not by rewriting scan. Each is a
+    # pure function conn -> candidates, mirroring how RULES/TREND_RULES/
+    # CORRELATION_RULES make the eye's growth structural.
     recorded: list[dict] = []
     proposals_created = 0
-    for candidate in _activity_daily_rhythm_candidates(conn):
-        if experience_exists(conn, candidate["experience_key"]):
-            continue
-        experience_event_id = record_experience_event(conn, candidate)
-        proposal_event_id = None
-        if proposals_created < MAX_PROPOSALS_PER_SCAN:
-            proposal_event_id = record_experience_proposal(
-                conn,
-                candidate,
-                experience_event_id,
+    for detector in DETECTORS:
+        for candidate in detector(conn):
+            if experience_exists(conn, candidate["experience_key"]):
+                continue
+            experience_event_id = record_experience_event(conn, candidate)
+            proposal_event_id = None
+            if candidate.get("proposable") and proposals_created < MAX_PROPOSALS_PER_SCAN:
+                proposal_event_id = record_experience_proposal(
+                    conn,
+                    candidate,
+                    experience_event_id,
+                )
+                proposals_created += 1
+            recorded.append(
+                {
+                    "experience_event_id": experience_event_id,
+                    "proposal_event_id": proposal_event_id,
+                    **candidate,
+                }
             )
-            proposals_created += 1
-        recorded.append(
-            {
-                "experience_event_id": experience_event_id,
-                "proposal_event_id": proposal_event_id,
-                **candidate,
-            }
-        )
     return recorded
 
 
@@ -253,6 +263,7 @@ def _activity_daily_rhythm_candidates(conn) -> list[dict]:
                     f"during UTC hour(s) {_format_hours(hours_utc)} "
                     f"({total_count} contrasting observations)"
                 ),
+                "proposable": True,
             }
         )
     return candidates
@@ -260,3 +271,103 @@ def _activity_daily_rhythm_candidates(conn) -> list[dict]:
 
 def _format_hours(hours: list[int]) -> str:
     return ", ".join(f"{hour:02d}:00" for hour in hours)
+
+
+def _belief_stability_candidates(conn) -> list[dict]:
+    # GENUS reflects on its own beliefs: how volatile is each, measured from its
+    # lifecycle in the ledger. flip_rate = supersessions / (confirmations +
+    # supersessions). A rock-stable belief flips ~never; a volatile one flips
+    # often. This is the first experience whose subject is GENUS's own cognition.
+    rows = conn.execute(
+        """
+        SELECT id, event_type, payload
+        FROM event_log
+        WHERE event_type IN ('belief_created', 'belief_confirmed', 'belief_superseded')
+        ORDER BY id
+        """
+    ).fetchall()
+    if not rows:
+        return []
+
+    id_to_key: dict[int, str] = {}
+    confirms: dict[str, int] = defaultdict(int)
+    flips: dict[str, int] = defaultdict(int)
+    events: dict[str, list[int]] = defaultdict(list)
+
+    for row in rows:
+        payload = json.loads(row["payload"])
+        event_id = int(row["id"])
+        if row["event_type"] == "belief_created":
+            key = payload["claim_key"]
+            id_to_key[int(payload["belief_id"])] = key
+            events[key].append(event_id)
+        elif row["event_type"] == "belief_superseded":
+            key = payload["claim_key"]
+            id_to_key[int(payload["new_belief_id"])] = key
+            flips[key] += 1
+            events[key].append(event_id)
+        else:  # belief_confirmed carries belief_id only; map it to its claim_key
+            key = id_to_key.get(int(payload["belief_id"]))
+            if key is None:
+                continue
+            confirms[key] += 1
+            events[key].append(event_id)
+
+    # Flip-rate per belief that has enough lifecycle to judge (premise of meaning).
+    rates: dict[str, float] = {}
+    for key in set(confirms) | set(flips):
+        updates = confirms[key] + flips[key]
+        if updates < MIN_LIFECYCLE_UPDATES:
+            continue
+        rates[key] = flips[key] / updates
+
+    # A relative "volatile/stable" verdict needs a spread to judge against. With
+    # fewer than two qualifying beliefs or no spread, withhold (premise of meaning).
+    if len(rates) < 2:
+        return []
+    ordered = sorted(rates.values())
+    if ordered[-1] <= ordered[0]:
+        return []
+    median = _median(ordered)
+
+    candidates = []
+    for key in sorted(rates):
+        rate = rates[key]
+        updates = confirms[key] + flips[key]
+        classification = "volatile" if rate > median else "stable"
+        candidates.append(
+            {
+                "experience_key": f"belief_stability:{key}",
+                "experience_type": BELIEF_STABILITY_TYPE,
+                "subject_key": key,
+                "pattern": {
+                    "flip_rate": round(rate, 3),
+                    "confirmations": confirms[key],
+                    "supersessions": flips[key],
+                    "updates": updates,
+                    "classification": classification,
+                    "population_median": round(median, 3),
+                },
+                "supporting_events": events[key],
+                "derivation": BELIEF_STABILITY_DERIVATION,
+                "summary": (
+                    f"{key} is {classification} (flip-rate {rate:.2f} over "
+                    f"{updates} lifecycle updates; GENUS-median {median:.2f})"
+                ),
+                "proposable": False,
+            }
+        )
+    return candidates
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+# Cognition detector registry: each is a pure function conn -> candidates.
+DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates)

@@ -63,7 +63,16 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   does not resolve itself automatically.
 - `experience_recorded` is emitted by deterministic ledger aggregation. The
   first v0.9 detector records contrasted activity hours instead of raw sample
-  frequency.
+  frequency. Detectors are a registry of pure functions (`conn -> candidates`);
+  cognition grows by registering one, not by rewriting the scan.
+- `BeliefStability` is the first experience whose subject is GENUS's own cognition
+  rather than a sensor metric: per `claim_key` it measures `flip_rate =
+  supersessions / (confirmations + supersessions)` from the belief lifecycle and
+  classifies the belief stable/volatile relative to the core's own population of
+  flip-rates. It withholds until a belief has enough lifecycle history and the
+  population has spread (premise of meaning). It is recorded knowledge only and
+  raises no proposal. Determinism is preserved by freezing the measure in the
+  `experience_recorded` event; replay re-applies it and does not re-scan.
 - An experience may create an `ExperienceProposal`, but the proposal is still
   review work only and does not execute changes.
 - `state_changed` is emitted by deterministic aggregation over active beliefs.

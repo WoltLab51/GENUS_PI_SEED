@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.7.0"
-description = "GENUS PI SEED v1.7.0 - Phase 2: external material (weather), structure material, trend & correlation, self-calibration"
+version = "1.8.0"
+description = "GENUS PI SEED v1.8.0 - Phase 2: cognition registry + first self-reflection (belief stability), external material, self-calibration"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

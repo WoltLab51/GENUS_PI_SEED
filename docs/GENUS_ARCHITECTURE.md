@@ -204,6 +204,18 @@ never enters the ledger. The trend is self-calibrated to the core's own scatter
 like `disk.trend`. The market remains the deliberate *next* external sensor, under
 a hard no-auto-trade guardrail.
 
+v1.8 begins generalizing cognition (the "mind" beside the "eye"). Experience
+detection becomes a **registry** of pure detector functions, so the mind grows by
+registering a detector rather than by rewriting the scan — mirroring how
+`RULES`/`TREND_RULES`/`CORRELATION_RULES` make perception's growth structural. The
+first new detector, `BeliefStability`, is the first experience about GENUS's *own
+cognition*: it measures each belief's flip-rate from its lifecycle and judges it
+stable/volatile against the core's own population of flip-rates, withholding
+without enough history or spread. This is the embryo of anticipation: a learned
+expectation ("from situation x, expect y") that future evidence can falsify. v1.8
+records the learning only; raising an inquiry when a reliably-stable belief
+unexpectedly flips — closing the expect-then-be-surprised loop — is the next step.
+
 ## Document Family
 
 - `docs/README.md` defines the documentation shelves and authority levels.
