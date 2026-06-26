@@ -186,6 +186,27 @@ def observe_repo(
         conn.close()
 
 
+@main.command("observe-weather")
+@click.option("--temp-outside", "temp_outside", required=True, type=float)
+@click.option("--source", default="unknown", show_default=True)
+def observe_weather(temp_outside: float, source: str) -> None:
+    """Record an outside-temperature observation fetched by the membrane.
+
+    The membrane reaches the network and hands in only the number; the core never
+    fetches. The location stays in the membrane configuration — only the
+    temperature and its source provenance enter the ledger. A failed fetch records
+    nothing, so the belief simply ages: absence of a reading is not a reading.
+    """
+    conn = get_conn()
+    try:
+        reading = sensor.weather_reading(temp_outside, source)
+        result = reactors.observe_weather_reading(conn, reading)
+        _print_observation_result("WTR", reading, result)
+        _print_active_belief_summary(conn)
+    finally:
+        conn.close()
+
+
 @main.command("ask")
 @click.argument("question", nargs=-1, required=True)
 def ask_command(question: tuple[str, ...]) -> None:

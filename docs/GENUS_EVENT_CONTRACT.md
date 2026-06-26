@@ -92,6 +92,15 @@ External ledger anchors are JSON artifacts, not events. They never appear in
   until there is enough history. The `observation_created` payload carries
   `measured_on` provenance. A missing measurement records nothing (the belief
   ages); only a real run reports the quiet/light state. Absence is not quiet.
+- `weather.temp_outside` is the first **external** material: the outside
+  temperature fetched by the membrane from a public, no-auth source. HTTP lives
+  only in the membrane — `genus/` never reaches the network. It reuses
+  `observation_created` + `evidence_recorded` (no new types) and drives the trend
+  belief `weather.trend` (`rising`/`stable`/`falling`), self-calibrated to the
+  core's own scatter like `disk.trend`. The `observation_created` payload carries
+  the `provider` (source) but **never the location** — latitude/longitude stay in
+  the membrane configuration and never enter the ledger. A failed fetch records
+  nothing (the belief ages); absence is not a reading.
 - Governance checks write all `constraint_checked` events, then all
   `policy_evaluated` events, then exactly one `governance_decision` event.
 - `constraint_checked` and `policy_evaluated` are audit-only. Replay projects

@@ -43,14 +43,14 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (Phase 2, v1.x — Release 1.6.0)
+## Wo wir stehen (Phase 2, v1.x — Release 1.7.0)
 
 **Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
 External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance ·
-Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material (repo.commits_per_day, repo.lines_changed_per_day) · Disk-Trend (disk.trend) · Korrelation (system.thermal, self-kalibriert) · Self-Kalibrierung (repo.churn-Schwelle + disk.trend-ε aus eigener Verteilung)
+Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material (repo.commits_per_day, repo.lines_changed_per_day) · Disk-Trend (disk.trend) · Korrelation (system.thermal, self-kalibriert) · Self-Kalibrierung (repo.churn-Schwelle + disk.trend-ε aus eigener Verteilung) · Externes Material (weather.temp_outside → weather.trend, erster Internet-Sensor über die Membran)
 **Gelb:** automatisierte externe Ablage und Signaturen fehlen
 **Rot:** alles Übrige der Karte
 

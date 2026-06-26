@@ -10,10 +10,28 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] observe-all" in script
     assert "[TICK] state-refresh" in script
     assert "[TICK] clock-check" in script
+    assert "[TICK] weather" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] status-publish" in script
     assert r"date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ" in script
+
+
+def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():
+    script = (ROOT / "deploy" / "observe_weather.sh").read_text(encoding="utf-8")
+
+    # HTTP lives at the edge; only the number is fed to the core.
+    assert "observe-weather" in script
+    assert "--temp-outside" in script
+    assert "--source" in script
+    assert "open-meteo" in script
+    assert "temperature_2m" in script
+    # location is configured here and never handed to the core
+    assert "GENUS_WEATHER_LAT" in script
+    assert "GENUS_WEATHER_LON" in script
+    # a failed fetch records nothing — absence is not a reading
+    assert "no observation recorded" in script
+    assert 'if [ -z "$temp" ]' in script
 
 
 def test_clock_check_probes_ntp_and_records_operation_event():

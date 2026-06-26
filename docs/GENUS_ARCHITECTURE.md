@@ -193,6 +193,17 @@ self-calibrated: `repo.churn`, `disk.trend`, and `system.thermal` judge against
 the core's own lived distribution at read time and withhold until they have
 enough history — no imposed magnitudes.
 
+v1.7 adds the first **external** material: `weather.temp_outside` ->
+`weather.trend` (rising/stable/falling), fetched by the membrane from a public,
+no-auth source. It is a deliberate early crossing of the "local first" boundary
+(one local form, rarity, is still open): an idle Pi yields too little varying
+material, while outside temperature flows richly and independently of the human
+and is the missing variable behind the `system.thermal` "hot but idle" reading.
+HTTP stays in the membrane; the core never reaches the network and the location
+never enters the ledger. The trend is self-calibrated to the core's own scatter
+like `disk.trend`. The market remains the deliberate *next* external sensor, under
+a hard no-auto-trade guardrail.
+
 ## Document Family
 
 - `docs/README.md` defines the documentation shelves and authority levels.

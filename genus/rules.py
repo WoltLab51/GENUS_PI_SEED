@@ -43,6 +43,8 @@ TREND_WINDOW = 24
 TREND_RISING = "rising"
 TREND_STABLE = "stable"
 TREND_FALLING = "falling"
+WEATHER_TEMP_METRIC_KEY = "weather.temp_outside"
+WEATHER_TREND_DERIVATION = "rule:weather_trend_v1"
 THERMAL_CORRELATION_DERIVATION = "rule:thermal_correlation_v1"
 # Form, not magnitude: "high = top quartile of this core's own readings", judged
 # only after a week of own history. What counts as hot/busy is never preset.
@@ -121,6 +123,14 @@ TREND_RULES = {
         "derivation": DISK_TREND_DERIVATION,
         "window": TREND_WINDOW,
     },
+    # First external material: outside temperature, fetched by the membrane.
+    # Self-calibrated like disk.trend (epsilon = own scatter), so the daily swing
+    # is filtered and only a sustained multi-day warming/cooling reads as a trend.
+    WEATHER_TEMP_METRIC_KEY: {
+        "claim_key": "weather.trend",
+        "derivation": WEATHER_TREND_DERIVATION,
+        "window": TREND_WINDOW,
+    },
 }
 
 # Cross-metric: temperature read against CPU. "anomalous" = temperature high
@@ -174,7 +184,12 @@ def apply_temperature_threshold(conn) -> list[str]:
 
 
 def apply_threshold(conn, metric_key: str) -> list[str]:
-    rule = RULES[metric_key]
+    rule = RULES.get(metric_key)
+    if rule is None:
+        # Not every metric carries a threshold/binary rule. Some feed only a
+        # trend or correlation (weather.temp_outside is the first such metric);
+        # those passes handle them. Nothing to judge here.
+        return []
     if rule.get("type") == "binary":
         return apply_binary_rule(conn, metric_key, rule)
 

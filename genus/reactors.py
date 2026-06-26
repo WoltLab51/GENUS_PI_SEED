@@ -33,6 +33,10 @@ def observe_repo_lines_reading(conn, reading: dict) -> dict:
     return observe_system_reading(conn, reading, rules.REPO_LINES_METRIC_KEY)
 
 
+def observe_weather_reading(conn, reading: dict) -> dict:
+    return observe_system_reading(conn, reading, rules.WEATHER_TEMP_METRIC_KEY)
+
+
 def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:
     try:
         payload = dict(reading)

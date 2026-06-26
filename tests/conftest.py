@@ -4,7 +4,14 @@ import pytest
 
 from genus import reactors
 from genus.db import init_schema
-from genus.sensor import mock_activity, mock_cpu, mock_disk, mock_memory, mock_temperature
+from genus.sensor import (
+    mock_activity,
+    mock_cpu,
+    mock_disk,
+    mock_memory,
+    mock_temperature,
+    mock_weather,
+)
 
 
 @pytest.fixture
@@ -59,4 +66,10 @@ def observe_activity_value(conn, value: float) -> list[str]:
 def observe_temperature_value(conn, value: float) -> list[str]:
     reading = mock_temperature(value)
     result = reactors.observe_temperature_reading(conn, reading)
+    return [event["event_type"] for event in result["events"]]
+
+
+def observe_weather_value(conn, value: float) -> list[str]:
+    reading = mock_weather(value)
+    result = reactors.observe_weather_reading(conn, reading)
     return [event["event_type"] for event in result["events"]]

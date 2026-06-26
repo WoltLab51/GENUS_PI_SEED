@@ -112,6 +112,23 @@ def _structural_reading(
     }
 
 
+def weather_reading(temp_outside: float, source: str = "unknown") -> dict:
+    """Shape an outside-temperature reading fetched by the membrane.
+
+    The core never reaches the network: the membrane fetches the current outside
+    temperature from a public, no-auth source and hands in only the number. The
+    location stays in the membrane's configuration and never enters the ledger;
+    only the temperature and its ``source`` provenance travel.
+    """
+    return {
+        "source": "weather.api",
+        "raw_value": float(temp_outside),
+        "unit": "celsius",
+        "interval": 0.0,
+        "provider": source or "unknown",
+    }
+
+
 def mock_cpu(value: float) -> dict:
     return {
         "source": "mock",
@@ -157,4 +174,14 @@ def mock_temperature(value: float) -> dict:
         "raw_value": value,
         "unit": "celsius",
         "interval": 0.0,
+    }
+
+
+def mock_weather(value: float) -> dict:
+    return {
+        "source": "mock",
+        "raw_value": float(value),
+        "unit": "celsius",
+        "interval": 0.0,
+        "provider": "mock",
     }

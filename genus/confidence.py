@@ -18,6 +18,9 @@ HALFLIFE_SECONDS_BY_CLAIM_KEY = {
     "repo.churn": 86400.0,
     # Disk fill is inert; its trend changes over hours/days, not minutes.
     "disk.trend": 86400.0,
+    # Outside temperature trends over hours/days too, like disk.trend (a seed
+    # value pending the parked flip-rate self-calibration).
+    "weather.trend": 86400.0,
 }
 FALLBACK_HALFLIFE_SECONDS = 1800.0
 

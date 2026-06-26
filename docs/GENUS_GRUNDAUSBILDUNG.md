@@ -98,6 +98,22 @@ nur **Zähler & Rhythmen**, nie Inhalte (keine Commit-Texte, Diffs, Dateinamen).
 Erkenntnisform: Rhythmus — also bereits abgedeckt; der Wert liegt im neuen
 Subjekt, nicht in einer neuen Form.
 
+### Wetter — *erstes externes Material* (die „erst lokal"-Grenze bewusst überschritten)
+`weather.temp_outside → weather.trend` (rising/stable/falling,
+`rule:weather_trend_v1`, **self-kalibriert** wie `disk.trend`: die eigene Streuung
+filtert die Tagesschwankung, nur ein anhaltendes Mehr-Tage-Erwärmen/Abkühlen
+zählt als Trend). **Der erste Sensor, der ins Internet greift** — über die Membran
+auf dem Pi (Open-Meteo, kein API-Key). HTTP lebt am Rand, `genus/` bleibt
+grep-leer. **Privacy-Grenze:** der Standort (Lat/Lon) steht nur in der
+Membran-Config, *nie* im Ledger; nur die Zahl + Quelle reisen.
+**Warum vorgezogen** — vor der noch offenen Form *Seltenheit* und vor *Markt*: das
+lokale Material eines idle Pi ist zu dünn, um die Mechanik zu fordern; Wetter
+fließt reich und dir-unabhängig, ist eine *eindeutige Zahl* (gut zum Üben), und es
+ist die **fehlende Variable** für `system.thermal` — „heiß bei idle CPU" ist an
+einem 34-°C-Tag das Wetter, kein Fehler. Ein bewusster Override der eigenen
+„erst lokal"-Reihenfolge, kein Reinrutschen. **Nächster Schritt:** die Korrelation
+Pi-Temp ↔ Außen-Temp, die genau diese Anomalie auflöst.
+
 ---
 
 ## Überblick
@@ -112,14 +128,17 @@ Subjekt, nicht in einer neuen Form.
 | Selbstbeobachtung (Ledger) | Selbstreflexion | ❌ **nicht gebaut** |
 | `system.network`, `system.clock` | Self-Operation (Schwellwert/binär) | ✅ gebaut (seit Urplan) |
 | `repo.activity`, `repo.churn` | Rhythmus/Intensität (deine Arbeit) | ✅ gebaut (neue Kategorie) |
+| `weather.trend` | Trend auf **externem** Material | ✅ gebaut (erster Internet-Sensor, Membran) |
 
 **Ehrliche Bilanz:** Geübt sind heute **Schwellwert**, **Rhythmus**, **Trend**
-(`disk.trend`) und **Korrelation** (`system.thermal`), auf mehreren Subjekten
-(Maschine, Betrieb, deine Arbeit). **Noch offen: nur Seltenheit** (diskrete
-Ereignisse). Der ursprüngliche Satz „decken jede deterministische Erkenntnisform
-ab" war Plan, nicht Stand — jetzt fehlt zum Abschluss nur noch *eine* Form.
-Alles offline, kein Byte aus dem Internet, und die neuen Schwellen sind
-self-kalibriert (eigene Perzentile, keine Vorgabe).
+(`disk.trend`, jetzt auch `weather.trend`) und **Korrelation** (`system.thermal`),
+auf mehreren Subjekten (Maschine, Betrieb, deine Arbeit, und neu: die Welt).
+**Noch offen: nur Seltenheit** (diskrete Ereignisse). Der ursprüngliche Satz
+„decken jede deterministische Erkenntnisform ab" war Plan, nicht Stand — jetzt
+fehlt zum Abschluss nur noch *eine* Form. Die Schwellen sind self-kalibriert
+(eigene Perzentile/Streuung, keine Vorgabe). **Nicht mehr alles offline:** mit
+`weather.trend` fließt erstmals ein Internet-Wert — aber nur über die Membran,
+nur eine Zahl, der Kern bleibt rein.
 
 ---
 
@@ -144,13 +163,18 @@ fragen — nicht alle auf einmal.
 
 ## Reihenfolge & Grenzen
 
-**Erst lokal komplett, dann nach außen.** Die Grundausbildung ist über die
-*Erkenntnisformen* definiert, nicht über eine feste Sensor-Zahl — und sie ist
-**noch nicht abgeschlossen**: nur noch Seltenheit fehlt (Trend ist seit
-`disk.trend` geübt, Korrelation seit `system.thermal`). Erst wenn
-alle deterministischen Erkenntnisformen geübt sind, kommt der erste externe
-Sensor — und der naheliegende ist nicht Wetter, sondern **Markt**, weil er direkt
-auf Antizipation und Trading zuläuft. Wir stehen also bewusst *vor* dieser Tür.
+**Erst lokal komplett, dann nach außen — bewusst übersteuert.** Die
+Grundausbildung ist über die *Erkenntnisformen* definiert, nicht über eine feste
+Sensor-Zahl. Lokal fehlt nur noch **Seltenheit** (Trend seit `disk.trend`,
+Korrelation seit `system.thermal`). Der Urplan sah den ersten externen Sensor
+*nach* dieser letzten Form vor — und als naheliegenden nicht Wetter, sondern
+**Markt** (er läuft direkt auf Antizipation/Trading zu). Wir sind die Tür
+trotzdem **bewusst früher** durchgegangen: mit **Wetter**, eine lokale Form noch
+offen. Grund: das Material eines idle Pi ist zu dünn, um die Mechanik weiter zu
+fordern, Wetter ist eine eindeutige Zahl (gut zum Üben) und die fehlende Variable
+für `system.thermal`. **Markt bleibt bewusst der *nächste* externe Schritt** —
+mit der harten Leitplanke: Beobachtung/Belief ja, **niemals Auto-Trade** auf
+Backtest-Konfidenz.
 
 **Externe Sensoren brechen die HTTP-Regel nicht — sie verlegen sie.** Wenn es
 soweit ist, gehört HTTP nicht in den Kern (`genus/`, bleibt für immer
@@ -163,7 +187,9 @@ nicht. Der denkende Kern bleibt offline und rein.
 - *Kamera / Wohnung* — fühlt sich nach Überwachung an, gestrichen. Falls
   visuelles Material später kommt, dann als Aufgabe (Schachbrett, Chart),
   nicht als Zuhause.
-- *Wetter, Markt* — extern (HTTP) bzw. Antizipation. Später, bewusst.
+- *Markt* — extern (HTTP) und Antizipation/Trading. Bewusst der nächste externe
+  Schritt, mit Anti-Auto-Trade-Leitplanke. (*Wetter* ist seit `weather.trend` das
+  erste externe Material — siehe oben.)
 - *Text, Sprache, Bild-Bedeutung* — brauchen ein Modell. Model Era.
 
 ---
