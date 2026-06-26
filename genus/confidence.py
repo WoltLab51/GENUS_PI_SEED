@@ -4,7 +4,9 @@ import math
 from datetime import datetime, timezone
 
 
-# TODO: aus Ledger-Daten kalibrieren, nicht final.
+# Seed half-lives, used only as a fallback. The live half-life is learned per
+# belief from its own flip history (projection.learned_halflife); these values
+# apply only until a belief has enough tenure to learn its own timescale.
 HALFLIFE_SECONDS_BY_CLAIM_KEY = {
     "system.activity": 1800.0,
     "system.network": 1800.0,

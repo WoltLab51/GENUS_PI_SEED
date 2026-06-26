@@ -47,6 +47,12 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 - `belief_projection` has no `confidence` column.
 - Confidence is calculated at read time from the `created_at` timestamps of
   supporting and contradicting evidence events. It has no replay side effect.
+- The confidence half-life is **learned per belief** from its own flip history:
+  `H = observation span / number of flips` (the mean time between belief changes),
+  via `projection.learned_halflife`. A belief that never flips earns a long
+  half-life; one that flips often gets a short one. The seed
+  `HALFLIFE_SECONDS_BY_CLAIM_KEY` table is only a fallback for beliefs without
+  enough tenure. This is read-time and replay-safe.
 - `belief_projection.supporting_events` and `contradicting_events` are bounded to
   a recent window. The full evidence history always remains in `event_log`; the
   projection keeps only the most recent ids. The bound is confidence-negligible

@@ -232,6 +232,15 @@ projection keeps only the most recent ids. Because confidence weights evidence b
 unchanged. Reducing the *write volume* of redundant confirmations (a confidence
 model change) is a separate, later step.
 
+v1.11 closes the last preset. The confidence half-life — previously a hardcoded
+table per claim_key — is now learned per belief from its own flip history:
+`H = observation span / number of flips`, the mean time between belief changes.
+A belief that never flips earns a long half-life (slow decay, high earned
+confidence); one that flips constantly gets a short one (stays skeptical). The
+seed table is only a fallback until a belief has enough tenure. This makes the
+self-reflection of v1.8 useful: the measured volatility now drives confidence,
+and every magnitude in the core is self-calibrated from lived data.
+
 ## Document Family
 
 - `docs/README.md` defines the documentation shelves and authority levels.

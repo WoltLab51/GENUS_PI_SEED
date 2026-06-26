@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Iterable
 
 from genus.confidence import calculate_confidence
@@ -8,6 +9,47 @@ from genus.confidence import calculate_confidence
 
 ACTIVE = "active"
 SUPERSEDED = "superseded"
+
+# Learned confidence half-life: instead of a preset per claim_key, derive each
+# belief's decay timescale from its own lived behaviour. H = observation span /
+# number of flips = the mean time between belief changes. A belief that never
+# flips earns a long half-life (slow decay, high earned confidence); one that
+# flips constantly gets a short one (stays skeptical). No epistemic constants --
+# span and flips are observed. The two floors below are structural, not epistemic.
+LEARN_MIN_SPAN_SECONDS = 3600.0     # need ~an hour of tenure to learn a timescale
+LEARN_MIN_HALFLIFE_SECONDS = 300.0  # never decay faster than the sensing cadence
+
+
+def _parse_ts(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def learned_halflife(conn, claim_key: str) -> float | None:
+    """Derive a belief's confidence half-life from its own flip history.
+
+    Returns ``None`` when there is too little tenure to learn a timescale, so the
+    caller falls back to the seed table. Read-time and replay-safe (confidence has
+    no replay effect).
+    """
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS instances, MIN(created_at) AS first_at,
+               MAX(last_updated_at) AS last_at
+        FROM belief_projection
+        WHERE claim_key = ?
+        """,
+        (claim_key,),
+    ).fetchone()
+    if not row or not row["instances"] or not row["first_at"] or not row["last_at"]:
+        return None
+    span = (_parse_ts(row["last_at"]) - _parse_ts(row["first_at"])).total_seconds()
+    if span < LEARN_MIN_SPAN_SECONDS:
+        return None
+    flips = int(row["instances"]) - 1
+    return max(span / max(flips, 1), LEARN_MIN_HALFLIFE_SECONDS)
 
 # Structural bound on the projection's evidence lists. The full history always
 # stays in event_log; the projection keeps only the most recent ids. This keeps
@@ -202,6 +244,8 @@ def belief_with_confidence(conn, row) -> dict:
             supporting_times,
             contradicting_times,
             claim_key=row["claim_key"],
+            # learned per-belief half-life; None falls back to the seed table
+            halflife_seconds=learned_halflife(conn, row["claim_key"]),
         ),
     }
 
