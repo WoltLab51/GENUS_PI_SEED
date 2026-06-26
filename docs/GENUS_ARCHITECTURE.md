@@ -110,7 +110,10 @@ own events and projections are written.
   hand-writing a pass. This mirrors the cognition `DETECTORS` registry — the eye
   and the mind share one uniform module pattern. Magnitude thresholds for
   churn/trend/thermal are self-calibrated from the core's own evidence
-  distribution at read time, not preset.
+  distribution at read time, not preset. The few values still imposed (the fixed
+  cpu/mem/disk/temp high/normal thresholds and the seed half-lives) are collected
+  in `genus/constants.py` — the visible "preset budget" that should shrink toward
+  empty as each is self-calibrated.
 - `reactors.py` runs synchronous observation-to-evidence-to-rules cycles.
 - `proposals.py` coordinates `proposal_created` and `proposal_reviewed` events
   with `proposal_log` rows.

@@ -3,28 +3,9 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 
-
-# Seed half-lives, used only as a fallback. The live half-life is learned per
-# belief from its own flip history (projection.learned_halflife); these values
-# apply only until a belief has enough tenure to learn its own timescale.
-HALFLIFE_SECONDS_BY_CLAIM_KEY = {
-    "system.activity": 1800.0,
-    "system.network": 1800.0,
-    "system.disk": 86400.0,
-    # Clock sync is an inert property: it flips rarely and then for a while, so
-    # it belongs in the slow (disk) class, not the 30-minute network class.
-    "system.clock": 86400.0,
-    # Commit rhythm is a daily/weekly pattern, also inert: one observation a day
-    # should keep its weight until the next one, not decay within the hour.
-    "repo.activity": 86400.0,
-    "repo.churn": 86400.0,
-    # Disk fill is inert; its trend changes over hours/days, not minutes.
-    "disk.trend": 86400.0,
-    # Outside temperature trends over hours/days too, like disk.trend (a seed
-    # value pending the parked flip-rate self-calibration).
-    "weather.trend": 86400.0,
-}
-FALLBACK_HALFLIFE_SECONDS = 1800.0
+# Seed half-lives live in the preset budget; the live half-life is learned per
+# belief from its own flip history (projection.learned_halflife).
+from genus.constants import FALLBACK_HALFLIFE_SECONDS, HALFLIFE_SECONDS_BY_CLAIM_KEY
 
 
 def calculate_confidence(

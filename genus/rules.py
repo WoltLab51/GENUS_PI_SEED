@@ -3,16 +3,19 @@ from __future__ import annotations
 import math
 
 from genus import inquiries, ledger, projection, proposals
+# The fixed thresholds are the preset budget — collected in one visible place.
+from genus.constants import (
+    CPU_HIGH_THRESHOLD,
+    CPU_LOW_THRESHOLD,
+    MEMORY_HIGH_THRESHOLD,
+    MEMORY_LOW_THRESHOLD,
+    DISK_HIGH_THRESHOLD,
+    DISK_LOW_THRESHOLD,
+    TEMP_HIGH_THRESHOLD,
+    TEMP_LOW_THRESHOLD,
+)
 
 
-CPU_HIGH_THRESHOLD = 80.0
-CPU_LOW_THRESHOLD = 60.0
-MEMORY_HIGH_THRESHOLD = 85.0
-MEMORY_LOW_THRESHOLD = 70.0
-DISK_HIGH_THRESHOLD = 85.0
-DISK_LOW_THRESHOLD = 60.0
-TEMP_HIGH_THRESHOLD = 75.0
-TEMP_LOW_THRESHOLD = 55.0
 WINDOW_SIZE = 3
 CPU_METRIC_KEY = "system.cpu_percent"
 MEMORY_METRIC_KEY = "system.memory_percent"
