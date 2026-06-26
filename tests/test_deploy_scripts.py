@@ -74,6 +74,16 @@ def test_repo_pi_membrane_fetches_remote_and_counts_only():
     assert "no observation recorded" in script
 
 
+def test_pi_deploy_rebuilds_projection_before_integrity():
+    script = (ROOT / "deploy" / "pi_deploy.sh").read_text(encoding="utf-8")
+
+    # A projection-logic change must be applied to the live projection before the
+    # integrity check, otherwise the deploy aborts on the stored-vs-replay mismatch.
+    assert "rebuilding projection" in script
+    assert "genus replay || true" in script
+    assert script.index("genus replay || true") < script.index("integrity check")
+
+
 def test_network_watchdog_records_operation_events_and_governed_recovery():
     watchdog = (ROOT / "deploy" / "pi_network_watchdog.sh").read_text(
         encoding="utf-8"

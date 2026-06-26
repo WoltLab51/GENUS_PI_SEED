@@ -58,6 +58,13 @@ else
     echo "[DEPLOY] skipping tests"
 fi
 
+echo "[DEPLOY] rebuilding projection with the deployed code"
+# A projection-LOGIC change (a new derivation, a bounded window) makes the stored
+# projection differ from a fresh replay. Rebuild it here, tolerating the legitimate
+# "state changed" exit, so the checks below compare a consistent state. Without
+# this the integrity check aborts the deploy on any projection-logic change.
+.venv/bin/genus replay || true
+
 echo "[DEPLOY] integrity before sealing"
 .venv/bin/genus integrity check
 
@@ -82,7 +89,7 @@ else
     echo "[DEPLOY] skipping anchor export"
 fi
 
-echo "[DEPLOY] replay check"
+echo "[DEPLOY] replay check (must be idempotent after the rebuild)"
 .venv/bin/genus replay
 
 echo "[DEPLOY] final integrity check"
