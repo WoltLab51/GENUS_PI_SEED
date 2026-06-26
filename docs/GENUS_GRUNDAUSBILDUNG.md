@@ -92,9 +92,12 @@ Betrieb).
 `repo.commits_per_day → repo.activity` (binär, Rhythmus) und
 `repo.lines_changed_per_day → repo.churn` (binär, Intensität — **self-kalibriert**:
 „heavy" relativ zur *eigenen* Churn-Verteilung des Pi, keine Vorgabe-Zahl).
-**Neue Kategorie:** erstmals beobachtet GENUS *dich*, nicht die Maschine —
-gemessen von der Membran auf dem X1, in den Pi-Kern gespeist. **Privacy-Grenze:**
-nur **Zähler & Rhythmen**, nie Inhalte (keine Commit-Texte, Diffs, Dateinamen).
+**Neue Kategorie:** erstmals beobachtet GENUS *dich*, nicht die Maschine.
+Gemessen wird jetzt von der **immer-an Membran auf dem Pi**, die den
+veröffentlichten Remote (`origin/main`) zählt — robust und X1-unabhängig (die
+frühere X1-Membran verhungerte, sobald die Workstation aus war). Damit beobachtet
+GENUS faktisch seine *eigene publizierte Entwicklung*. **Privacy-Grenze:** nur
+**Zähler & Rhythmen**, nie Inhalte (keine Commit-Texte, Diffs, Dateinamen).
 Erkenntnisform: Rhythmus — also bereits abgedeckt; der Wert liegt im neuen
 Subjekt, nicht in einer neuen Form.
 
