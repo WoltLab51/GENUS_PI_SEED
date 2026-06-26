@@ -81,7 +81,8 @@ def test_pi_deploy_rebuilds_projection_before_integrity():
     # integrity check, otherwise the deploy aborts on the stored-vs-replay mismatch.
     assert "rebuilding projection" in script
     assert "genus replay || true" in script
-    assert script.index("genus replay || true") < script.index("integrity check")
+    # the tolerant rebuild command must precede the integrity-check command
+    assert script.index("genus replay || true") < script.index("genus integrity check")
 
 
 def test_network_watchdog_records_operation_events_and_governed_recovery():
