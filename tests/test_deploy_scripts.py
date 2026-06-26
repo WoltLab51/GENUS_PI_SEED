@@ -13,6 +13,7 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] weather" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
+    assert "[TICK] repo-observe" in script
     assert "[TICK] status-publish" in script
     assert r"date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ" in script
 
@@ -54,6 +55,23 @@ def test_repo_membrane_counts_only_and_feeds_observe_repo():
     assert "wc -l" in script
     assert "--numstat" in script
     assert "git -C" in script
+
+
+def test_repo_pi_membrane_fetches_remote_and_counts_only():
+    script = (ROOT / "deploy" / "observe_repo_on_pi.sh").read_text(encoding="utf-8")
+
+    # Robust Pi-side variant: fetch the published history and count over the
+    # remote-tracking branch, independent of the workstation.
+    assert "git -C" in script
+    assert "fetch" in script
+    assert "origin/" in script
+    assert "observe-repo" in script
+    assert "--measured-on pi" in script
+    # counts only, same as the X1 membrane
+    assert "wc -l" in script
+    assert "--numstat" in script
+    # a failed fetch records nothing — absence is not quiet
+    assert "no observation recorded" in script
 
 
 def test_network_watchdog_records_operation_events_and_governed_recovery():

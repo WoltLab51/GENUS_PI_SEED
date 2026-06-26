@@ -48,6 +48,7 @@ fi
     echo '7 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] weather $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_weather.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '27 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] doctor $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/doctor.log" 2>&1 && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
+    echo '47 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] repo-observe $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_repo_on_pi.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     if [ "${GENUS_ENABLE_STATUS_PUBLISH:-0}" = "1" ]; then
         echo '37 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] status-publish $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/status.log" 2>&1 && ./deploy/pi_publish_status.sh >> "$GENUS_LOG_DIR/status.log" 2>&1'
     fi
