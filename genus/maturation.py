@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 
 from genus import experience, ledger, proposals
+from genus.proposal_types import RULE_PROPOSAL
 
 
 RULE_TYPE = "activity_expectation_v1"
 DERIVATION = "maturation:activity_expectation_v1"
-PROPOSAL_TYPE = "RuleProposal"
+PROPOSAL_TYPE = RULE_PROPOSAL
 ACTIVE = "active"
 
 

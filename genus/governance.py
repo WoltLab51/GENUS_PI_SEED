@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 
 from genus import ledger, state
+from genus.proposal_types import RULE_PROPOSAL
 
 
 ACTION_PROPOSAL_REVIEW = "proposal.review"
@@ -397,8 +398,6 @@ def _evaluate_kernel_constraints(conn, proposal_id: int, decision: str) -> list[
 
 
 def _evaluate_rule_activation_constraints(conn, proposal_id: int) -> list[dict]:
-    from genus import maturation
-
     proposal = conn.execute(
         "SELECT proposal_type, state, payload FROM proposal_log WHERE id = ?",
         (proposal_id,),
@@ -407,7 +406,7 @@ def _evaluate_rule_activation_constraints(conn, proposal_id: int) -> list[dict]:
     if proposal is None:
         source_result = VIOLATION
         source_reason = "proposal not found"
-    elif proposal["proposal_type"] != maturation.PROPOSAL_TYPE:
+    elif proposal["proposal_type"] != RULE_PROPOSAL:
         source_result = VIOLATION
         source_reason = "proposal is not a RuleProposal"
     elif proposal["state"] != ACCEPTED:
