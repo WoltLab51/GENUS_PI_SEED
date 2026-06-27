@@ -34,6 +34,26 @@ def _print_calibration(report: dict) -> None:
         click.echo(f"[CAL] betrayed: {', '.join(report['betrayed'])}")
 
 
+def _print_learning(report: dict) -> None:
+    n = report["scored"]
+    if n == 0:
+        click.echo("[LRN] no scored forecasts yet — the learner is warming up")
+        return
+    click.echo(f"[LRN] scored forecasts: {n}")
+    click.echo(
+        f"[LRN] mean error: {report['mean_error']:.3f}  ·  "
+        f"early (first {min(n, 20)}): {report['early_mean_error']:.3f}  ·  "
+        f"recent (last {min(n, 20)}): {report['recent_mean_error']:.3f}"
+    )
+    if report["improving"] is not None:
+        verdict = (
+            "improving — forecast error is shrinking"
+            if report["improving"]
+            else "flat — no improvement yet (or already at the noise floor)"
+        )
+        click.echo(f"[LRN] {verdict}")
+
+
 def _print_surprisal(rows: list[dict]) -> None:
     if not rows:
         click.echo("[SRP] no characterized beliefs yet")

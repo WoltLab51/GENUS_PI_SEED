@@ -150,6 +150,14 @@ REQUIRED_EVENT_KEYS = {
         "state",
     },
     "inquiry_resolved": {"inquiry_id", "answer"},
+    "forecast_made": {"metric_key", "predicted_value", "method", "support"},
+    "forecast_scored": {
+        "forecast_event",
+        "metric_key",
+        "predicted_value",
+        "actual_value",
+        "error",
+    },
     "ledger_epoch_opened": {
         "algo",
         "genesis_digest",

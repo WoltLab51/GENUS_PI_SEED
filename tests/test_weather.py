@@ -115,7 +115,7 @@ def test_weather_trend_is_replay_stable_and_integrity_passes(conn):
     assert integrity.check(conn)["ok"] is True
 
 
-def test_observe_weather_cli_writes_two_base_events(monkeypatch, cli_conn, conn):
+def test_observe_weather_cli_writes_base_events_and_forecasts(monkeypatch, cli_conn, conn):
     monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
 
     result = CliRunner().invoke(
@@ -125,9 +125,12 @@ def test_observe_weather_cli_writes_two_base_events(monkeypatch, cli_conn, conn)
 
     assert result.exit_code == 0
     rows = conn.execute("SELECT event_type FROM event_log ORDER BY id").fetchall()
+    # the two base events, plus the 24/7 learning loop forecasting the next reading
+    # (no prior forecast to score on the first observation)
     assert [row["event_type"] for row in rows] == [
         "observation_created",
         "evidence_recorded",
+        "forecast_made",
     ]
     observation = json.loads(
         conn.execute(

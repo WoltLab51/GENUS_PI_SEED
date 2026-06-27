@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import ledger, rules
+from genus import learning, ledger, rules
 
 
 def observe_cpu_reading(conn, reading: dict) -> dict:
@@ -34,7 +34,13 @@ def observe_repo_lines_reading(conn, reading: dict) -> dict:
 
 
 def observe_weather_reading(conn, reading: dict) -> dict:
-    return observe_system_reading(conn, reading, rules.WEATHER_TEMP_METRIC_KEY)
+    result = observe_system_reading(conn, reading, rules.WEATHER_TEMP_METRIC_KEY)
+    # The 24/7 learning loop: score the last forecast against the value that just
+    # arrived, then forecast the next. Runs on the hourly weather cron.
+    result["events"].extend(
+        learning.run_forecast_cycle(conn, rules.WEATHER_TEMP_METRIC_KEY)
+    )
+    return result
 
 
 def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:

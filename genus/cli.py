@@ -15,6 +15,7 @@ from genus import (
     governance,
     inquiries,
     integrity,
+    learning,
     ledger,
     maturation,
     operation,
@@ -33,6 +34,7 @@ from genus.cli_format import (
     _print_calibration,
     _print_decision_explanation,
     _print_experience_explanation,
+    _print_learning,
     _print_observation_result,
     _print_proposal_explanation,
     _print_rule_explanation,
@@ -286,6 +288,16 @@ def surprisal_command() -> None:
     conn = get_conn()
     try:
         _print_surprisal(query.surprisal(conn))
+    finally:
+        conn.close()
+
+
+@main.command("learning")
+def learning_command() -> None:
+    """Show GENUS's forecast learning curve — is its prediction error shrinking?"""
+    conn = get_conn()
+    try:
+        _print_learning(learning.curve(conn))
     finally:
         conn.close()
 
