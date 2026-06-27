@@ -27,7 +27,7 @@
 <body>
 <header>
   <h1>GENUS — Visueller Atlas</h1>
-  <p class="lede">Neunzehn fokussierte Bilder — jedes beantwortet eine Frage. Vom einzelnen Belief
+  <p class="lede">Zweiundzwanzig fokussierte Bilder — jedes beantwortet eine Frage. Vom einzelnen Belief
   bis zur Föderation, von der Taktung bis zur Selbst-Kalibrierung. Kein Bild packt alles ein;
   zusammen ergeben sie das Gesamtbild.</p>
   <p class="meta">Stand: GENUS PI SEED v1.12.0 · erstellt 2026-06-26 · Glass-Box-Dokumentation</p>
@@ -550,6 +550,102 @@
 <circle cx="130" cy="292" r="6" fill="#1D9E75"/><text x="118" y="289" font-size="12" font-weight="700" text-anchor="end" fill="#0F6E56">1.12</text><text x="118" y="303" font-size="8.5" text-anchor="end" fill="#888780">lebendig &amp; robust</text>
 <text x="150" y="290" font-size="11" font-weight="600" fill="#2C2C2A">Re-Charakterisierung + DB-Härtung</text><text x="150" y="303" font-size="9" fill="#5F5E5A">Selbst-Wissen aktuell · WAL · Index</text>
 <text x="150" y="335" font-size="11" font-style="italic" fill="#444441">Sieben Releases an einem Tag — Material, ein erwachter Geist, ein self-kalibrierter Kern.</text>
+</svg></div>
+
+<h2 class="sec">Architektur — Daten, Trust, Ausfall</h2>
+
+<div class="card"><h3>⑳ Daten — aufgezeichnet vs. abgeleitet</h3>
+<p>Das Event-Sourcing-Herz: Events werden append-only in den <code>event_log</code> geschrieben; Projektionen sind wegwerfbare Read-Models, per Replay daraus gefaltet. Konfidenz: read-time, nie gespeichert.</p>
+<svg viewBox="0 0 680 348" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+<title>Daten-Architektur — Events und Projektionen</title>
+<desc>Events werden append-only in den event_log geschrieben; per Replay werden daraus die Projektionen gefaltet. Konfidenz wird read-time berechnet, nie gespeichert.</desc>
+<defs><marker id="ada" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5F5E5A"/></marker></defs>
+<text x="20" y="26" font-size="16" font-weight="700" fill="#2C2C2A">Daten-Architektur</text>
+<text x="20" y="44" font-size="11" fill="#5F5E5A">aufgezeichnet (Events) → abgeleitet (Projektionen)</text>
+<text x="20" y="66" font-size="10" font-weight="700" fill="#993C1D">EVENTS — aufgezeichnet</text>
+<g font-size="9" text-anchor="middle" fill="#4A1B0C">
+<rect x="20" y="72" width="204" height="26" rx="4" fill="#F5C4B3" stroke="#993C1D"/><text x="122" y="89">observation · evidence</text>
+<rect x="234" y="72" width="204" height="26" rx="4" fill="#F5C4B3" stroke="#993C1D"/><text x="336" y="89">belief_created/confirmed/superseded</text>
+<rect x="448" y="72" width="204" height="26" rx="4" fill="#F5C4B3" stroke="#993C1D"/><text x="550" y="89">experience_recorded/recharacterized</text>
+<rect x="20" y="104" width="204" height="26" rx="4" fill="#F5C4B3" stroke="#993C1D"/><text x="122" y="121">state_changed</text>
+<rect x="234" y="104" width="204" height="26" rx="4" fill="#F5C4B3" stroke="#993C1D"/><text x="336" y="121">proposal · inquiry</text>
+<rect x="448" y="104" width="204" height="26" rx="4" fill="#F5C4B3" stroke="#993C1D"/><text x="550" y="121">governance · operation · rule</text>
+</g>
+<line x1="336" y1="130" x2="336" y2="150" stroke="#5F5E5A" stroke-width="1.6" marker-end="url(#ada)"/>
+<text x="346" y="145" font-size="8.5" fill="#5F5E5A">append</text>
+<rect x="20" y="152" width="632" height="34" rx="6" fill="#9FE1CB" stroke="#0F6E56" stroke-width="1.6"/>
+<text x="336" y="173" font-size="12" font-weight="700" text-anchor="middle" fill="#04342C">event_log — die einzige Wahrheit · append-only · versiegelt</text>
+<line x1="336" y1="186" x2="336" y2="214" stroke="#5F5E5A" stroke-width="1.6" marker-end="url(#ada)"/>
+<text x="346" y="204" font-size="8.5" fill="#5F5E5A">Replay (Faltung)</text>
+<text x="20" y="232" font-size="10" font-weight="700" fill="#3C3489">PROJEKTIONEN — abgeleitet, wegwerfbar</text>
+<g font-size="9" text-anchor="middle" fill="#26215C">
+<rect x="20" y="238" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="96" y="255">belief_projection</text>
+<rect x="180" y="238" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="256" y="255">experience_log</text>
+<rect x="340" y="238" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="416" y="255">state_projection</text>
+<rect x="500" y="238" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="576" y="255">rule_projection</text>
+<rect x="20" y="270" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="96" y="287">proposal_log</text>
+<rect x="180" y="270" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="256" y="287">inquiry_log</text>
+<rect x="340" y="270" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="416" y="287">governance_log</text>
+<rect x="500" y="270" width="152" height="26" rx="4" fill="#CECBF6" stroke="#3C3489"/><text x="576" y="287">operation_log</text>
+</g>
+<text x="20" y="320" font-size="11" font-style="italic" fill="#444441">Projektionen sind wegwerfbar — jederzeit aus dem Log neu baubar. Konfidenz: read-time, nie gespeichert.</text>
+</svg></div>
+
+<div class="card"><h3>㉑ Trust — Schicht &amp; Bedrohung</h3>
+<p>Sechs Schutz-Schichten von außen (Membran) nach innen (Replay-Probe), jede einzeln nachprüfbar. Vertrauen entsteht durch Nachprüfbarkeit, nicht durch Geheimnis.</p>
+<svg viewBox="0 0 680 360" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+<title>Trust- und Sicherheits-Architektur</title>
+<desc>Sechs Schutz-Schichten und wovor jede schützt: Membran, append-only, Siegel-Kette, externe Anchors, Governance-Tore und die Replay-Wahrheitsprobe.</desc>
+<text x="20" y="26" font-size="16" font-weight="700" fill="#2C2C2A">Trust-Architektur — Schicht &amp; Bedrohung</text>
+<text x="20" y="44" font-size="11" fill="#5F5E5A">Vertrauen durch Nachprüfbarkeit, nicht durch Geheimnis</text>
+<g>
+<rect x="20" y="60" width="244" height="30" rx="5" fill="#9FE1CB" stroke="#0F6E56"/><text x="142" y="79" font-size="10.5" font-weight="700" text-anchor="middle" fill="#04342C">Membran</text>
+<text x="276" y="79" font-size="10" fill="#444441">schützt vor: HTTP/LLM/Socket im denkenden Kern</text>
+<rect x="20" y="98" width="244" height="30" rx="5" fill="#9FE1CB" stroke="#0F6E56"/><text x="142" y="117" font-size="10.5" font-weight="700" text-anchor="middle" fill="#04342C">Append-only + Trigger</text>
+<text x="276" y="117" font-size="10" fill="#444441">schützt vor: Löschen/Ändern der Historie</text>
+<rect x="20" y="136" width="244" height="30" rx="5" fill="#9FE1CB" stroke="#0F6E56"/><text x="142" y="155" font-size="10.5" font-weight="700" text-anchor="middle" fill="#04342C">Siegel-Kette (Hash)</text>
+<text x="276" y="155" font-size="10" fill="#444441">schützt vor: stiller Manipulation alter Events</text>
+<rect x="20" y="174" width="244" height="30" rx="5" fill="#9FE1CB" stroke="#0F6E56"/><text x="142" y="193" font-size="10.5" font-weight="700" text-anchor="middle" fill="#04342C">Externer Anchor</text>
+<text x="276" y="193" font-size="10" fill="#444441">schützt vor: adaptivem lokalem Angreifer</text>
+<rect x="20" y="212" width="244" height="30" rx="5" fill="#9FE1CB" stroke="#0F6E56"/><text x="142" y="231" font-size="10.5" font-weight="700" text-anchor="middle" fill="#04342C">Governance-Tore</text>
+<text x="276" y="231" font-size="10" fill="#444441">schützt vor: ungeprüften Änderungen (Proposal ≠ Change)</text>
+<rect x="20" y="250" width="244" height="30" rx="5" fill="#9FE1CB" stroke="#0F6E56"/><text x="142" y="269" font-size="10.5" font-weight="700" text-anchor="middle" fill="#04342C">Replay-Wahrheitsprobe</text>
+<text x="276" y="269" font-size="10" fill="#444441">schützt vor: Projektions-Drift / Korruption</text>
+</g>
+<text x="20" y="312" font-size="11" font-style="italic" fill="#444441">Sechs Schichten — von außen (Membran) bis innen (Replay-Probe). Jede einzeln verifizierbar.</text>
+</svg></div>
+
+<div class="card"><h3>㉒ Ausfall — was geht schief?</h3>
+<p>Sieben Failure-Modes, jeder erkannt, gemildert oder graceful behandelt. Kein „single point of silent failure" — und sichtbar: die <em>absolute</em> disk-Schwelle warnt vor voller SD-Karte.</p>
+<svg viewBox="0 0 680 364" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+<title>Ausfall-Sicht — Failure Modes und was sie fängt</title>
+<desc>Sieben Ausfallmodi, je mit dem Mechanismus der sie fängt und dem Status.</desc>
+<text x="20" y="26" font-size="16" font-weight="700" fill="#2C2C2A">Ausfall-Sicht — was geht schief?</text>
+<text x="20" y="44" font-size="11" fill="#5F5E5A">jeder Ausfall: was ihn fängt · Radius</text>
+<g>
+<text x="24" y="72" font-size="10.5" font-weight="700" fill="#993C1D">Membran-Quelle weg (X1 aus · kein Netz · API down)</text>
+<text x="24" y="84" font-size="8.5" fill="#5F5E5A">„absence ≠ quiet" — Belief altert, kein falsches Signal</text>
+<rect x="548" y="60" width="112" height="22" rx="11" fill="#C0DD97" stroke="#3B6D11"/><text x="604" y="75" font-size="9" font-weight="700" text-anchor="middle" fill="#27500A">graceful</text>
+<text x="24" y="110" font-size="10.5" font-weight="700" fill="#993C1D">Pi-Reboot / RTC fehlt → Uhr stale</text>
+<text x="24" y="122" font-size="8.5" fill="#5F5E5A">clock-check → system.clock-Belief + Proposal</text>
+<rect x="548" y="98" width="112" height="22" rx="11" fill="#9FE1CB" stroke="#0F6E56"/><text x="604" y="113" font-size="9" font-weight="700" text-anchor="middle" fill="#04342C">erkannt</text>
+<text x="24" y="148" font-size="10.5" font-weight="700" fill="#993C1D">DB-Lock (überlappende Cron-Writer)</text>
+<text x="24" y="160" font-size="8.5" fill="#5F5E5A">WAL + busy_timeout — 0× in 11 Tagen beobachtet</text>
+<rect x="548" y="136" width="112" height="22" rx="11" fill="#FAC775" stroke="#854F0B"/><text x="604" y="151" font-size="9" font-weight="700" text-anchor="middle" fill="#412402">gemildert</text>
+<text x="24" y="186" font-size="10.5" font-weight="700" fill="#993C1D">Manipulation am Ledger</text>
+<text x="24" y="198" font-size="8.5" fill="#5F5E5A">Siegel-Kette bricht → integrity rot</text>
+<rect x="548" y="174" width="112" height="22" rx="11" fill="#9FE1CB" stroke="#0F6E56"/><text x="604" y="189" font-size="9" font-weight="700" text-anchor="middle" fill="#04342C">erkannt</text>
+<text x="24" y="224" font-size="10.5" font-weight="700" fill="#993C1D">Replay nicht-deterministisch</text>
+<text x="24" y="236" font-size="8.5" fill="#5F5E5A">integrity-Gate bricht den Deploy ab</text>
+<rect x="548" y="212" width="112" height="22" rx="11" fill="#C0DD97" stroke="#3B6D11"/><text x="604" y="227" font-size="9" font-weight="700" text-anchor="middle" fill="#27500A">gefangen</text>
+<text x="24" y="262" font-size="10.5" font-weight="700" fill="#993C1D">SD-Karte läuft voll</text>
+<text x="24" y="274" font-size="8.5" fill="#5F5E5A">disk-Schwelle (absolut) + disk.trend warnen früh</text>
+<rect x="548" y="250" width="112" height="22" rx="11" fill="#9FE1CB" stroke="#0F6E56"/><text x="604" y="265" font-size="9" font-weight="700" text-anchor="middle" fill="#04342C">früh gewarnt</text>
+<text x="24" y="300" font-size="10.5" font-weight="700" fill="#993C1D">Schlechter Deploy</text>
+<text x="24" y="312" font-size="8.5" fill="#5F5E5A">CI · 253 Tests · Replay-Gate — vor Produktion</text>
+<rect x="548" y="288" width="112" height="22" rx="11" fill="#C0DD97" stroke="#3B6D11"/><text x="604" y="303" font-size="9" font-weight="700" text-anchor="middle" fill="#27500A">gefangen</text>
+</g>
+<text x="20" y="344" font-size="11" font-style="italic" fill="#444441">Kein „single point of silent failure" — jeder Ausfall wird erkannt, gemildert oder graceful behandelt.</text>
 </svg></div>
 
 </section>
