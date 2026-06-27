@@ -408,10 +408,11 @@ def experience_scan() -> None:
         if not rows:
             click.echo("[EXP] no new experience")
             return
-        click.echo(f"[EXP] recorded {len(rows)} experience(s)")
+        click.echo(f"[EXP] recorded {len(rows)} experience update(s)")
         for row in rows:
+            tag = "re-characterized" if row.get("recharacterized") else "new"
             click.echo(
-                f"[EXP] #{row['experience_id']} {row['experience_type']} "
+                f"[EXP] #{row['experience_id']} {tag} {row['experience_type']} "
                 f"{row['experience_key']}"
             )
     finally:

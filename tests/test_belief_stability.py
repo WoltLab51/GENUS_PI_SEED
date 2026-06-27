@@ -1,7 +1,9 @@
 import json
 import sqlite3
 
-from genus import event_router, experience, integrity, ledger
+from click.testing import CliRunner
+
+from genus import cli, event_router, experience, integrity, ledger
 from genus.db import init_schema
 
 
@@ -258,6 +260,30 @@ def test_stability_recharacterizes_on_classification_change():
     assert rows == 1
     assert _rechar_count(conn) == 1  # event-backed
     conn.close()
+
+
+def test_experience_cli_scan_succeeds_on_recharacterization(monkeypatch):
+    # The scan command must exit 0 when it *re-characterizes*, not only when it
+    # records a new experience. The re-characterized result row carries different
+    # keys than a freshly-recorded one (no experience_id was set on it), which the
+    # command printed blindly -- crashing on the live Pi's first re-characterization
+    # while the work had already committed. Regression for KeyError 'experience_id'.
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "anchor.one", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "anchor.two", confirms=30, flips=0)
+    _emit_lifecycle(conn, ids, "subject", confirms=20, flips=0)  # starts stable
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    conn.commit()
+    for _ in range(25):  # subject begins flipping a lot -> next scan re-characterizes
+        _flip(conn, ids, "subject")
+
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["experience", "scan"])
+
+    assert result.exit_code == 0, result.output
+    assert "re-characterized" in result.output
 
 
 def test_no_recharacterization_when_classification_unchanged():

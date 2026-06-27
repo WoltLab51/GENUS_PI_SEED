@@ -43,7 +43,12 @@ def scan(conn) -> list[dict]:
                 event_id = _maybe_recharacterize(conn, existing, candidate)
                 if event_id is not None:
                     recorded.append(
-                        {"experience_event_id": event_id, "recharacterized": True, **candidate}
+                        {
+                            "experience_event_id": event_id,
+                            "experience_id": int(existing["id"]),
+                            "recharacterized": True,
+                            **candidate,
+                        }
                     )
                 continue
             experience_event_id = record_experience_event(conn, candidate)
