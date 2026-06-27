@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import math
 
 from genus import inquiries, ledger, projection, proposals
+from genus.proposal_types import ACTIVITY_EXPECTATION_RULE
 # The fixed thresholds are the preset budget — collected in one visible place.
 from genus.constants import (
     CPU_HIGH_THRESHOLD,
@@ -665,8 +667,6 @@ def _check_activity_expectations(
     evidence_id: int,
     observed_value: str,
 ) -> list[str]:
-    from genus import maturation
-
     hour_row = conn.execute(
         """
         SELECT CAST(strftime('%H', created_at) AS INTEGER) AS hour_utc
@@ -683,8 +683,21 @@ def _check_activity_expectations(
         return []
 
     written: list[str] = []
-    for rule in maturation.active_expectations_for_hour(conn, int(hour_row["hour_utc"])):
-        expected_value = rule["spec"]["expected_value"]
+    # Read the active expectation rules directly from the shared rule_projection
+    # read-model — no import of the maturation module that produced them.
+    rules_for_hour = conn.execute(
+        """
+        SELECT id, rule_key, subject_key, spec
+        FROM rule_projection
+        WHERE status = 'active' AND rule_type = ?
+          AND CAST(json_extract(spec, '$.hour_utc') AS INTEGER) = ?
+        ORDER BY id
+        """,
+        (ACTIVITY_EXPECTATION_RULE, int(hour_row["hour_utc"])),
+    ).fetchall()
+    for rule in rules_for_hour:
+        spec = json.loads(rule["spec"])
+        expected_value = spec["expected_value"]
         if expected_value == observed_value:
             continue
         if _expectation_inquiry_exists(conn, evidence_id, rule["rule_key"]):
@@ -700,7 +713,7 @@ def _check_activity_expectations(
             payload={
                 "rule_key": rule["rule_key"],
                 "rule_id": rule["id"],
-                "hour_utc": rule["spec"]["hour_utc"],
+                "hour_utc": spec["hour_utc"],
                 "expected": expected_value,
                 "observed": observed_value,
                 "evidence_id": evidence_id,

@@ -1,10 +1,11 @@
-"""Shared proposal-type identifiers.
+"""Shared type identifiers.
 
-A neutral leaf module (it imports nothing) so policy code can name a RuleProposal
-without importing the maturation module that produces it. This is what keeps the
-governance / maturation / proposals cluster acyclic: maturation still asks
-governance for a decision, but governance no longer reaches back into maturation
-just to know a type string.
+A neutral leaf module (it imports nothing) so policy and reactor code can name a
+proposal or rule type without importing the module that produces it. This keeps
+the governance / maturation / proposals / rules cluster acyclic: governance names
+a RuleProposal and the activity reactor reads active expectation rules, neither by
+importing maturation.
 """
 
 RULE_PROPOSAL = "RuleProposal"
+ACTIVITY_EXPECTATION_RULE = "activity_expectation_v1"

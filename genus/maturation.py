@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 
 from genus import experience, ledger, proposals
-from genus.proposal_types import RULE_PROPOSAL
+from genus.proposal_types import ACTIVITY_EXPECTATION_RULE, RULE_PROPOSAL
 
 
-RULE_TYPE = "activity_expectation_v1"
+RULE_TYPE = ACTIVITY_EXPECTATION_RULE
 DERIVATION = "maturation:activity_expectation_v1"
 PROPOSAL_TYPE = RULE_PROPOSAL
 ACTIVE = "active"
@@ -156,20 +156,6 @@ def get_rule(conn, rule_id: int):
     if row is None:
         raise ValueError(f"rule not found: {rule_id}")
     return row
-
-
-def active_expectations_for_hour(conn, hour: int) -> list[dict]:
-    rows = conn.execute(
-        """
-        SELECT * FROM rule_projection
-        WHERE status = ?
-          AND rule_type = ?
-          AND CAST(json_extract(spec, '$.hour_utc') AS INTEGER) = ?
-        ORDER BY id
-        """,
-        (ACTIVE, RULE_TYPE, hour),
-    ).fetchall()
-    return [rule_dict(row) for row in rows]
 
 
 def rule_exists(conn, rule_key: str) -> bool:
