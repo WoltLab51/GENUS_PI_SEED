@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.13.0"
-description = "GENUS PI SEED v1.13.0 - sharper self-characterization (volatility as an outlier vs the population's own spread, not a median split), experience re-characterization, learned half-life, self-reflection loop, DB hardening"
+version = "1.14.0"
+description = "GENUS PI SEED v1.14.0 - self-reflection (calibration: does it know that it knows; surprisal: bits a flip carries) and 24/7 learning programs (forecast -> self-test -> score, four paths), on a sharper self-characterization, learned half-life, and DB-hardened deterministic core"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
