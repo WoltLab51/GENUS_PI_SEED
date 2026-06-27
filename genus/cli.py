@@ -294,10 +294,10 @@ def surprisal_command() -> None:
 
 @main.command("learning")
 def learning_command() -> None:
-    """Show GENUS's forecast learning curve — is its prediction error shrinking?"""
+    """Show GENUS's forecast learning curves — is its prediction error shrinking?"""
     conn = get_conn()
     try:
-        _print_learning(learning.curve(conn))
+        _print_learning(learning.curves(conn))
     finally:
         conn.close()
 

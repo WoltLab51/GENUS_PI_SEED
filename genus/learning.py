@@ -1,19 +1,33 @@
 from __future__ import annotations
 
+import datetime
+
 from genus import ledger
 
 
-# The learning-program engine. First application: weather self-forecasting -- GENUS
-# predicts the next observation, the future grades it, and its forecast error is the
-# learning curve. Forecasts are recorded as raw facts (forecast_made, forecast_scored),
-# like observations: no projection, so replay is unaffected. The forecast itself is
-# a self-calibrated daily-cycle mean (no fixed model), computed read-time from the
-# ledger. The same engine will later point at richer, verifiable domains.
+# The learning-program engine. It predicts the next observation of a metric, the
+# future grades it, and the accumulating error is the learning curve. Forecasts are
+# raw facts (forecast_made, forecast_scored), like observations: no projection, so
+# replay is unaffected. The forecast is a self-calibrated cycle mean -- no fixed
+# model -- and the engine is generic over both the metric and the cycle period
+# (hour-of-day or weekday), so it serves signals of any cadence: weather (hourly),
+# system metrics (5-minutely), repo (daily). The next observation's bucket is found
+# from the metric's own typical gap, so the cadence need not be configured.
+
+MIN_HISTORY = 2  # need two readings to estimate the cadence and a baseline
+RECENT_GAPS = 12  # how many recent intervals to estimate the typical gap from
 
 
-def _hour(created_at: str) -> int:
-    # created_at is ISO like 2026-06-27T07:56:07.674Z -> hour of day (UTC).
-    return int(created_at[11:13])
+def _dt(created_at: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+
+
+def _bucket(moment: datetime.datetime, cycle: str) -> int:
+    if cycle == "hour":
+        return moment.hour
+    if cycle == "weekday":
+        return moment.weekday()
+    raise ValueError(f"unknown cycle: {cycle}")
 
 
 def _readings(conn, metric_key: str) -> list[tuple[str, float]]:
@@ -30,15 +44,27 @@ def _readings(conn, metric_key: str) -> list[tuple[str, float]]:
     return [(row["created_at"], float(row["v"])) for row in rows]
 
 
-def forecast_value(conn, metric_key: str, target_hour: int):
-    # Predict the value at target_hour as the mean of all past readings at that hour
-    # of day. As days accumulate the hourly mean stabilises and the forecast improves
-    # -- a learned daily rhythm, no fixed model. Cold start (no reading yet for that
-    # hour) falls back to the overall mean. Returns (value, support, method).
+def _next_observation_bucket(readings: list[tuple[str, float]], cycle: str):
+    # Estimate the next observation's time = latest + the median recent gap, then
+    # take its cycle bucket. This adapts to any cadence: a 5-minute metric stays in
+    # the same hour, an hourly one rolls to the next hour, a daily one to the next
+    # weekday -- without configuring the cadence.
+    if len(readings) < MIN_HISTORY:
+        return None
+    times = [_dt(ts) for (ts, _) in readings][-(RECENT_GAPS + 1):]
+    gaps = sorted((b - a).total_seconds() for a, b in zip(times, times[1:]))
+    median_gap = gaps[len(gaps) // 2]
+    next_moment = times[-1] + datetime.timedelta(seconds=median_gap)
+    return _bucket(next_moment, cycle)
+
+
+def forecast_value(conn, metric_key: str, cycle: str, target_bucket: int):
+    # Predict the value in target_bucket as the mean of all past readings in that
+    # bucket (the learned cycle). Cold start falls back to the overall mean.
     readings = _readings(conn, metric_key)
-    same_hour = [v for (ts, v) in readings if _hour(ts) == target_hour]
-    if same_hour:
-        return sum(same_hour) / len(same_hour), len(same_hour), "hourly_cycle_mean"
+    same = [v for (ts, v) in readings if _bucket(_dt(ts), cycle) == target_bucket]
+    if same:
+        return sum(same) / len(same), len(same), f"{cycle}_cycle_mean"
     if readings:
         vals = [v for (_, v) in readings]
         return sum(vals) / len(vals), len(vals), "overall_mean"
@@ -48,7 +74,7 @@ def forecast_value(conn, metric_key: str, target_hour: int):
 def _latest_reading(conn, metric_key: str):
     row = conn.execute(
         """
-        SELECT created_at, json_extract(payload, '$.metric_value') AS v
+        SELECT json_extract(payload, '$.metric_value') AS v
         FROM event_log
         WHERE event_type = 'evidence_recorded'
           AND json_extract(payload, '$.metric_key') = ?
@@ -56,11 +82,10 @@ def _latest_reading(conn, metric_key: str):
         """,
         (metric_key,),
     ).fetchone()
-    return (row["created_at"], float(row["v"])) if row else None
+    return float(row["v"]) if row else None
 
 
 def _pending_forecast(conn, metric_key: str):
-    # The latest forecast for this metric that has not yet been scored.
     row = conn.execute(
         """
         SELECT id, json_extract(payload, '$.predicted_value') AS p
@@ -78,16 +103,15 @@ def _pending_forecast(conn, metric_key: str):
     return (int(row["id"]), float(row["p"])) if row else None
 
 
-def run_forecast_cycle(conn, metric_key: str) -> list[dict]:
-    # One turn of the 24/7 loop, run after a fresh observation arrives: (1) score the
-    # last un-scored forecast against the value that just came in -- the self-test --
-    # then (2) forecast the next observation. The accumulating error is the curve.
+def run_forecast_cycle(conn, metric_key: str, cycle: str) -> list[dict]:
+    # One turn of the loop, after a fresh observation: (1) score the last un-scored
+    # forecast against the value that just arrived -- the self-test -- then (2)
+    # forecast the next observation. Forecasting waits for MIN_HISTORY readings.
     try:
         events: list[dict] = []
-        latest = _latest_reading(conn, metric_key)
-        if latest is None:
+        actual = _latest_reading(conn, metric_key)
+        if actual is None:
             return events
-        actual_ts, actual = latest
         pending = _pending_forecast(conn, metric_key)
         if pending is not None:
             forecast_id, predicted = pending
@@ -103,20 +127,22 @@ def run_forecast_cycle(conn, metric_key: str) -> list[dict]:
                 },
             )
             events.append({"event_type": "forecast_scored", "id": scored_id})
-        next_hour = (_hour(actual_ts) + 1) % 24
-        predicted, support, method = forecast_value(conn, metric_key, next_hour)
-        if predicted is not None:
-            made_id = ledger.append(
-                conn,
-                "forecast_made",
-                {
-                    "metric_key": metric_key,
-                    "predicted_value": predicted,
-                    "method": method,
-                    "support": support,
-                },
-            )
-            events.append({"event_type": "forecast_made", "id": made_id})
+        readings = _readings(conn, metric_key)
+        target = _next_observation_bucket(readings, cycle)
+        if target is not None:
+            predicted, support, method = forecast_value(conn, metric_key, cycle, target)
+            if predicted is not None:
+                made_id = ledger.append(
+                    conn,
+                    "forecast_made",
+                    {
+                        "metric_key": metric_key,
+                        "predicted_value": predicted,
+                        "method": method,
+                        "support": support,
+                    },
+                )
+                events.append({"event_type": "forecast_made", "id": made_id})
         conn.commit()
         return events
     except Exception:
@@ -124,34 +150,46 @@ def run_forecast_cycle(conn, metric_key: str) -> list[dict]:
         raise
 
 
-def curve(conn, metric_key: str | None = None) -> dict:
-    # The learning curve, read-time: is GENUS's forecast error shrinking over time?
-    sql = (
-        "SELECT json_extract(payload, '$.error') AS e FROM event_log "
-        "WHERE event_type = 'forecast_scored'"
-    )
-    params: tuple = ()
-    if metric_key is not None:
-        sql += " AND json_extract(payload, '$.metric_key') = ?"
-        params = (metric_key,)
-    sql += " ORDER BY id"
-    errors = [float(row["e"]) for row in conn.execute(sql, params).fetchall()]
+def forecasted_metrics(conn) -> list[str]:
+    rows = conn.execute(
+        """
+        SELECT DISTINCT json_extract(payload, '$.metric_key') AS m
+        FROM event_log WHERE event_type = 'forecast_scored' ORDER BY m
+        """
+    ).fetchall()
+    return [row["m"] for row in rows]
+
+
+def curve(conn, metric_key: str) -> dict:
+    # The learning curve for one metric, read-time: is its forecast error shrinking?
+    errors = [
+        float(row["e"])
+        for row in conn.execute(
+            """
+            SELECT json_extract(payload, '$.error') AS e FROM event_log
+            WHERE event_type = 'forecast_scored'
+              AND json_extract(payload, '$.metric_key') = ?
+            ORDER BY id
+            """,
+            (metric_key,),
+        ).fetchall()
+    ]
     n = len(errors)
     if n == 0:
-        return {
-            "scored": 0,
-            "mean_error": None,
-            "early_mean_error": None,
-            "recent_mean_error": None,
-            "improving": None,
-        }
+        return {"metric_key": metric_key, "scored": 0, "mean_error": None,
+                "early_mean_error": None, "recent_mean_error": None, "improving": None}
     window = min(n, 20)
     early_mean = sum(errors[:window]) / window
     recent_mean = sum(errors[-window:]) / window
     return {
+        "metric_key": metric_key,
         "scored": n,
         "mean_error": sum(errors) / n,
         "early_mean_error": early_mean,
         "recent_mean_error": recent_mean,
         "improving": (recent_mean < early_mean) if n >= 2 else None,
     }
+
+
+def curves(conn) -> list[dict]:
+    return [curve(conn, metric_key) for metric_key in forecasted_metrics(conn)]
