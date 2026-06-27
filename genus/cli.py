@@ -37,6 +37,7 @@ from genus.cli_format import (
     _print_proposal_explanation,
     _print_rule_explanation,
     _print_state_explanation,
+    _print_surprisal,
 )
 
 
@@ -275,6 +276,16 @@ def calibration_command() -> None:
     conn = get_conn()
     try:
         _print_calibration(query.calibration(conn))
+    finally:
+        conn.close()
+
+
+@main.command("surprisal")
+def surprisal_command() -> None:
+    """Rank beliefs by how many bits a flip would carry (information-theoretic surprise)."""
+    conn = get_conn()
+    try:
+        _print_surprisal(query.surprisal(conn))
     finally:
         conn.close()
 

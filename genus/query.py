@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import string
 
 from genus import (
@@ -212,6 +213,37 @@ def calibration(conn) -> dict:
             sum(volatile.values()) / len(volatile) if volatile else None
         ),
     }
+
+
+def surprisal(conn) -> list[dict]:
+    # Information-theoretic surprise (Shannon): how many bits would a flip of each
+    # belief carry? surprisal = -log2(p_flip), with p_flip Laplace-smoothed from the
+    # belief's own lifecycle ((flips + 0.5) / (updates + 1)) so a never-flipping
+    # belief has a finite, large surprise potential. A rock-stable belief flipping is
+    # shocking (many bits); a volatile one flipping is expected (few). Lets GENUS rank
+    # where a surprise would teach it the most -- the seed of "learn the
+    # high-information thing first". Read-time, from existing experiences.
+    rows = conn.execute(
+        "SELECT subject_key, pattern FROM experience_log WHERE experience_type = ?",
+        (experience.BELIEF_STABILITY_TYPE,),
+    ).fetchall()
+    out = []
+    for row in rows:
+        pattern = json.loads(row["pattern"])
+        updates = int(pattern.get("updates", 0))
+        flips = int(pattern.get("supersessions", 0))
+        p_flip = (flips + 0.5) / (updates + 1)
+        out.append(
+            {
+                "subject_key": row["subject_key"],
+                "classification": pattern.get("classification"),
+                "flip_rate": float(pattern.get("flip_rate", 0.0)),
+                "updates": updates,
+                "surprise_bits": -math.log2(p_flip),
+            }
+        )
+    out.sort(key=lambda r: r["surprise_bits"], reverse=True)
+    return out
 
 
 def status(conn) -> dict:

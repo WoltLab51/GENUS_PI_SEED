@@ -34,6 +34,18 @@ def _print_calibration(report: dict) -> None:
         click.echo(f"[CAL] betrayed: {', '.join(report['betrayed'])}")
 
 
+def _print_surprisal(rows: list[dict]) -> None:
+    if not rows:
+        click.echo("[SRP] no characterized beliefs yet")
+        return
+    click.echo("[SRP] surprise potential — bits a flip would carry (high = most informative)")
+    for row in rows:
+        click.echo(
+            f"[SRP] {row['surprise_bits']:5.1f} bits  {row['subject_key']}  "
+            f"({row['classification']}, flip-rate {row['flip_rate']:.3f}, {row['updates']} updates)"
+        )
+
+
 def _print_active_belief_summary(conn) -> None:
     rows = projection.list_active_beliefs(conn)
     for row in rows:
