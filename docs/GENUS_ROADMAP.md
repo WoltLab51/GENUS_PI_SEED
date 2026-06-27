@@ -1,7 +1,7 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (Phase 2, v1.x) bis zum Zielsystem der Architektur-Karte.
-> Ein **Bau-Instrument**, keine Wunschliste.
+> Vom heutigen Stand (v1.13 — der Geist ist erwacht) bis zum Zielsystem der
+> Architektur-Karte. Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
 
@@ -43,16 +43,26 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (Phase 2, v1.x — Release 1.7.0)
+## Wo wir stehen (v1.13 — Geist erwacht, Kern rund)
 
-**Grün:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
+**Grün — deterministischer Kern + Material:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
 append-only Trigger · Proposal Review · Inquiry Resolve · Experience Core ·
 State Core · Governance v1 · Maturation v1 · CI · Ledger Audit · Ledger Sealing ·
 External Ledger Anchors · Self-Operation Evidence · Self-Healing Governance ·
 Confidence Decay v2 · Clock-Sync Self-Check · Struktur-Material (repo.commits_per_day, repo.lines_changed_per_day) · Disk-Trend (disk.trend) · Korrelation (system.thermal, self-kalibriert) · Self-Kalibrierung (repo.churn-Schwelle + disk.trend-ε aus eigener Verteilung) · Externes Material (weather.temp_outside → weather.trend, erster Internet-Sensor über die Membran)
-**Gelb:** automatisierte externe Ablage und Signaturen fehlen
-**Rot:** alles Übrige der Karte
+
+**Grün — der Geist erwacht (Selbst-Reflexion, NICHT in der alten Roadmap geplant — gewachsen):**
+BeliefStability (GENUS reflektiert über die Stabilität *eigener* Beliefs) ·
+Surprise-Loop (StabilityInquiry bei Erwartungsbruch) · Experience-Re-Charakterisierung
+(Selbst-Wissen bleibt aktuell) · gelernte Halbwertszeit (letztes Preset geschlossen) ·
+gebundenes Evidenz-Fenster (Tier-0 zu) · DB-Härtung (WAL, busy_timeout) ·
+Volatilität-als-Ausreißer (Selbst-Sicht geschärft, aus gelebten Pi-Daten) ·
+azyklischer Modul-Cluster · cli-Entflechtung · Preset-Budget ehrlich reklassifiziert ·
+Visual Atlas (22 Bilder) + generierte, drift-feste atlas-facts
+
+**Gelb:** Maturation-Pfad gebaut, aber schläft (idle Pi hat keinen Aktivitäts-Rhythmus, `active_rules=0`) · cli-Split nur teilweise
+**Rot — der nächste Schritt:** **Wissen & Quellen-Vertrauen** (Phase 2.5, unten), dann Model Era, dann der Rest der Karte
 
 ---
 
@@ -480,6 +490,66 @@ beide Beobachtungen in einem Aufruf; eine Membran, ein geplanter Task.
 
 ---
 
+# Phase 2.5 — Wissen & Quellen-Vertrauen (noch deterministisch)
+
+> Der Schritt, der GENUS von *„weiß, was es gemessen hat"* zu *„weiß Dinge, mit
+> Herkunft"* bringt — **ohne Modell**. Das Fundament für Wetter-Ausbau, Gespräch
+> und später Programmieren. Aus dem Gespräch vom 2026-06-27 herausdestilliert.
+
+**Die Einsicht.** Ein LLM weiß durch Interpolation: keine Herkunft, nicht prüfbar,
+kann halluzinieren, man *muss* ihm glauben. GENUS weiß durch *Aufzeichnung*.
+„GENUS weiß X" muss heißen: es gibt eine herkunftsbehaftete, replaybare Kette, die
+X mit einer Konfidenz behauptet. Damit wird auch *zweifelhaftes* Material sicher
+konsumierbar — GENUS glaubt nie einer Quelle, es zeichnet auf, *welche* Quelle
+*was* behauptet, und **lernt, wem zu trauen ist**.
+
+**Was neu ist (drei deterministische Bausteine):**
+
+- **Behauptung verallgemeinert.** Ein Belief ist heute schon Herkunft + Evidenz +
+  Konfidenz. Verallgemeinere ihn zur *Behauptung aus einer Quelle*: jede trägt
+  `source:<name>`, einen Zeitstempel und eine quellen-gedeckelte Confidence.
+- **Quellen-Vertrauen, gelernt.** Jede Quelle bekommt eine Reputation — *nicht*
+  vorgegeben, sondern aus ihrer Bilanz gelernt: wie oft stimmte sie mit anderen
+  Quellen / mit direkter Beobachtung überein, wie oft widersprach sie. Self-
+  kalibriert, wie churn und Volatilität. Eine neue Quelle startet gedeckelt und
+  verdient (oder verliert) Vertrauen.
+- **Widerspruch erster Klasse.** Widersprechende Evidenz gibt es schon pro Belief;
+  hier wird *Quelle gegen Quelle* zum eigenen Signal: ein Widerspruch senkt
+  Vertrauen und kann eine Inquiry auslösen — der Surprise-Loop, auf Wissen
+  angewandt.
+
+**Membran-Grenze:** Wie bei Wetter — der Abruf (Datensatz, Almanach-Rechnung wie
+Sonnenauf-/untergang, fragwürdige Web-Zahl) passiert *außerhalb*; nur
+`(claim, source, value)` betritt den Kern. Kein HTTP/LLM in `genus/`.
+
+**Warum *vor* der Model Era:** Erst wenn GENUS Quellen sauber verwaltet, ist ein
+LLM bloß *eine weitere gedeckelte Quelle* — der „Model-Vertrag" (Phase 3) wird zum
+**Spezialfall** des Quellen-Vertrauens, nicht zu einem Sonderorgan. Ohne diese
+Schicht wäre ein LLM ein Sonderfall ohne Rahmen; mit ihr ist es nur der
+unzuverlässigste Zeuge unter vielen. Genau das adressiert „GENUS muss kein LLM
+fragen": es weiß aus eigenem, herkunftsbehaftetem Bestand.
+
+**Bezug zu „GENUS programmiert":** Programmieren ist großteils *Wissen + Regeln +
+Historie* („diese API verhält sich so", „diese Änderung tat damals X"). Diese
+Schicht hält genau das — und GENUS kennt seine *eigene* Codebasis + jede Änderung
+schon (der Ledger). `Proposal ≠ Change` ist bereits die Form sicherer
+Selbst-Veränderung (siehe Leitplanken). Der Weg dorthin führt *durch* diese
+Schicht, nicht an ihr vorbei.
+
+**Neue Events:** `assertion_recorded` (`derivation: source:*`, gedeckelte
+Confidence) · `source_trust_updated` (Reputation aus eigener Bilanz, read-time) ·
+`contradiction_detected` (Quelle gegen Quelle / gegen Beobachtung). Confidence
+bleibt read-time, nie gespeichert.
+
+**Definition of Done (Skizze — der genaue Schritt wird beim Öffnen spezifiziert):**
+- [ ] Behauptung mit `source` + gedeckelter Confidence, replay-stabil
+- [ ] Quellen-Vertrauen aus eigener Bilanz gelernt (keine Vorgabe), read-time
+- [ ] Widerspruch Quelle-gegen-Quelle als Event + optionale Inquiry
+- [ ] Membran rein (kein Fetch/LLM in `genus/`, grep leer)
+- [ ] Wachstumsregel ✓ — Frage 5 bleibt erfüllt (noch kein Modell)
+
+---
+
 # Phase 3 — Model Era (ab hier mit LLM)
 
 > Wachstumsregel Frage 5 wird **bewusst und kontrolliert** gelockert. Der
@@ -527,10 +597,22 @@ DETERMINISTISCH (kein LLM)
   v1.5   Confidence Decay     → alte Evidence wird leichter
 
 MEHR MATERIAL (noch deterministisch)
-  v1.x   Struktur-Material    → GENUS beobachtet deine Arbeit
+  v1.6   Struktur-Material    → GENUS beobachtet deine Arbeit (repo)
+  v1.7   Externes Material    → Wetter über die Membran
+
+DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
+  v1.8   BeliefStability      → erste Reflexion über eigene Beliefs
+  v1.9   Surprise-Loop        → Inquiry bei Erwartungsbruch
+  v1.10  Evidenz-Fenster      → Tier-0 geschlossen
+  v1.11  Gelernte Halbwertszeit → das letzte Preset geschlossen
+  v1.12  Re-Charakterisierung → Selbst-Wissen aktuell · DB-Härtung
+  v1.13  Volatilität-als-Ausreißer → Selbst-Sicht geschärft
+
+WISSEN (noch deterministisch)        ← DER NÄCHSTE SCHRITT
+  v1.x   Wissen & Quellen-Vertrauen → GENUS weiß, mit Herkunft
 
 MODEL ERA (mit LLM, eigener Vertrag)
-  v2.0   Meaning Engine       → echtes Gespräch
+  v2.0   Meaning Engine       → echtes Gespräch (LLM = nur eine Quelle mehr)
   v2.x   Graph · Transition · Worker · Visual · Rest der Karte
 ```
 
