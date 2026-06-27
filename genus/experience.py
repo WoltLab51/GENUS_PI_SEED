@@ -400,12 +400,21 @@ def _belief_stability_candidates(conn) -> list[dict]:
     if ordered[-1] <= ordered[0]:
         return []
     median = _median(ordered)
+    # Split the population at its widest natural gap, not at the median. A median
+    # split labels ~half of every population "volatile" by construction, however
+    # calm it actually is -- so a belief that flips 0.3% of the time gets called
+    # "volatile" merely for sitting above a near-zero median. The widest-gap break
+    # flags only beliefs clearly separated from the calm pack (a thermal belief
+    # flipping 36% stands far above siblings flipping ~0%). Fully data-derived: the
+    # threshold is the midpoint of the population's own largest gap, no constant.
+    gap_lo, gap_hi = _largest_gap(ordered)
+    threshold = (gap_lo + gap_hi) / 2
 
     candidates = []
     for key in sorted(rates):
         rate = rates[key]
         updates = confirms[key] + flips[key]
-        classification = "volatile" if rate > median else "stable"
+        classification = "volatile" if rate > threshold else "stable"
         candidates.append(
             {
                 "experience_key": f"belief_stability:{key}",
@@ -418,12 +427,14 @@ def _belief_stability_candidates(conn) -> list[dict]:
                     "updates": updates,
                     "classification": classification,
                     "population_median": round(median, 3),
+                    "volatility_threshold": round(threshold, 3),
                 },
                 "supporting_events": events[key],
                 "derivation": BELIEF_STABILITY_DERIVATION,
                 "summary": (
-                    f"{key} is {classification} (flip-rate {rate:.2f} over "
-                    f"{updates} lifecycle updates; GENUS-median {median:.2f})"
+                    f"{key} is {classification} ({flips[key]} flips in {updates} "
+                    f"updates, rate {rate:.3f}; GENUS-median {median:.3f}, "
+                    f"volatile above {threshold:.3f})"
                 ),
                 "proposable": False,
                 # re-characterize the experience if this verdict later changes
@@ -505,6 +516,18 @@ def _median(values: list[float]) -> float:
     if n % 2:
         return ordered[mid]
     return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _largest_gap(ordered: list[float]) -> tuple[float, float]:
+    # The (low, high) edges of the widest gap between consecutive sorted values.
+    # Deterministic (the first widest gap wins) so the verdict is replay-stable.
+    best_lo, best_hi = ordered[0], ordered[-1]
+    widest = -1.0
+    for lo, hi in zip(ordered, ordered[1:]):
+        if hi - lo > widest:
+            widest = hi - lo
+            best_lo, best_hi = lo, hi
+    return best_lo, best_hi
 
 
 # Cognition detector registry: each is a pure function conn -> candidates.
