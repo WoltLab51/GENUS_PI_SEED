@@ -30,7 +30,9 @@ genus observe-disk
 genus observe-activity
 genus observe-temperature
 genus observe-all
+genus observe-weather --temp-outside 14.2 --source open-meteo
 genus doctor
+genus atlas-facts
 genus ask "was glaubst du"
 genus ask "status"
 genus explain belief 1
@@ -40,6 +42,9 @@ genus explain rule 1
 genus why proposal 1
 genus why decision 1
 genus beliefs show
+genus calibration
+genus surprisal
+genus learning
 genus experience scan
 genus experience show
 genus state refresh
@@ -248,6 +253,26 @@ norms instead of being told them.
   history. The only remaining preset magnitudes are the confidence half-lives.
 
 All deterministic, replay-stable, no new event types, no LLM.
+
+## Self-Reflection And Learning
+
+GENUS watches the reliability of its own mind and runs deliberate learning programs.
+All three commands are read-time and add no stored magnitude; the core stays
+deterministic and model-free.
+
+- `genus calibration` — are GENUS's own "stable" judgments borne out? It reports the
+  accuracy of those judgments (a held-rate) and whether they discriminate stable from
+  volatile beliefs. The seed of "does GENUS know that it knows."
+- `genus surprisal` — how many bits a flip of each belief would carry
+  (`-log2(p_flip)`, Shannon). A rock-stable belief flipping is shocking; a volatile
+  one flipping is expected. Ranks where a surprise would teach the most.
+- `genus learning` — the learning-program engine. For each configured metric GENUS
+  forecasts the next observation from a self-calibrated cycle mean (hour-of-day or
+  weekday, found from the metric's own cadence), scores it when the value arrives, and
+  shows the per-metric error curve. `forecast_made`/`forecast_scored` are raw facts
+  (not projected; replay-stable). It runs on the crons that observe each metric, so
+  the Pi learns 24/7 — currently weather, the Pi's own temperature, disk, and the
+  repo work rhythm.
 
 ## Automatic Collection With Cron
 

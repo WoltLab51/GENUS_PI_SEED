@@ -61,6 +61,14 @@ Volatilität-als-Ausreißer (Selbst-Sicht geschärft, aus gelebten Pi-Daten) ·
 azyklischer Modul-Cluster · cli-Entflechtung · Preset-Budget ehrlich reklassifiziert ·
 Visual Atlas (22 Bilder) + generierte, drift-feste atlas-facts
 
+**Grün — weiß über sein eigenes Wissen + lernt 24/7 (wissenschaftlich fundiert):**
+`genus calibration` (Bayes — sind die „stabil"-Urteile belegt? live 4/4) ·
+`genus surprisal` (Shannon — Bits, die ein Flip trägt) ·
+`genus learning` (die Lernprogramm-Engine: Vorhersage → Selbst-Test → benoten → Kurve,
+läuft 24/7 auf den Crons; vier Pfade: Wetter, Pi-Temperatur, disk, repo-Rhythmus) ·
+SPC als verkörpert erkannt, TMS auf die Inferenz-Schicht vertagt. Alle read-time, rohe
+Fakten, Replay-stabil, Kern bleibt modell-frei.
+
 **Gelb:** Maturation-Pfad gebaut, aber schläft (idle Pi hat keinen Aktivitäts-Rhythmus, `active_rules=0`) · cli-Split nur teilweise
 **Rot — der nächste Schritt:** **Wissen & Quellen-Vertrauen** (Phase 2.5, unten), dann Model Era, dann der Rest der Karte
 
