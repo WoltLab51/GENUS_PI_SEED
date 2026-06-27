@@ -173,6 +173,47 @@ def ask(conn, question: str) -> dict:
     }
 
 
+def calibration(conn) -> dict:
+    # Read-time honesty check: are GENUS's own stability judgments borne out? A
+    # belief it characterised "stable" is a high-confidence prediction ("this will
+    # not flip"); the held-rate is that prediction's empirical accuracy, and the
+    # mean flip-rate gap is whether the judgment actually separates stable from
+    # volatile. Aggregated from existing experiences + stability surprises -- no new
+    # state, computed read-time like every other magnitude. The seed of "does GENUS
+    # know that it knows" (Bayesian calibration, applied to its self-characterisation).
+    rows = conn.execute(
+        "SELECT subject_key, pattern FROM experience_log WHERE experience_type = ?",
+        (experience.BELIEF_STABILITY_TYPE,),
+    ).fetchall()
+    stable: dict[str, float] = {}
+    volatile: dict[str, float] = {}
+    for row in rows:
+        pattern = json.loads(row["pattern"])
+        bucket = stable if pattern.get("classification") == "stable" else volatile
+        bucket[row["subject_key"]] = float(pattern.get("flip_rate", 0.0))
+    surprised = {
+        row["claim_key"]
+        for row in conn.execute(
+            "SELECT DISTINCT claim_key FROM inquiry_log WHERE inquiry_type = ?",
+            (experience.STABILITY_INQUIRY_TYPE,),
+        ).fetchall()
+    }
+    betrayed = sorted(key for key in stable if key in surprised)
+    stable_n = len(stable)
+    return {
+        "stable_count": stable_n,
+        "volatile_count": len(volatile),
+        "betrayed": betrayed,
+        "stable_judgment_accuracy": (
+            (stable_n - len(betrayed)) / stable_n if stable_n else None
+        ),
+        "stable_mean_flip_rate": (sum(stable.values()) / stable_n if stable_n else None),
+        "volatile_mean_flip_rate": (
+            sum(volatile.values()) / len(volatile) if volatile else None
+        ),
+    }
+
+
 def status(conn) -> dict:
     event_count = conn.execute("SELECT COUNT(*) AS count FROM event_log").fetchone()[
         "count"

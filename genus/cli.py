@@ -30,6 +30,7 @@ from genus.cli_format import (
     _print_active_belief_summary,
     _print_ask_response,
     _print_belief_explanation,
+    _print_calibration,
     _print_decision_explanation,
     _print_experience_explanation,
     _print_observation_result,
@@ -264,6 +265,16 @@ def ask_command(question: tuple[str, ...]) -> None:
     try:
         response = query.ask(conn, " ".join(question))
         _print_ask_response(response)
+    finally:
+        conn.close()
+
+
+@main.command("calibration")
+def calibration_command() -> None:
+    """Report whether GENUS's own stability judgments have held up."""
+    conn = get_conn()
+    try:
+        _print_calibration(query.calibration(conn))
     finally:
         conn.close()
 

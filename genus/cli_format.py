@@ -12,6 +12,28 @@ import click
 from genus import projection
 
 
+def _print_calibration(report: dict) -> None:
+    n = report["stable_count"]
+    if n == 0:
+        click.echo("[CAL] no stability judgments yet — nothing to calibrate")
+        return
+    held = n - len(report["betrayed"])
+    click.echo(f"[CAL] stable judgments: {n}  ·  held: {held}  ·  betrayed: {len(report['betrayed'])}")
+    click.echo(
+        f"[CAL] stable-judgment accuracy: {report['stable_judgment_accuracy']:.3f}  "
+        f"(1.0 = a 'stable' belief never surprised me by flipping)"
+    )
+    sm, vm = report["stable_mean_flip_rate"], report["volatile_mean_flip_rate"]
+    if sm is not None and vm is not None:
+        verb = "discriminates" if vm > sm else "does NOT discriminate"
+        click.echo(
+            f"[CAL] mean flip-rate  stable={sm:.3f}  volatile={vm:.3f}  "
+            f"(gap {vm - sm:+.3f} — judgment {verb})"
+        )
+    if report["betrayed"]:
+        click.echo(f"[CAL] betrayed: {', '.join(report['betrayed'])}")
+
+
 def _print_active_belief_summary(conn) -> None:
     rows = projection.list_active_beliefs(conn)
     for row in rows:
