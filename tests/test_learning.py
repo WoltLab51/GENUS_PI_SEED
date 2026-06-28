@@ -35,6 +35,20 @@ def _observe(conn, temp):
     return reactors.observe_weather_reading(conn, sensor.weather_reading(temp, "test"))
 
 
+def _inject_scored(conn, predicted, actual):
+    payload = json.dumps(
+        {"forecast_event": 0, "metric_key": METRIC, "predicted_value": predicted,
+         "actual_value": actual, "error": abs(predicted - actual)},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    conn.execute(
+        "INSERT INTO event_log (event_type, payload) VALUES ('forecast_scored', ?)",
+        (payload,),
+    )
+    conn.commit()
+
+
 def test_forecast_value_learns_the_hour_cycle():
     conn = _fresh()
     _inject_reading(conn, 10.0, "2026-06-25T08:00:00.000Z")
@@ -89,6 +103,27 @@ def test_cycle_makes_and_scores_forecasts_after_warmup():
     report = learning.curve(conn, METRIC)
     assert report["scored"] == 2
     assert report["mean_error"] is not None
+    assert "skill" in report
+    conn.close()
+
+
+def test_curve_skill_rewards_beating_naive():
+    conn = _fresh()
+    # actuals vary widely (10, 20) and the model predicts them exactly (error 0); a
+    # naive "guess the mean (15)" would be off by 5 each -> skill = 1 - 0/5 = 1.0.
+    _inject_scored(conn, predicted=10.0, actual=10.0)
+    _inject_scored(conn, predicted=20.0, actual=20.0)
+    assert learning.curve(conn, METRIC)["skill"] == 1.0
+    conn.close()
+
+
+def test_curve_skill_is_zero_when_signal_is_too_flat_to_learn():
+    conn = _fresh()
+    # a near-constant signal: the model's error equals the naive error -> skill 0,
+    # i.e. "nothing to learn" -- not mistaken for "improving".
+    _inject_scored(conn, predicted=10.0, actual=10.1)
+    _inject_scored(conn, predicted=10.0, actual=9.9)
+    assert learning.curve(conn, METRIC)["skill"] == 0.0
     conn.close()
 
 

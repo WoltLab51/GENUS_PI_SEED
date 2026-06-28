@@ -269,7 +269,9 @@ deterministic and model-free.
 - `genus learning` — the learning-program engine. For each configured metric GENUS
   forecasts the next observation from a self-calibrated cycle mean (hour-of-day or
   weekday, found from the metric's own cadence), scores it when the value arrives, and
-  shows the per-metric error curve. `forecast_made`/`forecast_scored` are raw facts
+  reports each path's **forecast skill** (`1 - model/naive error`, Murphy's skill score):
+  `> 0` learned real structure, `~ 0` the signal is too flat to learn, `< 0` worse than
+  naive. `forecast_made`/`forecast_scored` are raw facts
   (not projected; replay-stable). It runs on the crons that observe each metric, so
   the Pi learns 24/7 — currently weather, the Pi's own temperature, disk, and the
   repo work rhythm.

@@ -161,33 +161,41 @@ def forecasted_metrics(conn) -> list[str]:
 
 
 def curve(conn, metric_key: str) -> dict:
-    # The learning curve for one metric, read-time: is its forecast error shrinking?
-    errors = [
-        float(row["e"])
-        for row in conn.execute(
-            """
-            SELECT json_extract(payload, '$.error') AS e FROM event_log
-            WHERE event_type = 'forecast_scored'
-              AND json_extract(payload, '$.metric_key') = ?
-            ORDER BY id
-            """,
-            (metric_key,),
-        ).fetchall()
-    ]
-    n = len(errors)
+    # The learning curve for one metric, read-time. The honest headline is forecast
+    # *skill* = 1 - (model error / naive error), where the naive baseline is "always
+    # guess the signal's overall mean" (climatology). skill > 0 means GENUS learned
+    # real structure (it beats naive); skill ~0 means the signal is too flat to learn
+    # anything; skill < 0 means the model is worse than just guessing. This is Murphy's
+    # skill score from forecasting science -- threshold-free, and it does not mistake a
+    # flat-at-the-floor signal for "improving" the way an early-vs-recent split did.
+    rows = conn.execute(
+        """
+        SELECT json_extract(payload, '$.error') AS e,
+               json_extract(payload, '$.actual_value') AS a
+        FROM event_log
+        WHERE event_type = 'forecast_scored'
+          AND json_extract(payload, '$.metric_key') = ?
+        ORDER BY id
+        """,
+        (metric_key,),
+    ).fetchall()
+    n = len(rows)
     if n == 0:
-        return {"metric_key": metric_key, "scored": 0, "mean_error": None,
-                "early_mean_error": None, "recent_mean_error": None, "improving": None}
-    window = min(n, 20)
-    early_mean = sum(errors[:window]) / window
-    recent_mean = sum(errors[-window:]) / window
+        return {"metric_key": metric_key, "scored": 0, "mean_error": None, "skill": None}
+    errors = [float(row["e"]) for row in rows]
+    actuals = [float(row["a"]) for row in rows]
+    mean_error = sum(errors) / n
+    skill = None
+    if n >= 2:
+        overall_mean = sum(actuals) / n
+        naive_error = sum(abs(a - overall_mean) for a in actuals) / n
+        if naive_error > 0:
+            skill = round(1 - mean_error / naive_error, 3)
     return {
         "metric_key": metric_key,
         "scored": n,
-        "mean_error": sum(errors) / n,
-        "early_mean_error": early_mean,
-        "recent_mean_error": recent_mean,
-        "improving": (recent_mean < early_mean) if n >= 2 else None,
+        "mean_error": round(mean_error, 3),
+        "skill": skill,
     }
 
 

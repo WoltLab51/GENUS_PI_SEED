@@ -38,17 +38,19 @@ def _print_learning(reports: list[dict]) -> None:
     if not reports:
         click.echo("[LRN] no scored forecasts yet — the learners are warming up")
         return
-    click.echo("[LRN] forecast learning curves (per metric — is the error shrinking?)")
+    click.echo("[LRN] forecast skill — how much better than naive (guessing the mean)? <=0 = nothing learned")
     for report in reports:
-        trend = (
-            "—"
-            if report["improving"] is None
-            else ("down — improving" if report["improving"] else "flat")
-        )
+        if report["skill"] is None:
+            note = "warming up" if report["scored"] < 5 else "constant signal"
+            click.echo(
+                f"[LRN] {report['metric_key']:22s} {report['scored']:4d} scored  "
+                f"mean {report['mean_error']:7.3f}  skill    —   ({note})"
+            )
+            continue
+        note = "  <- no real skill: signal too flat to learn" if report["skill"] <= 0.05 else ""
         click.echo(
             f"[LRN] {report['metric_key']:22s} {report['scored']:4d} scored  "
-            f"mean {report['mean_error']:7.3f}  "
-            f"early {report['early_mean_error']:7.3f} -> recent {report['recent_mean_error']:7.3f}  {trend}"
+            f"mean {report['mean_error']:7.3f}  skill {report['skill']:+.2f}{note}"
         )
 
 

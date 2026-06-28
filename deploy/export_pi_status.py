@@ -72,10 +72,10 @@ def _round(value: float | None) -> float | None:
 
 def _cognition(conn) -> dict:
     # Aggregate, privacy-safe self-knowledge for the public status: how honest is
-    # GENUS's confidence (calibration), and how is each 24/7 learning path doing.
-    # Only counts and errors -- no values, paths, or event detail. The unreliable
-    # binary "improving" verdict is left out; the early->recent errors tell the
-    # honest trajectory.
+    # GENUS's confidence (calibration), and how is each 24/7 learning path doing. Only
+    # counts, errors, and forecast skill -- no values, paths, or event detail. Skill
+    # (1 - model/naive error) honestly says whether a path learned real structure
+    # (>0) or the signal is too flat to learn (~0).
     cal = query.calibration(conn)
     discrimination = None
     if cal["stable_mean_flip_rate"] is not None and cal["volatile_mean_flip_rate"] is not None:
@@ -92,8 +92,7 @@ def _cognition(conn) -> dict:
                 "metric_key": curve["metric_key"],
                 "scored": curve["scored"],
                 "mean_error": _round(curve["mean_error"]),
-                "early_error": _round(curve["early_mean_error"]),
-                "recent_error": _round(curve["recent_mean_error"]),
+                "skill": curve["skill"],
             }
             for curve in learning.curves(conn)
         ],
@@ -135,6 +134,7 @@ def _history_entry(status: dict) -> dict:
             curve["metric_key"]: {
                 "scored": curve["scored"],
                 "mean_error": curve["mean_error"],
+                "skill": curve["skill"],
             }
             for curve in status["cognition"]["learning"]
         },
@@ -205,14 +205,20 @@ def _render_markdown(status: dict, history: list[dict]) -> str:
     out += ["", "**Learning** — 24/7 forecast paths (predict → self-test → score):", ""]
     if learning:
         out += [
-            "| metric | scored | mean error | early → recent |",
-            "| --- | ---: | ---: | --- |",
+            "| metric | scored | mean error | skill |",
+            "| --- | ---: | ---: | ---: |",
         ]
         for curve in learning:
+            skill = curve["skill"]
             out.append(
                 f"| `{curve['metric_key']}` | {curve['scored']} | {curve['mean_error']} | "
-                f"{curve['early_error']} → {curve['recent_error']} |"
+                f"{'—' if skill is None else f'{skill:+.2f}'} |"
             )
+        out += [
+            "",
+            "_skill = how much better than naive (guessing the mean): >0 learned real "
+            "structure · ~0 the signal is too flat to learn · <0 worse than naive._",
+        ]
     else:
         out.append("_warming up — no scored forecasts yet._")
     if len(history) >= 2:
