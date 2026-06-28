@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 from click.testing import CliRunner
@@ -61,7 +62,7 @@ def test_two_agreeing_sources_earn_trust_with_no_contradiction():
     _assert_source(conn, 18.0, "provider-b")  # a second source, agreeing
     assert sources.source_trust(conn, "mock") == 1.0
     assert sources.source_trust(conn, "provider-b") == 1.0
-    result = sources.consensus(conn, CLAIM)
+    result = sources.resolve(conn, CLAIM)
     assert set(result["candidates"]) == {"mock", "provider-b"}
     assert result["contradiction"] is False
     conn.close()
@@ -74,9 +75,63 @@ def test_two_disagreeing_sources_lose_trust_and_flag_contradiction():
     _assert_source(conn, 30.0, "provider-b")  # far outside the claim's own spread
     assert sources.source_trust(conn, "mock") == 0.0
     assert sources.source_trust(conn, "provider-b") == 0.0
-    result = sources.consensus(conn, CLAIM)
+    result = sources.resolve(conn, CLAIM)
     assert result["contradiction"] is True
     conn.close()
+
+
+def _inject_assertion(conn, value, source, created_at):
+    payload = json.dumps(
+        {"claim_key": CLAIM, "claim_value": value, "source": source,
+         "derivation": f"source:{source}"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    conn.execute(
+        "INSERT INTO event_log (event_type, payload, created_at) VALUES ('assertion_recorded', ?, ?)",
+        (payload, created_at),
+    )
+    conn.commit()
+
+
+def test_single_source_resolves_to_itself_behaviour_preserving():
+    conn = _fresh()
+    _observe(conn, 18.0)
+    result = sources.resolve(conn, CLAIM)
+    assert result["value"] == 18.0
+    assert result["chosen_source"] == "mock"
+    assert result["candidates"]["mock"]["live"] is True
+    assert result["contradiction"] is False
+    conn.close()
+
+
+def test_a_stale_source_fades_and_raises_no_false_contradiction():
+    conn = _fresh()
+    # an hourly cadence with two fresh sources that agree
+    _inject_assertion(conn, 18.0, "open-meteo", "2026-06-28T10:00:00.000Z")
+    _inject_assertion(conn, 18.2, "open-meteo", "2026-06-28T11:00:00.000Z")
+    _inject_assertion(conn, 18.1, "wttr", "2026-06-28T11:00:30.000Z")
+    # a third source spoke once, long ago, with a wildly different value
+    _inject_assertion(conn, 40.0, "old", "2026-06-28T02:00:00.000Z")
+
+    result = sources.resolve(conn, CLAIM)
+    # ~9h stale against an hourly cadence -> faded, so it neither wins nor raises alarm
+    assert result["candidates"]["old"]["live"] is False
+    assert result["chosen_source"] in {"open-meteo", "wttr"}
+    assert result["contradiction"] is False
+    conn.close()
+
+
+def test_resolve_cli_runs(monkeypatch):
+    conn = _fresh()
+    for temp in (18.0, 18.0):
+        _observe(conn, temp)
+    _assert_source(conn, 18.0, "wttr.in")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["resolve", CLAIM])
+    assert result.exit_code == 0, result.output
+    assert "[RSV]" in result.output
+    assert "weight" in result.output
 
 
 def test_assertion_recorded_passes_integrity_and_replays_clean():

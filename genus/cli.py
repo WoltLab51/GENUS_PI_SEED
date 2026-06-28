@@ -38,6 +38,7 @@ from genus.cli_format import (
     _print_learning,
     _print_observation_result,
     _print_proposal_explanation,
+    _print_resolve,
     _print_rule_explanation,
     _print_sources,
     _print_state_explanation,
@@ -327,10 +328,21 @@ def learning_command() -> None:
 
 @main.command("sources")
 def sources_command() -> None:
-    """Show each source's learned trust and the read-time consensus where sources overlap."""
+    """Show each source's learned trust and the read-time resolution where sources overlap."""
     conn = get_conn()
     try:
         _print_sources(sources.report(conn))
+    finally:
+        conn.close()
+
+
+@main.command("resolve")
+@click.argument("claim_key")
+def resolve_command(claim_key: str) -> None:
+    """Resolve a claim to its current value over all sources (trust × freshness)."""
+    conn = get_conn()
+    try:
+        _print_resolve(sources.resolve(conn, claim_key))
     finally:
         conn.close()
 

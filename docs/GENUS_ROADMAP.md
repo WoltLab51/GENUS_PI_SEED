@@ -631,9 +631,18 @@ Gebaut in zwei Teil-Schnitten (1a verhaltens-erhaltend, 1b neues Verhalten); Sta
 *Gefüttert (1c):* ein zweiter, unabhängiger Wetter-Anbieter (**wttr.in**) speist über
 `deploy/observe_weather_second.sh` + `genus observe-assertion` *denselben* Claim
 `weather.temp_outside` (stündlicher Cron) — Konsens & Widerspruch werden auf dem Pi real.
-*Offen (vom Deploy aufgedeckt):* **Rezenz-Bewusstsein** — eine Quelle, die lange nicht
-mehr gesprochen hat (z. B. die alten quellen-losen Wetter-Events als `sensor`), sollte
-nicht als *aktueller* Anspruch zählen; aktuell ist ihr letzter Wert eingefroren.
+**`resolve(claim)` — die allgemeine Form (gebaut):** „gegeben ein Claim, was ist sein
+*aktueller* Wert?" Kandidaten = letzte Behauptung je Quelle; gewählt wird per **Trust ×
+Frische** (read-time, self-kalibrierte Kadenz als Halbwertszeit). Eine veraltete Quelle
+*verblasst* (löst die Rezenz-Lücke: der eingefrorene `sensor`-Kandidat zählt nicht mehr
+und kann keinen Falschalarm auslösen); Widerspruch wird nur unter *lebenden* Kandidaten
+geprüft. CLI: `genus resolve <claim>`. Dieselbe Form trägt später ein Bewertungs-Kriterium
+(Schach) und Erdung (Bedeutung) — `resolve` *wählt* immer unter Kandidaten, *erzeugt* sie nie.
+
+*Ehrliche Staffelung:* `resolve` vereinheitlicht bisher das **Lesen** (der kanonische
+Wert eines Claims). Das **Eintreten** ist noch asymmetrisch — der Sensor-Pfad treibt
+Forecasting/Beliefs inline; sie durch `resolve` zu leiten (statt am Rohwert) ist der
+nächste Konsumenten-Schnitt.
 
 *Danach (gleiche Schicht, freie Reihenfolge):* claim-verankerte Widersprüche + Inquiry (1c)
 · **du als hoch-vertraute Quelle** (Lehrer-Loop) · Almanach/Datensätze · **Struktur**

@@ -62,18 +62,35 @@ def _print_sources(report: dict) -> None:
     click.echo("[SRC] source trust — earned by agreeing with other sources (0.50 = unproven seed)")
     for row in rows:
         click.echo(f"[SRC] {row['source']:30s} trust {row['trust']:.2f}")
-    contested = report["consensus"]
+    contested = report["resolved"]
     if contested:
-        click.echo("[SRC] claims more than one source speaks to (read-time consensus):")
+        click.echo("[SRC] claims more than one source speaks to (resolved by trust × freshness):")
         for item in contested:
             mark = "  <- CONTRADICTION" if item["contradiction"] else ""
             cands = ", ".join(
-                f"{src}={data['value']}" for src, data in item["candidates"].items()
+                f"{src}={data['value']}" + ("" if data["live"] else "(faded)")
+                for src, data in item["candidates"].items()
             )
             click.echo(
                 f"[SRC] {item['claim_key']:22s} -> {item['value']} "
                 f"via {item['chosen_source']}  [{cands}]{mark}"
             )
+
+
+def _print_resolve(result: dict) -> None:
+    if result["value"] is None:
+        click.echo(f"[RSV] {result['claim_key']}: no source has spoken to this claim")
+        return
+    mark = "  <- CONTRADICTION" if result["contradiction"] else ""
+    click.echo(f"[RSV] {result['claim_key']} -> {result['value']}  via {result['chosen_source']}{mark}")
+    click.echo("[RSV] candidates  (value · trust × freshness = weight):")
+    ordered = sorted(result["candidates"].items(), key=lambda kv: -kv[1]["weight"])
+    for src, c in ordered:
+        faded = "" if c["live"] else "   (faded — stale)"
+        click.echo(
+            f"[RSV]   {src:30s} {str(c['value']):>7}   "
+            f"{c['trust']:.2f} × {c['recency']:.2f} = {c['weight']:.2f}{faded}"
+        )
 
 
 def _print_surprisal(rows: list[dict]) -> None:
