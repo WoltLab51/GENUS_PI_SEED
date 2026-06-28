@@ -133,6 +133,62 @@ def _open_source_contradiction(conn, claim_key: str) -> bool:
     return row is not None
 
 
+def teach(conn, claim_key: str, value, source: str = "human") -> dict:
+    """The teacher-loop: a human asserts a claim's value and settles any open conflict.
+
+    The answer enters as an ordinary assertion from a human source -- no preset trust.
+    It governs naturally: the disagreeing machine sources have driven each other's trust
+    to ~0, so the human's seed trust outranks them and `resolve` picks the taught value;
+    going forward, whichever source agreed with the human earns trust back. Any open
+    SourceContradiction inquiry for this claim is then resolved -- GENUS asked, you
+    answered.
+    """
+    result = observe_assertion(conn, claim_key, value, source)
+    resolved = []
+    try:
+        rows = conn.execute(
+            "SELECT id FROM inquiry_log WHERE inquiry_type = ? AND claim_key = ? AND state = 'open'",
+            (inquiries.SOURCE_CONTRADICTION_TYPE, claim_key),
+        ).fetchall()
+        for row in rows:
+            inquiries.record_inquiry_resolved_event(conn, int(row["id"]), f"{source}={value}")
+            resolved.append(int(row["id"]))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {"event_id": result["event_id"], "resolved_inquiries": resolved}
+
+
+def observe_relation(
+    conn, subject: str, predicate: str, object_: str, source: str, derivation: str | None = None
+) -> dict:
+    """Record a relation between two entities -- networked knowledge, not just a value.
+
+    The structure pillar of the WISSEN layer: a ``(subject, predicate, object)`` triple
+    asserted by a source, e.g. ``(system.thermal, correlates_with, system.load)``. A raw
+    fact (not projected -> replay-stable); read as a graph via ``genus relations``. The
+    same source-trust applies, so a relation from a distrusted source is held lightly.
+    """
+    try:
+        event_id = ledger.append(
+            conn,
+            "relation_asserted",
+            {
+                "subject": subject,
+                "predicate": predicate,
+                "object": object_,
+                "source": source,
+                "derivation": derivation or f"source:{source}",
+            },
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {"event_id": event_id, "events": [{"event_type": "relation_asserted", "id": event_id}]}
+
+
 def process_observation(conn, observation_id: int) -> list[dict]:
     observation = _load_event(conn, observation_id)
     if observation["event_type"] != "observation_created":

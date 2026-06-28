@@ -263,6 +263,35 @@ def resolved_window(conn, claim_key: str, n: int) -> list[dict]:
     return [{"metric_value": row["value"], "id": row["id"]} for row in rows[-n:]]
 
 
+def relations(conn, subject: str | None = None, predicate: str | None = None) -> list[dict]:
+    """The relation graph: ``(subject, predicate, object, source)`` triples GENUS holds --
+    networked knowledge, not just claim → value. Read-only; the latest assertion of each
+    distinct triple per source is kept. Filterable by subject/predicate for graph walks.
+    """
+    rows = conn.execute(
+        """
+        SELECT id,
+               json_extract(payload, '$.subject')   AS subject,
+               json_extract(payload, '$.predicate')  AS predicate,
+               json_extract(payload, '$.object')     AS object,
+               json_extract(payload, '$.source')     AS source,
+               created_at
+        FROM event_log
+        WHERE event_type = 'relation_asserted'
+        ORDER BY id
+        """
+    ).fetchall()
+    latest: dict[tuple, dict] = {}
+    for row in rows:
+        latest[(row["subject"], row["predicate"], row["object"], row["source"])] = dict(row)
+    triples = list(latest.values())
+    if subject is not None:
+        triples = [t for t in triples if t["subject"] == subject]
+    if predicate is not None:
+        triples = [t for t in triples if t["predicate"] == predicate]
+    return triples
+
+
 def report(conn) -> dict:
     """A read-time summary for the CLI -- each source's trust and the resolution for
     every claim more than one source speaks to. One ledger read, grouped once."""

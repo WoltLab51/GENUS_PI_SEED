@@ -656,9 +656,24 @@ lebender Widerspruch ist separat geflaggt). Und **Forecasting** lernt über *all
 Verhaltens-erhaltend (Einzel-/lebende Quelle → wie zuvor); der Sensor ist in der *ganzen*
 Belief- und Lern-Schicht ein Peer.
 
-*Danach (gleiche Schicht, freie Reihenfolge):* claim-verankerte Widersprüche + Inquiry (1c)
-· **du als hoch-vertraute Quelle** (Lehrer-Loop) · Almanach/Datensätze · **Struktur**
-(Entität–Relation).
+**Lehrer-Loop — gebaut.** `genus teach <claim> <value>` (`reactors.teach`): deine Antwort
+betritt als gewöhnliche `human`-Behauptung — *kein* Preset-Trust. Sie regiert *natürlich*:
+die zerstrittenen Maschinen-Quellen haben ihr Vertrauen gegenseitig auf ~0 gedrückt, also
+schlägt das Saat-Vertrauen des Menschen sie, `resolve` wählt den gelehrten Wert, und das
+Vertrauen kalibriert sich nach (die Quelle, die mit dir übereinstimmte, verdient Vertrauen
+zurück). Offene `SourceContradiction`-Inquiries für den Claim werden gelöst — GENUS fragte,
+du antwortest.
+
+**Struktur — gebaut.** `genus relate <s> <p> <o>` / `genus relations [s]`
+(`reactors.observe_relation`, `sources.relations`): vernetztes Wissen als
+`(Subjekt, Prädikat, Objekt)`-Tripel mit Herkunft (`relation_asserted`, Roh-Fakt,
+replay-stabil), abfragbar als Graph. Dieselbe Quellen-Vertrauen-Logik gilt. *Wissen
+halten* ist damit strukturiert; es *nutzen* (Inferenz, Cross-Consistency) ist die nächste
+**Schicht** (SYSTEME), nicht mehr WISSEN.
+
+> ✅ **Die WISSEN-Schicht ist vollendet** (2026-06-28): Herkunft · Vertrauen (read-time,
+> self-kalibriert) · Auflösung (regiert alle Konsumenten) · Widerspruch→Surprise-Loop ·
+> Lehrer-Loop · Struktur. Der nächste Sprung ist die Schicht **SYSTEME**.
 
 ---
 

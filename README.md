@@ -47,6 +47,9 @@ genus surprisal
 genus learning
 genus sources
 genus resolve weather.temp_outside
+genus teach weather.temp_outside 18.5
+genus relate system.thermal correlates_with system.load
+genus relations
 genus experience scan
 genus experience show
 genus state refresh
@@ -289,6 +292,15 @@ deterministic and model-free.
   move's evaluation, a sentence's grounding): resolve always *chooses* among
   candidates, never *generates* them. `assertion_recorded` is a raw fact (not
   projected; replay-stable); trust and the resolution are never stored.
+- `genus teach <claim> <value>` — the teacher-loop. When trusted sources disagree, GENUS
+  raises a `SourceContradiction` inquiry; your answer enters as a `human` source (no
+  preset trust) and settles it. It governs naturally — the disagreeing machine sources
+  have driven each other's trust to ~0, so your seed trust outranks them and `resolve`
+  picks your value; the source that agreed with you then earns trust back.
+- `genus relate <s> <p> <o>` / `genus relations [s]` — the structure pillar: networked
+  knowledge as provenanced `(subject, predicate, object)` triples (`relation_asserted`,
+  a raw replay-stable fact), read back as a graph. Holding structured knowledge completes
+  the WISSEN layer; *using* it (inference) is the next layer.
 
 ## Automatic Collection With Cron
 

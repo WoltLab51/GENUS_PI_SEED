@@ -173,6 +173,34 @@ def test_source_contradiction_events_replay_clean():
     conn.close()
 
 
+def test_teach_records_a_human_source_settles_and_governs():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)  # source "mock" ~18
+    reactors.observe_assertion(conn, CLAIM, 30.0, "provider-b")  # disagree -> inquiry
+    result = reactors.teach(conn, CLAIM, 18.5, "human")
+    assert result["resolved_inquiries"]               # the inquiry was settled
+    assert "human" in sources.sources(conn)           # the teacher is now a source
+    open_count = conn.execute(
+        "SELECT COUNT(*) AS c FROM inquiry_log "
+        "WHERE state = 'open' AND inquiry_type = 'SourceContradiction'"
+    ).fetchone()["c"]
+    assert open_count == 0
+    # the teacher governs: its seed trust outranks the distrusted machine sources
+    assert sources.resolve(conn, CLAIM)["chosen_source"] == "human"
+    conn.close()
+
+
+def test_teach_events_replay_clean():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)
+    reactors.observe_assertion(conn, CLAIM, 30.0, "provider-b")
+    reactors.teach(conn, CLAIM, 18.5, "human")
+    assert integrity.check(conn)["ok"] is True
+    conn.close()
+
+
 def test_resolved_window_drops_a_faded_source_keeps_the_live_trajectory():
     conn = _fresh()
     _inject_assertion(conn, 10.0, "live", "2026-06-28T10:00:00.000Z")
@@ -192,6 +220,35 @@ def test_resolved_window_single_source_is_behaviour_preserving():
     values = [row["metric_value"] for row in sources.resolved_window(conn, CLAIM, 3)]
     assert values == [18.0, 19.0, 20.0]
     conn.close()
+
+
+def test_observe_relation_holds_a_triple_in_the_graph():
+    conn = _fresh()
+    reactors.observe_relation(conn, "system.thermal", "correlates_with", "system.load", "experience")
+    reactors.observe_relation(conn, "system.thermal", "measured_by", "cpu_thermal", "sensor")
+    assert len(sources.relations(conn)) == 2
+    subject = sources.relations(conn, subject="system.thermal")
+    assert {(t["predicate"], t["object"]) for t in subject} == {
+        ("correlates_with", "system.load"),
+        ("measured_by", "cpu_thermal"),
+    }
+    conn.close()
+
+
+def test_relation_asserted_replays_clean():
+    conn = _fresh()
+    reactors.observe_relation(conn, "a", "relates_to", "b", "human")
+    assert integrity.check(conn)["ok"] is True
+    conn.close()
+
+
+def test_relations_cli_runs(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "system.thermal", "correlates_with", "system.load", "experience")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["relations"])
+    assert result.exit_code == 0, result.output
+    assert "correlates_with" in result.output
 
 
 def test_resolve_cli_runs(monkeypatch):

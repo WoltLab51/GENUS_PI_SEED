@@ -38,6 +38,7 @@ from genus.cli_format import (
     _print_learning,
     _print_observation_result,
     _print_proposal_explanation,
+    _print_relations,
     _print_resolve,
     _print_rule_explanation,
     _print_sources,
@@ -343,6 +344,50 @@ def resolve_command(claim_key: str) -> None:
     conn = get_conn()
     try:
         _print_resolve(sources.resolve(conn, claim_key))
+    finally:
+        conn.close()
+
+
+@main.command("teach")
+@click.argument("claim_key")
+@click.argument("value", type=float)
+@click.option("--source", default="human", show_default=True)
+def teach_command(claim_key: str, value: float, source: str) -> None:
+    """Teach a claim's value as a human source and settle any open contradiction for it."""
+    conn = get_conn()
+    try:
+        result = reactors.teach(conn, claim_key, value, source)
+        settled = len(result["resolved_inquiries"])
+        click.echo(
+            f"[TCH] {claim_key} = {value} (source={source}) — "
+            f"settled {settled} contradiction inquiry(ies)"
+        )
+    finally:
+        conn.close()
+
+
+@main.command("relate")
+@click.argument("subject")
+@click.argument("predicate")
+@click.argument("object")
+@click.option("--source", default="human", show_default=True)
+def relate_command(subject: str, predicate: str, object: str, source: str) -> None:
+    """Assert a relation between two entities — networked knowledge (subject -[pred]-> object)."""
+    conn = get_conn()
+    try:
+        reactors.observe_relation(conn, subject, predicate, object, source)
+        click.echo(f"[REL] {subject} -[{predicate}]-> {object}   · {source}")
+    finally:
+        conn.close()
+
+
+@main.command("relations")
+@click.argument("subject", required=False)
+def relations_command(subject: str | None) -> None:
+    """Show the knowledge graph — relations GENUS holds (optionally for one subject)."""
+    conn = get_conn()
+    try:
+        _print_relations(sources.relations(conn, subject))
     finally:
         conn.close()
 

@@ -93,6 +93,18 @@ def _print_resolve(result: dict) -> None:
         )
 
 
+def _print_relations(triples: list[dict]) -> None:
+    if not triples:
+        click.echo("[REL] no relations yet")
+        return
+    click.echo("[REL] knowledge graph — (subject) -[predicate]-> (object) · source")
+    for triple in sorted(triples, key=lambda t: (t["subject"], t["predicate"], t["object"])):
+        click.echo(
+            f"[REL] {triple['subject']} -[{triple['predicate']}]-> {triple['object']}"
+            f"   · {triple['source']}"
+        )
+
+
 def _print_surprisal(rows: list[dict]) -> None:
     if not rows:
         click.echo("[SRP] no characterized beliefs yet")
