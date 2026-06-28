@@ -45,7 +45,7 @@ vorhersagen, lernen. Themen (Trading, Schach, Fahrpläne) sind Trainingsgelände
 
 **Die Anwendungen** wachsen später auf dem Kern: Trading als erster Use-Case;
 Charaktere (Hausaufgabenhelfer, Begleiter, DnD-Meister, je Familienmitglied)
-als LLM-Bewohner in der Model Era; und der Anspruch, dass GENUS selbständig neue
+als LLM-Bewohner (das LLM als gedeckelte Stimme am Rand, kein Ziel); und der Anspruch, dass GENUS selbständig neue
 Funktionen entwickelt.
 
 **Die ehrliche Haltung:** eine *Modelleisenbahn* — gebaut mit Hingabe, langsam
@@ -167,7 +167,7 @@ GENUS_GESAMTBILD.md        dieses Dokument — Synthese & Navigation (oben)
 │   GENUS_PHYSIK.md         Landkarte der Erkenntnisformen (wachsend)
 │
 └─ Verwahrte Vision
-    GENUS_VISUAL_THINKING.md visuelles Denken (Model Era)
+    GENUS_VISUAL_THINKING.md visuelles Denken (LLM-Querschnitt)
 ```
 
 **Konsistenz-Regel:** Jede Information hat *einen* Wohnort. Die Einzeldokumente

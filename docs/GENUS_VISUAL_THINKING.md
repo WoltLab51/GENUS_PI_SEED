@@ -1,7 +1,7 @@
 # GENUS VISUAL THINKING
 
 > Verwahrte Vision — wann und wie GENUS visuell denken sollte.
-> Gehört in die Model Era (v2.x), nicht in den frühen Bau.
+> Gehört zum LLM-Querschnitt / den späteren Schichten, nicht in den frühen Bau.
 
 ---
 
@@ -51,7 +51,7 @@ Entscheidend ist, dass "GENUS sieht Bilder" zwei sehr verschiedene Dinge meint:
 
 2. Bild → STRUKTUR         Pixel → "Objekt A, Objekt B, Relation"
                           → braucht ein Vision-Modell (Organ, nicht GENUS selbst)
-                          → Model Era
+                          → LLM-Querschnitt
 
 3. Struktur → ERKENNTNIS   GENUS denkt über die Szene, lernt Muster
                           → das kann GENUS gläsern selbst
@@ -87,7 +87,7 @@ das wahrnimmt, aber nicht urteilt.
 
 Mit eigenen Objekten — `ImageArtifact`, `SceneObject`, `SpatialRelation`,
 `VisualEmbedding`, `SceneGraph`, `VisualMemory`, `VisualStateMap`. Das ist
-mehrere Phasen entfernt und gehört klar in die Model Era.
+mehrere Schichten entfernt und gehört klar zum LLM-Querschnitt.
 
 Schöne Übungsplätze, wenn es soweit ist: Bilder, die eine *Aufgabe* zeigen —
 ein Schachbrett, ein Chart, ein Diagramm — nicht ein Zuhause. (Kamera in der

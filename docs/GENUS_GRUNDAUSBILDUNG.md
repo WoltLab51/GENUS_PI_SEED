@@ -193,7 +193,7 @@ nicht. Der denkende Kern bleibt offline und rein.
 - *Markt* — extern (HTTP) und Antizipation/Trading. Bewusst der nächste externe
   Schritt, mit Anti-Auto-Trade-Leitplanke. (*Wetter* ist seit `weather.trend` das
   erste externe Material — siehe oben.)
-- *Text, Sprache, Bild-Bedeutung* — brauchen ein Modell. Model Era.
+- *Text, Sprache, Bild-Bedeutung* — brauchen ein Modell → der LLM-Querschnitt (eine gedeckelte Quelle, kein Ziel).
 
 ---
 

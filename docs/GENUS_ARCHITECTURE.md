@@ -28,7 +28,7 @@ it currently believes, and keeps every important state change replayable.
   active `claim_value` per `claim_key` with read-time confidence. While material
   is unambiguous, this loses nothing. Richer representations (a distribution over
   values, competing hypotheses, relations between beliefs) arrive as *new* event
-  types when ambiguous or multi-valued material does (Model Era, belief graph),
+  types when ambiguous or multi-valued material does (the LLM cross-cut, belief graph),
   never by reshaping existing belief events. Append-only keeps that enrichment
   additive — the shape is a deliberate forward choice, not a one-way door.
   *(Decided 2026-06-21.)*

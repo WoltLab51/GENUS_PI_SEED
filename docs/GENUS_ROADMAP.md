@@ -1,6 +1,6 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.13 — der Geist ist erwacht) bis zum Zielsystem der
+> Vom heutigen Stand (v1.14 — der Geist ist erwacht, GENUS lernt 24/7) bis zum Zielsystem der
 > Architektur-Karte. Ein **Bau-Instrument**, keine Wunschliste.
 
 ---
@@ -22,7 +22,8 @@ dem Bauen fünf Fragen mit Ja beantworten:
 5. Vermeidet der Schritt LLM-, Web-, Worker- und HTTP-Abhängigkeiten —
    sofern nicht eine Version es ausdrücklich erlaubt?
 
-Frage 5 wird erst in der **Model Era** (ab v2.0) bewusst gelockert.
+Frage 5 wird erst beim **LLM-Querschnitt** (unten) bewusst gelockert — und auch dort
+nur für den *offenen Schwanz*; verifizierbares Erschaffen bleibt deterministisch.
 
 ---
 
@@ -43,7 +44,39 @@ immer auf dem *einfachsten* Material zuerst bewiesen.
 
 ---
 
-## Wo wir stehen (v1.13 — Geist erwacht, Kern rund)
+## Die Form — drei Schichten in einem gläsernen Kern (statt linearer Phasen)
+
+Lange dachten wir in linearen Phasen, die auf eine „Model Era" zulaufen. Das war
+schief: **verifizierbares Erschaffen ist deterministisch** — ein Beweiser, ein
+Code-Synthesizer braucht kein Modell. Der gläserne, deterministische Kern endet also
+*nicht* vor dem LLM; er **wächst durch drei Schichten bis zum Erschaffen**:
+
+1. **WISSEN** — beobachten → glauben → … → Wissen mit *Herkunft, Vertrauen,
+   Struktur*. (Gebaut bis zum Sensor-Wissen; ⑤ unten *vollendet* es: Wissen aus
+   *jeder* Quelle.)
+2. **SYSTEME** — regelgeführte Domänen *lernen* und darüber *schließen* (Sprache,
+   Schach, Code …). Setzt Struktur aus Schicht 1 voraus.
+3. **ERSCHAFFEN** — *erzeugen mit Beweis*: der „vorhersagen→testen"-Loop,
+   verallgemeinert zu „erzeugen→verifizieren". Der Gipfel — **immer noch
+   deterministisch, gläsern**.
+
+Das **LLM ist keine Phase und kein Ziel.** Es ist ein **Querschnitt**: eine
+gedeckelte Quelle/Stimme für den *offenen Schwanz* (Fluss, Idiom, das Ungeprüfbare),
+die *jederzeit* andocken kann — nie Orakel, immer gegen das eigene Wissen geprüft.
+
+Folgen für die Reihenfolge:
+- **Über „Wissen" ist die Reihenfolge frei** — Domänen (Sprache/Schach/Code) und der
+  LLM-Andock-Zeitpunkt sind wählbar, kein starrer Marsch.
+- **„Programmieren" ist keine eigene Stufe** — es ist *Erschaffen, auf Code
+  angewandt*. **„Begleiter"** ist keine Stufe — es ist *wie* GENUS genutzt wird.
+
+(Die folgenden v0.6–v1.14-Schritte sind die *gebaute Geschichte* dieser Form — vor
+allem das Wachsen der Wissens-Schicht. Was kommt, steht weiter unten *nach Schichten*,
+nicht als nummerierte Phasen.)
+
+---
+
+## Wo wir stehen (v1.14 — Geist erwacht, lernt 24/7, Kern rund)
 
 **Grün — deterministischer Kern + Material:** Observation · Evidence · Belief · Ledger · CPU/Memory-Sensor ·
 Disk/Activity/Temperature-Sensor · CLI · Query · Replay · Integrity ·
@@ -64,13 +97,13 @@ Visual Atlas (22 Bilder) + generierte, drift-feste atlas-facts
 **Grün — weiß über sein eigenes Wissen + lernt 24/7 (wissenschaftlich fundiert):**
 `genus calibration` (Bayes — sind die „stabil"-Urteile belegt? live 4/4) ·
 `genus surprisal` (Shannon — Bits, die ein Flip trägt) ·
-`genus learning` (die Lernprogramm-Engine: Vorhersage → Selbst-Test → benoten → Kurve,
-läuft 24/7 auf den Crons; vier Pfade: Wetter, Pi-Temperatur, disk, repo-Rhythmus) ·
+`genus learning` (die Lernprogramm-Engine: Vorhersage → Selbst-Test → benoten →
+Forecast-Skill, läuft 24/7 auf den Crons; vier Pfade: Wetter, Pi-Temperatur, disk, repo-Rhythmus) ·
 SPC als verkörpert erkannt, TMS auf die Inferenz-Schicht vertagt. Alle read-time, rohe
 Fakten, Replay-stabil, Kern bleibt modell-frei.
 
 **Gelb:** Maturation-Pfad gebaut, aber schläft (idle Pi hat keinen Aktivitäts-Rhythmus, `active_rules=0`) · cli-Split nur teilweise
-**Rot — der nächste Schritt:** **Wissen & Quellen-Vertrauen** (Phase 2.5, unten), dann Model Era, dann der Rest der Karte
+**Rot — der nächste Schritt:** **Schicht WISSEN vollenden** (⑤ Wissen & Quellen-Vertrauen, unten) — danach in *freier* Reihenfolge Systeme & Erschaffen; das LLM dockt als gedeckelte Quelle an, wann es gebraucht wird
 
 ---
 
@@ -498,11 +531,12 @@ beide Beobachtungen in einem Aufruf; eine Membran, ein geplanter Task.
 
 ---
 
-# Phase 2.5 — Wissen & Quellen-Vertrauen (noch deterministisch)
+# Schicht WISSEN — vollenden · ⑤ Knowledge &amp; Source-Trust (deterministisch)
 
-> Der Schritt, der GENUS von *„weiß, was es gemessen hat"* zu *„weiß Dinge, mit
-> Herkunft"* bringt — **ohne Modell**. Das Fundament für Wetter-Ausbau, Gespräch
-> und später Programmieren. Aus dem Gespräch vom 2026-06-27 herausdestilliert.
+> Der Schritt, der die **Wissens-Schicht des Kerns vollendet**: von „weiß, was es
+> gemessen hat" zu „weiß Dinge aus *jeder* Quelle, mit Herkunft" — **ohne Modell**.
+> *Kein* „Eintritt in eine Model Era", sondern Kern-Vollendung. Das Fundament für
+> Systeme, Sprache und Erschaffen. Aus dem Gespräch vom 2026-06-27/28 destilliert.
 
 **Die Einsicht.** Ein LLM weiß durch Interpolation: keine Herkunft, nicht prüfbar,
 kann halluzinieren, man *muss* ihm glauben. GENUS weiß durch *Aufzeichnung*.
@@ -530,9 +564,10 @@ konsumierbar — GENUS glaubt nie einer Quelle, es zeichnet auf, *welche* Quelle
 Sonnenauf-/untergang, fragwürdige Web-Zahl) passiert *außerhalb*; nur
 `(claim, source, value)` betritt den Kern. Kein HTTP/LLM in `genus/`.
 
-**Warum *vor* der Model Era:** Erst wenn GENUS Quellen sauber verwaltet, ist ein
-LLM bloß *eine weitere gedeckelte Quelle* — der „Model-Vertrag" (Phase 3) wird zum
-**Spezialfall** des Quellen-Vertrauens, nicht zu einem Sonderorgan. Ohne diese
+**Warum es den Kern *vollendet*:** Das heutige Belief-System ist nur der *Sonderfall*
+„Quelle = eigener Sensor". Diese Schicht verallgemeinert ihn — und macht damit das
+LLM zu *einer weiteren gedeckelten Quelle* statt einem Sonderorgan: der „Model-Vertrag"
+(unten, Querschnitt) wird zum **Spezialfall** des Quellen-Vertrauens. Ohne diese
 Schicht wäre ein LLM ein Sonderfall ohne Rahmen; mit ihr ist es nur der
 unzuverlässigste Zeuge unter vielen. Genau das adressiert „GENUS muss kein LLM
 fragen": es weiß aus eigenem, herkunftsbehaftetem Bestand.
@@ -544,46 +579,82 @@ schon (der Ledger). `Proposal ≠ Change` ist bereits die Form sicherer
 Selbst-Veränderung (siehe Leitplanken). Der Weg dorthin führt *durch* diese
 Schicht, nicht an ihr vorbei.
 
-**Neue Events:** `assertion_recorded` (`derivation: source:*`, gedeckelte
-Confidence) · `source_trust_updated` (Reputation aus eigener Bilanz, read-time) ·
-`contradiction_detected` (Quelle gegen Quelle / gegen Beobachtung). Confidence
-bleibt read-time, nie gespeichert.
+**Events:** `assertion_recorded` (`derivation: source:*`, quellen-gedeckelte
+Confidence) · `contradiction_detected` erweitert (Quelle gegen Quelle / gegen
+Beobachtung). **Kein** `source_trust_updated`-Event — *Vertrauen ist read-time*
+berechnet wie Konfidenz und Halbwertszeit, nie gespeichert (eine Korrektur an der
+ersten Skizze).
 
-**Definition of Done (Skizze — der genaue Schritt wird beim Öffnen spezifiziert):**
-- [ ] Behauptung mit `source` + gedeckelter Confidence, replay-stabil
-- [ ] Quellen-Vertrauen aus eigener Bilanz gelernt (keine Vorgabe), read-time
-- [ ] Widerspruch Quelle-gegen-Quelle als Event + optionale Inquiry
-- [ ] Membran rein (kein Fetch/LLM in `genus/`, grep leer)
-- [ ] Wachstumsregel ✓ — Frage 5 bleibt erfüllt (noch kein Modell)
+**Erster Schritt (kleinste solide Scheibe) — „zwei Quellen, eine Behauptung".**
+Beweise das Gerüst an einem konkreten Quellen-Paar, *bevor* reichere Quellen (du, das
+LLM) andocken. Definition of Done:
+- [ ] Evidenz verallgemeinert zur **Behauptung mit `source`** (eine Sensor-Messung ist
+  eine Behauptung von `source:sensor:*`), replay-stabil, Contract erweitert.
+- [ ] Eine **zweite Quelle** für eine bestehende Behauptung (z. B. ein zweiter
+  Wetter-Anbieter für `weather.temp_outside`) — zwei Quellen behaupten dasselbe.
+- [ ] `source_trust(conn, source)` **read-time**: Übereinstimmungs-Rate aus der eigenen
+  Bilanz (keine Vorgabe); eine neue Quelle startet gedeckelt.
+- [ ] Widerspruch Quelle-gegen-Quelle (Divergenz > *self-kalibrierter* Toleranz) →
+  `contradiction_detected`, senkt Vertrauen, optionale Inquiry.
+- [ ] Behauptungs-Confidence durch Quellen-Vertrauen gedeckelt; Belief = trust-
+  gewichteter Konsens. Read-time, nie gespeichert.
+- [ ] Membran rein (kein Fetch/LLM in `genus/`, grep leer) · Replay-stabil · Integrity grün.
+- [ ] Wachstumsregel ✓ — Frage 5 bleibt erfüllt (noch kein Modell).
+
+*Danach (gleiche Schicht, freie Reihenfolge):* **du als hoch-vertraute Quelle** — der
+Lehrer-Loop, GENUS richtet Inquiries an dich („ist das korrekt?") · Almanach/Datensätze
+· **Struktur** (Entität–Relation) als erstklassige Darstellung.
 
 ---
 
-# Phase 3 — Model Era (ab hier mit LLM)
+# Schicht SYSTEME — Regel-Domänen lernen + schließen (deterministisch)
 
-> Wachstumsregel Frage 5 wird **bewusst und kontrolliert** gelockert. Der
-> Punkt, an dem `Model Output ≠ Knowledge` praktisch greifen muss.
+> Vom *Signal* zum *System*. Setzt die Struktur aus Schicht WISSEN voraus.
 
-**Der Model-Vertrag (für alle Schritte ab v2.0):**
-- Modell-Output betritt GENUS **nur als Evidence**, nie direkt als Belief
-- trägt `derivation: model:<name>`, gedeckelte Confidence
-- Governance gated jeden Modell-Beitrag
-- der deterministische Kern bleibt ohne Modell voll funktionsfähig
+GENUS lernt regelgeführte Domänen, in denen es sich *selbst prüfen* kann (der
+Lernprogramm-Loop, auf Regeln statt auf Vorhersagen). Und es **schließt**: leitet
+neue, beweisbare Tripel aus bekannten ab.
 
-## v2.0 — Meaning Engine · *erstes Modell-Organ, echtes Gespräch*
+- **Lernprogramme für prüfbare Domänen** — der regelmäßige Kern *einer* Sprache,
+  Mathe, Spiele, Code. Selbst-Test gegen Grundwahrheit (parst es? legal? Tests grün?).
+- **Inferenz** — gebundenes, deterministisches Schließen über den Graph (rückverfolgbar).
+- Domänen sind **frei wählbar und parallel** — keine feste Reihenfolge.
 
-Sprache → Evidence. Du sagst etwas, GENUS interpretiert es als Beobachtung.
-Jetzt versteht GENUS *dich* — die Query-Schicht aus v0.7 wird zum echten
-Dialog. Erst hier, weil Sprache am weitesten von "roh und eindeutig" entfernt
-ist.
+# Schicht ERSCHAFFEN — verifizierbare Generativität (deterministisch · der Gipfel)
 
-**Neue Events:** `meaning_extracted` (immer `derivation: model:*`)
+> Erzeugen **mit Beweis**. Der „vorhersagen→testen"-Loop, verallgemeinert zu
+> „erzeugen→verifizieren". Setzt ein gemeistertes System voraus.
 
-## v2.x — und weiter
+Wo es einen Prüfstein gibt, *erschafft* GENUS Neues, das korrekt ist: neue Beweise,
+neue Sätze, neuen Code (läuft? Tests grün?). Über **Komponieren + Suchen + Verifizieren**
+— alles deterministisch, geerdet, mit Herkunft. „**Programmieren**" ist genau das, auf
+die Code-Domäne angewandt (governt, Mensch-merge — siehe Leitplanken).
 
-- **Belief-Graph / Memory-Tiefe** — Beliefs vernetzen, wenn ein Proposal es braucht
-- **Transition Core + Worker Interface** — wenn GENUS handeln soll (eigener Replay-Vertrag)
-- **Visual Observation Model** — Bild als Sensor-Typ → Evidence (siehe `GENUS_VISUAL_THINKING.md`)
-- **Maturation+ / Monitoring / Habitat-Pi** — der Rest der Karte, einer nach dem anderen
+---
+
+# Querschnitt — das LLM als gedeckelte Quelle (kein Phase, kein Ziel)
+
+> Wachstumsregel Frage 5 wird **bewusst und kontrolliert** gelockert — *nur* für den
+> *offenen Schwanz* (Fluss, Idiom, das Ungeprüfbare). Verifizierbares Erschaffen
+> bleibt deterministisch im Kern; das LLM ist ein **Werkzeug am Rand**, das jederzeit
+> andocken kann, nie das Ziel.
+
+**Der Model-Vertrag (für jeden Modell-Beitrag):**
+- Modell-Output betritt GENUS **nur als Behauptung einer (niedrig-vertrauten) Quelle**,
+  nie direkt als Belief — der Spezialfall des Quellen-Vertrauens aus Schicht WISSEN.
+- trägt `derivation: model:<name>`, gedeckelte Confidence; Governance gated jeden Beitrag.
+- der deterministische Kern bleibt **ohne Modell voll funktionsfähig**.
+
+Seine zwei ehrlichen Jobs: **dolmetschen** (fuzzy Sprache → Struktur, die „Meaning
+Engine" — `meaning_extracted`, immer `derivation: model:*`) und **Stimme** für flüssige
+Ausgabe. *GENUS weiß und erdet; das LLM dolmetscht und spricht* — jede Äußerung gegen
+das eigene Wissen geprüft.
+
+## Noch offen auf der Karte (einzuordnen, nicht linear)
+
+- **Transition Core + Worker Interface** — wenn GENUS *handeln* soll (eigener Replay-Vertrag).
+- **Visual Observation Model** — Bild als Sensor-Typ → Behauptung (siehe `GENUS_VISUAL_THINKING.md`).
+- **Föderation / Begleiter** — *wie* GENUS genutzt wird (ein Kern pro Charakter, getrennte DBs).
 
 ---
 
@@ -615,13 +686,17 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
   v1.11  Gelernte Halbwertszeit → das letzte Preset geschlossen
   v1.12  Re-Charakterisierung → Selbst-Wissen aktuell · DB-Härtung
   v1.13  Volatilität-als-Ausreißer → Selbst-Sicht geschärft
+  v1.14  Selbst-Reflexion + 24/7-Lernen → Kalibrierung · Surprisal · Forecast-Skill
 
-WISSEN (noch deterministisch)        ← DER NÄCHSTE SCHRITT
-  v1.x   Wissen & Quellen-Vertrauen → GENUS weiß, mit Herkunft
+── Schicht WISSEN vollenden ──        ← DER NÄCHSTE SCHRITT (noch deterministisch)
+  ⑤      Wissen & Quellen-Vertrauen → GENUS weiß aus JEDER Quelle, mit Herkunft
 
-MODEL ERA (mit LLM, eigener Vertrag)
-  v2.0   Meaning Engine       → echtes Gespräch (LLM = nur eine Quelle mehr)
-  v2.x   Graph · Transition · Worker · Visual · Rest der Karte
+── darüber: freie Reihenfolge, alles noch deterministisch & gläsern ──
+  Systeme    Regel-Domänen lernen + schließen (Sprache · Schach · Code …)
+  Erschaffen erzeugen MIT Beweis → der Gipfel  ("Programmieren" = das, auf Code)
+
+── Querschnitt, jederzeit andockbar (kein Phase, kein Ziel) ──
+  LLM        gedeckelte Quelle & Stimme für den offenen Schwanz — nie Orakel
 ```
 
 ---
