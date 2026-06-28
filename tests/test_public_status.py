@@ -51,9 +51,19 @@ def test_public_status_omits_local_paths_and_recent_event_timeline(
     assert status["core_id"] == "pi-core"
     assert status["seed_commit"] == "abc123"
     assert status["privacy"] == {
-        "profile": "public-minimal-v1",
+        "profile": "public-minimal-v2",
         "redacted": ["local_paths", "raw_doctor", "latest_events"],
     }
+    # aggregate, privacy-safe self-knowledge: calibration + per-path learning
+    assert "calibration" in status["cognition"]
+    assert "learning" in status["cognition"]
+    assert set(status["cognition"]["calibration"]) == {
+        "stable_judgments",
+        "held",
+        "accuracy",
+        "discrimination",
+    }
+    assert isinstance(status["cognition"]["learning"], list)
     assert "latest_events" not in status
     assert "doctor" not in status
     assert str(tmp_path) not in serialized

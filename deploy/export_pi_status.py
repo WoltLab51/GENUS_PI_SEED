@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from genus import db, integrity, sealing
+from genus import db, integrity, learning, query, sealing
 
 
 def main() -> int:
@@ -43,8 +43,9 @@ def main() -> int:
                 "active_rules": check["active_rules"],
             },
             "sealing": _seal_summary(head),
+            "cognition": _cognition(conn),
             "privacy": {
-                "profile": "public-minimal-v1",
+                "profile": "public-minimal-v2",
                 "redacted": ["local_paths", "raw_doctor", "latest_events"],
             },
         }
@@ -57,6 +58,40 @@ def main() -> int:
         encoding="utf-8",
     )
     return 0
+
+
+def _round(value: float | None) -> float | None:
+    return round(value, 3) if value is not None else None
+
+
+def _cognition(conn) -> dict:
+    # Aggregate, privacy-safe self-knowledge for the public status: how honest is
+    # GENUS's confidence (calibration), and how is each 24/7 learning path doing.
+    # Only counts and errors -- no values, paths, or event detail. The unreliable
+    # binary "improving" verdict is left out; the early->recent errors tell the
+    # honest trajectory.
+    cal = query.calibration(conn)
+    discrimination = None
+    if cal["stable_mean_flip_rate"] is not None and cal["volatile_mean_flip_rate"] is not None:
+        discrimination = round(cal["volatile_mean_flip_rate"] - cal["stable_mean_flip_rate"], 3)
+    return {
+        "calibration": {
+            "stable_judgments": cal["stable_count"],
+            "held": cal["stable_count"] - len(cal["betrayed"]),
+            "accuracy": _round(cal["stable_judgment_accuracy"]),
+            "discrimination": discrimination,
+        },
+        "learning": [
+            {
+                "metric_key": curve["metric_key"],
+                "scored": curve["scored"],
+                "mean_error": _round(curve["mean_error"]),
+                "early_error": _round(curve["early_mean_error"]),
+                "recent_error": _round(curve["recent_mean_error"]),
+            }
+            for curve in learning.curves(conn)
+        ],
+    }
 
 
 def _seal_summary(head: dict | None) -> dict:
