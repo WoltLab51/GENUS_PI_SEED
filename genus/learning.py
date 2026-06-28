@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 
-from genus import ledger
+from genus import ledger, sources
 
 
 # The learning-program engine. It predicts the next observation of a metric, the
@@ -31,17 +31,15 @@ def _bucket(moment: datetime.datetime, cycle: str) -> int:
 
 
 def _readings(conn, metric_key: str) -> list[tuple[str, float]]:
-    rows = conn.execute(
-        """
-        SELECT created_at, json_extract(payload, '$.metric_value') AS v
-        FROM event_log
-        WHERE event_type = 'evidence_recorded'
-          AND json_extract(payload, '$.metric_key') = ?
-        ORDER BY id
-        """,
-        (metric_key,),
-    ).fetchall()
-    return [(row["created_at"], float(row["v"])) for row in rows]
+    # All sources' readings of this claim (the sensor is one peer), ordered by event id,
+    # so the cycle mean and cadence are learned over the whole observed series -- not
+    # just the sensor path. For a single-source metric this is exactly the evidence.
+    readings = []
+    for row in sources.assertions(conn, metric_key):
+        value = row["value"]
+        if value is not None:
+            readings.append((row["created_at"], float(value)))
+    return readings
 
 
 def _next_observation_bucket(readings: list[tuple[str, float]], cycle: str):
@@ -72,17 +70,10 @@ def forecast_value(conn, metric_key: str, cycle: str, target_bucket: int):
 
 
 def _latest_reading(conn, metric_key: str):
-    row = conn.execute(
-        """
-        SELECT json_extract(payload, '$.metric_value') AS v
-        FROM event_log
-        WHERE event_type = 'evidence_recorded'
-          AND json_extract(payload, '$.metric_key') = ?
-        ORDER BY id DESC LIMIT 1
-        """,
-        (metric_key,),
-    ).fetchone()
-    return float(row["v"]) if row else None
+    # The actual value a forecast is scored against = the resolved current value across
+    # all sources (trust × freshness), not the raw latest sensor reading.
+    value = sources.resolve(conn, metric_key)["value"]
+    return float(value) if value is not None else None
 
 
 def _pending_forecast(conn, metric_key: str):

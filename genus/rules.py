@@ -198,7 +198,7 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
     if rule.get("type") == "binary":
         return apply_binary_rule(conn, metric_key, rule)
 
-    window = _latest_evidence_window(conn, metric_key)
+    window = sources.resolved_window(conn, metric_key, WINDOW_SIZE)
     if len(window) < WINDOW_SIZE:
         return []
 
@@ -329,13 +329,14 @@ def apply_threshold(conn, metric_key: str) -> list[str]:
 
 
 def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
-    window = _latest_evidence_window(conn, metric_key, n=1)
-    if not window:
+    # Point consumer: the current value is the resolved value across all sources
+    # (the sensor is one peer), behaviour-preserving for a single source.
+    resolution = sources.resolve(conn, metric_key)
+    if resolution["value"] is None:
         return []
 
-    latest = window[0]
-    value = float(latest["metric_value"])
-    event_id = int(latest["id"])
+    value = float(resolution["value"])
+    event_id = int(resolution["chosen_event"])
     claim_key = rule["claim_key"]
     derivation = rule["derivation"]
     calibration = rule.get("calibration")
@@ -431,7 +432,7 @@ def apply_trend(conn, metric_key: str) -> list[str]:
     if rule is None:
         return []
 
-    window = _latest_evidence_window(conn, metric_key, n=rule["window"])
+    window = sources.resolved_window(conn, metric_key, rule["window"])
     if len(window) < rule["window"]:
         # A trend needs a full window before it judges direction.
         return []
@@ -589,29 +590,6 @@ def _record_value_belief(
         written.append("belief_superseded")
 
     return written
-
-
-def _latest_evidence_window(conn, metric_key: str = CPU_METRIC_KEY, n: int = WINDOW_SIZE):
-    rows = conn.execute(
-        """
-        SELECT id, json_extract(payload, '$.metric_value') AS metric_value
-        FROM event_log
-        WHERE event_type = 'evidence_recorded'
-          AND json_extract(payload, '$.metric_key') = ?
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (metric_key, n),
-    ).fetchall()
-    evidence = []
-    for row in reversed(rows):
-        evidence.append(
-            {
-                "id": row["id"],
-                "metric_value": row["metric_value"],
-            }
-        )
-    return evidence
 
 
 # Recency bound on the self-calibration scan: percentiles use the most recent

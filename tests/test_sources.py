@@ -173,6 +173,27 @@ def test_source_contradiction_events_replay_clean():
     conn.close()
 
 
+def test_resolved_window_drops_a_faded_source_keeps_the_live_trajectory():
+    conn = _fresh()
+    _inject_assertion(conn, 10.0, "live", "2026-06-28T10:00:00.000Z")
+    _inject_assertion(conn, 11.0, "live", "2026-06-28T11:00:00.000Z")
+    _inject_assertion(conn, 12.0, "live", "2026-06-28T12:00:00.000Z")
+    _inject_assertion(conn, 99.0, "old", "2026-06-28T02:00:00.000Z")  # stale outlier
+    values = [row["metric_value"] for row in sources.resolved_window(conn, CLAIM, 3)]
+    assert 99.0 not in values             # the faded source never enters the window
+    assert values == [10.0, 11.0, 12.0]   # chronological, live trajectory only
+    conn.close()
+
+
+def test_resolved_window_single_source_is_behaviour_preserving():
+    conn = _fresh()
+    for temp in (18.0, 19.0, 20.0):
+        _observe(conn, temp)
+    values = [row["metric_value"] for row in sources.resolved_window(conn, CLAIM, 3)]
+    assert values == [18.0, 19.0, 20.0]
+    conn.close()
+
+
 def test_resolve_cli_runs(monkeypatch):
     conn = _fresh()
     for temp in (18.0, 18.0):

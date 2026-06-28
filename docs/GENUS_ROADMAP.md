@@ -647,9 +647,14 @@ ist dort nur noch *eine Quelle unter Peers*. Verhaltens-erhaltend (eine Quelle �
 letzter Wert); mit mehreren regiert die Auflösung. `resolve(claim)` filtert per Claim in
 SQL, damit der Reactor-Aufruf nicht den ganzen Strom scannt.
 
-*Ehrliche Staffelung (Rest):* die **Fenster**-Konsumenten (`apply_threshold`/`apply_trend`,
-Anti-Flap/Richtung) und **Forecasting** (Kadenz-Subtilität) lesen noch den Rohwert — sie
-durch `resolve` zu leiten ist der nächste Schnitt. Dann regiert die Auflösung *alles*.
+*Die Auflösung regiert jetzt **alles**:* auch die **Fenster**-Konsumenten
+(`apply_threshold`/`apply_trend`) lesen über `sources.resolved_window` — die letzten n
+Werte, beschränkt auf *lebende* Quellen (eine veraltete kann die Bahn nicht verschmutzen;
+lebender Widerspruch ist separat geflaggt). Und **Forecasting** lernt über *alle* Quellen
+(`assertions`) und benotet gegen den **aufgelösten** Wert (`resolve`). `apply_binary_rule`
+(Punkt) läuft ebenfalls über `resolve`; das tote `_latest_evidence_window` ist entfernt.
+Verhaltens-erhaltend (Einzel-/lebende Quelle → wie zuvor); der Sensor ist in der *ganzen*
+Belief- und Lern-Schicht ein Peer.
 
 *Danach (gleiche Schicht, freie Reihenfolge):* claim-verankerte Widersprüche + Inquiry (1c)
 · **du als hoch-vertraute Quelle** (Lehrer-Loop) · Almanach/Datensätze · **Struktur**

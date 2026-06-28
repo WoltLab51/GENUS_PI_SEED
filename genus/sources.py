@@ -244,6 +244,25 @@ def resolve(conn, claim_key: str) -> dict:
     return _resolve(_group_by_claim(assertions(conn)), claim_key)
 
 
+def resolved_window(conn, claim_key: str, n: int) -> list[dict]:
+    """The recent value series a window reactor (trend/threshold) should judge.
+
+    The last ``n`` values of the claim, restricted to sources that are still **live** --
+    so a stale source (the audit's worry: a frozen candidate polluting the trajectory)
+    is left out. Live disagreement is not filtered here; it is a contradiction, flagged
+    and inquired separately. Returns ``{"metric_value", "id"}`` dicts in chronological
+    order, a drop-in for the reactors. With a single (live) source it is exactly the last
+    n readings -- behaviour-preserving.
+    """
+    stream = assertions(conn, claim_key)
+    if not stream:
+        return []
+    resolution = _resolve({claim_key: stream}, claim_key)
+    live = {src for src, cand in resolution["candidates"].items() if cand["live"]}
+    rows = [row for row in stream if row["source"] in live] or stream
+    return [{"metric_value": row["value"], "id": row["id"]} for row in rows[-n:]]
+
+
 def report(conn) -> dict:
     """A read-time summary for the CLI -- each source's trust and the resolution for
     every claim more than one source speaks to. One ledger read, grouped once."""
