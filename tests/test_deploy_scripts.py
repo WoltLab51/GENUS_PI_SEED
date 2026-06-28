@@ -54,6 +54,21 @@ def test_second_weather_membrane_feeds_observe_assertion_number_only():
     assert 'if [ -z "$temp" ]' in script
 
 
+def test_word_membrane_parses_structure_and_feeds_relate():
+    script = (ROOT / "deploy" / "observe_word.sh").read_text(encoding="utf-8")
+
+    # structured knowledge acquisition: the membrane parses word-meaning structure
+    # (part of speech, synonyms, antonyms -- no model) and hands in relations; HTTP at edge.
+    assert "relate" in script
+    assert "--source" in script
+    assert "dictionaryapi" in script
+    assert "synonym" in script
+    assert "is_a" in script
+    # a failed fetch records nothing
+    assert "nothing recorded" in script
+    assert 'if [ -z "$facts" ]' in script
+
+
 def test_clock_check_probes_ntp_and_records_operation_event():
     script = (ROOT / "deploy" / "pi_clock_check.sh").read_text(encoding="utf-8")
 

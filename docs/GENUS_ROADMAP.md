@@ -672,9 +672,50 @@ replay-stabil), abfragbar als Graph. Dieselbe Quellen-Vertrauen-Logik gilt. *Wis
 halten* ist damit strukturiert; es *nutzen* (Inferenz, Cross-Consistency) ist die nächste
 **Schicht** (SYSTEME), nicht mehr WISSEN.
 
-> ✅ **Die WISSEN-Schicht ist vollendet** (2026-06-28): Herkunft · Vertrauen (read-time,
-> self-kalibriert) · Auflösung (regiert alle Konsumenten) · Widerspruch→Surprise-Loop ·
-> Lehrer-Loop · Struktur. Der nächste Sprung ist die Schicht **SYSTEME**.
+> ✅ **Das *Wert-/Quellen*-Wissen ist vollendet** (2026-06-28): Herkunft · Vertrauen
+> (read-time, self-kalibriert) · Auflösung (regiert alle Konsumenten) ·
+> Widerspruch→Surprise-Loop · Lehrer-Loop.
+>
+> ⚠️ **Ehrliche Korrektur (2026-06-28, im Gespräch erkannt):** „WISSEN vollendet" war
+> voreilig. Der **Struktur**-Pfeiler ist erst ein Substrat (flache Tripel, keine
+> Relevanz/Inferenz). Und zwei *notwendige* Dimensionen fehlen, von echtem Bedarf
+> erzwungen (nicht erfunden — siehe [[representation-dimensions-as-merkmale]]):
+> **Kontext** (wo ein Claim gilt — Welt/Gespräch/Strang; Relevanz lebt darin) und
+> **Modalität** (Fakt vs *Ziel/Absicht* — ein Handlungsstrang = Kontext + Ziel).
+> *Vollständigkeits-Test:* eine Schicht ist fertig, wenn keine *gebrauchte* Fähigkeit an
+> einer fehlenden Dimension scheitert — Gespräch/Stränge scheitern noch.
+
+## Nächster Zwischenstand — Wissens-Akquise (strukturierte Quellen → Hirn)
+
+> Ronnys Ziel (2026-06-28): GENUS *eignet sich* Wissen an — saugt **strukturiertes**
+> Wissen aus dem Internet (Fakten, Mathe, Geo, Sprachen, Wortbedeutungen) und füllt sein
+> Hirn; weiß, *wann* etwas Relevanz hat, und *setzt es ein*. **Viel Maschine, LLM am Rand.**
+
+**Warum das ohne LLM geht:** das Internet ist großteils *schon strukturiert* —
+**Wikidata** (Tripel!), **WordNet/Wiktionary** (Wort-Sinne + Relationen, genau „Bedeutung
+in Beziehung x"), **GeoNames/REST-APIs** (Geo), formale Mathe-Bibliotheken,
+Grammatik-Tabellen. Aufnehmen = *parsen* (Membran), nicht *interpretieren*. Das LLM braucht
+es nur für den *unstrukturierten Schwanz* (freier Text → Struktur) und die Stimme.
+
+**Der Bogen (jedes Stück deterministisch, bekannt):**
+```
+strukturierte Quellen (Wikidata/WordNet/GeoNames/…)
+  → Membran-Parser → relation_asserted (Herkunft, Trust)
+  → indizierte Relations-Projektion (Skala — das eigene event→projection-Muster,
+     wie belief_projection; der heutige read-time-Voll-Scan reicht nur für Tausende)
+  → Kontext + Relevanz (was holen, wann nutzen)
+  → resolve über Sinne (Wortbedeutung im Kontext = Kandidaten aus WordNet, Kriterium Kontext)
+  → LLM NUR für den unstrukturierten Schwanz + Stimme
+```
+
+**Erste Scheibe — GEBAUT (2026-06-28):** *strukturierte Wortbedeutung* über die Membran ins
+Hirn (`deploy/observe_word.sh`) — genau dein „Bedeutung in Beziehung x". Eine freie,
+no-auth Wörterbuch-API liefert Wortsinn als *Struktur* (Wortart, Synonyme, Antonyme); der
+Parser macht daraus Tripel wie `run -[is_a]-> verb` · `run -[synonym]-> execute`, die als
+`relation_asserted` (Quelle `dictionaryapi`, Herkunft) in den Graph gehen. Deterministisch,
+**kein LLM**. `genus relations run` zeigt das gelernte Wort-Wissen.
+*Danach:* Skala (indizierte Relations-Projektion) · mehr Quellen (Wikidata, GeoNames) ·
+Kontext/Relevanz (welcher Sinn wann) · `resolve` über Sinne.
 
 ---
 
