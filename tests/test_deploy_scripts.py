@@ -11,6 +11,7 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] state-refresh" in script
     assert "[TICK] clock-check" in script
     assert "[TICK] weather" in script
+    assert "[TICK] weather-2" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
@@ -28,6 +29,24 @@ def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():
     assert "open-meteo" in script
     assert "temperature_2m" in script
     # location is configured here and never handed to the core
+    assert "GENUS_WEATHER_LAT" in script
+    assert "GENUS_WEATHER_LON" in script
+    # a failed fetch records nothing — absence is not a reading
+    assert "no observation recorded" in script
+    assert 'if [ -z "$temp" ]' in script
+
+
+def test_second_weather_membrane_feeds_observe_assertion_number_only():
+    script = (ROOT / "deploy" / "observe_weather_second.sh").read_text(encoding="utf-8")
+
+    # an independent second source for the SAME claim, fed via the assertion entry point
+    assert "observe-assertion" in script
+    assert "--claim-key" in script
+    assert "weather.temp_outside" in script
+    assert "--source" in script
+    assert "wttr.in" in script
+    assert "temp_C" in script
+    # location lives at the edge; only the number crosses
     assert "GENUS_WEATHER_LAT" in script
     assert "GENUS_WEATHER_LON" in script
     # a failed fetch records nothing — absence is not a reading

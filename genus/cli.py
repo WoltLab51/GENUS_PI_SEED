@@ -224,6 +224,27 @@ def observe_weather(temp_outside: float, source: str) -> None:
         conn.close()
 
 
+@main.command("observe-assertion")
+@click.option("--claim-key", "claim_key", required=True)
+@click.option("--value", "value", required=True, type=float)
+@click.option("--source", required=True)
+def observe_assertion(claim_key: str, value: float, source: str) -> None:
+    """Record a claim asserted by an external source — the general WISSEN entry point.
+
+    The membrane fetches the value and hands in only (claim, source, value); the core
+    never reaches out. Used to feed a second source for an existing claim so GENUS
+    learns whom to trust (see `genus sources`).
+    """
+    conn = get_conn()
+    try:
+        result = reactors.observe_assertion(conn, claim_key, value, source)
+        click.echo(
+            f"[ASR] {claim_key} = {value} (source={source}) — event {result['event_id']}"
+        )
+    finally:
+        conn.close()
+
+
 def _atlas_facts() -> str:
     """Derive the atlas's drift-prone facts from the code itself.
 

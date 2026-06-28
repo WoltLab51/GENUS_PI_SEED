@@ -628,9 +628,12 @@ Gebaut in zwei Teil-Schnitten (1a verhaltens-erhaltend, 1b neues Verhalten); Sta
 - [x] Membran rein (`test_membrane_purity`) · Replay-stabil · Integrity grün · 279 Tests.
 - [x] Wachstumsregel ✓ — Frage 5 bleibt erfüllt (noch kein Modell).
 
-*Noch zu füttern:* die zweite Quelle lebt erst als `observe_assertion`-Eingang — ein
-`deploy/`-Skript (zweiter Wetter-Anbieter) muss sie auf dem Pi *speisen*, damit der Konsens
-real wird (1c, Membran-Seite).
+*Gefüttert (1c):* ein zweiter, unabhängiger Wetter-Anbieter (**wttr.in**) speist über
+`deploy/observe_weather_second.sh` + `genus observe-assertion` *denselben* Claim
+`weather.temp_outside` (stündlicher Cron) — Konsens & Widerspruch werden auf dem Pi real.
+*Offen (vom Deploy aufgedeckt):* **Rezenz-Bewusstsein** — eine Quelle, die lange nicht
+mehr gesprochen hat (z. B. die alten quellen-losen Wetter-Events als `sensor`), sollte
+nicht als *aktueller* Anspruch zählen; aktuell ist ihr letzter Wert eingefroren.
 
 *Danach (gleiche Schicht, freie Reihenfolge):* claim-verankerte Widersprüche + Inquiry (1c)
 · **du als hoch-vertraute Quelle** (Lehrer-Loop) · Almanach/Datensätze · **Struktur**

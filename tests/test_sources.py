@@ -87,6 +87,19 @@ def test_assertion_recorded_passes_integrity_and_replays_clean():
     conn.close()
 
 
+def test_observe_assertion_cli_records_a_source(monkeypatch):
+    conn = _fresh()
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(
+        cli.main,
+        ["observe-assertion", "--claim-key", CLAIM, "--value", "18.5", "--source", "wttr.in"],
+    )
+    # the command closes its own connection, so assert on its output, not the conn
+    assert result.exit_code == 0, result.output
+    assert "[ASR]" in result.output
+    assert "wttr.in" in result.output
+
+
 def test_sources_cli_runs(monkeypatch):
     conn = _fresh()
     for temp in (18.0, 18.0):
