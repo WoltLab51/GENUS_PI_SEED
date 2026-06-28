@@ -242,6 +242,19 @@ def test_relation_asserted_replays_clean():
     conn.close()
 
 
+def test_gaps_are_referenced_but_unknown_words():
+    conn = _fresh()
+    reactors.observe_relation(conn, "run", "synonym", "execute", "dict")
+    reactors.observe_relation(conn, "run", "is_a", "verb", "dict")
+    g = sources.gaps(conn)
+    assert "execute" in g   # referenced via synonym, not yet a subject -> a gap
+    assert "verb" not in g  # is_a objects (parts of speech) are not word gaps
+    # once GENUS learns "execute", it is no longer a gap
+    reactors.observe_relation(conn, "execute", "synonym", "run", "dict")
+    assert "execute" not in sources.gaps(conn)
+    conn.close()
+
+
 def test_relations_project_and_rebuild_from_the_log():
     conn = _fresh()
     reactors.observe_relation(conn, "run", "is_a", "verb", "dict")

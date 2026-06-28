@@ -12,6 +12,7 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] clock-check" in script
     assert "[TICK] weather" in script
     assert "[TICK] weather-2" in script
+    assert "[TICK] acquire-gaps" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
@@ -67,6 +68,16 @@ def test_word_membrane_parses_structure_and_feeds_relate():
     # a failed fetch records nothing
     assert "nothing recorded" in script
     assert 'if [ -z "$facts" ]' in script
+
+
+def test_acquire_gaps_loop_asks_genus_and_fetches_each():
+    script = (ROOT / "deploy" / "acquire_gaps.sh").read_text(encoding="utf-8")
+
+    # the loop asks GENUS what it doesn't know, then the membrane fetches each word
+    assert "gaps" in script
+    assert "observe_word.sh" in script
+    assert "GENUS_GAP_LIMIT" in script  # bounded per tick -- gentle on the API
+    assert "no gaps" in script          # the closed-vocabulary case records nothing
 
 
 def test_clock_check_probes_ntp_and_records_operation_event():

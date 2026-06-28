@@ -392,6 +392,18 @@ def relations_command(subject: str | None) -> None:
         conn.close()
 
 
+@main.command("gaps")
+@click.option("--limit", default=20, type=int, show_default=True)
+def gaps_command(limit: int) -> None:
+    """List knowledge gaps — referenced words GENUS doesn't know yet (one per line)."""
+    conn = get_conn()
+    try:
+        for word in sources.gaps(conn, limit):
+            click.echo(word)
+    finally:
+        conn.close()
+
+
 @main.group(name="explain")
 def explain_group() -> None:
     pass

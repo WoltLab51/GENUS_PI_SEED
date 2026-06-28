@@ -286,6 +286,26 @@ def relations(conn, subject: str | None = None, predicate: str | None = None) ->
     return [dict(row) for row in rows]
 
 
+def gaps(conn, limit: int = 20) -> list[str]:
+    """Knowledge gaps: words GENUS's own graph *points at* but has not learned yet --
+    objects of synonym/antonym relations that are not themselves subjects. The seed of
+    gap-driven (permanent) learning: GENUS knows what it does not know, and the membrane
+    fills it. Bounded by ``limit`` so each tick is gentle.
+    """
+    rows = conn.execute(
+        """
+        SELECT DISTINCT object AS word
+        FROM relation_projection
+        WHERE predicate IN ('synonym', 'antonym')
+          AND object NOT IN (SELECT subject FROM relation_projection)
+        ORDER BY object
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [row["word"] for row in rows]
+
+
 def report(conn) -> dict:
     """A read-time summary for the CLI -- each source's trust and the resolution for
     every claim more than one source speaks to. One ledger read, grouped once."""
