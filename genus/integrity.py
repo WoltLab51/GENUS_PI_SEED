@@ -29,7 +29,7 @@ REQUIRED_EVENT_KEYS = {
         "supporting_events",
         "reason",
     },
-    "contradiction_detected": {"belief_id", "reason"},
+    "contradiction_detected": {"reason"},
     "proposal_created": {
         "proposal_id",
         "proposal_type",
@@ -406,6 +406,14 @@ def validate_event_contract(conn) -> list[str]:
             "derivation"
         ):
             issues.append(f"event {row['id']} {event_type} has empty derivation")
+        if event_type == "contradiction_detected" and not (
+            payload.get("belief_id") or payload.get("claim_key")
+        ):
+            # A contradiction must anchor to something: a belief (belief-vs-evidence) or
+            # a claim (source-vs-source, which may have no belief).
+            issues.append(
+                f"event {row['id']} contradiction_detected needs belief_id or claim_key"
+            )
         if event_type == "experience_recorded" and not payload.get("derivation"):
             issues.append(f"event {row['id']} experience_recorded has empty derivation")
         if event_type == "state_changed" and not payload.get("derivation"):

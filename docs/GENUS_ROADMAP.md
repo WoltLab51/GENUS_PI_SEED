@@ -617,11 +617,13 @@ Gebaut in zwei Teil-Schnitten (1a verhaltens-erhaltend, 1b neues Verhalten); Sta
   read-time `consensus`) — zwei Quellen behaupten dasselbe. *(1b)*
 - [x] `source_trust(conn, source)` **read-time**: Übereinstimmungs-Bilanz, self-kalibrierte
   Toleranz, keine Vorgabe; neue Quelle am Saat-Deckel. CLI: `genus sources`. *(1a/1b)*
-- [~] Widerspruch Quelle-gegen-Quelle (Divergenz > self-kalibrierter Toleranz): **erkannt**
-  (read-time, `consensus.contradiction`) und **senkt Vertrauen** automatisch. Das
-  `contradiction_detected`-**Event + Inquiry** ist **vertagt** — Widerspruch/Inquiry sind
-  heute belief-verankert, Wetter hat aber keinen Belief; *claim-verankerte* Widersprüche
-  sind ein struktureller Schnitt (1c).
+- [x] Widerspruch Quelle-gegen-Quelle (Divergenz > self-kalibrierter Toleranz, nur unter
+  *lebenden* Kandidaten): **erkannt** (`resolve.contradiction`), **senkt Vertrauen**
+  automatisch, *und* **regiert** den Surprise-Loop — `observe_assertion` emittiert ein
+  **claim-verankertes** `contradiction_detected` + eine `SourceContradiction`-Inquiry
+  (einmal pro offener Episode). `contradiction_detected` ist nun belief- *oder*
+  claim-verankert (Contract gelockert, rückwärtskompatibel); Inquiry mit `source_belief =
+  NULL` (Schema erlaubte es). Der Keim des Lehrer-Loops.
 - [~] Belief = trust-gewichteter Konsens, read-time: als **`consensus`-Sicht** geliefert
   (Auswahl per einsteckbarem Kriterium). Sie zur *kanonischen* `active_belief` zu erheben
   berührt alle Belief-Konsumenten → eigener Schnitt (1c).

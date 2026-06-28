@@ -122,6 +122,57 @@ def test_a_stale_source_fades_and_raises_no_false_contradiction():
     conn.close()
 
 
+def test_disagreeing_live_sources_raise_a_claim_anchored_inquiry():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)  # source "mock"
+    result = reactors.observe_assertion(conn, CLAIM, 30.0, "provider-b")
+    types = [event["event_type"] for event in result["events"]]
+    assert "contradiction_detected" in types
+    assert "inquiry_created" in types
+    rows = conn.execute(
+        "SELECT inquiry_type, source_belief FROM inquiry_log WHERE state = 'open'"
+    ).fetchall()
+    # claim-anchored: a SourceContradiction inquiry with no belief behind it
+    assert any(
+        row["inquiry_type"] == "SourceContradiction" and row["source_belief"] is None
+        for row in rows
+    )
+    conn.close()
+
+
+def test_source_contradiction_fires_once_per_open_episode():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)
+    reactors.observe_assertion(conn, CLAIM, 30.0, "provider-b")
+    second = reactors.observe_assertion(conn, CLAIM, 31.0, "provider-b")  # still disagrees
+    assert "inquiry_created" not in [event["event_type"] for event in second["events"]]
+    count = conn.execute(
+        "SELECT COUNT(*) AS c FROM inquiry_log WHERE inquiry_type = 'SourceContradiction'"
+    ).fetchone()["c"]
+    assert count == 1
+    conn.close()
+
+
+def test_agreeing_sources_raise_no_contradiction_inquiry():
+    conn = _fresh()
+    for temp in (18.0, 18.0):
+        _observe(conn, temp)
+    result = reactors.observe_assertion(conn, CLAIM, 18.0, "provider-b")
+    assert "inquiry_created" not in [event["event_type"] for event in result["events"]]
+    conn.close()
+
+
+def test_source_contradiction_events_replay_clean():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)
+    reactors.observe_assertion(conn, CLAIM, 30.0, "provider-b")
+    assert integrity.check(conn)["ok"] is True
+    conn.close()
+
+
 def test_resolve_cli_runs(monkeypatch):
     conn = _fresh()
     for temp in (18.0, 18.0):

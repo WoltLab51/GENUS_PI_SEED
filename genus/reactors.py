@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import learning, ledger, rules
+from genus import inquiries, learning, ledger, rules, sources
 
 
 # Which metrics run a 24/7 learning program, and on which cycle period. The engine
@@ -93,11 +93,44 @@ def observe_assertion(
                 "derivation": derivation or f"source:{source}",
             },
         )
+        events = [{"event_type": "assertion_recorded", "id": event_id}]
+        # The surprise loop, on knowledge: if trusted, live sources now disagree about
+        # this claim, record the contradiction and raise one inquiry per open episode.
+        # GENUS flags a conflict it cannot settle from its own sources -- the teacher-loop
+        # seed. (Replay re-applies the stored events; the check runs only live.)
+        resolution = sources.resolve(conn, claim_key)
+        if resolution["contradiction"] and not _open_source_contradiction(conn, claim_key):
+            contradiction_id = ledger.append(
+                conn,
+                "contradiction_detected",
+                {"claim_key": claim_key, "reason": f"sources disagree on {claim_key}"},
+            )
+            events.append({"event_type": "contradiction_detected", "id": contradiction_id})
+            live = {
+                src: cand["value"]
+                for src, cand in resolution["candidates"].items()
+                if cand["live"]
+            }
+            inquiries.record_source_contradiction_inquiry(
+                conn,
+                claim_key=claim_key,
+                source_event=contradiction_id,
+                payload={"claim_key": claim_key, "candidates": live, "review_recommended": True},
+            )
+            events.append({"event_type": "inquiry_created"})
         conn.commit()
     except Exception:
         conn.rollback()
         raise
-    return {"event_id": event_id, "events": [{"event_type": "assertion_recorded", "id": event_id}]}
+    return {"event_id": event_id, "events": events}
+
+
+def _open_source_contradiction(conn, claim_key: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM inquiry_log WHERE inquiry_type = ? AND claim_key = ? AND state = 'open' LIMIT 1",
+        (inquiries.SOURCE_CONTRADICTION_TYPE, claim_key),
+    ).fetchone()
+    return row is not None
 
 
 def process_observation(conn, observation_id: int) -> list[dict]:

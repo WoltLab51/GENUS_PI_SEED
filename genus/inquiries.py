@@ -7,6 +7,8 @@ from genus import ledger
 
 INQUIRY_TYPE = "CauseInquiry"
 QUESTION_KEY = "cause.changed_state"
+SOURCE_CONTRADICTION_TYPE = "SourceContradiction"
+SOURCE_CONTRADICTION_QUESTION = "source.contradiction"
 OPEN = "open"
 RESOLVED = "resolved"
 
@@ -15,7 +17,7 @@ def create_inquiry(
     conn,
     inquiry_type: str,
     claim_key: str,
-    source_belief: int,
+    source_belief: int | None,
     source_event: int,
     question_key: str,
     payload: dict,
@@ -96,6 +98,31 @@ def record_cause_inquiry_for_contradiction(
     )
 
 
+def record_source_contradiction_inquiry(
+    conn,
+    claim_key: str,
+    source_event: int,
+    payload: dict,
+) -> int:
+    """Raise a claim-anchored inquiry: trusted sources disagree about this claim.
+
+    A metric claim need not have a categorical belief, so there is nothing to anchor a
+    belief to -- ``source_belief`` is ``None`` and the inquiry hangs on the claim and the
+    assertion event that exposed the conflict. The seed of the teacher-loop: GENUS flags
+    a disagreement it cannot settle from its own sources.
+    """
+    return record_inquiry_created_event(
+        conn,
+        inquiry_id=next_inquiry_id(conn),
+        inquiry_type=SOURCE_CONTRADICTION_TYPE,
+        claim_key=claim_key,
+        source_belief=None,
+        source_event=source_event,
+        question_key=SOURCE_CONTRADICTION_QUESTION,
+        payload=payload,
+    )
+
+
 def record_inquiry_created_event(
     conn,
     inquiry_id: int,
@@ -123,11 +150,12 @@ def record_inquiry_created_event(
 
 
 def apply_inquiry_created(conn, payload: dict) -> int:
+    source_belief = payload["source_belief"]
     return create_inquiry(
         conn,
         inquiry_type=payload["inquiry_type"],
         claim_key=payload["claim_key"],
-        source_belief=int(payload["source_belief"]),
+        source_belief=int(source_belief) if source_belief is not None else None,
         source_event=int(payload["source_event"]),
         question_key=payload["question_key"],
         payload=dict(payload["payload"]),
