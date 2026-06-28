@@ -103,7 +103,8 @@ SPC als verkörpert erkannt, TMS auf die Inferenz-Schicht vertagt. Alle read-tim
 Fakten, Replay-stabil, Kern bleibt modell-frei.
 
 **Gelb:** Maturation-Pfad gebaut, aber schläft (idle Pi hat keinen Aktivitäts-Rhythmus, `active_rules=0`) · cli-Split nur teilweise
-**Rot — der nächste Schritt:** **Schicht WISSEN vollenden** (⑤ Wissen & Quellen-Vertrauen, unten) — danach in *freier* Reihenfolge Systeme & Erschaffen; das LLM dockt als gedeckelte Quelle an, wann es gebraucht wird
+**Grün, neu (2026-06-28):** **Schicht WISSEN vollendet** — Herkunft · Vertrauen (read-time) · `resolve` regiert alle Konsumenten · Widerspruch→Surprise-Loop · Lehrer-Loop · Struktur (Relationen).
+**Rot — der nächste Schritt:** **Schicht SYSTEME** — Regel-Domänen lernen + schließen; danach Erschaffen; das LLM dockt als gedeckelte Quelle an, wann es gebraucht wird
 
 ---
 
@@ -758,10 +759,11 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
   v1.13  Volatilität-als-Ausreißer → Selbst-Sicht geschärft
   v1.14  Selbst-Reflexion + 24/7-Lernen → Kalibrierung · Surprisal · Forecast-Skill
 
-── Schicht WISSEN vollenden ──        ← DER NÄCHSTE SCHRITT (noch deterministisch)
-  ⑤      Wissen & Quellen-Vertrauen → GENUS weiß aus JEDER Quelle, mit Herkunft
+── Schicht WISSEN ── VOLLENDET ✅ (2026-06-28, deterministisch)
+  ⑤      Wissen & Quellen-Vertrauen → weiß aus JEDER Quelle, mit Herkunft · resolve
+         regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur (Relationen)
 
-── darüber: freie Reihenfolge, alles noch deterministisch & gläsern ──
+── darüber: freie Reihenfolge, alles noch deterministisch & gläsern ──   ← JETZT HIER
   Systeme    Regel-Domänen lernen + schließen (Sprache · Schach · Code …)
   Erschaffen erzeugen MIT Beweis → der Gipfel  ("Programmieren" = das, auf Code)
 
