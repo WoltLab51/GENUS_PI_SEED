@@ -47,7 +47,6 @@ fi
     echo '*/15 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] clock-check $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/pi_clock_check.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '7 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] weather $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_weather.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '12 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] weather-2 $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_weather_second.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
-    echo '*/30 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] acquire-gaps $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/acquire_gaps.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '27 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] doctor $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/doctor.log" 2>&1 && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
     echo '47 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] repo-observe $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_repo_on_pi.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'

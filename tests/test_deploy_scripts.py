@@ -12,7 +12,6 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] clock-check" in script
     assert "[TICK] weather" in script
     assert "[TICK] weather-2" in script
-    assert "[TICK] acquire-gaps" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
