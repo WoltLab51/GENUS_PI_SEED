@@ -10,8 +10,14 @@ is stored, there is no ``source_trust_updated`` event.
 A source earns trust by *agreeing* with other sources where their claims overlap.
 With no overlap it is simply unproven and held at a seed -- so adding a brand-new
 source never silently overrules one that has actually earned agreement.
+
+Efficiency: the stream is read from the ledger *once* per call and all trust /
+consensus is computed in memory (grouped by claim). The live Pi proved this matters --
+a per-source/per-claim re-query took seconds on a 20k-event ledger.
 """
 from __future__ import annotations
+
+from collections import defaultdict
 
 # A new/unproven source starts here. Structural seed, not an epistemic threshold:
 # a source we have no agreement record for is held at arm's length. As it builds a
@@ -32,7 +38,8 @@ def assertions(conn, claim_key: str | None = None) -> list[dict]:
 
     Unifies the sensor path (``evidence_recorded``, source carried from the
     observation; older events without one read as ``sensor``) and the general path
-    (``assertion_recorded``, explicit source). Read-only, ordered by event id.
+    (``assertion_recorded``, explicit source). The one DB read; callers group it in
+    memory. Read-only, ordered by event id.
     """
     rows = conn.execute(
         """
@@ -60,28 +67,29 @@ def assertions(conn, claim_key: str | None = None) -> list[dict]:
     return out
 
 
-def sources(conn) -> list[str]:
-    return sorted({row["source"] for row in assertions(conn) if row["source"]})
+def _group_by_claim(stream: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for row in stream:
+        grouped[row["claim_key"]].append(row)
+    return grouped
 
 
-def latest_by_source(conn, claim_key: str) -> dict[str, dict]:
-    """The most recent assertion for ``claim_key`` from each source (the candidates)."""
+def _latest_by_source(rows: list[dict]) -> dict[str, dict]:
+    """The most recent assertion from each source (the candidates), for one claim."""
     latest: dict[str, dict] = {}
-    for row in assertions(conn, claim_key):
+    for row in rows:  # rows are id-ordered, so later overwrites -> latest per source
         if row["source"]:
-            latest[row["source"]] = row  # later id wins -> latest per source
+            latest[row["source"]] = row
     return latest
 
 
-def _claim_tolerance(conn, claim_key: str) -> float | None:
+def _tolerance(values: list[float]) -> float | None:
     """Self-calibrated agree/disagree band: the claim's own spread (1 std).
 
     Not a constant -- a value within one standard deviation of the claim's lived
-    variation counts as agreement. ``None`` when there is too little history to
-    learn a band (caller then requires exact agreement). The Pi sharpens this.
+    variation counts as agreement. ``None`` when there is too little history to learn
+    a band (caller then requires exact agreement). The Pi sharpens this.
     """
-    values = [_to_float(row["value"]) for row in assertions(conn, claim_key)]
-    values = [v for v in values if v is not None]
     if len(values) < 2:
         return None
     mean = sum(values) / len(values)
@@ -95,21 +103,14 @@ def _agree(a: float, b: float, tolerance: float | None) -> bool:
     return abs(a - b) <= tolerance
 
 
-def source_trust(conn, source: str) -> float:
-    """Read-time trust for ``source``: how often it agrees with other sources.
-
-    Assessed only on claims where at least one *other* source asserted too; with no
-    such overlap the source is unproven and held at :data:`SOURCE_TRUST_SEED`. The
-    agreement band is self-calibrated per claim (:func:`_claim_tolerance`).
-    """
-    claim_keys = {row["claim_key"] for row in assertions(conn) if row["source"] == source}
+def _trust(by_claim: dict[str, list[dict]], source: str) -> float:
     agreements: list[float] = []
-    for claim_key in claim_keys:
-        latest = latest_by_source(conn, claim_key)
+    for rows in by_claim.values():
+        latest = _latest_by_source(rows)
         mine = _to_float(latest.get(source, {}).get("value"))
         if mine is None:
             continue
-        tolerance = _claim_tolerance(conn, claim_key)
+        tolerance = _tolerance([v for v in (_to_float(r["value"]) for r in rows) if v is not None])
         for other, row in latest.items():
             if other == source:
                 continue
@@ -122,37 +123,11 @@ def source_trust(conn, source: str) -> float:
     return round(sum(agreements) / len(agreements), 3)
 
 
-def report(conn) -> dict:
-    """A read-time summary for the CLI: each source's trust, and the consensus for
-    every claim more than one source speaks to."""
-    claim_keys = sorted({row["claim_key"] for row in assertions(conn) if row["claim_key"]})
-    contested = [
-        consensus(conn, claim_key)
-        for claim_key in claim_keys
-        if len(latest_by_source(conn, claim_key)) > 1
-    ]
-    return {
-        "sources": [{"source": src, "trust": source_trust(conn, src)} for src in sources(conn)],
-        "consensus": contested,
-    }
-
-
-def consensus(conn, claim_key: str) -> dict:
-    """Read-time consensus over a claim's candidate assertions (one per source).
-
-    The morphological cell: candidates (the latest value per source) selected by a
-    *pluggable criterion* -- today source trust (highest-trust source's value; ties
-    broken by the most recent assertion). Reports whether the sources agree or
-    contradict, with each source's value and trust. Read-only, nothing stored; the
-    same shape later carries an evaluation criterion (e.g. a chess move score).
-    """
-    latest = latest_by_source(conn, claim_key)
+def _consensus(by_claim: dict[str, list[dict]], claim_key: str) -> dict:
+    rows = by_claim.get(claim_key, [])
+    latest = _latest_by_source(rows)
     candidates = {
-        src: {
-            "value": row["value"],
-            "trust": source_trust(conn, src),
-            "event_id": row["id"],
-        }
+        src: {"value": row["value"], "trust": _trust(by_claim, src), "event_id": row["id"]}
         for src, row in latest.items()
     }
     if not candidates:
@@ -167,9 +142,8 @@ def consensus(conn, claim_key: str) -> dict:
         candidates,
         key=lambda src: (candidates[src]["trust"], candidates[src]["event_id"]),
     )
-    tolerance = _claim_tolerance(conn, claim_key)
-    numeric = [_to_float(c["value"]) for c in candidates.values()]
-    numeric = [v for v in numeric if v is not None]
+    tolerance = _tolerance([v for v in (_to_float(r["value"]) for r in rows) if v is not None])
+    numeric = [v for v in (_to_float(c["value"]) for c in candidates.values()) if v is not None]
     contradiction = any(not _agree(a, b, tolerance) for a in numeric for b in numeric)
     return {
         "claim_key": claim_key,
@@ -177,4 +151,48 @@ def consensus(conn, claim_key: str) -> dict:
         "chosen_source": chosen,
         "candidates": candidates,
         "contradiction": contradiction,
+    }
+
+
+def sources(conn) -> list[str]:
+    return sorted({row["source"] for row in assertions(conn) if row["source"]})
+
+
+def source_trust(conn, source: str) -> float:
+    """Read-time trust for ``source``: how often it agrees with other sources.
+
+    Assessed only on claims where at least one *other* source asserted too; with no
+    such overlap the source is unproven and held at :data:`SOURCE_TRUST_SEED`. The
+    agreement band is self-calibrated per claim (:func:`_tolerance`).
+    """
+    return _trust(_group_by_claim(assertions(conn)), source)
+
+
+def consensus(conn, claim_key: str) -> dict:
+    """Read-time consensus over a claim's candidate assertions (one per source).
+
+    The morphological cell: candidates (the latest value per source) selected by a
+    *pluggable criterion* -- today source trust (highest-trust source's value; ties
+    broken by the most recent assertion). Reports whether the sources agree or
+    contradict, with each source's value and trust. Read-only, nothing stored; the
+    same shape later carries an evaluation criterion (e.g. a chess move score).
+    """
+    return _consensus(_group_by_claim(assertions(conn)), claim_key)
+
+
+def report(conn) -> dict:
+    """A read-time summary for the CLI -- each source's trust and the consensus for
+    every claim more than one source speaks to. One ledger read, grouped once."""
+    by_claim = _group_by_claim(assertions(conn))
+    source_names = sorted(
+        {row["source"] for rows in by_claim.values() for row in rows if row["source"]}
+    )
+    contested = [
+        _consensus(by_claim, claim_key)
+        for claim_key, rows in by_claim.items()
+        if len({row["source"] for row in rows if row["source"]}) > 1
+    ]
+    return {
+        "sources": [{"source": src, "trust": _trust(by_claim, src)} for src in source_names],
+        "consensus": contested,
     }
