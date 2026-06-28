@@ -77,16 +77,21 @@ def process_observation(conn, observation_id: int) -> list[dict]:
         raise ValueError("process_observation requires observation_created")
 
     payload = json.loads(observation["payload"])
+    metric_key = payload.get("metric_key", rules.CPU_METRIC_KEY)
     evidence_id = ledger.append(
         conn,
         "evidence_recorded",
         {
             "observation_id": observation_id,
-            "metric_key": payload.get("metric_key", rules.CPU_METRIC_KEY),
+            "metric_key": metric_key,
             "metric_value": payload["raw_value"],
+            # Provenance into the knowledge layer: the membrane already tags every
+            # observation with a source -- carry it so source trust can be learned
+            # read-time (genus/sources.py). Optional on the contract; older
+            # evidence_recorded events (pre-source) stay valid and replay clean.
+            "source": payload.get("source", "sensor"),
         },
     )
-    metric_key = payload.get("metric_key", rules.CPU_METRIC_KEY)
     events = [
         {
             "event_type": "evidence_recorded",
