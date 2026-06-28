@@ -703,6 +703,9 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
 
 ## Harte Leitplanken — was auf keinem Schritt passieren darf
 
+> *Wie* wir bauen, damit diese Leitplanken halten: [GENUS_QUALITY.md](GENUS_QUALITY.md)
+> — die Qualitäts-Charta (Plan-Disziplin + Bau-Gates, an jeder Scheibe abgehakt).
+
 Diese gelten über alle Versionen, ohne Ausnahme:
 
 - **Proposals werden niemals automatisch ausgeführt.** `Proposal ≠ Change`
