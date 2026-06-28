@@ -69,3 +69,18 @@ def test_public_status_omits_local_paths_and_recent_event_timeline(
     assert str(tmp_path) not in serialized
     assert "/home/" not in serialized
     assert "C:\\" not in serialized
+
+    # the daily time-series and the human-readable rendering, alongside latest.json
+    history_text = (output.parent / "history.jsonl").read_text(encoding="utf-8")
+    status_md = (output.parent / "STATUS.md").read_text(encoding="utf-8")
+    history = [json.loads(line) for line in history_text.splitlines() if line.strip()]
+    assert len(history) == 1
+    assert history[0]["events"] == status["counts"]["events"]
+    assert "date" in history[0] and "calibration_accuracy" in history[0]
+    assert status_md.startswith("# GENUS")
+    assert "Self-knowledge" in status_md
+    # neither convenience artifact leaks local paths
+    for blob in (history_text, status_md):
+        assert str(tmp_path) not in blob
+        assert "/home/" not in blob
+        assert "C:\\" not in blob

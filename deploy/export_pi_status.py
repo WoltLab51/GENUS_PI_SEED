@@ -57,6 +57,12 @@ def main() -> int:
         json.dumps(status, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
+    # A daily time-series so the learning journey is visible over days, plus a
+    # human-readable rendering -- both alongside latest.json, no new privacy surface.
+    history = _update_history(output_path.parent / "history.jsonl", _history_entry(status))
+    (output_path.parent / "STATUS.md").write_text(
+        _render_markdown(status, history), encoding="utf-8"
+    )
     return 0
 
 
@@ -111,6 +117,131 @@ def _now_utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace(
         "+00:00", "Z"
     )
+
+
+def _history_entry(status: dict) -> dict:
+    cal = status["cognition"]["calibration"]
+    return {
+        "date": status["generated_at"][:10],
+        "generated_at": status["generated_at"],
+        "ok": status["ok"],
+        "events": status["counts"]["events"],
+        "active_beliefs": status["counts"]["active_beliefs"],
+        "experiences": status["counts"]["experiences"],
+        "calibration_accuracy": cal["accuracy"],
+        "calibration_held": cal["held"],
+        "calibration_stable": cal["stable_judgments"],
+        "learning": {
+            curve["metric_key"]: {
+                "scored": curve["scored"],
+                "mean_error": curve["mean_error"],
+            }
+            for curve in status["cognition"]["learning"]
+        },
+    }
+
+
+def _read_history(history_path: Path) -> list[dict]:
+    if not history_path.exists():
+        return []
+    entries = []
+    for line in history_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return entries
+
+
+def _update_history(history_path: Path, entry: dict) -> list[dict]:
+    # One entry per calendar day (the most recent publish wins), so the series is a
+    # clean daily trend even if the status is published more than once that day.
+    entries = [e for e in _read_history(history_path) if e.get("date") != entry["date"]]
+    entries.append(entry)
+    entries.sort(key=lambda e: e.get("generated_at", ""))
+    history_path.write_text(
+        "\n".join(json.dumps(e, sort_keys=True) for e in entries) + "\n",
+        encoding="utf-8",
+    )
+    return entries
+
+
+def _render_markdown(status: dict, history: list[dict]) -> str:
+    counts = status["counts"]
+    cal = status["cognition"]["calibration"]
+    learning = status["cognition"]["learning"]
+    head = (status["sealing"].get("head") or "")[:16]
+    out = [
+        f"# GENUS · {status['core_id']}",
+        "",
+        f"**{'healthy ✓' if status['ok'] else 'ISSUES ✗'}** · seed "
+        f"`{status.get('seed_commit') or '?'}` · generated `{status['generated_at']}`",
+        "",
+        "> Auto-generated public status — aggregate health only, no values, paths, or event detail.",
+        "",
+        "## Health",
+        "",
+        f"- events **{counts['events']}** · beliefs **{counts['active_beliefs']}** · "
+        f"experiences **{counts['experiences']}** · proposals {counts['proposals']} · "
+        f"rules {counts['active_rules']} · governance {counts['governance_decisions']}",
+        f"- sealing head `{head}…` (event {status['sealing'].get('head_event_id')})",
+        "",
+        "## Self-knowledge",
+        "",
+    ]
+    if cal["stable_judgments"]:
+        disc = cal["discrimination"]
+        out.append(
+            f"**Calibration** — {cal['held']}/{cal['stable_judgments']} stable judgments held · "
+            f"accuracy **{cal['accuracy']}**"
+            + (f" · discriminates (+{disc})" if disc is not None else "")
+            + " — *does GENUS know that it knows?*"
+        )
+    else:
+        out.append("**Calibration** — no stability judgments yet.")
+    out += ["", "**Learning** — 24/7 forecast paths (predict → self-test → score):", ""]
+    if learning:
+        out += [
+            "| metric | scored | mean error | early → recent |",
+            "| --- | ---: | ---: | --- |",
+        ]
+        for curve in learning:
+            out.append(
+                f"| `{curve['metric_key']}` | {curve['scored']} | {curve['mean_error']} | "
+                f"{curve['early_error']} → {curve['recent_error']} |"
+            )
+    else:
+        out.append("_warming up — no scored forecasts yet._")
+    if len(history) >= 2:
+        out += [
+            "",
+            "## Trend (last days)",
+            "",
+            "| day | events | beliefs | calib. | temp. err |",
+            "| --- | ---: | ---: | ---: | ---: |",
+        ]
+        for entry in history[-7:]:
+            temp = entry.get("learning", {}).get("system.temperature", {}).get("mean_error", "—")
+            out.append(
+                f"| {entry['date']} | {entry['events']} | {entry['active_beliefs']} | "
+                f"{entry.get('calibration_accuracy', '—')} | {temp} |"
+            )
+    out += [
+        "",
+        "## Verify it has not been tampered with",
+        "",
+        "The ledger is hash-sealed and externally anchored here. Verify any file in",
+        "`anchors/` against the live head — if it matches, the Pi has not rewritten its past:",
+        "",
+        "```",
+        "genus ledger anchor verify anchors/genus-anchor-<core>-<event>-<hash>.json",
+        "```",
+        "",
+    ]
+    return "\n".join(out) + "\n"
 
 
 if __name__ == "__main__":
