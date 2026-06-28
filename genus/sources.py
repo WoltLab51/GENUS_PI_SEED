@@ -61,15 +61,20 @@ def assertions(conn, claim_key: str | None = None) -> list[dict]:
     (``assertion_recorded``, explicit source). The one DB read; callers resolve it in
     memory. Read-only, ordered by event id.
     """
+    # Filter by claim in SQL when one is given, so resolving a single claim (e.g. in a
+    # reactor, per observation) reads only that claim's rows -- not the whole stream.
+    evidence_filter = "" if claim_key is None else "AND json_extract(payload, '$.metric_key') = ?"
+    assertion_filter = "" if claim_key is None else "AND json_extract(payload, '$.claim_key') = ?"
+    params = () if claim_key is None else (claim_key, claim_key)
     rows = conn.execute(
-        """
+        f"""
         SELECT id,
                json_extract(payload, '$.metric_key')   AS claim_key,
                json_extract(payload, '$.metric_value')  AS value,
                COALESCE(json_extract(payload, '$.source'), 'sensor') AS source,
                created_at
         FROM event_log
-        WHERE event_type = 'evidence_recorded'
+        WHERE event_type = 'evidence_recorded' {evidence_filter}
         UNION ALL
         SELECT id,
                json_extract(payload, '$.claim_key')    AS claim_key,
@@ -77,14 +82,12 @@ def assertions(conn, claim_key: str | None = None) -> list[dict]:
                json_extract(payload, '$.source')        AS source,
                created_at
         FROM event_log
-        WHERE event_type = 'assertion_recorded'
+        WHERE event_type = 'assertion_recorded' {assertion_filter}
         ORDER BY id
-        """
+        """,
+        params,
     ).fetchall()
-    out = [dict(row) for row in rows]
-    if claim_key is not None:
-        out = [row for row in out if row["claim_key"] == claim_key]
-    return out
+    return [dict(row) for row in rows]
 
 
 def _group_by_claim(stream: list[dict]) -> dict[str, list[dict]]:
@@ -169,6 +172,7 @@ def _resolve(by_claim: dict[str, list[dict]], claim_key: str) -> dict:
             "claim_key": claim_key,
             "value": None,
             "chosen_source": None,
+            "chosen_event": None,
             "candidates": {},
             "contradiction": False,
         }
@@ -194,6 +198,7 @@ def _resolve(by_claim: dict[str, list[dict]], claim_key: str) -> dict:
             "live": rec >= LIVE_RECENCY,
         }
     chosen = max(candidates, key=lambda src: (candidates[src]["weight"], latest[src]["id"]))
+    chosen_event = int(latest[chosen]["id"])
     # contradiction is judged only among *live* candidates -- a faded source's stale
     # value must not raise a false alarm.
     live_values = [
@@ -209,6 +214,7 @@ def _resolve(by_claim: dict[str, list[dict]], claim_key: str) -> dict:
         "claim_key": claim_key,
         "value": candidates[chosen]["value"],
         "chosen_source": chosen,
+        "chosen_event": chosen_event,
         "candidates": candidates,
         "contradiction": contradiction,
     }

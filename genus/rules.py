@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import math
 
-from genus import inquiries, ledger, projection, proposals
+from genus import inquiries, ledger, projection, proposals, sources
 from genus.proposal_types import ACTIVITY_EXPECTATION_RULE
 # The fixed thresholds are the preset budget — collected in one visible place.
 from genus.constants import (
@@ -460,15 +460,20 @@ def apply_correlation(conn, metric_key: str) -> list[str]:
     if rule is None:
         return []
 
-    primary_window = _latest_evidence_window(conn, rule["primary"]["metric"], n=1)
-    secondary_window = _latest_evidence_window(conn, rule["secondary"]["metric"], n=1)
-    if not primary_window or not secondary_window:
+    # The current value of each metric is now the *resolved* value across all its
+    # sources (trust × freshness), not the raw latest sensor reading -- the sensor is
+    # just one peer. With a single source this is exactly the latest reading
+    # (behaviour-preserving); with several, the resolution governs. The historical
+    # regime below (`_calibrated_threshold`, `_prior_distribution`) stays evidence-based.
+    primary = sources.resolve(conn, rule["primary"]["metric"])
+    secondary = sources.resolve(conn, rule["secondary"]["metric"])
+    if primary["value"] is None or secondary["value"] is None:
         return []
 
-    primary_value = float(primary_window[0]["metric_value"])
-    primary_event = int(primary_window[0]["id"])
-    secondary_value = float(secondary_window[0]["metric_value"])
-    secondary_event = int(secondary_window[0]["id"])
+    primary_value = float(primary["value"])
+    primary_event = int(primary["chosen_event"])
+    secondary_value = float(secondary["value"])
+    secondary_event = int(secondary["chosen_event"])
 
     primary_threshold = _calibrated_threshold(conn, rule["primary"], primary_event)
     secondary_values = _prior_distribution(

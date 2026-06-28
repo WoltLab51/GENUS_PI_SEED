@@ -639,10 +639,15 @@ und kann keinen Falschalarm auslösen); Widerspruch wird nur unter *lebenden* Ka
 geprüft. CLI: `genus resolve <claim>`. Dieselbe Form trägt später ein Bewertungs-Kriterium
 (Schach) und Erdung (Bedeutung) — `resolve` *wählt* immer unter Kandidaten, *erzeugt* sie nie.
 
-*Ehrliche Staffelung:* `resolve` vereinheitlicht bisher das **Lesen** (der kanonische
-Wert eines Claims). Das **Eintreten** ist noch asymmetrisch — der Sensor-Pfad treibt
-Forecasting/Beliefs inline; sie durch `resolve` zu leiten (statt am Rohwert) ist der
-nächste Konsumenten-Schnitt.
+*Erster Konsument verdrahtet:* die **Korrelations-Belief** (`apply_correlation`, ein
+Punkt-Konsument) liest jetzt den *aufgelösten* Wert statt des rohen Sensors — der Sensor
+ist dort nur noch *eine Quelle unter Peers*. Verhaltens-erhaltend (eine Quelle → resolve =
+letzter Wert); mit mehreren regiert die Auflösung. `resolve(claim)` filtert per Claim in
+SQL, damit der Reactor-Aufruf nicht den ganzen Strom scannt.
+
+*Ehrliche Staffelung (Rest):* die **Fenster**-Konsumenten (`apply_threshold`/`apply_trend`,
+Anti-Flap/Richtung) und **Forecasting** (Kadenz-Subtilität) lesen noch den Rohwert — sie
+durch `resolve` zu leiten ist der nächste Schnitt. Dann regiert die Auflösung *alles*.
 
 *Danach (gleiche Schicht, freie Reihenfolge):* claim-verankerte Widersprüche + Inquiry (1c)
 · **du als hoch-vertraute Quelle** (Lehrer-Loop) · Almanach/Datensätze · **Struktur**
