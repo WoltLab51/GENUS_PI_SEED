@@ -120,3 +120,61 @@ def source_trust(conn, source: str) -> float:
     if not agreements:
         return SOURCE_TRUST_SEED
     return round(sum(agreements) / len(agreements), 3)
+
+
+def report(conn) -> dict:
+    """A read-time summary for the CLI: each source's trust, and the consensus for
+    every claim more than one source speaks to."""
+    claim_keys = sorted({row["claim_key"] for row in assertions(conn) if row["claim_key"]})
+    contested = [
+        consensus(conn, claim_key)
+        for claim_key in claim_keys
+        if len(latest_by_source(conn, claim_key)) > 1
+    ]
+    return {
+        "sources": [{"source": src, "trust": source_trust(conn, src)} for src in sources(conn)],
+        "consensus": contested,
+    }
+
+
+def consensus(conn, claim_key: str) -> dict:
+    """Read-time consensus over a claim's candidate assertions (one per source).
+
+    The morphological cell: candidates (the latest value per source) selected by a
+    *pluggable criterion* -- today source trust (highest-trust source's value; ties
+    broken by the most recent assertion). Reports whether the sources agree or
+    contradict, with each source's value and trust. Read-only, nothing stored; the
+    same shape later carries an evaluation criterion (e.g. a chess move score).
+    """
+    latest = latest_by_source(conn, claim_key)
+    candidates = {
+        src: {
+            "value": row["value"],
+            "trust": source_trust(conn, src),
+            "event_id": row["id"],
+        }
+        for src, row in latest.items()
+    }
+    if not candidates:
+        return {
+            "claim_key": claim_key,
+            "value": None,
+            "chosen_source": None,
+            "candidates": {},
+            "contradiction": False,
+        }
+    chosen = max(
+        candidates,
+        key=lambda src: (candidates[src]["trust"], candidates[src]["event_id"]),
+    )
+    tolerance = _claim_tolerance(conn, claim_key)
+    numeric = [_to_float(c["value"]) for c in candidates.values()]
+    numeric = [v for v in numeric if v is not None]
+    contradiction = any(not _agree(a, b, tolerance) for a in numeric for b in numeric)
+    return {
+        "claim_key": claim_key,
+        "value": candidates[chosen]["value"],
+        "chosen_source": chosen,
+        "candidates": candidates,
+        "contradiction": contradiction,
+    }

@@ -71,6 +71,35 @@ def observe_system_reading(conn, reading: dict, metric_key: str) -> dict:
     return {"observation_id": observation_id, "events": events}
 
 
+def observe_assertion(
+    conn, claim_key: str, claim_value, source: str, derivation: str | None = None
+) -> dict:
+    """Record a claim asserted by a source -- the general WISSEN entry point.
+
+    The value is fetched by the membrane (a second weather provider, an almanac, later
+    you or a model) and handed in; only ``(claim, source, value)`` crosses. The core
+    stays pure -- no fetch here. ``assertion_recorded`` is a raw fact (not projected),
+    so it is replay-stable; source trust and consensus over the candidates are computed
+    read-time in ``genus/sources.py``.
+    """
+    try:
+        event_id = ledger.append(
+            conn,
+            "assertion_recorded",
+            {
+                "claim_key": claim_key,
+                "claim_value": claim_value,
+                "source": source,
+                "derivation": derivation or f"source:{source}",
+            },
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {"event_id": event_id, "events": [{"event_type": "assertion_recorded", "id": event_id}]}
+
+
 def process_observation(conn, observation_id: int) -> list[dict]:
     observation = _load_event(conn, observation_id)
     if observation["event_type"] != "observation_created":

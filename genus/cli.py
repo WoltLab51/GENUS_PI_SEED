@@ -25,6 +25,7 @@ from genus import (
     reactors,
     sealing,
     sensor,
+    sources,
     state,
 )
 from genus.cli_format import (
@@ -38,6 +39,7 @@ from genus.cli_format import (
     _print_observation_result,
     _print_proposal_explanation,
     _print_rule_explanation,
+    _print_sources,
     _print_state_explanation,
     _print_surprisal,
 )
@@ -298,6 +300,16 @@ def learning_command() -> None:
     conn = get_conn()
     try:
         _print_learning(learning.curves(conn))
+    finally:
+        conn.close()
+
+
+@main.command("sources")
+def sources_command() -> None:
+    """Show each source's learned trust and the read-time consensus where sources overlap."""
+    conn = get_conn()
+    try:
+        _print_sources(sources.report(conn))
     finally:
         conn.close()
 

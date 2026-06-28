@@ -610,24 +610,31 @@ vertraute Quelle) · LLM als Quelle (Querschnitt) · Bewertungs-Kriterium (Schac
 `model:*` sein), baut sie aber nicht.
 
 **Erster Schritt (kleinste solide Scheibe) — „zwei Quellen, eine Behauptung".**
-Beweise das Gerüst an einem konkreten Quellen-Paar, *bevor* reichere Quellen (du, das
-LLM) andocken. Definition of Done:
-- [ ] Evidenz verallgemeinert zur **Behauptung mit `source`** (eine Sensor-Messung ist
-  eine Behauptung von `source:sensor:*`), replay-stabil, Contract erweitert.
-- [ ] Eine **zweite Quelle** für eine bestehende Behauptung (z. B. ein zweiter
-  Wetter-Anbieter für `weather.temp_outside`) — zwei Quellen behaupten dasselbe.
-- [ ] `source_trust(conn, source)` **read-time**: Übereinstimmungs-Rate aus der eigenen
-  Bilanz (keine Vorgabe); eine neue Quelle startet gedeckelt.
-- [ ] Widerspruch Quelle-gegen-Quelle (Divergenz > *self-kalibrierter* Toleranz) →
-  `contradiction_detected`, senkt Vertrauen, optionale Inquiry.
-- [ ] Behauptungs-Confidence durch Quellen-Vertrauen gedeckelt; Belief = trust-
-  gewichteter Konsens. Read-time, nie gespeichert.
-- [ ] Membran rein (kein Fetch/LLM in `genus/`, grep leer) · Replay-stabil · Integrity grün.
-- [ ] Wachstumsregel ✓ — Frage 5 bleibt erfüllt (noch kein Modell).
+Gebaut in zwei Teil-Schnitten (1a verhaltens-erhaltend, 1b neues Verhalten); Stand 2026-06-28:
+- [x] Evidenz verallgemeinert zur **Behauptung mit `source`** (Sensor-Messung trägt ihre
+  Quelle; neues `assertion_recorded` für Nicht-Sensor-Quellen), replay-stabil, Contract erweitert. *(1a/1b)*
+- [x] Eine **zweite Quelle** für eine bestehende Behauptung (`observe_assertion`,
+  read-time `consensus`) — zwei Quellen behaupten dasselbe. *(1b)*
+- [x] `source_trust(conn, source)` **read-time**: Übereinstimmungs-Bilanz, self-kalibrierte
+  Toleranz, keine Vorgabe; neue Quelle am Saat-Deckel. CLI: `genus sources`. *(1a/1b)*
+- [~] Widerspruch Quelle-gegen-Quelle (Divergenz > self-kalibrierter Toleranz): **erkannt**
+  (read-time, `consensus.contradiction`) und **senkt Vertrauen** automatisch. Das
+  `contradiction_detected`-**Event + Inquiry** ist **vertagt** — Widerspruch/Inquiry sind
+  heute belief-verankert, Wetter hat aber keinen Belief; *claim-verankerte* Widersprüche
+  sind ein struktureller Schnitt (1c).
+- [~] Belief = trust-gewichteter Konsens, read-time: als **`consensus`-Sicht** geliefert
+  (Auswahl per einsteckbarem Kriterium). Sie zur *kanonischen* `active_belief` zu erheben
+  berührt alle Belief-Konsumenten → eigener Schnitt (1c).
+- [x] Membran rein (`test_membrane_purity`) · Replay-stabil · Integrity grün · 279 Tests.
+- [x] Wachstumsregel ✓ — Frage 5 bleibt erfüllt (noch kein Modell).
 
-*Danach (gleiche Schicht, freie Reihenfolge):* **du als hoch-vertraute Quelle** — der
-Lehrer-Loop, GENUS richtet Inquiries an dich („ist das korrekt?") · Almanach/Datensätze
-· **Struktur** (Entität–Relation) als erstklassige Darstellung.
+*Noch zu füttern:* die zweite Quelle lebt erst als `observe_assertion`-Eingang — ein
+`deploy/`-Skript (zweiter Wetter-Anbieter) muss sie auf dem Pi *speisen*, damit der Konsens
+real wird (1c, Membran-Seite).
+
+*Danach (gleiche Schicht, freie Reihenfolge):* claim-verankerte Widersprüche + Inquiry (1c)
+· **du als hoch-vertraute Quelle** (Lehrer-Loop) · Almanach/Datensätze · **Struktur**
+(Entität–Relation).
 
 ---
 

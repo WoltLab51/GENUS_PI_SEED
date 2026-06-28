@@ -10,6 +10,7 @@ from genus.db import init_schema
 REQUIRED_EVENT_KEYS = {
     "observation_created": {"source", "raw_value", "unit"},
     "evidence_recorded": {"observation_id", "metric_key", "metric_value"},
+    "assertion_recorded": {"claim_key", "claim_value", "source", "derivation"},
     "belief_created": {
         "belief_id",
         "claim_key",

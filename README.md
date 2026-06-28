@@ -45,6 +45,7 @@ genus beliefs show
 genus calibration
 genus surprisal
 genus learning
+genus sources
 genus experience scan
 genus experience show
 genus state refresh
@@ -275,6 +276,14 @@ deterministic and model-free.
   (not projected; replay-stable). It runs on the crons that observe each metric, so
   the Pi learns 24/7 — currently weather, the Pi's own temperature, disk, and the
   repo work rhythm.
+- `genus sources` — the first slice of the Knowledge & Source-Trust layer. Every
+  observation now carries its `source`, and GENUS learns **which sources to trust**
+  read-time: a source earns trust by agreeing with other sources where their claims
+  overlap, and is held at an unproven seed until it does — never a preset. Where more
+  than one source speaks to a claim it shows the read-time **consensus** (the value
+  selected by a pluggable criterion — source trust today) and flags a **contradiction**
+  when they disagree beyond the claim's own spread. `assertion_recorded` is a raw fact
+  (not projected; replay-stable); trust is never stored.
 
 ## Automatic Collection With Cron
 

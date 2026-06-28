@@ -1,6 +1,8 @@
 import sqlite3
 
-from genus import integrity, reactors, sensor, sources
+from click.testing import CliRunner
+
+from genus import cli, integrity, reactors, sensor, sources
 from genus.db import init_schema
 
 CLAIM = "weather.temp_outside"
@@ -46,3 +48,52 @@ def test_threading_source_is_behaviour_preserving_and_replays_clean():
     assert integrity.check(conn)["ok"] is True
     assert sources.assertions(conn, CLAIM)
     conn.close()
+
+
+def _assert_source(conn, value, source):
+    return reactors.observe_assertion(conn, CLAIM, value, source)
+
+
+def test_two_agreeing_sources_earn_trust_with_no_contradiction():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)  # sensor source "mock"
+    _assert_source(conn, 18.0, "provider-b")  # a second source, agreeing
+    assert sources.source_trust(conn, "mock") == 1.0
+    assert sources.source_trust(conn, "provider-b") == 1.0
+    result = sources.consensus(conn, CLAIM)
+    assert set(result["candidates"]) == {"mock", "provider-b"}
+    assert result["contradiction"] is False
+    conn.close()
+
+
+def test_two_disagreeing_sources_lose_trust_and_flag_contradiction():
+    conn = _fresh()
+    for temp in (18.0, 18.0, 18.0):
+        _observe(conn, temp)
+    _assert_source(conn, 30.0, "provider-b")  # far outside the claim's own spread
+    assert sources.source_trust(conn, "mock") == 0.0
+    assert sources.source_trust(conn, "provider-b") == 0.0
+    result = sources.consensus(conn, CLAIM)
+    assert result["contradiction"] is True
+    conn.close()
+
+
+def test_assertion_recorded_passes_integrity_and_replays_clean():
+    conn = _fresh()
+    _observe(conn, 18.0)
+    _assert_source(conn, 18.0, "provider-b")
+    assert integrity.check(conn)["ok"] is True
+    conn.close()
+
+
+def test_sources_cli_runs(monkeypatch):
+    conn = _fresh()
+    for temp in (18.0, 18.0):
+        _observe(conn, temp)
+    _assert_source(conn, 18.0, "provider-b")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["sources"])
+    assert result.exit_code == 0, result.output
+    assert "trust" in result.output
+    assert "provider-b" in result.output

@@ -54,6 +54,28 @@ def _print_learning(reports: list[dict]) -> None:
         )
 
 
+def _print_sources(report: dict) -> None:
+    rows = report["sources"]
+    if not rows:
+        click.echo("[SRC] no sources yet")
+        return
+    click.echo("[SRC] source trust — earned by agreeing with other sources (0.50 = unproven seed)")
+    for row in rows:
+        click.echo(f"[SRC] {row['source']:30s} trust {row['trust']:.2f}")
+    contested = report["consensus"]
+    if contested:
+        click.echo("[SRC] claims more than one source speaks to (read-time consensus):")
+        for item in contested:
+            mark = "  <- CONTRADICTION" if item["contradiction"] else ""
+            cands = ", ".join(
+                f"{src}={data['value']}" for src, data in item["candidates"].items()
+            )
+            click.echo(
+                f"[SRC] {item['claim_key']:22s} -> {item['value']} "
+                f"via {item['chosen_source']}  [{cands}]{mark}"
+            )
+
+
 def _print_surprisal(rows: list[dict]) -> None:
     if not rows:
         click.echo("[SRP] no characterized beliefs yet")
