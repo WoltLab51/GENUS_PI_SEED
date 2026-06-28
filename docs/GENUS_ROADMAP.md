@@ -585,6 +585,30 @@ Beobachtung). **Kein** `source_trust_updated`-Event — *Vertrauen ist read-time
 berechnet wie Konfidenz und Halbwertszeit, nie gespeichert (eine Korrektur an der
 ersten Skizze).
 
+**Skelett — die tragenden Verträge (verbindlich, 2026-06-28):**
+1. **Darstellung** — Behauptung = (claim, value, `source`), *append-only*: neues
+   `assertion_recorded`; alte `evidence_recorded` bleiben unangetastet (Sonderfall
+   `source:sensor`). Kein Reshapen bestehender Events → Replay alter Events stabil.
+2. **Event-Contract** — `assertion_recorded` ist *projektionsrelevant* (speist Beliefs,
+   anders als die rohen forecast-Events); `contradiction_detected` um Quelle-gegen-Quelle
+   erweitert; Integrity-Keys registriert; replay-stabil (Trust/Auswahl read-time).
+3. **Trust = read-time** — `source_trust(conn, source)` als Query (Übereinstimmungs-Bilanz,
+   self-kalibriert wie Confidence/Halbwertszeit), **kein** `source_trust_updated`-Event;
+   neue Quelle gedeckelt (Seed-Fallback, kein Preset).
+4. **Membran** — Abruf in `deploy/`; nur `(claim, source, value)` betritt den Kern über
+   einen `observe_assertion`-Reactor; `tests/test_membrane_purity.py` erzwingt die Reinheit.
+5. **Der Knackpunkt — gelöst:** die Projektion hält *Kandidaten* (`claim_key × source`);
+   der aktive Belief ist eine **read-time-Auswahl per einsteckbarem Kriterium** (heute:
+   Quellen-Vertrauen; Confidence = Decay ∧ Trust-Cap, beides read-time, nichts gespeichert).
+   **Eine Quelle ≡ heutiges Verhalten** (Regressionstest pinnt es), *bevor* Quelle B
+   dazukommt. Dieselbe Form trägt später ein Bewertungs-Kriterium (Schach) — das Kriterium
+   ist tauschbar.
+
+*Bewusst draußen (erlaubt, nicht jetzt):* Relationen/Graph · Lehrer-Loop (du als hoch-
+vertraute Quelle) · LLM als Quelle (Querschnitt) · Bewertungs-Kriterium (Schach, SYSTEME)
+· Merkmal-Erkennung (nie geraten). Das Skelett *erlaubt* sie (eine Quelle kann Mensch oder
+`model:*` sein), baut sie aber nicht.
+
 **Erster Schritt (kleinste solide Scheibe) — „zwei Quellen, eine Behauptung".**
 Beweise das Gerüst an einem konkreten Quellen-Paar, *bevor* reichere Quellen (du, das
 LLM) andocken. Definition of Done:
