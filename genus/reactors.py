@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import inquiries, learning, ledger, rules, sources
+from genus import inquiries, learning, ledger, projection, rules, sources
 
 
 # Which metrics run a 24/7 learning program, and on which cycle period. The engine
@@ -171,17 +171,16 @@ def observe_relation(
     same source-trust applies, so a relation from a distrusted source is held lightly.
     """
     try:
-        event_id = ledger.append(
-            conn,
-            "relation_asserted",
-            {
-                "subject": subject,
-                "predicate": predicate,
-                "object": object_,
-                "source": source,
-                "derivation": derivation or f"source:{source}",
-            },
-        )
+        payload = {
+            "subject": subject,
+            "predicate": predicate,
+            "object": object_,
+            "source": source,
+            "derivation": derivation or f"source:{source}",
+        }
+        event_id = ledger.append(conn, "relation_asserted", payload)
+        payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+        projection.apply_relation_asserted(conn, payload)
         conn.commit()
     except Exception:
         conn.rollback()

@@ -632,6 +632,17 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
+    relations = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT id, subject, predicate, object, source, derivation,
+                   created_at, last_updated_at
+            FROM relation_projection
+            ORDER BY id
+            """
+        ).fetchall()
+    ]
     return {
         "beliefs": beliefs,
         "proposals": proposals,
@@ -641,4 +652,5 @@ def snapshot_projections(conn) -> dict:
         "governance": governance,
         "operations": operations,
         "rules": rules,
+        "relations": relations,
     }

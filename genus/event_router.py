@@ -24,6 +24,7 @@ def replay(conn) -> dict:
     conn.execute("DELETE FROM experience_log")
     conn.execute("DELETE FROM state_projection")
     conn.execute("DELETE FROM belief_projection")
+    conn.execute("DELETE FROM relation_projection")
     conn.execute(
         """
         DELETE FROM sqlite_sequence
@@ -35,7 +36,8 @@ def replay(conn) -> dict:
             'proposal_log',
             'experience_log',
             'state_projection',
-            'belief_projection'
+            'belief_projection',
+            'relation_projection'
         )
         """
     )
@@ -93,6 +95,8 @@ def apply_event(conn, event) -> None:
         projection.apply_belief_weakened(conn, payload)
     elif event_type == "belief_superseded":
         projection.apply_belief_superseded(conn, payload)
+    elif event_type == "relation_asserted":
+        projection.apply_relation_asserted(conn, payload)
     elif event_type == "proposal_created":
         proposals.apply_proposal_created(conn, payload)
     elif event_type == "proposal_reviewed":

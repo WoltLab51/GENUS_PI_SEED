@@ -265,31 +265,25 @@ def resolved_window(conn, claim_key: str, n: int) -> list[dict]:
 
 def relations(conn, subject: str | None = None, predicate: str | None = None) -> list[dict]:
     """The relation graph: ``(subject, predicate, object, source)`` triples GENUS holds --
-    networked knowledge, not just claim → value. Read-only; the latest assertion of each
-    distinct triple per source is kept. Filterable by subject/predicate for graph walks.
+    networked knowledge, not just claim → value. Read from the indexed
+    ``relation_projection`` (built from ``relation_asserted`` events), so graph walks
+    scale to millions of triples. Filterable by subject/predicate.
     """
-    rows = conn.execute(
-        """
-        SELECT id,
-               json_extract(payload, '$.subject')   AS subject,
-               json_extract(payload, '$.predicate')  AS predicate,
-               json_extract(payload, '$.object')     AS object,
-               json_extract(payload, '$.source')     AS source,
-               created_at
-        FROM event_log
-        WHERE event_type = 'relation_asserted'
-        ORDER BY id
-        """
-    ).fetchall()
-    latest: dict[tuple, dict] = {}
-    for row in rows:
-        latest[(row["subject"], row["predicate"], row["object"], row["source"])] = dict(row)
-    triples = list(latest.values())
+    clauses, params = [], []
     if subject is not None:
-        triples = [t for t in triples if t["subject"] == subject]
+        clauses.append("subject = ?")
+        params.append(subject)
     if predicate is not None:
-        triples = [t for t in triples if t["predicate"] == predicate]
-    return triples
+        clauses.append("predicate = ?")
+        params.append(predicate)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    rows = conn.execute(
+        "SELECT subject, predicate, object, source FROM relation_projection"
+        + where
+        + " ORDER BY subject, predicate, object",
+        params,
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def report(conn) -> dict:

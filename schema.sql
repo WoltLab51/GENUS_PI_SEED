@@ -77,6 +77,25 @@ CREATE TABLE IF NOT EXISTS inquiry_log (
 
 CREATE INDEX IF NOT EXISTS idx_inquiry_log_state ON inquiry_log(state);
 
+-- The knowledge graph as an indexed projection over relation_asserted events. The
+-- events stay the truth (provenance, replay); this table is the fast, indexed view so
+-- lookup scales to millions of triples (read-time full-scan only fits thousands). One
+-- row per distinct (subject, predicate, object, source); re-assertion refreshes its time.
+CREATE TABLE IF NOT EXISTS relation_projection (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject         TEXT    NOT NULL,
+    predicate       TEXT    NOT NULL,
+    object          TEXT    NOT NULL,
+    source          TEXT    NOT NULL,
+    derivation      TEXT    NOT NULL,
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    last_updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(subject, predicate, object, source)
+);
+
+CREATE INDEX IF NOT EXISTS idx_relation_subject ON relation_projection(subject);
+CREATE INDEX IF NOT EXISTS idx_relation_object ON relation_projection(object);
+
 CREATE TABLE IF NOT EXISTS experience_log (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     experience_key     TEXT    NOT NULL UNIQUE,

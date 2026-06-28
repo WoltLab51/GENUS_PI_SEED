@@ -3,7 +3,7 @@ import sqlite3
 
 from click.testing import CliRunner
 
-from genus import cli, integrity, reactors, sensor, sources
+from genus import cli, event_router, integrity, reactors, sensor, sources
 from genus.db import init_schema
 
 CLAIM = "weather.temp_outside"
@@ -238,6 +238,19 @@ def test_observe_relation_holds_a_triple_in_the_graph():
 def test_relation_asserted_replays_clean():
     conn = _fresh()
     reactors.observe_relation(conn, "a", "relates_to", "b", "human")
+    assert integrity.check(conn)["ok"] is True
+    conn.close()
+
+
+def test_relations_project_and_rebuild_from_the_log():
+    conn = _fresh()
+    reactors.observe_relation(conn, "run", "is_a", "verb", "dict")
+    reactors.observe_relation(conn, "run", "synonym", "execute", "dict")
+    # served from the indexed relation_projection (not an event scan)
+    assert len(sources.relations(conn, subject="run")) == 2
+    # and the projection rebuilds deterministically from the event log (the scale view)
+    event_router.replay(conn)
+    assert len(sources.relations(conn, subject="run")) == 2
     assert integrity.check(conn)["ok"] is True
     conn.close()
 

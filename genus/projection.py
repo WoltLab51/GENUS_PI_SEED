@@ -306,6 +306,34 @@ def apply_belief_weakened(conn, payload: dict) -> None:
     )
 
 
+def apply_relation_asserted(conn, payload: dict) -> None:
+    """Project a relation_asserted event into the indexed knowledge graph.
+
+    One row per distinct (subject, predicate, object, source); re-assertion only
+    refreshes last_updated_at. The event stays the truth; this is the fast view.
+    """
+    created_at = payload.get("_event_created_at")
+    conn.execute(
+        """
+        INSERT INTO relation_projection
+            (subject, predicate, object, source, derivation, created_at, last_updated_at)
+        VALUES (?, ?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))
+        ON CONFLICT(subject, predicate, object, source) DO UPDATE SET
+            last_updated_at = COALESCE(excluded.last_updated_at, last_updated_at)
+        """,
+        (
+            payload["subject"],
+            payload["predicate"],
+            payload["object"],
+            payload["source"],
+            payload["derivation"],
+            created_at,
+            created_at,
+        ),
+    )
+
+
 def apply_belief_superseded(conn, payload: dict) -> int:
     new_belief_id = create_belief(
         conn,
