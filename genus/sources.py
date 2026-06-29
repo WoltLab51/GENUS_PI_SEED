@@ -285,6 +285,29 @@ def relation_confidence(conn, subject: str, predicate: str, object: str) -> dict
     }
 
 
+# Predicates where a subject should have ONE object, so competing objects are a
+# contradiction (like disagreeing value sources). Non-functional predicates -- is_a,
+# expresses, synonym -- legitimately allow many objects (multiple parents, polysemy).
+FUNCTIONAL_PREDICATES = {"label"}
+
+
+def relation_contradiction(conn, subject: str, predicate: str) -> dict:
+    """Knowledge-side analogue of value-source disagreement: for a FUNCTIONAL predicate, do
+    sources disagree on the object of ``(subject, predicate)``? Returns each candidate
+    object with its confidence and a contradiction flag (two-or-more distinct objects on a
+    functional predicate). The signal that seeds the teacher-loop for the graph."""
+    objects = {row["object"] for row in relations(conn, subject=subject, predicate=predicate)}
+    by_object = {
+        obj: relation_confidence(conn, subject, predicate, obj)["confidence"] for obj in objects
+    }
+    return {
+        "subject": subject,
+        "predicate": predicate,
+        "objects": by_object,
+        "contradiction": predicate in FUNCTIONAL_PREDICATES and len(objects) >= 2,
+    }
+
+
 def resolve(conn, claim_key: str) -> dict:
     """Resolve a claim to its current value over all sources -- the general form.
 

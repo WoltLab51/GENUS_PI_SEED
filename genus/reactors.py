@@ -181,11 +181,32 @@ def observe_relation(
         event_id = ledger.append(conn, "relation_asserted", payload)
         payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
         projection.apply_relation_asserted(conn, payload)
+        events = [{"event_type": "relation_asserted", "id": event_id}]
+        # Knowledge self-check: for a functional predicate, if sources now disagree on the
+        # object, flag the contradiction and raise one inquiry -- the teacher-loop seed for
+        # the knowledge graph (mirrors observe_assertion on the value side).
+        rel_key = f"{subject}|{predicate}"
+        contra = sources.relation_contradiction(conn, subject, predicate)
+        if contra["contradiction"] and not _open_source_contradiction(conn, rel_key):
+            contradiction_id = ledger.append(
+                conn,
+                "contradiction_detected",
+                {"claim_key": rel_key, "reason": f"sources disagree on {subject} -[{predicate}]->"},
+            )
+            events.append({"event_type": "contradiction_detected", "id": contradiction_id})
+            inquiries.record_source_contradiction_inquiry(
+                conn,
+                claim_key=rel_key,
+                source_event=contradiction_id,
+                payload={"subject": subject, "predicate": predicate,
+                         "objects": contra["objects"], "review_recommended": True},
+            )
+            events.append({"event_type": "inquiry_created"})
         conn.commit()
     except Exception:
         conn.rollback()
         raise
-    return {"event_id": event_id, "events": [{"event_type": "relation_asserted", "id": event_id}]}
+    return {"event_id": event_id, "events": events}
 
 
 def retract_relation(

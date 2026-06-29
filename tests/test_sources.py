@@ -344,6 +344,24 @@ def test_confidence_cli_shows_corroborated_value(monkeypatch):
     assert "confidence 0.75" in result.output
 
 
+def test_functional_predicate_contradiction_raises_inquiry():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "label", "Q144", "wikidata")
+    r = reactors.observe_relation(conn, "Hund@de", "label", "Q999", "other")  # disagrees on the label
+    types = [e["event_type"] for e in r["events"]]
+    assert "contradiction_detected" in types and "inquiry_created" in types
+    assert reactors._open_source_contradiction(conn, "Hund@de|label")
+    assert sources.relation_contradiction(conn, "Hund@de", "label")["contradiction"] is True
+
+
+def test_nonfunctional_predicate_allows_many_objects():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "wikidata")
+    r = reactors.observe_relation(conn, "Hund", "is_a", "Haustier", "wikidata")  # 2nd parent, fine
+    assert "contradiction_detected" not in [e["event_type"] for e in r["events"]]
+    assert sources.relation_contradiction(conn, "Hund", "is_a")["contradiction"] is False
+
+
 def test_retract_relation_removes_edge_and_survives_replay():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q37575615", "wikidata")  # wrong (surname)
