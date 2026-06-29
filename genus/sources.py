@@ -33,6 +33,15 @@ SOURCE_TRUST_SEED = 0.5
 # Structural ("one cadence"), derived from the claim's own rhythm, not a magic value.
 LIVE_RECENCY = 0.5
 
+# A cadence is only *measurable* above this floor: assertions closer together than this are
+# concurrent writes of one reporting round (timestamp jitter), not a rhythm. Below it a claim
+# has no freshness half-life, so nothing fades and every current claimant stays live. This is
+# a resolution floor (what distinguishes two rounds from two writes of one round), not a
+# tuning knob -- real GENUS cadences (sensors every few seconds, weather hourly) sit far
+# above it. Without it, a burst of same-millisecond writes yields a millisecond "cadence" that
+# falsely ages out a concurrent source, hiding genuine contradictions.
+_MIN_CADENCE_SECONDS = 1.0
+
 
 def _to_float(value):
     try:
@@ -124,7 +133,8 @@ def _cadence_halflife(rows: list[dict]) -> float | None:
     if len(times) < 2:
         return None
     gaps = [(times[i + 1] - times[i]).total_seconds() for i in range(len(times) - 1)]
-    gaps = sorted(g for g in gaps if g > 0)
+    # Ignore sub-round gaps: concurrent writes are not a rhythm (see _MIN_CADENCE_SECONDS).
+    gaps = sorted(g for g in gaps if g >= _MIN_CADENCE_SECONDS)
     if not gaps:
         return None
     mid = len(gaps) // 2
@@ -385,6 +395,39 @@ def gaps(conn, limit: int = 20, predicates: tuple[str, ...] = ("synonym", "anton
         (*predicates, limit),
     ).fetchall()
     return [row["word"] for row in rows]
+
+
+def characterize_knowledge(conn, weakest: int = 5) -> dict:
+    """The knowledge graph's epistemic self-report -- how much GENUS knows, and how surely.
+
+    Read-time: the distinct relations it holds, how many rest on a single uncorroborated
+    source (held lightly), the mean confidence, the least-confident relations, and the open
+    knowledge-contradictions it has flagged but not yet settled. GENUS knowing *how sure it
+    knows* -- the calibration half of weaving the graph into the core.
+    """
+    triples: dict[tuple[str, str, str], set[str]] = {}
+    for row in relations(conn):
+        key = (row["subject"], row["predicate"], row["object"])
+        triples.setdefault(key, set()).add(row["source"])
+    scored = []
+    for (s, p, o), srcs in triples.items():
+        scored.append({
+            "subject": s, "predicate": p, "object": o,
+            "confidence": relation_confidence(conn, s, p, o)["confidence"],
+            "n_sources": len(srcs),
+        })
+    n = len(scored)
+    open_contradictions = conn.execute(
+        "SELECT COUNT(*) AS c FROM inquiry_log "
+        "WHERE inquiry_type = 'SourceContradiction' AND state = 'open' AND claim_key LIKE '%|%'"
+    ).fetchone()["c"]
+    return {
+        "n_relations": n,
+        "n_uncorroborated": sum(1 for r in scored if r["n_sources"] == 1),
+        "mean_confidence": round(sum(r["confidence"] for r in scored) / n, 3) if n else 0.0,
+        "weakest": sorted(scored, key=lambda r: (r["confidence"], r["subject"], r["predicate"]))[:weakest],
+        "open_contradictions": int(open_contradictions),
+    }
 
 
 # --- Lexicon: the lexeme <-> concept layer (multilingual) -----------------------------

@@ -487,6 +487,29 @@ def confidence_command(subject: str, predicate: str, object: str) -> None:
         conn.close()
 
 
+@main.command("knowledge")
+@click.option("--weakest", default=5, show_default=True, help="how many least-confident relations to show")
+def knowledge_command(weakest: int) -> None:
+    """GENUS's epistemic self-report for the knowledge graph — how much it knows and how surely."""
+    conn = get_conn()
+    try:
+        k = sources.characterize_knowledge(conn, weakest=weakest)
+        click.echo(
+            f"[KNOW] {k['n_relations']} relation(s), mean confidence {k['mean_confidence']:.2f}, "
+            f"{k['n_uncorroborated']} uncorroborated (single source), "
+            f"{k['open_contradictions']} open contradiction(s)"
+        )
+        if k["weakest"]:
+            click.echo("[KNOW] least confident:")
+            for r in k["weakest"]:
+                click.echo(
+                    f"[KNOW]   {sources.display(conn, r['subject'])} -[{r['predicate']}]-> "
+                    f"{sources.display(conn, r['object'])}   conf {r['confidence']:.2f}  ({r['n_sources']} src)"
+                )
+    finally:
+        conn.close()
+
+
 @main.command("gaps")
 @click.option("--limit", default=20, type=int, show_default=True)
 @click.option("--predicate", "predicates", multiple=True,
@@ -884,6 +907,23 @@ def governance_list(target: str | None) -> None:
                 f"{row['target_type']}:{row['target_id']:<7} "
                 f"{row['decision']:<9} {str(row['override']):<9} {row['reason']}"
             )
+    finally:
+        conn.close()
+
+
+@governance_group.command("acquisition-allowed")
+@click.argument("source")
+def governance_acquisition_allowed(source: str) -> None:
+    """Exit 0 if the autonomous learner may acquire from <source> now, else non-zero — the
+    learner consults this each word (pause + self-calibrating source-trust gate)."""
+    conn = get_conn()
+    try:
+        verdict = governance.acquisition_allowed(conn, source)
+        if verdict["allowed"]:
+            click.echo(f"[GOV] acquisition allowed for {source}")
+        else:
+            click.echo(f"[GOV] acquisition BLOCKED for {source}: {verdict['reason']}")
+            raise SystemExit(1)
     finally:
         conn.close()
 

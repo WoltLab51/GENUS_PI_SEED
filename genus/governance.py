@@ -667,3 +667,29 @@ def _rule_activated(conn, rule_key: str) -> bool:
 
 def _json(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+# --- Acquisition gate: lightweight, read-time governance for the autonomous learner -------
+# The engine above is deliberative -- it logs a decision per review. Autonomous knowledge
+# acquisition runs in a hot loop (potentially 100k words), so its governance is a read-time
+# gate that records nothing: it just answers "may the learner acquire from this source now?"
+ACQUISITION_ALLOWED = "allowed"
+ACQUISITION_PAUSED = "GENUS is paused"
+ACQUISITION_UNTRUSTED = "source trust below seed"
+
+
+def acquisition_allowed(conn, source: str) -> dict:
+    """May the autonomous learner acquire knowledge from ``source`` right now?
+
+    Glass-box and self-calibrating: blocked while GENUS is paused (the control plane), or
+    when the source has proven *less* trustworthy than a fresh one -- its read-time
+    ``source_trust`` has fallen below the seed. No preset rate or allow-list; the gate reads
+    the live ledger. Records nothing (safe to call in the learner's hot loop).
+    """
+    from genus import control, sources
+
+    if control.is_paused():
+        return {"allowed": False, "reason": ACQUISITION_PAUSED}
+    if sources.source_trust(conn, source) < sources.SOURCE_TRUST_SEED:
+        return {"allowed": False, "reason": ACQUISITION_UNTRUSTED}
+    return {"allowed": True, "reason": ACQUISITION_ALLOWED}

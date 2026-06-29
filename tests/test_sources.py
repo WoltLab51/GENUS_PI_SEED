@@ -133,6 +133,22 @@ def test_a_stale_source_fades_and_raises_no_false_contradiction():
     conn.close()
 
 
+def test_cadence_ignores_subsecond_jitter():
+    # A burst of near-simultaneous writes has no measurable cadence -> None (nothing fades),
+    # so sub-second timestamp jitter can never make a concurrent source look stale. Without
+    # this, same-millisecond bursts yielded a millisecond "cadence" that intermittently hid a
+    # genuine contradiction (the flake).
+    burst = [{"created_at": "2026-06-28T11:00:00.001Z"},
+             {"created_at": "2026-06-28T11:00:00.002Z"},
+             {"created_at": "2026-06-28T11:00:00.004Z"}]
+    assert sources._cadence_halflife(burst) is None
+    # a real (>= 1s) rhythm is still measured exactly
+    rhythm = [{"created_at": "2026-06-28T11:00:00.000Z"},
+              {"created_at": "2026-06-28T11:00:30.000Z"},
+              {"created_at": "2026-06-28T11:01:00.000Z"}]
+    assert sources._cadence_halflife(rhythm) == 30.0
+
+
 def test_disagreeing_live_sources_raise_a_claim_anchored_inquiry():
     conn = _fresh()
     for temp in (18.0, 18.0, 18.0):
@@ -479,3 +495,64 @@ def test_sources_cli_runs(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "trust" in result.output
     assert "provider-b" in result.output
+
+
+def test_characterize_knowledge_reports_epistemic_state():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "wikidata")
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "curated")    # corroborated
+    reactors.observe_relation(conn, "Katze", "is_a", "Säugetier", "wikidata")  # single source
+    k = sources.characterize_knowledge(conn)
+    assert k["n_relations"] == 2
+    assert k["n_uncorroborated"] == 1                  # only Katze rests on one source
+    assert 0.0 < k["mean_confidence"] <= 1.0
+    assert k["weakest"][0]["subject"] == "Katze"       # least confident surfaced first
+
+
+def test_characterize_knowledge_counts_open_contradictions():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "label", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "label", "Q999", "other")  # raises a relation contradiction
+    assert sources.characterize_knowledge(conn)["open_contradictions"] == 1
+
+
+def test_knowledge_cli(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "wikidata")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["knowledge"])
+    assert result.exit_code == 0, result.output
+    assert "1 relation(s)" in result.output
+
+
+def test_acquisition_allowed_for_fresh_source():
+    from genus import governance
+    conn = _fresh()
+    assert governance.acquisition_allowed(conn, "wikidata")["allowed"] is True
+
+
+def test_acquisition_blocked_when_paused():
+    from genus import control, governance
+    conn = _fresh()
+    control.pause("test")
+    try:
+        verdict = governance.acquisition_allowed(conn, "wikidata")
+        assert verdict["allowed"] is False and "paused" in verdict["reason"]
+    finally:
+        control.resume()
+
+
+def test_acquisition_blocked_for_untrusted_source(monkeypatch):
+    from genus import governance
+    conn = _fresh()
+    monkeypatch.setattr(sources, "source_trust", lambda c, s: 0.1)  # below seed (0.5)
+    verdict = governance.acquisition_allowed(conn, "shady")
+    assert verdict["allowed"] is False and "trust" in verdict["reason"]
+
+
+def test_governance_acquisition_allowed_cli(monkeypatch):
+    conn = _fresh()
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["governance", "acquisition-allowed", "wikidata"])
+    assert result.exit_code == 0, result.output
+    assert "allowed" in result.output
