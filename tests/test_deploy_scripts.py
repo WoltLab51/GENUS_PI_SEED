@@ -5,29 +5,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_grundwortschatz_seed_file_is_wellformed():
+def test_grundwortschatz_seed_file_is_a_wellformed_word_list():
     lines = (ROOT / "deploy" / "grundwortschatz_de.tsv").read_text(encoding="utf-8").splitlines()
-    entries = []
+    words = []
     for line in lines:
-        if not line.strip() or line.lstrip().startswith("#"):
+        s = line.strip()
+        if not s or s.startswith("#"):
             continue
-        parts = line.split("\t")
-        assert len(parts) >= 2, f"entry needs word<TAB>Q-id: {line!r}"
-        word, qid = parts[0], parts[1]
-        assert word and "@" not in word, f"bad word: {word!r}"
-        assert re.fullmatch(r"Q[0-9]+", qid), f"bad Q-id for {word}: {qid!r}"
-        entries.append(word)
-    assert len(entries) >= 15                 # a real starting foundation
-    assert len(entries) == len(set(entries))  # no duplicate words
+        # the list is the VOCABULARY -- one word per line, no hand-typed Q-ids
+        assert " " not in s and "\t" not in s, f"one word per line: {line!r}"
+        assert not re.fullmatch(r"Q[0-9]+", s), "the list holds words, not guessed Q-ids"
+        assert "@" not in s
+        words.append(s)
+    assert len(words) >= 20                # a real starting foundation
+    assert len(words) == len(set(words))   # no duplicate words
 
 
-def test_grundwortschatz_seed_script_feeds_curated_mapping_and_concept():
+def test_grundwortschatz_seed_script_resolves_each_word_from_the_source():
     script = (ROOT / "deploy" / "seed_grundwortschatz.sh").read_text(encoding="utf-8")
     assert "grundwortschatz_de.tsv" in script
-    assert "relate" in script
-    assert "expresses" in script
-    assert "curated" in script              # the guaranteed word->concept mapping
-    assert "observe_konzept.sh" in script   # concept labels + is_a hierarchy from Wikidata
+    assert "observe_konzept.sh" in script        # GENUS resolves the word from Wikidata itself
+    assert "--source curated" not in script      # no hand-typed Q-id mappings anymore
+    assert "expresses" in script                 # the review report shows the resolved concept
 
 
 def test_cron_installation_writes_timestamped_ticks():
@@ -137,9 +136,9 @@ def test_concept_membrane_feeds_both_layers_from_wikidata():
     assert "expresses" in script            # word@lang -> concept (label + aliases, for lookup)
     assert "\\tlabel\\t" in script          # the canonical label, for readable display
     assert "is_a" in script                 # concept -> parent concept
-    assert "wbsearchentities" in script     # word -> Q-id
-    assert "limit=7" in script              # several candidates, not just the top hit
-    assert "exact" in script                # prefer an exact label match (disambiguation)
+    assert "wbsearchentities" in script     # word -> candidates
+    assert "limit=10" in script             # several candidates, not just the top hit
+    assert "sitelinks" in script            # pick the most-prominent concept FROM THE SOURCE
     assert "nothing recorded" in script     # a failed/empty fetch records nothing
 
 

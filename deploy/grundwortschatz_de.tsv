@@ -1,58 +1,69 @@
-# GENUS Grundwortschatz (Deutsch) — kuratierte Zuordnung Wort -> Wikidata-Konzept (Q-ID).
+# GENUS Grundwortschatz (Deutsch) — nur der WORTSCHATZ, eine Zeile je Wort.
 #
-# Warum kuratiert: automatische Wort->Konzept-Auflösung ist unzuverlässiges Entity-Linking
-# (Top-Treffer gibt Mond->Monat, Blume->ein Botaniker; exakter Label-Treffer erwischt
-# Familiennamen). Das ist die *bewusste, geprüfte* Grundlage. Das LLM am Rand wird später
-# der allgemeine Disambiguierer — hier wird von Hand verankert.
-#
-# Format:  <Wort><TAB><Q-ID><TAB><Glosse>.  Zeilen mit # werden ignoriert.
-# Neue Einträge: die Q-ID VOR dem Eintragen am Label prüfen
-#   (wbgetentities&ids=Q…&props=labels&languages=de|en).
-#
-# Wort	Q-ID	Glosse (Wikidata-Label de / en)
-Mensch	Q5	Mensch / human
-Hund	Q144	Haushund / dog
-Wasser	Q283	Wasser / water
-Haus	Q3947	Haus / house
-Auto	Q1420	Auto / car
-Stadt	Q515	Stadt / city
-Buch	Q571	Buch / book
-Fluss	Q4022	Fluss / river
-Brot	Q7802	Brot / bread
-Fisch	Q152	Fisch / fish
-Hand	Q33767	Hand / hand
-Sonne	Q525	Sonne / Sun
-Mond	Q405	Mond / Moon
-Apfel	Q89	Apfel / apple
-Berg	Q8502	Berg / mountain
-Baum	Q10884	Baum / tree
-Vogel	Q5113	Vögel / bird
-Katze	Q146	Hauskatze / cat
-Pferd	Q726	Hauspferd / horse
-Schwein	Q787	Hausschwein / pig
-Huhn	Q780	Huhn / chicken
-Tier	Q729	Tier / animal
-Pflanze	Q756	Pflanzen / plant
-Stein	Q22731	Stein / stone
-Feuer	Q3196	Feuer / fire
-Stern	Q523	Stern / star
-Wald	Q4421	Wald / forest
-Meer	Q165	Meer / sea
-Insel	Q23442	Insel / island
-Straße	Q34442	Straße / road
-Tür	Q36794	Tür / door
-Fenster	Q35473	Fenster / window
-Bett	Q42177	Bett / bed
-Herz	Q1072	Herz / heart
-Kind	Q7569	Kind / child
-Frau	Q467	Frau / woman
-Mann	Q8441	Mann / man
-Milch	Q8495	Milch / milk
-Ei	Q93189	Ei / egg
-Tag	Q573	Tag / day
-Nacht	Q575	Nacht / night
-Jahr	Q577	Jahr / year
-Geld	Q1368	Geld / money
-Sprache	Q315	Sprache / language
-Farbe	Q1075	Farbe / color
-Blut	Q7873	Blut / blood
+# KEINE hand-getippten Q-IDs: GENUS löst jedes Wort selbst aus der Quelle (Wikidata) auf
+# und wählt das prominenteste echte Konzept (meiste Sitelinks). Diese Liste ist nur die
+# Vokabel-Auswahl; die Bedeutung lernt der Kern aus der Datenbank. Wörter, die die Quelle
+# nicht sauber liefert (z.B. "Blume" -> Label ist "Blüte"), bleiben ehrlich ungelernt.
+# Zeilen mit # werden ignoriert.
+
+# --- Lebewesen ---
+Mensch
+Hund
+Katze
+Pferd
+Kuh
+Schwein
+Huhn
+Vogel
+Fisch
+Tier
+Pflanze
+Baum
+
+# --- Natur ---
+Wasser
+Feuer
+Luft
+Stein
+Berg
+Fluss
+Meer
+See
+Wald
+Insel
+Sonne
+Mond
+Stern
+
+# --- Körper ---
+Hand
+Auge
+Herz
+Blut
+
+# --- Alltag ---
+Haus
+Tür
+Fenster
+Tisch
+Bett
+Auto
+Straße
+Stadt
+Buch
+Brot
+Milch
+Ei
+Geld
+
+# --- Menschen ---
+Kind
+Frau
+Mann
+
+# --- Zeit & Abstraktes ---
+Tag
+Nacht
+Jahr
+Sprache
+Farbe

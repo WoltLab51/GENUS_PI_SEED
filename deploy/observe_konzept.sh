@@ -51,32 +51,34 @@ if printf '%s' "$SEED" | grep -Eq '^Q[0-9]+$'; then
     QID="$SEED"
 else
     enc="$("$REPO_DIR/.venv/bin/python" -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$SEED")"
-    wd_get "$API?action=wbsearchentities&search=$enc&language=$SEARCH_LANG&type=item&limit=7&format=json" "$TMP/search.json"
-    # Disambiguation, two signals, both free from the search response:
-    #  (1) drop non-concept hits by their description -- family names, given names,
-    #      disambiguation pages, scholarly articles (these often carry the exact word as a
-    #      label, e.g. the surname "Hund" or the botanist matched on "Blume").
-    #  (2) among the survivors, prefer an EXACT label match -- so "Mond"->Moon (not fuzzy
-    #      "Monat"), "Sonne"->Sun (not generic "Stern"); else the top-ranked survivor.
-    # Falls back to the raw top hit only if every candidate looked like junk.
-    QID="$(SEED="$SEED" "$REPO_DIR/.venv/bin/python" - "$TMP/search.json" <<'PY'
-import json, os, sys
-word = os.environ["SEED"].casefold()
-BAD = ("familienname", "vorname", "begriffsklärung", "wikimedia",
-       "wissenschaftlicher artikel", "asteroid", "song", "album", "film")
-try:
-    hits = json.load(open(sys.argv[1])).get("search", [])
-except Exception:
-    hits = []
-def is_concept(h):
-    d = h.get("description", "").casefold()
-    return not any(b in d for b in BAD)
-clean = [h for h in hits if is_concept(h)]
-exact = [h["id"] for h in clean if h.get("label", "").casefold() == word]
-pick = exact or [h["id"] for h in clean] or [h["id"] for h in hits]
-print(pick[0] if pick else "")
+    wd_get "$API?action=wbsearchentities&search=$enc&language=$SEARCH_LANG&uselang=$SEARCH_LANG&type=item&limit=10&format=json" "$TMP/search.json"
+    cand="$("$REPO_DIR/.venv/bin/python" -c 'import json,sys; print(" ".join(h["id"] for h in json.load(open(sys.argv[1])).get("search",[])))' "$TMP/search.json")"
+    if [ -n "$cand" ]; then
+        ids_pipe="$(printf '%s' "$cand" | tr ' ' '|')"
+        wd_get "$API?action=wbgetentities&ids=$ids_pipe&props=sitelinks&format=json" "$TMP/sitelinks.json"
+        # Resolve word -> concept FROM THE SOURCE, not by guessing: among the candidates,
+        # pick the most prominent genuine concept -- the one with the most Wikipedia
+        # sitelinks (the source's own notability signal, which reliably surfaces the
+        # everyday meaning: dog over the constellation/surname, Moon over month). Reject
+        # non-concept hits (family/given names, disambiguation pages, scholarly articles).
+        # If nothing notable remains, record NOTHING -- an honest gap beats a wrong guess.
+        QID="$("$REPO_DIR/.venv/bin/python" - "$TMP/search.json" "$TMP/sitelinks.json" <<'PY'
+import json, sys
+BAD = ("family name", "given name", "disambiguation", "scholarly article", "wikimedia",
+       "surname", "familienname", "vorname", "begriffsklarung", "nachname")
+search = json.load(open(sys.argv[1])).get("search", [])
+ent = json.load(open(sys.argv[2])).get("entities", {})
+best, best_n = "", -1
+for h in search:
+    if any(b in h.get("description", "").lower() for b in BAD):
+        continue
+    n = len(ent.get(h["id"], {}).get("sitelinks", {}))
+    if n > best_n:
+        best, best_n = h["id"], n
+print(best if best_n >= 1 else "")
 PY
 )"
+    fi
 fi
 
 if [ -z "$QID" ]; then
