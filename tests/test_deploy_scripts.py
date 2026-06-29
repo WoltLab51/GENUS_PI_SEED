@@ -1,7 +1,33 @@
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_grundwortschatz_seed_file_is_wellformed():
+    lines = (ROOT / "deploy" / "grundwortschatz_de.tsv").read_text(encoding="utf-8").splitlines()
+    entries = []
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = line.split("\t")
+        assert len(parts) >= 2, f"entry needs word<TAB>Q-id: {line!r}"
+        word, qid = parts[0], parts[1]
+        assert word and "@" not in word, f"bad word: {word!r}"
+        assert re.fullmatch(r"Q[0-9]+", qid), f"bad Q-id for {word}: {qid!r}"
+        entries.append(word)
+    assert len(entries) >= 15                 # a real starting foundation
+    assert len(entries) == len(set(entries))  # no duplicate words
+
+
+def test_grundwortschatz_seed_script_feeds_curated_mapping_and_concept():
+    script = (ROOT / "deploy" / "seed_grundwortschatz.sh").read_text(encoding="utf-8")
+    assert "grundwortschatz_de.tsv" in script
+    assert "relate" in script
+    assert "expresses" in script
+    assert "curated" in script              # the guaranteed word->concept mapping
+    assert "observe_konzept.sh" in script   # concept labels + is_a hierarchy from Wikidata
 
 
 def test_cron_installation_writes_timestamped_ticks():

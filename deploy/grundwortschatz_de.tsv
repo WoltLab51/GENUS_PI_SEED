@@ -1,0 +1,29 @@
+# GENUS Grundwortschatz (Deutsch) — kuratierte Zuordnung Wort -> Wikidata-Konzept (Q-ID).
+#
+# Warum kuratiert: automatische Wort->Konzept-Auflösung ist unzuverlässiges Entity-Linking
+# (Top-Treffer gibt Mond->Monat, Blume->ein Botaniker; exakter Label-Treffer erwischt
+# Familiennamen). Das ist die *bewusste, geprüfte* Grundlage. Das LLM am Rand wird später
+# der allgemeine Disambiguierer — hier wird von Hand verankert.
+#
+# Format:  <Wort><TAB><Q-ID><TAB><Glosse>.  Zeilen mit # werden ignoriert.
+# Neue Einträge: die Q-ID VOR dem Eintragen am Label prüfen
+#   (wbgetentities&ids=Q…&props=labels&languages=de|en).
+#
+# Wort	Q-ID	Glosse (Wikidata-Label de / en)
+Mensch	Q5	Mensch / human
+Hund	Q144	Haushund / dog
+Wasser	Q283	Wasser / water
+Haus	Q3947	Haus / house
+Auto	Q1420	Auto / car
+Stadt	Q515	Stadt / city
+Buch	Q571	Buch / book
+Fluss	Q4022	Fluss / river
+Brot	Q7802	Brot / bread
+Fisch	Q152	Fisch / fish
+Hand	Q33767	Hand / hand
+Sonne	Q525	Sonne / Sun
+Mond	Q405	Mond / Moon
+Apfel	Q89	Apfel / apple
+Berg	Q8502	Berg / mountain
+Baum	Q10884	Baum / tree
+Vogel	Q5113	Vögel / bird
