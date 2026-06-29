@@ -268,6 +268,16 @@ def test_gaps_are_referenced_but_unknown_words():
     conn.close()
 
 
+def test_gaps_can_follow_the_is_a_hierarchy():
+    conn = _fresh()
+    reactors.observe_relation(conn, "dog", "is_a", "mammal", "src")
+    reactors.observe_relation(conn, "dog", "synonym", "pooch", "src")
+    assert "pooch" in sources.gaps(conn)                        # default follows synonyms
+    assert "mammal" not in sources.gaps(conn)                   # is_a not followed by default
+    assert "mammal" in sources.gaps(conn, predicates=("is_a",))  # climb the hierarchy
+    conn.close()
+
+
 def test_relations_project_and_rebuild_from_the_log():
     conn = _fresh()
     reactors.observe_relation(conn, "run", "is_a", "verb", "dict")

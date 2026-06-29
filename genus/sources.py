@@ -302,22 +302,24 @@ def relations(conn, subject: str | None = None, predicate: str | None = None) ->
     return [dict(row) for row in rows]
 
 
-def gaps(conn, limit: int = 20) -> list[str]:
+def gaps(conn, limit: int = 20, predicates: tuple[str, ...] = ("synonym", "antonym")) -> list[str]:
     """Knowledge gaps: words GENUS's own graph *points at* but has not learned yet --
-    objects of synonym/antonym relations that are not themselves subjects. The seed of
-    gap-driven (permanent) learning: GENUS knows what it does not know, and the membrane
-    fills it. Bounded by ``limit`` so each tick is gentle.
+    objects of the given relation predicates that are not themselves subjects. GENUS
+    knows what it does not know, and the membrane fills it. Which predicates count is
+    source-dependent: synonym/antonym for a flat thesaurus, **is_a** to climb a hierarchy
+    (the German Oberbegriffe). Bounded by ``limit`` so each round is gentle.
     """
+    placeholders = ",".join("?" for _ in predicates)
     rows = conn.execute(
-        """
+        f"""
         SELECT DISTINCT object AS word
         FROM relation_projection
-        WHERE predicate IN ('synonym', 'antonym')
+        WHERE predicate IN ({placeholders})
           AND object NOT IN (SELECT subject FROM relation_projection)
         ORDER BY object
         LIMIT ?
         """,
-        (limit,),
+        (*predicates, limit),
     ).fetchall()
     return [row["word"] for row in rows]
 

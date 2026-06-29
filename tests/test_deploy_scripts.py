@@ -74,8 +74,10 @@ def test_acquire_gaps_loop_asks_genus_and_fetches_each():
 
     # the loop asks GENUS what it doesn't know, then the membrane fetches each word
     assert "gaps" in script
-    assert "observe_word.sh" in script
-    assert "GENUS_GAP_LIMIT" in script  # bounded per tick -- gentle on the API
+    assert "observe_word.sh" in script  # the default membrane
+    assert "GENUS_ACQUIRE_SCRIPT" in script  # configurable: e.g. observe_wort.sh (German)
+    assert "GENUS_GAP_PREDICATES" in script  # configurable: e.g. is_a to climb a hierarchy
+    assert "GENUS_GAP_LIMIT" in script  # bounded per round -- gentle on the API
     assert "no gaps" in script          # the closed-vocabulary case records nothing
 
 

@@ -16,6 +16,16 @@ REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 LIMIT="${GENUS_GAP_LIMIT:-5}"
+# Which membrane fetches a gap word, and which relation predicates count as gaps. Default
+# is the English thesaurus following synonyms; for the German hierarchy set e.g.
+# GENUS_ACQUIRE_SCRIPT=observe_wort.sh GENUS_GAP_PREDICATES=is_a to climb the Oberbegriffe.
+ACQUIRE_SCRIPT="${GENUS_ACQUIRE_SCRIPT:-observe_word.sh}"
+pred_args=""
+if [ -n "${GENUS_GAP_PREDICATES:-}" ]; then
+    OLD_IFS="$IFS"; IFS=','
+    for p in $GENUS_GAP_PREDICATES; do pred_args="$pred_args --predicate $p"; done
+    IFS="$OLD_IFS"
+fi
 
 mkdir -p "$LOG_DIR"
 
@@ -34,7 +44,7 @@ run_genus() {
     fi
 }
 
-words="$(run_genus gaps --limit "$LIMIT" 2>/dev/null || true)"
+words="$(run_genus gaps --limit "$LIMIT" $pred_args 2>/dev/null || true)"
 
 if [ -z "$words" ]; then
     log "no gaps — every referenced word is known"
@@ -45,7 +55,7 @@ count=0
 while IFS= read -r word; do
     [ -n "$word" ] || continue
     GENUS_DB_PATH="$DB_PATH" GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
-        "$SCRIPT_DIR/observe_word.sh" "$word" >/dev/null 2>&1 || true
+        "$SCRIPT_DIR/$ACQUIRE_SCRIPT" "$word" >/dev/null 2>&1 || true
     count=$((count + 1))
 done <<EOF
 $words

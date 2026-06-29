@@ -396,11 +396,13 @@ def relations_command(subject: str | None) -> None:
 
 @main.command("gaps")
 @click.option("--limit", default=20, type=int, show_default=True)
-def gaps_command(limit: int) -> None:
+@click.option("--predicate", "predicates", multiple=True,
+              help="relation predicate(s) to follow (default: synonym, antonym; e.g. is_a to climb a hierarchy)")
+def gaps_command(limit: int, predicates: tuple[str, ...]) -> None:
     """List knowledge gaps — referenced words GENUS doesn't know yet (one per line)."""
     conn = get_conn()
     try:
-        for word in sources.gaps(conn, limit):
+        for word in sources.gaps(conn, limit, predicates or ("synonym", "antonym")):
             click.echo(word)
     finally:
         conn.close()
