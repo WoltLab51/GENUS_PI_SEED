@@ -3,9 +3,10 @@ set -uo pipefail
 
 # Background vocabulary learner — GENUS grows its Grundwortschatz on its own, continuously,
 # in the idle gaps. It runs as a long-lived daemon: word after word, forever, learning each
-# by resolving it FROM THE SOURCE (observe_konzept.sh: Wikidata -> the most prominent
-# exact-match concept). A cursor file remembers its place, so a restart picks up where it
-# left off.
+# by resolving it FROM TWO SOURCES (observe_konzept.sh: Wikidata concepts, the most prominent
+# exact-match Q-id; observe_lexem.sh: Wikidata lexemes -> the same concepts + word class).
+# Two sources on a shared edge ignite the self-checking weave (corroboration raises
+# confidence). A cursor file remembers its place, so a restart picks up where it left off.
 #
 # It is the lowest-priority job (the installer gives it idle CPU and IO scheduling), so the
 # kernel only lets it run in true idle time and it yields instantly to the punctual ticks.
@@ -38,9 +39,14 @@ learn_next() {
     case "$start" in ''|*[!0-9]*) start=0 ;; esac
     word="$(grep -vE '^#|^[[:space:]]*$' "$WORDLIST" | sed -n "$((start + 1))p" | tr -d '\r' | awk '{print $1}')"
     [ -n "$word" ] || return 1
+    # Two sources per word: the concept membrane (Wikidata Q-ids) AND the lexeme membrane
+    # (Wikidata L-ids -> same concepts) under a different source name. A shared
+    # `word@de -expresses-> Q` edge thus gains a second source -> its confidence rises above
+    # the seed (the self-checking weave ignites), and lexemes add word classes beyond nouns.
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
+    GENUS_LEXEM_LANG=de "$SCRIPT_DIR/observe_lexem.sh" "$word" >/dev/null 2>&1 || true
     echo "$((start + 1))" > "$CURSOR"
-    log "learned '$word' (#$((start + 1)))"
+    log "learned '$word' (#$((start + 1))) — concept + lexeme"
     return 0
 }
 
