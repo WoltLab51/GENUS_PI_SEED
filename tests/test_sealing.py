@@ -105,6 +105,23 @@ def test_clean_chain_verifies_and_integrity_passes(conn):
     assert integrity.check(conn)["ok"] is True
 
 
+def test_integrity_check_uses_one_consistent_snapshot(conn, monkeypatch):
+    # Robustness against concurrent autonomous writes: the check must read the event log
+    # ONCE (a consistent point-in-time snapshot), not before-and-after the replay -- so a
+    # learner/cron append during the check can't spuriously trip "changed during replay".
+    _fill_sealed(conn, 4)
+    calls = {"n": 0}
+    real = integrity.snapshot_event_log
+    monkeypatch.setattr(
+        integrity, "snapshot_event_log",
+        lambda c: (calls.__setitem__("n", calls["n"] + 1), real(c))[1],
+    )
+    result = integrity.check(conn)
+    assert result["ok"] is True
+    assert calls["n"] == 1
+    assert not any("changed during replay" in i for i in result["issues"])
+
+
 def test_lazy_tampering_is_detected(conn):
     _fill_sealed(conn, 3)
     target = _first_real_sealed_id(conn)

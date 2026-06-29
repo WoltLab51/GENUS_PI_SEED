@@ -176,23 +176,33 @@ def check(conn) -> dict:
     issues.extend(validate_event_contract(conn))
     issues.extend(sealing.verify_chain(conn))
 
-    event_log_before = snapshot_event_log(conn)
-    projection_before = snapshot_projections(conn)
-    replay_conn = replay_connection_from_events(event_log_before)
+    # Take a CONSISTENT point-in-time snapshot of events + projections in one read
+    # transaction (a stable WAL snapshot), so concurrent autonomous writers -- the learner,
+    # cron ticks -- cannot make this check spuriously fail. The ledger is append-only, so a
+    # fresh replay of exactly those events must reproduce exactly those projections; new
+    # events appended *during* the check are simply not part of this snapshot.
+    in_txn = conn.in_transaction
+    if not in_txn:
+        conn.execute("BEGIN")
+    try:
+        event_log_snapshot = snapshot_event_log(conn)
+        projection_before = snapshot_projections(conn)
+    finally:
+        if not in_txn:
+            conn.execute("COMMIT")
+
+    replay_conn = replay_connection_from_events(event_log_snapshot)
     replay_summary = event_router.replay(replay_conn)
-    event_log_after = snapshot_event_log(conn)
     projection_after = snapshot_projections(replay_conn)
     replay_conn.close()
 
-    if event_log_after != event_log_before:
-        issues.append("event_log changed during replay")
     if projection_after != projection_before:
         issues.append("projection state changed after replay")
 
     return {
         "ok": not issues,
         "issues": issues,
-        "events": len(event_log_after),
+        "events": len(event_log_snapshot),
         "active_beliefs": replay_summary["active_beliefs"],
         "proposals": replay_summary["proposals"],
         "inquiries": replay_summary["inquiries"],
