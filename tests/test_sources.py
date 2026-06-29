@@ -289,6 +289,16 @@ def test_display_renders_concepts_with_a_readable_label():
     conn.close()
 
 
+def test_display_prefers_the_canonical_label_over_an_alias():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Pferd@de", "label", "Q726", "wikidata")     # canonical
+    reactors.observe_relation(conn, "Pferd@de", "expresses", "Q726", "wikidata")
+    reactors.observe_relation(conn, "Gaul@de", "expresses", "Q726", "wikidata")  # alias only
+    assert sources.display(conn, "Q726") == "Q726 (Pferd)"   # not the alphabetically-first "Gaul"
+    assert sources.senses(conn, "Gaul", "de") == ["Q726"]    # alias still resolves to the concept
+    conn.close()
+
+
 def test_relations_project_and_rebuild_from_the_log():
     conn = _fresh()
     reactors.observe_relation(conn, "run", "is_a", "verb", "dict")

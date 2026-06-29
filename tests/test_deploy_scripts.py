@@ -104,7 +104,8 @@ def test_concept_membrane_feeds_both_layers_from_wikidata():
     assert "wbgetclaims" in script          # P279 parents -- small, reliable REST call
     assert "wbgetentities" in script        # labels + aliases
     assert "P279" in script
-    assert "expresses" in script            # word@lang -> concept
+    assert "expresses" in script            # word@lang -> concept (label + aliases, for lookup)
+    assert "\\tlabel\\t" in script          # the canonical label, for readable display
     assert "is_a" in script                 # concept -> parent concept
     assert "wbsearchentities" in script     # word -> top Q-id
     assert "nothing recorded" in script     # a failed/empty fetch records nothing

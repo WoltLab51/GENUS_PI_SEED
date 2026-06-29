@@ -337,7 +337,8 @@ def gaps(conn, limit: int = 20, predicates: tuple[str, ...] = ("synonym", "anton
 # is simply a form with lexemes in several languages (Community@de + Community@en), one
 # concept -- no conflict. (Language is carried in the key for now; promotable to a column
 # when a capability demands it -- see [[representation-dimensions-as-merkmale]].)
-EXPRESSES = "expresses"
+EXPRESSES = "expresses"   # any form (label OR alias) -> concept; for word→concept lookup
+LABEL = "label"           # the ONE canonical name of a concept in a language; for display
 _LEXEME_SEP = "@"
 
 
@@ -375,16 +376,24 @@ def display(conn, node: str, langs: tuple[str, ...] = ("de", "en", "fr")) -> str
     its own label; a node nothing lexicalizes is shown unchanged."""
     if _LEXEME_SEP in node:
         return node
-    by_lang: dict[str, str] = {}
+    canon: dict[str, str] = {}      # the canonical label per language (preferred)
+    any_form: dict[str, str] = {}   # any expressing form, as a fallback
+    for r in relations(conn, predicate=LABEL, object=node):
+        form, lang_of = split_lexeme(r["subject"])
+        if lang_of is not None:
+            canon.setdefault(lang_of, form)
     for r in relations(conn, predicate=EXPRESSES, object=node):
         form, lang_of = split_lexeme(r["subject"])
         if lang_of is not None:
-            by_lang.setdefault(lang_of, form)
+            any_form.setdefault(lang_of, form)
     for lang in langs:
-        if lang in by_lang:
-            return f"{node} ({by_lang[lang]})"
-    if by_lang:
-        return f"{node} ({next(iter(by_lang.values()))})"
+        if lang in canon:
+            return f"{node} ({canon[lang]})"
+        if lang in any_form:
+            return f"{node} ({any_form[lang]})"
+    pool = canon or any_form
+    if pool:
+        return f"{node} ({next(iter(pool.values()))})"
     return node
 
 

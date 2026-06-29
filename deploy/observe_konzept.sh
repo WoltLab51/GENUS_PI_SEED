@@ -81,13 +81,17 @@ out, seen = [], set()
 try:
     ent = json.load(open(sys.argv[1]))["entities"][qid]
     labels, aliases = ent.get("labels", {}), ent.get("aliases", {})
+    def ok(t):
+        return t and "\t" not in t and "@" not in t
     for lg in langs:
-        terms = []
-        if lg in labels:
-            terms.append(labels[lg]["value"])
-        terms += [a["value"] for a in aliases.get(lg, [])]
-        for t in terms:
-            if t and "\t" not in t and "@" not in t and (t, lg) not in seen:
+        canon = labels.get(lg, {}).get("value")
+        # the ONE canonical label -> `label` (for readable display) AND `expresses`
+        if ok(canon):
+            out.append("%s@%s\tlabel\t%s" % (canon, lg, qid))
+        # every form (label + aliases) -> `expresses`, so any synonym resolves to the concept
+        forms = ([canon] if canon else []) + [a["value"] for a in aliases.get(lg, [])]
+        for t in forms:
+            if ok(t) and (t, lg) not in seen:
                 seen.add((t, lg))
                 out.append("%s@%s\texpresses\t%s" % (t, lg, qid))
 except Exception:
