@@ -279,11 +279,12 @@ def resolved_window(conn, claim_key: str, n: int) -> list[dict]:
     return [{"metric_value": row["value"], "id": row["id"]} for row in rows[-n:]]
 
 
-def relations(conn, subject: str | None = None, predicate: str | None = None) -> list[dict]:
+def relations(conn, subject: str | None = None, predicate: str | None = None,
+              object: str | None = None) -> list[dict]:
     """The relation graph: ``(subject, predicate, object, source)`` triples GENUS holds --
     networked knowledge, not just claim → value. Read from the indexed
     ``relation_projection`` (built from ``relation_asserted`` events), so graph walks
-    scale to millions of triples. Filterable by subject/predicate.
+    scale to millions of triples. Filterable by subject/predicate/object (all indexed).
     """
     clauses, params = [], []
     if subject is not None:
@@ -292,6 +293,9 @@ def relations(conn, subject: str | None = None, predicate: str | None = None) ->
     if predicate is not None:
         clauses.append("predicate = ?")
         params.append(predicate)
+    if object is not None:
+        clauses.append("object = ?")
+        params.append(object)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     rows = conn.execute(
         "SELECT subject, predicate, object, source FROM relation_projection"
@@ -322,6 +326,46 @@ def gaps(conn, limit: int = 20, predicates: tuple[str, ...] = ("synonym", "anton
         (*predicates, limit),
     ).fetchall()
     return [row["word"] for row in rows]
+
+
+# --- Lexicon: the lexeme <-> concept layer (multilingual) -----------------------------
+# A *lexeme* is a language-tagged word, keyed "form@lang" (e.g. "Hund@de"); the language
+# rides on the word. A *concept* is language-neutral (e.g. the Latin "Canis"), and the
+# is_a hierarchy + all reasoning live at the concept level. A lexeme `expresses` a concept.
+# So language sits on the word, meaning on the concept -- and one concept graph serves
+# every language (translation and cross-lingual reasoning fall out for free). A loan-word
+# is simply a form with lexemes in several languages (Community@de + Community@en), one
+# concept -- no conflict. (Language is carried in the key for now; promotable to a column
+# when a capability demands it -- see [[representation-dimensions-as-merkmale]].)
+EXPRESSES = "expresses"
+_LEXEME_SEP = "@"
+
+
+def lexeme_key(form: str, lang: str) -> str:
+    return f"{form}{_LEXEME_SEP}{lang}"
+
+
+def split_lexeme(key: str) -> tuple[str, str | None]:
+    """('Hund@de') -> ('Hund', 'de'); a bare concept key -> (key, None)."""
+    form, sep, lang = key.rpartition(_LEXEME_SEP)
+    return (form, lang) if sep else (key, None)
+
+
+def senses(conn, form: str, lang: str) -> list[str]:
+    """The concept(s) a word (form in a language) expresses -- its possible meanings."""
+    return [r["object"] for r in
+            relations(conn, subject=lexeme_key(form, lang), predicate=EXPRESSES)]
+
+
+def lexicalize(conn, concept: str, lang: str | None = None) -> list[str]:
+    """How a (language-neutral) concept is *said* -- the word form(s) expressing it,
+    optionally in one language. The inverse of senses."""
+    out = []
+    for r in relations(conn, predicate=EXPRESSES, object=concept):
+        form, lang_of = split_lexeme(r["subject"])
+        if lang is None or lang_of == lang:
+            out.append(form)
+    return sorted(set(out))
 
 
 def report(conn) -> dict:

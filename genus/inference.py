@@ -91,3 +91,50 @@ def infer(conn, subject: str, predicate: str, max_depth: int = MAX_DEPTH) -> lis
          "trust": data["trust"], "chain": data["chain"]}
         for obj, data in sorted(derived.items())
     ]
+
+
+def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
+    """Reason about a *word*: map it to its concept(s) via ``expresses``, infer at the
+    language-neutral concept level, then render the answers back as words in ``lang``.
+
+    A word asserts no hierarchy of its own -- it *inherits* its concept's. This is
+    sense-coherent **by construction**: each concept's is_a parent is a specific concept,
+    so a chain stays within one sense-line and can never wander across senses (the cure
+    for "Hund is_a Bevölkerung"). The chain begins at the word (the ``expresses`` step),
+    so the justification is fully glass-box; trust is still the weakest premise.
+    """
+    key = sources.lexeme_key(form, lang)
+    trust_cache: dict[str, float] = {}
+
+    def trust_of(source: str) -> float:
+        if source not in trust_cache:
+            trust_cache[source] = sources.source_trust(conn, source)
+        return trust_cache[source]
+
+    by_object: dict[str, dict] = {}  # ancestor concept -> {chain, trust}; shortest wins
+    for expr in sources.relations(conn, subject=key, predicate=sources.EXPRESSES):
+        concept = expr["object"]
+        head = _premise(key, sources.EXPRESSES, concept, expr["source"])
+        head_trust = trust_of(expr["source"])
+
+        # From the word's view *everything* is derived: direct concept parents first
+        # (shortest chains), then the transitive ancestors.
+        ancestors: list[tuple[str, list[dict], float]] = [
+            (direct["object"],
+             [_premise(concept, predicate, direct["object"], direct["source"])],
+             trust_of(direct["source"]))
+            for direct in sources.relations(conn, subject=concept, predicate=predicate)
+        ]
+        ancestors += [(d["object"], d["chain"], d["trust"]) for d in infer(conn, concept, predicate)]
+
+        for obj, chain, sub_trust in ancestors:
+            if obj in by_object or obj == concept:
+                continue
+            by_object[obj] = {"chain": [head] + chain, "trust": round(min(head_trust, sub_trust), 3)}
+
+    return [
+        {"subject": form, "lang": lang, "predicate": predicate, "object": obj,
+         "lexemes": sources.lexicalize(conn, obj, lang),
+         "trust": data["trust"], "chain": data["chain"]}
+        for obj, data in sorted(by_object.items())
+    ]

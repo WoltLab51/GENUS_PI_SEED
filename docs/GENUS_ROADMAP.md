@@ -717,6 +717,35 @@ Parser macht daraus Tripel wie `run -[is_a]-> verb` · `run -[synonym]-> execute
 *Danach:* Skala (indizierte Relations-Projektion) · mehr Quellen (Wikidata, GeoNames) ·
 Kontext/Relevanz (welcher Sinn wann) · `resolve` über Sinne.
 
+**Inferenz + Deutsch + die Sinn-Erkenntnis (2026-06-29):**
+- **Inferenz** (`genus infer`, `genus/inference.py`) — der erste Schluss-Primitiv: gebundene,
+  rückverfolgbare transitive/symmetrische Hülle über den Graph; abgeleitete Kanten werden
+  *nicht gespeichert* (Begründungskette statt Herkunft), Trust = schwächste Prämisse.
+- **Deutscher Grundwortschatz** (`deploy/observe_wort.sh`, OpenThesaurus) + der Lücke-Loop
+  klettert die `is_a`-Hierarchie (`genus gaps --predicate is_a`, `GENUS_ACQUIRE_SCRIPT`).
+- **Erzwungene Erkenntnis aus echten Daten:** der primäre-Sinn-Trick + transitive Hülle
+  erzeugte **Sinn-Kontamination** (`Hund is_a Bevölkerung`). Bedeutung lebt im *Sinn*, nicht
+  im Wort → die **Sinn-Dimension wurde erzwungen**, nicht am Reißbrett gewählt.
+
+**Zwei-Schichten-Modell — die mehrsprachige Form (gebaut, 2026-06-29):**
+```
+WORT / Lexem  "form@lang"  --expresses-->  KONZEPT (sprach-neutral)
+                                            KONZEPT --is_a--> KONZEPT   (Hierarchie + Schließen)
+```
+- Sprache sitzt am **Wort** (`Hund@de`, `dog@en`), Bedeutung + Hierarchie am **Konzept**
+  (latein-verschlüsselt für Naturarten: `Canis → Mammalia → Animalia`).
+- `genus infer Hund is_a --lang de` bildet Wort→Konzept ab, schließt **sinn-kohärent**
+  (keine Kontamination — jede Kette bleibt in *einer* Sinn-Linie) und rendert die Antwort
+  zurück ins Deutsche. **Ein** Konzept-Graph dient *jeder* Sprache → Englisch/Französisch
+  docken durch `expresses`-Kanten an, Übersetzung + cross-linguales Schließen fallen gratis ab.
+- **Lehnwörter** trennscharf: eine Form, Lexeme in mehreren Sprachen (`Community@de` +
+  `Community@en`), *ein* Konzept — kein Konflikt. (`sources.senses`/`lexicalize`/`split_lexeme`.)
+- *Erst Deutsch, dann en/fr, irgendwann alle* — die Konzepte sind neutral, das Schließen
+  wird *einmal* gelernt und gilt überall. Die Sprache ist im Schlüssel getragen (auf eine
+  Spalte promotbar, wenn eine Fähigkeit es verlangt).
+- *Danach:* die Quelle umstellen (Wikidata/Wikispecies → saubere latein-verankerte
+  Taxonomie statt vernakulärer Mehrdeutigkeit) · `expresses`-Akquise statt Wort-`is_a`.
+
 ---
 
 # Schicht SYSTEME — Regel-Domänen lernen + schließen (deterministisch)

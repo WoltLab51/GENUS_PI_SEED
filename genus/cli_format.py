@@ -118,6 +118,20 @@ def _print_inferences(derived: list[dict], subject: str, predicate: str) -> None
         click.echo(f"[INF]   {chain}")
 
 
+def _print_lexeme_inferences(results: list[dict], form: str, predicate: str, lang: str) -> None:
+    if not results:
+        click.echo(f"[INF] {form} ({lang}) -[{predicate}]-> : nothing to derive")
+        return
+    click.echo(f"[INF] {form} ({lang}) -[{predicate}]-> via concept (trust = weakest premise):")
+    for item in results:
+        words = ", ".join(item["lexemes"]) if item["lexemes"] else f"(no {lang} word yet)"
+        click.echo(f"[INF]   -> {item['object']}  = {words}   trust {item['trust']:.2f}")
+        chain = "  <=  " + "  ·  ".join(
+            f"{p['subject']} {p['predicate']} {p['object']} ({p['source']})" for p in item["chain"]
+        )
+        click.echo(f"[INF]   {chain}")
+
+
 def _print_surprisal(rows: list[dict]) -> None:
     if not rows:
         click.echo("[SRP] no characterized beliefs yet")

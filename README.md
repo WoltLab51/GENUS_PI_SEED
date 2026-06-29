@@ -299,8 +299,20 @@ deterministic and model-free.
   picks your value; the source that agreed with you then earns trust back.
 - `genus relate <s> <p> <o>` / `genus relations [s]` — the structure pillar: networked
   knowledge as provenanced `(subject, predicate, object)` triples (`relation_asserted`,
-  a raw replay-stable fact), read back as a graph. Holding structured knowledge completes
-  the WISSEN layer; *using* it (inference) is the next layer.
+  a raw replay-stable fact), read back as a graph.
+- `genus infer <s> <predicate>` — the first reasoning primitive: derive new, justified
+  relations from known ones (transitive `is_a`/`part_of`, symmetric `synonym`/`antonym`).
+  Derived edges aren't stored — each carries its premise chain and a trust equal to its
+  weakest premise. Read-time, glass-box, bounded.
+- **Two-layer knowledge (multilingual).** Language rides on the *word*, meaning on the
+  *concept*. A lexeme is keyed `form@lang` (`Hund@de`) and `expresses` a language-neutral
+  concept (`Canis`); the `is_a` hierarchy and all reasoning live at the concept level
+  (Latin-keyed for natural kinds: `Canis → Mammalia → Animalia`). `genus infer Hund is_a
+  --lang de` maps word→concept, reasons **sense-coherently** (no cross-sense drift), and
+  renders the answer back into German. One concept graph serves every language — English
+  and French slot in by adding `expresses` edges; translation and cross-lingual reasoning
+  fall out for free. A loan-word is just a form with lexemes in several languages
+  (`Community@de` + `Community@en`), one concept.
 
 ## Automatic Collection With Cron
 

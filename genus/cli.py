@@ -38,6 +38,7 @@ from genus.cli_format import (
     _print_experience_explanation,
     _print_inferences,
     _print_learning,
+    _print_lexeme_inferences,
     _print_observation_result,
     _print_proposal_explanation,
     _print_relations,
@@ -411,11 +412,20 @@ def gaps_command(limit: int, predicates: tuple[str, ...]) -> None:
 @main.command("infer")
 @click.argument("subject")
 @click.argument("predicate")
-def infer_command(subject: str, predicate: str) -> None:
-    """Derive new relations from known ones (transitive/symmetric), each with its why."""
+@click.option("--lang", default=None,
+              help="treat SUBJECT as a word in this language: map it to its concept(s), reason at the concept level, answer in this language")
+def infer_command(subject: str, predicate: str, lang: str | None) -> None:
+    """Derive new relations from known ones (transitive/symmetric), each with its why.
+
+    With --lang, SUBJECT is a word: GENUS reasons through its language-neutral concept
+    (sense-coherent) and renders the answer back into that language."""
     conn = get_conn()
     try:
-        _print_inferences(inference.infer(conn, subject, predicate), subject, predicate)
+        if lang:
+            _print_lexeme_inferences(
+                inference.infer_lexeme(conn, subject, predicate, lang), subject, predicate, lang)
+        else:
+            _print_inferences(inference.infer(conn, subject, predicate), subject, predicate)
     finally:
         conn.close()
 
