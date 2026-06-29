@@ -402,6 +402,28 @@ def teach_command(claim_key: str, value: float, source: str) -> None:
         conn.close()
 
 
+@main.command("teach-relation")
+@click.argument("subject")
+@click.argument("predicate")
+@click.argument("object")
+@click.option("--source", default="human", show_default=True)
+def teach_relation_command(subject: str, predicate: str, object: str, source: str) -> None:
+    """Teach the correct relation and settle any open conflict — the teacher-loop for knowledge."""
+    conn = get_conn()
+    try:
+        result = reactors.teach_relation(conn, subject, predicate, object, source)
+        settled = len(result["resolved_inquiries"])
+        dropped = result["retracted_objects"]
+        msg = (f"[TCH] {sources.display(conn, subject)} -[{predicate}]-> "
+               f"{sources.display(conn, object)} (source={source}) — "
+               f"settled {settled} inquiry(ies)")
+        if dropped:
+            msg += f", retracted {len(dropped)} wrong object(s)"
+        click.echo(msg)
+    finally:
+        conn.close()
+
+
 @main.command("relate")
 @click.argument("subject")
 @click.argument("predicate")

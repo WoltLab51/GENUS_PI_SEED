@@ -362,6 +362,38 @@ def test_nonfunctional_predicate_allows_many_objects():
     assert sources.relation_contradiction(conn, "Hund", "is_a")["contradiction"] is False
 
 
+def test_teach_relation_settles_inquiry_and_corrects_functional():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "label", "Q999", "wikidata")  # wrong
+    reactors.observe_relation(conn, "Hund@de", "label", "Q144", "other")     # right -> raises inquiry
+    assert reactors._open_source_contradiction(conn, "Hund@de|label")
+    result = reactors.teach_relation(conn, "Hund@de", "label", "Q144", "human")
+    assert result["resolved_inquiries"]                       # the inquiry is settled
+    assert "Q999" in result["retracted_objects"]              # the wrong object is taken back
+    objs = {r["object"] for r in sources.relations(conn, subject="Hund@de", predicate="label")}
+    assert objs == {"Q144"}                                   # only the taught object remains
+    assert not reactors._open_source_contradiction(conn, "Hund@de|label")
+
+
+def test_teach_relation_nonfunctional_adds_without_retract():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "wikidata")
+    result = reactors.teach_relation(conn, "Hund", "is_a", "Haustier", "human")
+    assert result["retracted_objects"] == []                  # non-functional: nothing dropped
+    objs = {r["object"] for r in sources.relations(conn, subject="Hund", predicate="is_a")}
+    assert objs == {"Säugetier", "Haustier"}                  # both parents kept
+
+
+def test_teach_relation_cli(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "label", "Q999", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "label", "Q144", "other")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["teach-relation", "Hund@de", "label", "Q144"])
+    assert result.exit_code == 0, result.output
+    assert "settled 1 inquiry" in result.output
+
+
 def test_retract_relation_removes_edge_and_survives_replay():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q37575615", "wikidata")  # wrong (surname)

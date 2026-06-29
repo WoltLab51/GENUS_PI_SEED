@@ -160,6 +160,53 @@ def teach(conn, claim_key: str, value, source: str = "human") -> dict:
     return {"event_id": result["event_id"], "resolved_inquiries": resolved}
 
 
+def teach_relation(
+    conn, subject: str, predicate: str, object_: str, source: str = "human"
+) -> dict:
+    """The teacher-loop for the knowledge graph: a human (or, later, the LLM at the edge)
+    asserts the correct relation and settles any open conflict.
+
+    For a FUNCTIONAL predicate the taught object is authoritative, so competing objects are
+    retracted first -- the wrong acquisition is taken back, not left to linger. The relation
+    is then asserted from the (human) source, and any open relation-contradiction inquiry for
+    ``(subject, predicate)`` is resolved -- GENUS asked, you answered. (Non-functional
+    predicates legitimately keep several objects; use ``unrelate`` to drop a specific wrong
+    edge there.)
+    """
+    rel_key = f"{subject}|{predicate}"
+    retracted: list[str] = []
+    if predicate in sources.FUNCTIONAL_PREDICATES:
+        competitors = {
+            row["object"]
+            for row in sources.relations(conn, subject=subject, predicate=predicate)
+            if row["object"] != object_
+        }
+        for obj in competitors:
+            retract_relation(conn, subject, predicate, obj, reason=f"corrected by {source}")
+            retracted.append(obj)
+    result = observe_relation(conn, subject, predicate, object_, source)
+    resolved: list[int] = []
+    try:
+        rows = conn.execute(
+            "SELECT id FROM inquiry_log WHERE inquiry_type = ? AND claim_key = ? AND state = 'open'",
+            (inquiries.SOURCE_CONTRADICTION_TYPE, rel_key),
+        ).fetchall()
+        for row in rows:
+            inquiries.record_inquiry_resolved_event(
+                conn, int(row["id"]), f"{source}: {subject} -[{predicate}]-> {object_}"
+            )
+            resolved.append(int(row["id"]))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {
+        "event_id": result["event_id"],
+        "resolved_inquiries": resolved,
+        "retracted_objects": retracted,
+    }
+
+
 def observe_relation(
     conn, subject: str, predicate: str, object_: str, source: str, derivation: str | None = None
 ) -> dict:
