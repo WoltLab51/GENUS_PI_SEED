@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -uo pipefail
 
-# Background vocabulary learner — GENUS grows its Grundwortschatz on its own, in the gaps.
+# Background vocabulary learner — GENUS grows its Grundwortschatz on its own, continuously,
+# in the idle gaps. It runs as a long-lived daemon: word after word, forever, learning each
+# by resolving it FROM THE SOURCE (observe_konzept.sh: Wikidata -> the most prominent
+# exact-match concept). A cursor file remembers its place, so a restart picks up where it
+# left off.
 #
-# Reads a German word list (the breadth driver) and learns the next bounded BATCH each run
-# by resolving each word FROM THE SOURCE (observe_konzept.sh: Wikidata -> the most prominent
-# exact-match concept), then climbing the chain. A cursor file remembers how far it got, so
-# it picks up where it left off. It is the LOWEST priority job: the installer runs it with
-# idle CPU/IO scheduling (nice/ionice), so it yields instantly to the punctual sensor ticks
-# and only fills true idle time. It honors the global pause switch (genus pause) before and
-# DURING the batch, so it can be stopped at any moment. Gentle on the source by design.
+# It is the lowest-priority job (the installer gives it idle CPU and IO scheduling), so the
+# kernel only lets it run in true idle time and it yields instantly to the punctual ticks.
+# Between words it waits GENUS_LEARN_DELAY seconds -- not to spare the Pi but to be POLITE to
+# Wikidata (no hammering). It checks the global pause switch every iteration, so `genus pause`
+# stops it within one delay; and it steps aside while the box is busy. When the word list is
+# exhausted it idles quietly, re-checking now and then for new words.
 
 GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"
 GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"
@@ -20,41 +23,46 @@ LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 
 WORDLIST="${GENUS_LEARN_WORDLIST:-$SCRIPT_DIR/wortschatz_de.txt}"
 CURSOR="${GENUS_LEARN_CURSOR:-$(dirname "$DB_PATH")/learn.cursor}"
-BATCH="${GENUS_LEARN_BATCH:-10}"
-MAX_LOAD="${GENUS_LEARN_MAX_LOAD:-2.0}"   # skip a run if the box is already busy
+DELAY="${GENUS_LEARN_DELAY:-2}"            # seconds between words -- politeness to Wikidata
+MAX_LOAD="${GENUS_LEARN_MAX_LOAD:-2.0}"    # step aside while the box is busy
+IDLE_SLEEP="${GENUS_LEARN_IDLE_SLEEP:-60}" # nap length while paused / busy / exhausted
 PAUSED="$(dirname "$DB_PATH")/paused"
 
 mkdir -p "$LOG_DIR"
 log() { printf '[LRN] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
-# --- gates: pause first, then "is the box busy right now?" ---------------------------
-if [ -f "$PAUSED" ]; then log "paused — skipping"; exit 0; fi
-if [ ! -f "$WORDLIST" ]; then log "no word list at $WORDLIST — nothing to learn"; exit 0; fi
-load1="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo 0)"
-if awk "BEGIN{exit !($load1 > $MAX_LOAD)}"; then
-    log "load $load1 > $MAX_LOAD — yielding, will try again later"
-    exit 0
-fi
-
-# --- the next bounded batch, resuming from the cursor --------------------------------
-start="$(cat "$CURSOR" 2>/dev/null || echo 0)"
-case "$start" in ''|*[!0-9]*) start=0 ;; esac
-words="$(grep -vE '^#|^[[:space:]]*$' "$WORDLIST" | sed -n "$((start + 1)),$((start + BATCH))p")"
-if [ -z "$words" ]; then
-    log "word list exhausted at $start — nothing new to learn"
-    exit 0
-fi
-
-n=0
-while IFS= read -r line; do
-    if [ -f "$PAUSED" ]; then log "paused mid-batch — stopping at +$n"; break; fi
-    word="$(printf '%s' "$line" | tr -d '\r' | awk '{print $1}')"
-    [ -n "$word" ] || continue
+# Learn the single next word from the cursor. Returns 1 when the list is exhausted.
+learn_next() {
+    local start word
+    start="$(cat "$CURSOR" 2>/dev/null || echo 0)"
+    case "$start" in ''|*[!0-9]*) start=0 ;; esac
+    word="$(grep -vE '^#|^[[:space:]]*$' "$WORDLIST" | sed -n "$((start + 1))p" | tr -d '\r' | awk '{print $1}')"
+    [ -n "$word" ] || return 1
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
-    n=$((n + 1))
-done <<EOF
-$words
-EOF
+    echo "$((start + 1))" > "$CURSOR"
+    log "learned '$word' (#$((start + 1)))"
+    return 0
+}
 
-echo "$((start + n))" > "$CURSOR"
-log "learned $n word(s) from the source; cursor now $((start + n))"
+if [ ! -f "$WORDLIST" ]; then log "no word list at $WORDLIST — nothing to learn"; exit 0; fi
+
+# Single step (for testing): GENUS_LEARN_ONCE=1
+if [ "${GENUS_LEARN_ONCE:-0}" = "1" ]; then
+    if [ -f "$PAUSED" ]; then log "paused — skipping"; exit 0; fi
+    learn_next || log "word list exhausted"
+    exit 0
+fi
+
+# Continuous: learn fortlaufend, in idle time, pausable.
+log "learner started — continuous, ${DELAY}s between words"
+while true; do
+    if [ -f "$PAUSED" ]; then sleep "$IDLE_SLEEP"; continue; fi
+    load1="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo 0)"
+    if awk "BEGIN{exit !($load1 > $MAX_LOAD)}"; then sleep "$IDLE_SLEEP"; continue; fi
+    if learn_next; then
+        sleep "$DELAY"
+    else
+        log "word list exhausted — idling (re-checking every ${IDLE_SLEEP}s for new words)"
+        sleep "$IDLE_SLEEP"
+    fi
+done

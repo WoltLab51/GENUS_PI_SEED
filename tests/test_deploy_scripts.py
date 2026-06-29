@@ -143,23 +143,25 @@ def test_concept_membrane_feeds_both_layers_from_wikidata():
     assert "nothing recorded" in script     # a failed/empty fetch records nothing
 
 
-def test_background_learner_is_gated_bounded_and_resumable():
+def test_background_learner_runs_continuously_and_is_pausable():
     script = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
     assert "observe_konzept.sh" in script   # learns each word by resolving from the source
     assert "wortschatz_de.txt" in script     # the word stream (breadth)
-    assert "paused" in script                # honors the global pause switch (before + during)
+    assert "while true" in script            # continuous, fortlaufend
+    assert "paused" in script                # honors the global pause switch every iteration
     assert "CURSOR" in script and "cursor" in script  # resumes where it left off
-    assert "BATCH" in script                 # bounded per run
+    assert "DELAY" in script                 # paced between words (politeness to the source)
     assert "loadavg" in script               # yields when the box is busy
 
 
-def test_learner_installer_runs_at_idle_priority():
+def test_learner_installer_is_a_continuous_idle_priority_service():
     script = (ROOT / "deploy" / "pi_install_learner.sh").read_text(encoding="utf-8")
-    assert "genus-learner.timer" in script
+    assert "genus-learner.service" in script
+    assert "Type=simple" in script                   # a long-lived daemon, not a timer
+    assert "Restart=always" in script                # stays alive across reboots/hiccups
     assert "Nice=19" in script                       # lowest CPU niceness
     assert "CPUSchedulingPolicy=idle" in script      # SCHED_IDLE
     assert "IOSchedulingClass=idle" in script        # idle IO -- yields to everything
-    assert "OnUnitActiveSec" in script               # periodic, but each run is tiny
     assert "genus pause" in script                   # documents how to stop it
 
 
