@@ -390,7 +390,7 @@ def relations_command(subject: str | None) -> None:
     """Show the knowledge graph — relations GENUS holds (optionally for one subject)."""
     conn = get_conn()
     try:
-        _print_relations(sources.relations(conn, subject))
+        _print_relations(sources.relations(conn, subject), label=lambda n: sources.display(conn, n))
     finally:
         conn.close()
 
@@ -421,11 +421,12 @@ def infer_command(subject: str, predicate: str, lang: str | None) -> None:
     (sense-coherent) and renders the answer back into that language."""
     conn = get_conn()
     try:
+        lbl = lambda n: sources.display(conn, n)
         if lang:
             _print_lexeme_inferences(
-                inference.infer_lexeme(conn, subject, predicate, lang), subject, predicate, lang)
+                inference.infer_lexeme(conn, subject, predicate, lang), subject, predicate, lang, label=lbl)
         else:
-            _print_inferences(inference.infer(conn, subject, predicate), subject, predicate)
+            _print_inferences(inference.infer(conn, subject, predicate), subject, predicate, label=lbl)
     finally:
         conn.close()
 

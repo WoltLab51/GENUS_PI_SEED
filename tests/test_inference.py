@@ -123,3 +123,15 @@ def test_infer_lexeme_cli_runs_with_lang(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "Animalia" in result.output
     assert "Tier" in result.output
+
+
+def test_relations_cli_renders_opaque_concepts_with_labels(monkeypatch):
+    conn = _fresh()
+    _rel(conn, "Pferd@de", "expresses", "Q726", "wikidata")
+    _rel(conn, "Q726", "is_a", "Q729", "wikidata")
+    _rel(conn, "Tier@de", "expresses", "Q729", "wikidata")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["relations", "Q726"])
+    assert result.exit_code == 0, result.output
+    assert "Q726 (Pferd)" in result.output     # opaque Q-id rendered readable
+    assert "Q729 (Tier)" in result.output       # object too

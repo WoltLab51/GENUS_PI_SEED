@@ -368,6 +368,26 @@ def lexicalize(conn, concept: str, lang: str | None = None) -> list[str]:
     return sorted(set(out))
 
 
+def display(conn, node: str, langs: tuple[str, ...] = ("de", "en", "fr")) -> str:
+    """Human-readable rendering of a graph node, so the raw graph stays glass-box.
+    A language-neutral concept key (e.g. a Wikidata Q-id) gets its label appended --
+    ``Q726 (Pferd)`` -- preferring ``langs`` in order. A lexeme (``form@lang``) is already
+    its own label; a node nothing lexicalizes is shown unchanged."""
+    if _LEXEME_SEP in node:
+        return node
+    by_lang: dict[str, str] = {}
+    for r in relations(conn, predicate=EXPRESSES, object=node):
+        form, lang_of = split_lexeme(r["subject"])
+        if lang_of is not None:
+            by_lang.setdefault(lang_of, form)
+    for lang in langs:
+        if lang in by_lang:
+            return f"{node} ({by_lang[lang]})"
+    if by_lang:
+        return f"{node} ({next(iter(by_lang.values()))})"
+    return node
+
+
 def report(conn) -> dict:
     """A read-time summary for the CLI -- each source's trust and the resolution for
     every claim more than one source speaks to. One ledger read, grouped once."""

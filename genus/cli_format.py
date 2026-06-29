@@ -93,32 +93,32 @@ def _print_resolve(result: dict) -> None:
         )
 
 
-def _print_relations(triples: list[dict]) -> None:
+def _print_relations(triples: list[dict], label=str) -> None:
     if not triples:
         click.echo("[REL] no relations yet")
         return
     click.echo("[REL] knowledge graph — (subject) -[predicate]-> (object) · source")
     for triple in sorted(triples, key=lambda t: (t["subject"], t["predicate"], t["object"])):
         click.echo(
-            f"[REL] {triple['subject']} -[{triple['predicate']}]-> {triple['object']}"
+            f"[REL] {label(triple['subject'])} -[{triple['predicate']}]-> {label(triple['object'])}"
             f"   · {triple['source']}"
         )
 
 
-def _print_inferences(derived: list[dict], subject: str, predicate: str) -> None:
+def _print_inferences(derived: list[dict], subject: str, predicate: str, label=str) -> None:
     if not derived:
-        click.echo(f"[INF] {subject} -[{predicate}]-> : nothing to derive")
+        click.echo(f"[INF] {label(subject)} -[{predicate}]-> : nothing to derive")
         return
-    click.echo(f"[INF] derived {subject} -[{predicate}]-> (trust = weakest premise):")
+    click.echo(f"[INF] derived {label(subject)} -[{predicate}]-> (trust = weakest premise):")
     for item in derived:
-        click.echo(f"[INF]   -> {item['object']}   trust {item['trust']:.2f}")
+        click.echo(f"[INF]   -> {label(item['object'])}   trust {item['trust']:.2f}")
         chain = "  <=  " + "  ·  ".join(
-            f"{p['subject']} {p['predicate']} {p['object']} ({p['source']})" for p in item["chain"]
+            f"{label(p['subject'])} {p['predicate']} {label(p['object'])} ({p['source']})" for p in item["chain"]
         )
         click.echo(f"[INF]   {chain}")
 
 
-def _print_lexeme_inferences(results: list[dict], form: str, predicate: str, lang: str) -> None:
+def _print_lexeme_inferences(results: list[dict], form: str, predicate: str, lang: str, label=str) -> None:
     if not results:
         click.echo(f"[INF] {form} ({lang}) -[{predicate}]-> : nothing to derive")
         return
@@ -127,7 +127,7 @@ def _print_lexeme_inferences(results: list[dict], form: str, predicate: str, lan
         words = ", ".join(item["lexemes"]) if item["lexemes"] else f"(no {lang} word yet)"
         click.echo(f"[INF]   -> {item['object']}  = {words}   trust {item['trust']:.2f}")
         chain = "  <=  " + "  ·  ".join(
-            f"{p['subject']} {p['predicate']} {p['object']} ({p['source']})" for p in item["chain"]
+            f"{label(p['subject'])} {p['predicate']} {label(p['object'])} ({p['source']})" for p in item["chain"]
         )
         click.echo(f"[INF]   {chain}")
 

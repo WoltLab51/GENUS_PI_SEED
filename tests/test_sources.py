@@ -278,6 +278,17 @@ def test_gaps_can_follow_the_is_a_hierarchy():
     conn.close()
 
 
+def test_display_renders_concepts_with_a_readable_label():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Pferd@de", "expresses", "Q726", "wikidata")
+    reactors.observe_relation(conn, "horse@en", "expresses", "Q726", "wikidata")
+    assert sources.display(conn, "Q726") == "Q726 (Pferd)"               # de preferred
+    assert sources.display(conn, "Q726", langs=("en",)) == "Q726 (horse)"
+    assert sources.display(conn, "Pferd@de") == "Pferd@de"               # a lexeme labels itself
+    assert sources.display(conn, "Q999") == "Q999"                       # nothing lexicalizes it
+    conn.close()
+
+
 def test_relations_project_and_rebuild_from_the_log():
     conn = _fresh()
     reactors.observe_relation(conn, "run", "is_a", "verb", "dict")
