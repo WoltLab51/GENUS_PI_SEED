@@ -143,6 +143,41 @@ def test_concept_membrane_feeds_both_layers_from_wikidata():
     assert "nothing recorded" in script     # a failed/empty fetch records nothing
 
 
+def test_background_learner_is_gated_bounded_and_resumable():
+    script = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
+    assert "observe_konzept.sh" in script   # learns each word by resolving from the source
+    assert "wortschatz_de.txt" in script     # the word stream (breadth)
+    assert "paused" in script                # honors the global pause switch (before + during)
+    assert "CURSOR" in script and "cursor" in script  # resumes where it left off
+    assert "BATCH" in script                 # bounded per run
+    assert "loadavg" in script               # yields when the box is busy
+
+
+def test_learner_installer_runs_at_idle_priority():
+    script = (ROOT / "deploy" / "pi_install_learner.sh").read_text(encoding="utf-8")
+    assert "genus-learner.timer" in script
+    assert "Nice=19" in script                       # lowest CPU niceness
+    assert "CPUSchedulingPolicy=idle" in script      # SCHED_IDLE
+    assert "IOSchedulingClass=idle" in script        # idle IO -- yields to everything
+    assert "OnUnitActiveSec" in script               # periodic, but each run is tiny
+    assert "genus pause" in script                   # documents how to stop it
+
+
+def test_learner_wordlist_is_words_only():
+    import re as _re
+    lines = (ROOT / "deploy" / "wortschatz_de.txt").read_text(encoding="utf-8").splitlines()
+    words = []
+    for line in lines:
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        assert " " not in s and "\t" not in s, f"one word per line: {line!r}"
+        assert not _re.fullmatch(r"Q[0-9]+", s) and "@" not in s  # words, not Q-ids
+        words.append(s)
+    assert len(words) >= 50                  # real breadth for the learner to chew
+    assert len(words) == len(set(words))     # no duplicates
+
+
 def test_clock_check_probes_ntp_and_records_operation_event():
     script = (ROOT / "deploy" / "pi_clock_check.sh").read_text(encoding="utf-8")
 
