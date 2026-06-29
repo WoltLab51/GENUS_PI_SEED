@@ -104,6 +104,7 @@ Fakten, Replay-stabil, Kern bleibt modell-frei.
 
 **Gelb:** Maturation-Pfad gebaut, aber schläft (idle Pi hat keinen Aktivitäts-Rhythmus, `active_rules=0`) · cli-Split nur teilweise
 **Grün, neu (2026-06-28):** **Schicht WISSEN vollendet** — Herkunft · Vertrauen (read-time) · `resolve` regiert alle Konsumenten · Widerspruch→Surprise-Loop · Lehrer-Loop · Struktur (Relationen).
+**Grün, neu (2026-06-29):** **Wissensgraph in den Kern verwoben** — der Struktur-Pfeiler prüft sich jetzt selbst: ① Confidence auf Relationen · ② Widerspruch→Surprise→Inquiry fürs Wissen · ③ Lehrer-Loop fürs Wissen · ④ Kalibrierung + Governance (`genus knowledge`/`acquisition-allowed`) · + Kadenz-Robustheitsfix. *Live-Befund:* der Graph ist 100 % einquellig → Confidence am Saatwert, Naht scharfgestellt-nicht-ausgelöst → die **zweite Quelle** ist der Zündschlüssel.
 **Rot — der nächste Schritt:** **Schicht SYSTEME** — Regel-Domänen lernen + schließen; danach Erschaffen; das LLM dockt als gedeckelte Quelle an, wann es gebraucht wird
 
 ---
@@ -746,6 +747,39 @@ WORT / Lexem  "form@lang"  --expresses-->  KONZEPT (sprach-neutral)
 - *Danach:* die Quelle umstellen (Wikidata/Wikispecies → saubere latein-verankerte
   Taxonomie statt vernakulärer Mehrdeutigkeit) · `expresses`-Akquise statt Wort-`is_a`.
 
+**Wissensgraph in den Kern verwoben — der Graph prüft sich selbst (2026-06-29):** Der
+**Struktur**-Pfeiler war ein Substrat (flache Tripel), das *neben* den epistemischen
+Schleifen des Kerns lief — er nutzte Wahrheit/Projektion/Vertrauen/Rücknahme, aber nicht
+Confidence, Widerspruch→Surprise→Lehrer, Governance/Kalibrierung. Vier Scheiben weben ihn
+ein (alle read-time, kein Schema, kein Replay):
+- **① Confidence auf Relationen** (`sources.relation_confidence`, `genus confidence`) —
+  Noisy-OR über die Quellen einer Tripel: eine Relation wird *geglaubt mit einer Zahl*
+  (Vertrauen × Korroboration), nicht nur „da". Die `resolve`-Idee für die Wissensseite.
+- **② Widerspruch→Surprise→Inquiry fürs Wissen** (`sources.relation_contradiction`,
+  `FUNCTIONAL_PREDICATES`) — für funktionale Prädikate spiegelt `observe_relation` jetzt
+  `observe_assertion`: konkurrierende Objekte → `contradiction_detected` +
+  `SourceContradiction`-Inquiry (Key `subject|predicate`). GENUS **flaggt faule Aufnahmen
+  selbst**.
+- **③ Lehrer-Loop fürs Wissen** (`reactors.teach_relation`, `genus teach-relation`) —
+  Mensch/LLM setzt die richtige Relation; bei funktionalem Prädikat werden konkurrierende
+  Objekte zurückgenommen, die Inquiry gelöst. Spiegelt `teach`.
+- **④ Kalibrierung + Governance** (`sources.characterize_knowledge`/`genus knowledge`;
+  `governance.acquisition_allowed`/`genus governance acquisition-allowed`) — GENUS weiß,
+  *wie sicher* es weiß (Confidence-Verteilung, unkorroborierte/widersprochene Relationen);
+  der Lerner ist read-time gegated (Pause + self-kalibrierter Quellen-Vertrauens-Boden,
+  ungeloggt für den Hotloop).
+- *Bonus, unterwegs gefunden:* **Kadenz-Robustheit** — die self-kalibrierte Frische-
+  Halbwertszeit nahm den Median der Lücken (nur `>0` gefiltert); ein Same-Millisekunde-Burst
+  erzeugte eine Millisekunden-„Kadenz", die einen gleichzeitigen Sensor fälschlich
+  „veraltete" und echte Wert-Widersprüche intermittierend verbarg. Sub-Runden-Jitter
+  (`< _MIN_CADENCE_SECONDS`) wird nun als Schreib-Jitter ignoriert, nicht als Rhythmus.
+- **Ehrlicher Live-Befund (Pi, 2026-06-29):** `genus knowledge` zeigt **5321 Relationen,
+  alle Confidence 0,50, alle einquellig (Wikidata), 0 Widersprüche** — die Maschinerie ist
+  *scharfgestellt, nicht ausgelöst*: ohne eine *zweite unabhängige Quelle* gibt es nichts zu
+  korroborieren und nichts zu widersprechen. Damit ist die zweite Quelle (Wiktionary/Lexeme
+  — auch jenseits der Substantive) nicht nur Breite, sondern der **Zündschlüssel** der ganzen
+  Naht.
+
 ---
 
 # Schicht SYSTEME — Regel-Domänen lernen + schließen (deterministisch)
@@ -832,6 +866,9 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
 ── Schicht WISSEN ── VOLLENDET ✅ (2026-06-28, deterministisch)
   ⑤      Wissen & Quellen-Vertrauen → weiß aus JEDER Quelle, mit Herkunft · resolve
          regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur (Relationen)
+  ⑥      Wissensgraph verwoben (2026-06-29) → der Graph PRÜFT SICH SELBST: Confidence ·
+         Widerspruch→Surprise→Inquiry · Lehrer-Loop · Kalibrierung+Governance fürs Wissen
+         (Zündschlüssel offen: eine zweite unabhängige Quelle)
 
 ── darüber: freie Reihenfolge, alles noch deterministisch & gläsern ──   ← JETZT HIER
   Systeme    Regel-Domänen lernen + schließen (Sprache · Schach · Code …)
