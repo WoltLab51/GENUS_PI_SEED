@@ -52,8 +52,8 @@ echo "[DEPLOY] installing package"
 export GENUS_DB_PATH="$DB_PATH"
 
 if [ "$SKIP_TESTS" != "1" ]; then
-    echo "[DEPLOY] running tests"
-    .venv/bin/python -m pytest
+    echo "[DEPLOY] running tests (hermetic: ambient GENUS_* unset so they never touch the live ledger)"
+    env -u GENUS_DB_PATH -u GENUS_CORE_ID -u GENUS_PAUSE_FILE .venv/bin/python -m pytest
 else
     echo "[DEPLOY] skipping tests"
 fi

@@ -226,6 +226,9 @@ def test_pi_deploy_rebuilds_projection_before_integrity():
     # integrity check, otherwise the deploy aborts on the stored-vs-replay mismatch.
     assert "rebuilding projection" in script
     assert "genus replay || true" in script
+    # tests run hermetically -- the ambient GENUS_* (incl. the live DB path + pause flag)
+    # must be unset so the suite never touches the live ledger or sees the real pause state
+    assert "env -u GENUS_DB_PATH" in script and "GENUS_PAUSE_FILE" in script
     # the tolerant rebuild command must precede the integrity-check command
     assert script.index("genus replay || true") < script.index("genus integrity check")
 
