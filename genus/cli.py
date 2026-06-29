@@ -8,6 +8,7 @@ import click
 
 from genus import (
     anchor,
+    control,
     db,
     doctor as doctor_checks,
     event_router,
@@ -148,6 +149,9 @@ def observe_temperature() -> None:
 
 @main.command("observe-all")
 def observe_all() -> None:
+    if control.is_paused():
+        click.echo("[OBS] paused — skipping (genus resume to continue)")
+        return
     conn = get_conn()
     try:
         for label, reading_fn, observe_fn in [
@@ -170,6 +174,35 @@ def observe_all() -> None:
         _print_active_belief_summary(conn)
     finally:
         conn.close()
+
+
+@main.command("pause")
+@click.option("--reason", default="", help="why (recorded in the marker)")
+def pause_command(reason: str) -> None:
+    """Freeze all autonomous activity — sensor ticks, membranes, the background learner all
+    skip while paused. Reads and manual commands keep working; the ledger is untouched."""
+    path = control.pause(reason)
+    click.echo(f"[CTL] PAUSED — autonomous activity will skip until 'genus resume' ({path})")
+
+
+@main.command("resume")
+def resume_command() -> None:
+    """Lift the pause — autonomous activity runs again."""
+    if control.resume():
+        click.echo("[CTL] resumed — autonomous activity will run")
+    else:
+        click.echo("[CTL] not paused — nothing to resume")
+
+
+@main.command("paused")
+def paused_command() -> None:
+    """Show whether autonomous activity is paused (exit 0 = paused, 1 = running)."""
+    if control.is_paused():
+        why = control.reason()
+        click.echo("[CTL] PAUSED" + (f" — {why}" if why else ""))
+    else:
+        click.echo("[CTL] running")
+        raise SystemExit(1)
 
 
 @main.command("observe-repo")

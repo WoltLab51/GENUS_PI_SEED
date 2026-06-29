@@ -33,6 +33,9 @@ log() {
     printf '[WT2] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
 
+# Honor the global pause switch (genus pause): freeze autonomous activity.
+if [ -f "$(dirname "$DB_PATH")/paused" ]; then log "paused — skipping"; exit 0; fi
+
 run_genus() {
     if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1; then
         runuser -u "$GENUS_USER" -- env \

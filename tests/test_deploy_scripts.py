@@ -63,6 +63,7 @@ def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():
     # a failed fetch records nothing — absence is not a reading
     assert "no observation recorded" in script
     assert 'if [ -z "$temp" ]' in script
+    assert "paused" in script  # honors the global pause switch
 
 
 def test_second_weather_membrane_feeds_observe_assertion_number_only():
