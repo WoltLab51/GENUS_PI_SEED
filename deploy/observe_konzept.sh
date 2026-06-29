@@ -56,26 +56,30 @@ else
     if [ -n "$cand" ]; then
         ids_pipe="$(printf '%s' "$cand" | tr ' ' '|')"
         wd_get "$API?action=wbgetentities&ids=$ids_pipe&props=sitelinks&format=json" "$TMP/sitelinks.json"
-        # Resolve word -> concept FROM THE SOURCE, not by guessing: among the candidates,
-        # pick the most prominent genuine concept -- the one with the most Wikipedia
-        # sitelinks (the source's own notability signal, which reliably surfaces the
-        # everyday meaning: dog over the constellation/surname, Moon over month). Reject
-        # non-concept hits (family/given names, disambiguation pages, scholarly articles).
-        # If nothing notable remains, record NOTHING -- an honest gap beats a wrong guess.
-        QID="$("$REPO_DIR/.venv/bin/python" - "$TMP/search.json" "$TMP/sitelinks.json" <<'PY'
-import json, sys
+        # Resolve word -> concept FROM THE SOURCE, not by guessing. Two signals from the
+        # search + sitelinks:
+        #  - a LEXICAL match: the word must be the candidate's exact label (tier 0) or an
+        #    exact alias (tier 1) -- this rejects prefix hits (Haus -> Haushund) and slang
+        #    that only contains the word; no exact match -> record NOTHING (honest gap).
+        #  - PROMINENCE: among equal-tier matches, the most Wikipedia sitelinks (the
+        #    source's own notability) -- dog over the surname, Sun over generic star.
+        # Reject non-concept hits (family/given names, disambiguation pages, articles).
+        QID="$(SEED="$SEED" "$REPO_DIR/.venv/bin/python" - "$TMP/search.json" "$TMP/sitelinks.json" <<'PY'
+import json, os, sys
+word = os.environ["SEED"].casefold()
 BAD = ("family name", "given name", "disambiguation", "scholarly article", "wikimedia",
        "surname", "familienname", "vorname", "begriffsklarung", "nachname")
 search = json.load(open(sys.argv[1])).get("search", [])
 ent = json.load(open(sys.argv[2])).get("entities", {})
-best, best_n = "", -1
-for h in search:
-    if any(b in h.get("description", "").lower() for b in BAD):
-        continue
-    n = len(ent.get(h["id"], {}).get("sitelinks", {}))
-    if n > best_n:
-        best, best_n = h["id"], n
-print(best if best_n >= 1 else "")
+def sitelinks(i): return len(ent.get(i, {}).get("sitelinks", {}))
+def tier(h):
+    if h.get("label", "").casefold() == word: return 0          # exact canonical label
+    m = h.get("match", {})
+    if m.get("text", "").casefold() == word and m.get("type") == "alias": return 1  # exact alias
+    return 2                                                     # only a partial/prefix hit
+pool = [h for h in search if not any(b in h.get("description", "").lower() for b in BAD)]
+pool.sort(key=lambda h: (tier(h), -sitelinks(h["id"])))
+print(pool[0]["id"] if pool and tier(pool[0]) < 2 else "")
 PY
 )"
     fi
