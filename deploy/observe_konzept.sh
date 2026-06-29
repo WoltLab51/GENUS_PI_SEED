@@ -125,8 +125,15 @@ print("\n".join(out))
 PY
 )"
 
+# The resolution itself is a fact from the source: the searched WORD expresses the concept
+# we picked. Wikidata may not list that exact form as a label/alias, so record it explicitly
+# (otherwise e.g. "Hund" would be lost when the label is "Haushund").
+if ! printf '%s' "$SEED" | grep -Eq '^Q[0-9]+$'; then
+    facts="$(printf '%s\n%s@%s\texpresses\t%s' "$facts" "$SEED" "$SEARCH_LANG" "$QID")"
+fi
+
 if [ -z "$facts" ]; then
-    log "no labels/parents for $QID ('$SEED') — nothing recorded"
+    log "no concept resolved for '$SEED' — nothing recorded"
     exit 0
 fi
 
