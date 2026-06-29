@@ -353,6 +353,27 @@ def apply_relation_retracted(conn, payload: dict) -> None:
         )
 
 
+def apply_evidence_recorded(conn, payload: dict) -> None:
+    """Project a sensor value-claim into the indexed value_projection (the fast read view
+    for resolve / source_trust). The event stays the truth."""
+    conn.execute(
+        "INSERT OR REPLACE INTO value_projection (event_id, claim_key, value, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (payload["_event_id"], payload["metric_key"], payload["metric_value"],
+         payload.get("source", "sensor"), payload["_event_created_at"]),
+    )
+
+
+def apply_assertion_recorded(conn, payload: dict) -> None:
+    """Project an explicit value-claim into the indexed value_projection."""
+    conn.execute(
+        "INSERT OR REPLACE INTO value_projection (event_id, claim_key, value, source, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (payload["_event_id"], payload["claim_key"], payload["claim_value"],
+         payload["source"], payload["_event_created_at"]),
+    )
+
+
 def apply_belief_superseded(conn, payload: dict) -> int:
     new_belief_id = create_belief(
         conn,

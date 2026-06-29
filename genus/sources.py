@@ -61,32 +61,19 @@ def assertions(conn, claim_key: str | None = None) -> list[dict]:
     (``assertion_recorded``, explicit source). The one DB read; callers resolve it in
     memory. Read-only, ordered by event id.
     """
-    # Filter by claim in SQL when one is given, so resolving a single claim (e.g. in a
-    # reactor, per observation) reads only that claim's rows -- not the whole stream.
-    evidence_filter = "" if claim_key is None else "AND json_extract(payload, '$.metric_key') = ?"
-    assertion_filter = "" if claim_key is None else "AND json_extract(payload, '$.claim_key') = ?"
-    params = () if claim_key is None else (claim_key, claim_key)
-    rows = conn.execute(
-        f"""
-        SELECT id,
-               json_extract(payload, '$.metric_key')   AS claim_key,
-               json_extract(payload, '$.metric_value')  AS value,
-               COALESCE(json_extract(payload, '$.source'), 'sensor') AS source,
-               created_at
-        FROM event_log
-        WHERE event_type = 'evidence_recorded' {evidence_filter}
-        UNION ALL
-        SELECT id,
-               json_extract(payload, '$.claim_key')    AS claim_key,
-               json_extract(payload, '$.claim_value')   AS value,
-               json_extract(payload, '$.source')        AS source,
-               created_at
-        FROM event_log
-        WHERE event_type = 'assertion_recorded' {assertion_filter}
-        ORDER BY id
-        """,
-        params,
-    ).fetchall()
+    # Read from the indexed value_projection, so resolving a single claim is an indexed
+    # lookup (idx_value_claim), not a scan of the whole event log.
+    if claim_key is None:
+        rows = conn.execute(
+            "SELECT event_id AS id, claim_key, value, source, created_at "
+            "FROM value_projection ORDER BY event_id"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT event_id AS id, claim_key, value, source, created_at "
+            "FROM value_projection WHERE claim_key = ? ORDER BY event_id",
+            (claim_key,),
+        ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -240,37 +227,30 @@ def sources(conn) -> list[str]:
     return sorted({row["source"] for row in assertions(conn) if row["source"]})
 
 
-def _has_value_assertions(conn, source: str) -> bool:
-    """Cheap existence check: did ``source`` ever assert a *value* claim (evidence/
-    assertion)? SQL-only, no Python materialization -- vs reading the whole value stream."""
-    row = conn.execute(
-        """
-        SELECT 1 FROM event_log
-        WHERE event_type = 'evidence_recorded'
-          AND COALESCE(json_extract(payload, '$.source'), 'sensor') = ?
-        UNION ALL
-        SELECT 1 FROM event_log
-        WHERE event_type = 'assertion_recorded'
-          AND json_extract(payload, '$.source') = ?
-        LIMIT 1
-        """,
-        (source, source),
-    ).fetchone()
-    return row is not None
-
-
 def source_trust(conn, source: str) -> float:
     """Read-time trust for ``source``: how often it agrees with other sources.
 
     Assessed only on claims where at least one *other* source asserted too; with no
-    such overlap the source is unproven and held at :data:`SOURCE_TRUST_SEED`.
+    such overlap the source is unproven and held at :data:`SOURCE_TRUST_SEED`. All reads
+    are indexed (idx_value_source / idx_value_claim) -- it only touches the claims this
+    source actually asserted, never the whole stream, so it stays sub-ms and decoupled
+    from the (ever-growing) sensor history.
     """
-    # Fast path: a source that never asserted a value (e.g. a relation-only source like
-    # wikidata) can only score the seed -- return it without scanning the whole value
-    # stream. This is what made inference (which asks trust per relation source) ~300ms.
-    if not _has_value_assertions(conn, source):
-        return SOURCE_TRUST_SEED
-    return _trust(_group_by_claim(assertions(conn)), source)
+    claims = [
+        row["claim_key"]
+        for row in conn.execute(
+            "SELECT DISTINCT claim_key FROM value_projection WHERE source = ?", (source,)
+        ).fetchall()
+    ]
+    if not claims:
+        return SOURCE_TRUST_SEED  # e.g. a relation-only source like wikidata
+    placeholders = ",".join("?" for _ in claims)
+    rows = conn.execute(
+        "SELECT event_id AS id, claim_key, value, source, created_at "
+        f"FROM value_projection WHERE claim_key IN ({placeholders}) ORDER BY event_id",
+        claims,
+    ).fetchall()
+    return _trust(_group_by_claim([dict(row) for row in rows]), source)
 
 
 def resolve(conn, claim_key: str) -> dict:

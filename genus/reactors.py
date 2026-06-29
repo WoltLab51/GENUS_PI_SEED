@@ -83,16 +83,16 @@ def observe_assertion(
     read-time in ``genus/sources.py``.
     """
     try:
-        event_id = ledger.append(
-            conn,
-            "assertion_recorded",
-            {
-                "claim_key": claim_key,
-                "claim_value": claim_value,
-                "source": source,
-                "derivation": derivation or f"source:{source}",
-            },
-        )
+        payload = {
+            "claim_key": claim_key,
+            "claim_value": claim_value,
+            "source": source,
+            "derivation": derivation or f"source:{source}",
+        }
+        event_id = ledger.append(conn, "assertion_recorded", payload)
+        payload["_event_id"] = event_id
+        payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+        projection.apply_assertion_recorded(conn, payload)  # indexed value view, before resolve
         events = [{"event_type": "assertion_recorded", "id": event_id}]
         # The surprise loop, on knowledge: if trusted, live sources now disagree about
         # this claim, record the contradiction and raise one inquiry per open episode.
@@ -220,20 +220,20 @@ def process_observation(conn, observation_id: int) -> list[dict]:
 
     payload = json.loads(observation["payload"])
     metric_key = payload.get("metric_key", rules.CPU_METRIC_KEY)
-    evidence_id = ledger.append(
-        conn,
-        "evidence_recorded",
-        {
-            "observation_id": observation_id,
-            "metric_key": metric_key,
-            "metric_value": payload["raw_value"],
-            # Provenance into the knowledge layer: the membrane already tags every
-            # observation with a source -- carry it so source trust can be learned
-            # read-time (genus/sources.py). Optional on the contract; older
-            # evidence_recorded events (pre-source) stay valid and replay clean.
-            "source": payload.get("source", "sensor"),
-        },
-    )
+    evidence_payload = {
+        "observation_id": observation_id,
+        "metric_key": metric_key,
+        "metric_value": payload["raw_value"],
+        # Provenance into the knowledge layer: the membrane already tags every
+        # observation with a source -- carry it so source trust can be learned
+        # read-time (genus/sources.py). Optional on the contract; older
+        # evidence_recorded events (pre-source) stay valid and replay clean.
+        "source": payload.get("source", "sensor"),
+    }
+    evidence_id = ledger.append(conn, "evidence_recorded", evidence_payload)
+    evidence_payload["_event_id"] = evidence_id
+    evidence_payload["_event_created_at"] = ledger.event_created_at(conn, evidence_id)
+    projection.apply_evidence_recorded(conn, evidence_payload)  # indexed value view
     events = [
         {
             "event_type": "evidence_recorded",

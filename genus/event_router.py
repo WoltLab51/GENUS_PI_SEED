@@ -25,6 +25,7 @@ def replay(conn) -> dict:
     conn.execute("DELETE FROM state_projection")
     conn.execute("DELETE FROM belief_projection")
     conn.execute("DELETE FROM relation_projection")
+    conn.execute("DELETE FROM value_projection")
     conn.execute(
         """
         DELETE FROM sqlite_sequence
@@ -86,8 +87,13 @@ def replay(conn) -> dict:
 def apply_event(conn, event) -> None:
     payload = json.loads(event["payload"])
     payload["_event_created_at"] = event["created_at"]
+    payload["_event_id"] = event["id"]
     event_type = event["event_type"]
-    if event_type == "belief_created":
+    if event_type == "evidence_recorded":
+        projection.apply_evidence_recorded(conn, payload)
+    elif event_type == "assertion_recorded":
+        projection.apply_assertion_recorded(conn, payload)
+    elif event_type == "belief_created":
         projection.apply_belief_created(conn, payload)
     elif event_type == "belief_confirmed":
         projection.apply_belief_confirmed(conn, payload)

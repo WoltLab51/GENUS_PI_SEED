@@ -3,7 +3,7 @@ import sqlite3
 
 from click.testing import CliRunner
 
-from genus import cli, event_router, integrity, reactors, sensor, sources
+from genus import cli, event_router, integrity, projection, reactors, sensor, sources
 from genus.db import init_schema
 
 CLAIM = "weather.temp_outside"
@@ -81,16 +81,14 @@ def test_two_disagreeing_sources_lose_trust_and_flag_contradiction():
 
 
 def _inject_assertion(conn, value, source, created_at):
-    payload = json.dumps(
-        {"claim_key": CLAIM, "claim_value": value, "source": source,
-         "derivation": f"source:{source}"},
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    conn.execute(
+    body = {"claim_key": CLAIM, "claim_value": value, "source": source,
+            "derivation": f"source:{source}"}
+    cur = conn.execute(
         "INSERT INTO event_log (event_type, payload, created_at) VALUES ('assertion_recorded', ?, ?)",
-        (payload, created_at),
+        (json.dumps(body, sort_keys=True, separators=(",", ":")), created_at),
     )
+    projection.apply_assertion_recorded(  # keep the indexed value view in sync, like the reactor
+        conn, {**body, "_event_id": cur.lastrowid, "_event_created_at": created_at})
     conn.commit()
 
 
@@ -299,19 +297,29 @@ def test_display_prefers_the_canonical_label_over_an_alias():
     conn.close()
 
 
-def test_source_trust_fast_path_for_relation_only_source():
+def test_source_trust_seed_for_relation_only_source():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")  # no value claim
-    assert sources._has_value_assertions(conn, "wikidata") is False
-    assert sources.source_trust(conn, "wikidata") == sources.SOURCE_TRUST_SEED  # seed, no scan
+    assert sources.source_trust(conn, "wikidata") == sources.SOURCE_TRUST_SEED  # seed, indexed
 
 
-def test_source_trust_unchanged_for_value_sources():
+def test_value_projection_indexes_assertions_and_trust():
     conn = _fresh()
     reactors.observe_assertion(conn, "thing.temp", "20", "a")
     reactors.observe_assertion(conn, "thing.temp", "20", "b")  # agrees with a
-    assert sources._has_value_assertions(conn, "a") is True
-    assert sources.source_trust(conn, "a") == 1.0  # full computation still runs (earned trust)
+    assert {r["source"] for r in sources.assertions(conn, "thing.temp")} == {"a", "b"}
+    assert sources.source_trust(conn, "a") == 1.0  # full agreement computation still runs
+
+
+def test_value_projection_rebuilds_identically_on_replay():
+    conn = _fresh()
+    reactors.observe_assertion(conn, "thing.temp", "21", "a")
+    before = [tuple(r) for r in conn.execute(
+        "SELECT event_id, claim_key, value, source FROM value_projection ORDER BY event_id")]
+    event_router.replay(conn)
+    after = [tuple(r) for r in conn.execute(
+        "SELECT event_id, claim_key, value, source FROM value_projection ORDER BY event_id")]
+    assert before == after and len(before) == 1
 
 
 def test_retract_relation_removes_edge_and_survives_replay():

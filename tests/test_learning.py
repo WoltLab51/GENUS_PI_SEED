@@ -3,7 +3,7 @@ import sqlite3
 
 from click.testing import CliRunner
 
-from genus import cli, event_router, integrity, learning, reactors, sensor
+from genus import cli, event_router, integrity, learning, projection, reactors, sensor
 from genus.db import init_schema
 
 METRIC = "weather.temp_outside"
@@ -19,15 +19,13 @@ def _fresh():
 def _inject_reading(conn, value, created_at):
     # Inject an evidence reading with a controlled timestamp (the ledger sets
     # created_at itself, so the cycle model is tested via direct insert).
-    payload = json.dumps(
-        {"observation_id": 0, "metric_key": METRIC, "metric_value": value},
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    conn.execute(
+    body = {"observation_id": 0, "metric_key": METRIC, "metric_value": value}
+    cur = conn.execute(
         "INSERT INTO event_log (event_type, payload, created_at) VALUES ('evidence_recorded', ?, ?)",
-        (payload, created_at),
+        (json.dumps(body, sort_keys=True, separators=(",", ":")), created_at),
     )
+    projection.apply_evidence_recorded(  # keep the indexed value view in sync, like the reactor
+        conn, {**body, "_event_id": cur.lastrowid, "_event_created_at": created_at})
     conn.commit()
 
 

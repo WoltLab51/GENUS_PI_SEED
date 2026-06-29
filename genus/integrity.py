@@ -644,6 +644,13 @@ def snapshot_projections(conn) -> dict:
             """
         ).fetchall()
     ]
+    values = [
+        dict(row)
+        for row in conn.execute(
+            "SELECT event_id, claim_key, value, source, created_at "
+            "FROM value_projection ORDER BY event_id"
+        ).fetchall()
+    ]
     return {
         "beliefs": beliefs,
         "proposals": proposals,
@@ -654,4 +661,5 @@ def snapshot_projections(conn) -> dict:
         "operations": operations,
         "rules": rules,
         "relations": relations,
+        "values": values,
     }

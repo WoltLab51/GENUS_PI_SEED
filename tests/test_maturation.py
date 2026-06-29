@@ -10,6 +10,7 @@ from genus import (
     inquiries,
     integrity,
     maturation,
+    projection,
     proposals,
     query,
     rules,
@@ -327,5 +328,8 @@ def insert_activity_evidence(conn, value: float, created_at: str) -> int:
         """,
         ("evidence_recorded", evidence_payload, created_at),
     ).lastrowid
+    projection.apply_evidence_recorded(conn, {  # keep the indexed value view in sync
+        "metric_key": experience.ACTIVITY_METRIC_KEY, "metric_value": value,
+        "_event_id": evidence_id, "_event_created_at": created_at})
     conn.commit()
     return int(evidence_id)

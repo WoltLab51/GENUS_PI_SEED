@@ -96,6 +96,21 @@ CREATE TABLE IF NOT EXISTS relation_projection (
 CREATE INDEX IF NOT EXISTS idx_relation_subject ON relation_projection(subject);
 CREATE INDEX IF NOT EXISTS idx_relation_object ON relation_projection(object);
 
+-- The value-claim stream as an indexed projection (mirrors relation_projection for the
+-- value side): one row per evidence_recorded / assertion_recorded event. The events stay
+-- the truth; this is the fast read view so resolve / source_trust are indexed lookups
+-- instead of scanning the whole log. `value` has BLOB affinity to preserve the JSON type.
+CREATE TABLE IF NOT EXISTS value_projection (
+    event_id    INTEGER PRIMARY KEY,
+    claim_key   TEXT NOT NULL,
+    value       BLOB,
+    source      TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_value_claim ON value_projection(claim_key);
+CREATE INDEX IF NOT EXISTS idx_value_source ON value_projection(source);
+
 CREATE TABLE IF NOT EXISTS experience_log (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     experience_key     TEXT    NOT NULL UNIQUE,
