@@ -299,6 +299,21 @@ def test_display_prefers_the_canonical_label_over_an_alias():
     conn.close()
 
 
+def test_source_trust_fast_path_for_relation_only_source():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")  # no value claim
+    assert sources._has_value_assertions(conn, "wikidata") is False
+    assert sources.source_trust(conn, "wikidata") == sources.SOURCE_TRUST_SEED  # seed, no scan
+
+
+def test_source_trust_unchanged_for_value_sources():
+    conn = _fresh()
+    reactors.observe_assertion(conn, "thing.temp", "20", "a")
+    reactors.observe_assertion(conn, "thing.temp", "20", "b")  # agrees with a
+    assert sources._has_value_assertions(conn, "a") is True
+    assert sources.source_trust(conn, "a") == 1.0  # full computation still runs (earned trust)
+
+
 def test_retract_relation_removes_edge_and_survives_replay():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q37575615", "wikidata")  # wrong (surname)

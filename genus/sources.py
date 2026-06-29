@@ -240,12 +240,36 @@ def sources(conn) -> list[str]:
     return sorted({row["source"] for row in assertions(conn) if row["source"]})
 
 
+def _has_value_assertions(conn, source: str) -> bool:
+    """Cheap existence check: did ``source`` ever assert a *value* claim (evidence/
+    assertion)? SQL-only, no Python materialization -- vs reading the whole value stream."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM event_log
+        WHERE event_type = 'evidence_recorded'
+          AND COALESCE(json_extract(payload, '$.source'), 'sensor') = ?
+        UNION ALL
+        SELECT 1 FROM event_log
+        WHERE event_type = 'assertion_recorded'
+          AND json_extract(payload, '$.source') = ?
+        LIMIT 1
+        """,
+        (source, source),
+    ).fetchone()
+    return row is not None
+
+
 def source_trust(conn, source: str) -> float:
     """Read-time trust for ``source``: how often it agrees with other sources.
 
     Assessed only on claims where at least one *other* source asserted too; with no
     such overlap the source is unproven and held at :data:`SOURCE_TRUST_SEED`.
     """
+    # Fast path: a source that never asserted a value (e.g. a relation-only source like
+    # wikidata) can only score the seed -- return it without scanning the whole value
+    # stream. This is what made inference (which asks trust per relation source) ~300ms.
+    if not _has_value_assertions(conn, source):
+        return SOURCE_TRUST_SEED
     return _trust(_group_by_claim(assertions(conn)), source)
 
 
