@@ -12,6 +12,7 @@ REQUIRED_EVENT_KEYS = {
     "evidence_recorded": {"observation_id", "metric_key", "metric_value"},
     "assertion_recorded": {"claim_key", "claim_value", "source", "derivation"},
     "relation_asserted": {"subject", "predicate", "object", "source", "derivation"},
+    "relation_retracted": {"subject", "predicate", "object", "source", "reason"},
     "belief_created": {
         "belief_id",
         "claim_key",

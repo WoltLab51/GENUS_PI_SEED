@@ -188,6 +188,31 @@ def observe_relation(
     return {"event_id": event_id, "events": [{"event_type": "relation_asserted", "id": event_id}]}
 
 
+def retract_relation(
+    conn, subject: str, predicate: str, object_: str, source: str | None = None, reason: str | None = None
+) -> dict:
+    """Take a relation back -- the honest counterpart to acquiring one. A source can be
+    wrong (a mis-resolved word, a corrected mapping); ``relation_retracted`` is a raw fact
+    that removes the edge from the graph on replay. With ``source`` only that source's edge
+    goes; without it the triple is removed for every source.
+    """
+    try:
+        payload = {
+            "subject": subject,
+            "predicate": predicate,
+            "object": object_,
+            "source": source,
+            "reason": reason or "retracted",
+        }
+        event_id = ledger.append(conn, "relation_retracted", payload)
+        projection.apply_relation_retracted(conn, payload)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {"event_id": event_id, "events": [{"event_type": "relation_retracted", "id": event_id}]}
+
+
 def process_observation(conn, observation_id: int) -> list[dict]:
     observation = _load_event(conn, observation_id)
     if observation["event_type"] != "observation_created":

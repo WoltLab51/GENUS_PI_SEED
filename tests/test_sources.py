@@ -299,6 +299,26 @@ def test_display_prefers_the_canonical_label_over_an_alias():
     conn.close()
 
 
+def test_retract_relation_removes_edge_and_survives_replay():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q37575615", "wikidata")  # wrong (surname)
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")        # right (dog)
+    reactors.retract_relation(conn, "Hund@de", "expresses", "Q37575615", "wikidata")
+    assert {r["object"] for r in sources.relations(conn, subject="Hund@de")} == {"Q144"}
+    event_router.replay(conn)  # the retraction must be replay-stable
+    assert {r["object"] for r in sources.relations(conn, subject="Hund@de")} == {"Q144"}
+    conn.close()
+
+
+def test_retract_relation_without_source_removes_all_copies():
+    conn = _fresh()
+    reactors.observe_relation(conn, "x", "is_a", "y", "a")
+    reactors.observe_relation(conn, "x", "is_a", "y", "b")
+    reactors.retract_relation(conn, "x", "is_a", "y")  # no source -> every copy
+    assert sources.relations(conn, subject="x") == []
+    conn.close()
+
+
 def test_relations_project_and_rebuild_from_the_log():
     conn = _fresh()
     reactors.observe_relation(conn, "run", "is_a", "verb", "dict")

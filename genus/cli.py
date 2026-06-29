@@ -384,6 +384,22 @@ def relate_command(subject: str, predicate: str, object: str, source: str) -> No
         conn.close()
 
 
+@main.command("unrelate")
+@click.argument("subject")
+@click.argument("predicate")
+@click.argument("object")
+@click.option("--source", default=None, help="retract only this source's edge (default: every source)")
+def unrelate_command(subject: str, predicate: str, object: str, source: str | None) -> None:
+    """Retract a relation — take a wrong or corrected assertion back (relation_retracted)."""
+    conn = get_conn()
+    try:
+        reactors.retract_relation(conn, subject, predicate, object, source)
+        where = f"· {source}" if source else "· all sources"
+        click.echo(f"[REL] retracted {subject} -[{predicate}]-> {object}   {where}")
+    finally:
+        conn.close()
+
+
 @main.command("relations")
 @click.argument("subject", required=False)
 def relations_command(subject: str | None) -> None:

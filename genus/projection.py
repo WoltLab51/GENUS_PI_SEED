@@ -334,6 +334,25 @@ def apply_relation_asserted(conn, payload: dict) -> None:
     )
 
 
+def apply_relation_retracted(conn, payload: dict) -> None:
+    """Remove a relation from the indexed graph -- a source taking an assertion back (a
+    wrong acquisition, a corrected mapping). The retraction event is itself the truth and
+    is replayed in order, so the projection rebuilds correctly. With ``source`` only that
+    source's edge goes; without it, every source's copy of the triple is removed.
+    """
+    if payload.get("source"):
+        conn.execute(
+            "DELETE FROM relation_projection "
+            "WHERE subject = ? AND predicate = ? AND object = ? AND source = ?",
+            (payload["subject"], payload["predicate"], payload["object"], payload["source"]),
+        )
+    else:
+        conn.execute(
+            "DELETE FROM relation_projection WHERE subject = ? AND predicate = ? AND object = ?",
+            (payload["subject"], payload["predicate"], payload["object"]),
+        )
+
+
 def apply_belief_superseded(conn, payload: dict) -> int:
     new_belief_id = create_belief(
         conn,

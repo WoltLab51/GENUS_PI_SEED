@@ -97,6 +97,8 @@ def apply_event(conn, event) -> None:
         projection.apply_belief_superseded(conn, payload)
     elif event_type == "relation_asserted":
         projection.apply_relation_asserted(conn, payload)
+    elif event_type == "relation_retracted":
+        projection.apply_relation_retracted(conn, payload)
     elif event_type == "proposal_created":
         proposals.apply_proposal_created(conn, payload)
     elif event_type == "proposal_reviewed":
