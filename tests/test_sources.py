@@ -322,6 +322,28 @@ def test_value_projection_rebuilds_identically_on_replay():
     assert before == after and len(before) == 1
 
 
+def test_relation_confidence_rises_with_corroboration():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "wikidata")
+    one = sources.relation_confidence(conn, "Hund", "is_a", "Säugetier")
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "curated")
+    two = sources.relation_confidence(conn, "Hund", "is_a", "Säugetier")
+    assert one["n_sources"] == 1 and two["n_sources"] == 2
+    assert two["confidence"] > one["confidence"]      # corroboration raises confidence
+    assert two["confidence"] == 0.75                  # noisy-OR of two seed-trust (0.5) sources
+    assert sources.relation_confidence(conn, "Hund", "is_a", "Pflanze")["confidence"] == 0.0
+
+
+def test_confidence_cli_shows_corroborated_value(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "wikidata")
+    reactors.observe_relation(conn, "Hund", "is_a", "Säugetier", "curated")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["confidence", "Hund", "is_a", "Säugetier"])
+    assert result.exit_code == 0, result.output
+    assert "confidence 0.75" in result.output
+
+
 def test_retract_relation_removes_edge_and_survives_replay():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q37575615", "wikidata")  # wrong (surname)

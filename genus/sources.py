@@ -253,6 +253,38 @@ def source_trust(conn, source: str) -> float:
     return _trust(_group_by_claim([dict(row) for row in rows]), source)
 
 
+def relation_confidence(conn, subject: str, predicate: str, object: str) -> dict:
+    """Read-time confidence that a relation holds -- the resolve idea for the knowledge side.
+
+    Each source that asserts ``(subject, predicate, object)`` votes with its read-time
+    ``source_trust``; the votes combine by **noisy-OR**, so independent corroboration raises
+    confidence (Wikidata + curated > a single source) while one lone, low-trust source keeps
+    it light. A relation is *believed with a number*, not merely *present*. Glass-box, nothing
+    stored; recency stays neutral here (a fact is current unless retracted, unlike a sensor
+    value that fades).
+    """
+    rows = relations(conn, subject=subject, predicate=predicate, object=object)
+    contributions: list[dict] = []
+    seen: set[str] = set()
+    not_held = 1.0
+    for row in rows:
+        src = row["source"]
+        if src in seen:
+            continue
+        seen.add(src)
+        trust = source_trust(conn, src)
+        contributions.append({"source": src, "trust": round(trust, 3)})
+        not_held *= 1.0 - trust
+    return {
+        "subject": subject,
+        "predicate": predicate,
+        "object": object,
+        "confidence": round(1.0 - not_held, 3) if contributions else 0.0,
+        "sources": contributions,
+        "n_sources": len(contributions),
+    }
+
+
 def resolve(conn, claim_key: str) -> dict:
     """Resolve a claim to its current value over all sources -- the general form.
 

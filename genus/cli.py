@@ -444,6 +444,27 @@ def relations_command(subject: str | None) -> None:
         conn.close()
 
 
+@main.command("confidence")
+@click.argument("subject")
+@click.argument("predicate")
+@click.argument("object")
+def confidence_command(subject: str, predicate: str, object: str) -> None:
+    """How confident is GENUS that a relation holds — read-time, from source trust × corroboration."""
+    conn = get_conn()
+    try:
+        c = sources.relation_confidence(conn, subject, predicate, object)
+        s, p, o = sources.display(conn, subject), predicate, sources.display(conn, object)
+        if c["n_sources"] == 0:
+            click.echo(f"[CNF] {s} -[{p}]-> {o}: not asserted")
+            return
+        click.echo(f"[CNF] {s} -[{p}]-> {o}   confidence {c['confidence']:.2f}  "
+                   f"({c['n_sources']} source(s), noisy-OR of trust)")
+        for src in c["sources"]:
+            click.echo(f"[CNF]   {src['source']}   trust {src['trust']:.2f}")
+    finally:
+        conn.close()
+
+
 @main.command("gaps")
 @click.option("--limit", default=20, type=int, show_default=True)
 @click.option("--predicate", "predicates", multiple=True,
