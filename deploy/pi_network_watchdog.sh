@@ -39,6 +39,33 @@ run_genus() {
     fi
 }
 
+# Supervisor role: keep the background vocabulary learner alive across crashes and reboots.
+# The learner is a user-level, idle-priority daemon; if it is down and GENUS is not paused,
+# (re)start it as the genus user in its OWN transient unit via systemd-run, so it survives
+# this watchdog tick's exit. No extra privileged install needed -- the watchdog already runs
+# here, so it is the natural keeper. Pause (genus pause) is respected.
+ensure_learner() {
+    local learner="$REPO_DIR/deploy/pi_learn.sh"
+    if [ ! -x "$learner" ]; then return 0; fi
+    if [ -f "$(dirname "$DB_PATH")/paused" ]; then return 0; fi
+    if pgrep -f "deploy/pi_learn.sh" >/dev/null 2>&1; then return 0; fi
+    if ! command -v systemd-run >/dev/null 2>&1; then return 0; fi
+    log "learner down — starting it (idle priority, own transient unit)"
+    systemd-run --quiet --collect \
+        --uid="$GENUS_USER" --nice=19 \
+        --property=CPUSchedulingPolicy=idle \
+        --property=IOSchedulingClass=idle \
+        --property="StandardOutput=append:$LOG_DIR/learn.log" \
+        --property="StandardError=append:$LOG_DIR/learn.log" \
+        --setenv=GENUS_USER="$GENUS_USER" \
+        --setenv=GENUS_HOME="$GENUS_HOME" \
+        --setenv=GENUS_REPO_DIR="$REPO_DIR" \
+        --setenv=GENUS_DB_PATH="$DB_PATH" \
+        --setenv=GENUS_LOG_DIR="$LOG_DIR" \
+        --setenv=GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
+        bash "$learner" || log "could not start learner"
+}
+
 json_field() {
     GENUS_JSON_INPUT="$(cat)" "$REPO_DIR/.venv/bin/python" -c '
 import json
@@ -73,6 +100,9 @@ restart_network_service() {
         printf 'networking\n'
     fi
 }
+
+# Keep the learner alive every tick (before the network check, so it runs regardless).
+ensure_learner
 
 target="$(detect_target)"
 if [ -z "$target" ]; then
