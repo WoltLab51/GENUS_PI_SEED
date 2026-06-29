@@ -107,7 +107,9 @@ def test_concept_membrane_feeds_both_layers_from_wikidata():
     assert "expresses" in script            # word@lang -> concept (label + aliases, for lookup)
     assert "\\tlabel\\t" in script          # the canonical label, for readable display
     assert "is_a" in script                 # concept -> parent concept
-    assert "wbsearchentities" in script     # word -> top Q-id
+    assert "wbsearchentities" in script     # word -> Q-id
+    assert "limit=7" in script              # several candidates, not just the top hit
+    assert "exact" in script                # prefer an exact label match (disambiguation)
     assert "nothing recorded" in script     # a failed/empty fetch records nothing
 
 

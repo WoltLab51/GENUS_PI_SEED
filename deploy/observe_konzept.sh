@@ -51,14 +51,20 @@ if printf '%s' "$SEED" | grep -Eq '^Q[0-9]+$'; then
     QID="$SEED"
 else
     enc="$("$REPO_DIR/.venv/bin/python" -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$SEED")"
-    wd_get "$API?action=wbsearchentities&search=$enc&language=$SEARCH_LANG&type=item&limit=1&format=json" "$TMP/search.json"
-    QID="$("$REPO_DIR/.venv/bin/python" - "$TMP/search.json" <<'PY'
-import json, sys
+    wd_get "$API?action=wbsearchentities&search=$enc&language=$SEARCH_LANG&type=item&limit=7&format=json" "$TMP/search.json"
+    # Disambiguation: among the candidates, prefer the one whose canonical label EXACTLY
+    # matches the word -- so "Mond"->Moon (not the fuzzy "Monat"), "Sonne"->Sun (not generic
+    # "Stern"), "Blume"->the flower (not the botanist "Carl Ludwig Blume"). Fall back to the
+    # top hit for words whose Wikidata label differs from the common term (Hund->"Haushund").
+    QID="$(SEED="$SEED" "$REPO_DIR/.venv/bin/python" - "$TMP/search.json" <<'PY'
+import json, os, sys
+word = os.environ["SEED"].casefold()
 try:
     hits = json.load(open(sys.argv[1])).get("search", [])
-    print(hits[0]["id"] if hits else "")
 except Exception:
-    print("")
+    hits = []
+exact = [h["id"] for h in hits if h.get("label", "").casefold() == word]
+print(exact[0] if exact else (hits[0]["id"] if hits else ""))
 PY
 )"
 fi
