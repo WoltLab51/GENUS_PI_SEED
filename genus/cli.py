@@ -13,6 +13,7 @@ from genus import (
     event_router,
     experience,
     governance,
+    inference,
     inquiries,
     integrity,
     learning,
@@ -35,6 +36,7 @@ from genus.cli_format import (
     _print_calibration,
     _print_decision_explanation,
     _print_experience_explanation,
+    _print_inferences,
     _print_learning,
     _print_observation_result,
     _print_proposal_explanation,
@@ -400,6 +402,18 @@ def gaps_command(limit: int) -> None:
     try:
         for word in sources.gaps(conn, limit):
             click.echo(word)
+    finally:
+        conn.close()
+
+
+@main.command("infer")
+@click.argument("subject")
+@click.argument("predicate")
+def infer_command(subject: str, predicate: str) -> None:
+    """Derive new relations from known ones (transitive/symmetric), each with its why."""
+    conn = get_conn()
+    try:
+        _print_inferences(inference.infer(conn, subject, predicate), subject, predicate)
     finally:
         conn.close()
 

@@ -105,6 +105,19 @@ def _print_relations(triples: list[dict]) -> None:
         )
 
 
+def _print_inferences(derived: list[dict], subject: str, predicate: str) -> None:
+    if not derived:
+        click.echo(f"[INF] {subject} -[{predicate}]-> : nothing to derive")
+        return
+    click.echo(f"[INF] derived {subject} -[{predicate}]-> (trust = weakest premise):")
+    for item in derived:
+        click.echo(f"[INF]   -> {item['object']}   trust {item['trust']:.2f}")
+        chain = "  <=  " + "  ·  ".join(
+            f"{p['subject']} {p['predicate']} {p['object']} ({p['source']})" for p in item["chain"]
+        )
+        click.echo(f"[INF]   {chain}")
+
+
 def _print_surprisal(rows: list[dict]) -> None:
     if not rows:
         click.echo("[SRP] no characterized beliefs yet")
