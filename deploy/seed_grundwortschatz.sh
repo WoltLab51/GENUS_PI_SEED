@@ -46,7 +46,7 @@ while IFS= read -r line; do
     # search -> most-prominent genuine concept), then learns its labels + is_a hierarchy.
     GENUS_KONZEPT_SEARCH_LANG="$LANG_TAG" "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
     resolved="$(run_genus relations "${word}@${LANG_TAG}" 2>/dev/null \
-        | grep -m1 'expresses' | sed -E 's/^\[REL\] [^ ]+ -\[expresses\]-> //; s/   .*$//')"
+        | grep -m1 'expresses' | sed -E 's/^\[REL\] [^ ]+ -\[expresses\]-> //; s/   .*$//' || true)"
     printf '[GWS] %-12s -> %s\n' "$word" "${resolved:-(nicht aufgelöst — Quelle liefert kein Konzept)}"
     count=$((count + 1))
 done < "$LIST"
