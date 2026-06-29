@@ -14,6 +14,14 @@ from genus.sensor import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_pause(tmp_path, monkeypatch):
+    # Tests must never read the AMBIENT pause flag (e.g. a paused Pi during a deploy's test
+    # run, where GENUS_DB_PATH points at the real ledger). Pin the marker at a per-test temp
+    # path that does not exist -> is_paused() is False unless the test sets it itself.
+    monkeypatch.setenv("GENUS_PAUSE_FILE", str(tmp_path / "paused"))
+
+
 @pytest.fixture
 def conn():
     c = sqlite3.connect(":memory:")
