@@ -79,6 +79,19 @@ def test_acquire_gaps_loop_asks_genus_and_fetches_each():
     assert "no gaps" in script          # the closed-vocabulary case records nothing
 
 
+def test_german_word_membrane_parses_hierarchy_and_feeds_relate():
+    script = (ROOT / "deploy" / "observe_wort.sh").read_text(encoding="utf-8")
+
+    # German word meaning WITH hierarchy: synonyms + Oberbegriffe (is_a), the chains
+    # inference needs; HTTP at the edge, primary sense only.
+    assert "relate" in script
+    assert "openthesaurus" in script
+    assert "is_a" in script
+    assert "synonym" in script
+    assert "supersynsets" in script
+    assert "nothing recorded" in script
+
+
 def test_clock_check_probes_ntp_and_records_operation_event():
     script = (ROOT / "deploy" / "pi_clock_check.sh").read_text(encoding="utf-8")
 
