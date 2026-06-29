@@ -94,6 +94,22 @@ def test_german_word_membrane_parses_hierarchy_and_feeds_relate():
     assert "nothing recorded" in script
 
 
+def test_concept_membrane_feeds_both_layers_from_wikidata():
+    script = (ROOT / "deploy" / "observe_konzept.sh").read_text(encoding="utf-8")
+
+    # Wikidata as a language-neutral concept graph: Q-id concepts, P279 = is_a hierarchy,
+    # labels+aliases per language = the lexemes. Both layers fed via `relate`.
+    assert "relate" in script
+    assert "wikidata" in script
+    assert "wbgetclaims" in script          # P279 parents -- small, reliable REST call
+    assert "wbgetentities" in script        # labels + aliases
+    assert "P279" in script
+    assert "expresses" in script            # word@lang -> concept
+    assert "is_a" in script                 # concept -> parent concept
+    assert "wbsearchentities" in script     # word -> top Q-id
+    assert "nothing recorded" in script     # a failed/empty fetch records nothing
+
+
 def test_clock_check_probes_ntp_and_records_operation_event():
     script = (ROOT / "deploy" / "pi_clock_check.sh").read_text(encoding="utf-8")
 
