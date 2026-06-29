@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GENUS CORE — Reifegrad-Karte</title>
+<title>GENUS CORE — Architektur-Karte</title>
 <style>
   :root{
     --bg:#0a0d12;
@@ -14,35 +14,36 @@
     --txt-dim:#8a96a6;
     --txt-faint:#5a6675;
     --built:#37d399;
-    --built-bg:rgba(55,211,153,.09);
-    --built-line:rgba(55,211,153,.35);
+    --built-bg:rgba(55,211,153,.10);
+    --built-line:rgba(55,211,153,.38);
     --partial:#f0b429;
-    --partial-bg:rgba(240,180,41,.09);
-    --partial-line:rgba(240,180,41,.32);
+    --partial-bg:rgba(240,180,41,.10);
+    --partial-line:rgba(240,180,41,.34);
     --vision:#e0556b;
-    --vision-bg:rgba(224,85,107,.07);
-    --vision-line:rgba(224,85,107,.28);
+    --vision-bg:rgba(224,85,107,.08);
+    --vision-line:rgba(224,85,107,.30);
+    --accent:#5aa9ff;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     background:
-      radial-gradient(900px 500px at 18% -5%, rgba(55,211,153,.05), transparent 60%),
-      radial-gradient(900px 500px at 85% 0%, rgba(224,85,107,.05), transparent 60%),
+      radial-gradient(1000px 560px at 12% -8%, rgba(55,211,153,.06), transparent 60%),
+      radial-gradient(1000px 560px at 60% -6%, rgba(240,180,41,.045), transparent 60%),
+      radial-gradient(1000px 560px at 92% -4%, rgba(224,85,107,.05), transparent 60%),
       var(--bg);
     color:var(--txt);
     font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    padding:34px 30px 40px;
+    padding:34px 30px 44px;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1280px;margin:0 auto}
+  .wrap{max-width:1300px;margin:0 auto}
 
   /* header */
-  header{display:flex;justify-content:space-between;align-items:flex-start;gap:30px;margin-bottom:24px;flex-wrap:wrap}
-  h1{font-size:34px;font-weight:700;letter-spacing:-.5px;line-height:1}
-  h1 small{display:block;font-family:"Consolas","Liberation Mono",monospace;font-size:12px;font-weight:500;color:var(--txt-dim);letter-spacing:3px;margin-top:8px}
-
-  .legend{display:flex;gap:18px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
-  .legend .li{display:flex;align-items:center;gap:9px;font-size:12px}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:30px;margin-bottom:22px;flex-wrap:wrap}
+  h1{font-size:34px;font-weight:800;letter-spacing:-.6px;line-height:1}
+  h1 small{display:block;font-family:"Consolas","Liberation Mono",monospace;font-size:12px;font-weight:500;color:var(--txt-dim);letter-spacing:3px;margin-top:9px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 17px}
+  .legend .li{display:flex;align-items:center;gap:9px;font-size:11.5px}
   .legend .li b{font-weight:600}
   .legend .li span{color:var(--txt-dim)}
   .dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
@@ -51,145 +52,214 @@
   .dot.v{background:var(--vision)}
 
   /* principle */
-  .principle{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:26px;text-align:center}
+  .principle{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px 22px;margin-bottom:24px;text-align:center}
   .principle .k{font-family:"Consolas","Liberation Mono",monospace;font-size:10px;letter-spacing:3px;color:var(--txt-faint);margin-bottom:7px}
-  .principle p{font-size:16px;color:var(--txt);font-weight:500;font-style:italic}
+  .principle p{font-size:16px;color:var(--txt);font-weight:500}
+  .principle p b{color:var(--built);font-weight:700}
+  .principle p i{color:var(--txt-dim);font-style:normal}
 
-  .section-label{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;letter-spacing:3px;color:var(--txt-dim);margin:0 0 13px 2px;text-transform:uppercase}
+  .section-label{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;letter-spacing:3px;color:var(--txt-dim);margin:0 0 12px 2px;text-transform:uppercase}
+  .section-label b{color:var(--txt)}
 
-  /* pipeline */
-  .pipeline{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin-bottom:8px}
-  .core{
-    position:relative;border-radius:11px;padding:13px 11px 12px;min-height:148px;
-    border:1px solid var(--line);background:var(--panel-2);
-    display:flex;flex-direction:column;
-  }
-  .core.built{background:var(--built-bg);border-color:var(--built-line)}
-  .core.partial{background:var(--partial-bg);border-color:var(--partial-line)}
-  .core.vision{background:var(--vision-bg);border-color:var(--vision-line)}
-  .core .num{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;font-weight:600;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid currentColor;margin-bottom:9px}
-  .core.built .num{color:var(--built)}
-  .core.partial .num{color:var(--partial)}
-  .core.vision .num{color:var(--vision)}
-  .core h3{font-size:12.5px;font-weight:700;line-height:1.15;letter-spacing:.2px;margin-bottom:7px}
-  .core .q{font-size:10.5px;color:var(--txt-dim);line-height:1.35;flex:1}
-  .core .out{font-family:"Consolas","Liberation Mono",monospace;font-size:9px;color:var(--txt-faint);margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
-  .core .stat{position:absolute;top:11px;right:10px;width:8px;height:8px;border-radius:50%}
-  .core.built .stat{background:var(--built);box-shadow:0 0 8px var(--built-line)}
-  .core.partial .stat{background:var(--partial);box-shadow:0 0 8px var(--partial-line)}
-  .core.vision .stat{background:var(--vision)}
+  /* THREE LAYERS — the hero */
+  .layers{display:grid;grid-template-columns:1fr 26px 1fr 26px 1fr;align-items:stretch;margin-bottom:11px}
+  .lyr{border-radius:15px;padding:15px 16px 13px;border:1px solid var(--line);display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .lyr.w{border-color:var(--built-line);background:linear-gradient(165deg,var(--built-bg),transparent 75%)}
+  .lyr.s{border-color:var(--partial-line);background:linear-gradient(165deg,var(--partial-bg),transparent 75%)}
+  .lyr.e{border-color:var(--vision-line);background:linear-gradient(165deg,var(--vision-bg),transparent 75%)}
+  .lyr .lh{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+  .lyr .lt{font-size:16px;font-weight:800;letter-spacing:.4px}
+  .lyr.w .lt{color:var(--built)} .lyr.s .lt{color:var(--partial)} .lyr.e .lt{color:var(--vision)}
+  .lyr .tag{font-family:"Consolas","Liberation Mono",monospace;font-size:9px;letter-spacing:1.5px;padding:3px 8px;border-radius:20px;border:1px solid currentColor}
+  .lyr.w .tag{color:var(--built)} .lyr.s .tag{color:var(--partial)} .lyr.e .tag{color:var(--vision)}
+  .lyr .sub{font-size:10.5px;color:var(--txt-dim);margin-bottom:11px;line-height:1.3}
+  .lyr ul{list-style:none;display:flex;flex-direction:column;gap:7px;flex:1}
+  .lyr li{font-size:11px;line-height:1.32;color:var(--txt);display:flex;gap:7px;align-items:flex-start}
+  .lyr li .m{flex-shrink:0;font-size:10px;margin-top:1px;width:11px;text-align:center}
+  .lyr li .m.ok{color:var(--built)} .lyr li .m.go{color:var(--partial)} .lyr li .m.no{color:var(--vision)}
+  .lyr li b{font-weight:700}
+  .lyr li span{color:var(--txt-dim)}
+  .lyr .out{font-family:"Consolas","Liberation Mono",monospace;font-size:8.5px;color:var(--txt-faint);margin-top:11px;padding-top:8px;border-top:1px dashed var(--line);letter-spacing:.3px}
+  .lyr-arrow{display:flex;align-items:center;justify-content:center;color:var(--txt-faint);font-size:17px}
 
-  /* generic layer panel */
-  .layer{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:9px}
-  .layer.cross{border-color:var(--vision-line);background:linear-gradient(180deg,var(--vision-bg),transparent)}
-  .grid{display:grid;gap:13px}
-  .g6{grid-template-columns:repeat(6,1fr)}
+  /* LLM cross-cut */
+  .llm{border:1px dashed var(--vision-line);border-radius:13px;padding:12px 18px;margin-bottom:9px;
+       background:linear-gradient(90deg,rgba(224,85,107,.05),rgba(224,85,107,.02));
+       display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .llm .badge{font-family:"Consolas","Liberation Mono",monospace;font-size:10px;letter-spacing:2px;color:var(--vision);border:1px solid var(--vision-line);border-radius:20px;padding:5px 12px;flex-shrink:0}
+  .llm .lx{font-size:11.5px;color:var(--txt-dim);line-height:1.45}
+  .llm .lx b{color:var(--txt);font-weight:600}
+
+  .arrow-row{display:flex;justify-content:center;margin:7px 0 16px;color:var(--txt-faint);font-size:13px;letter-spacing:6px}
+
+  /* metabolism — collapsed to a compact reference strip */
+  .cores-mini{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+  .cm{font-size:11px;color:var(--txt);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;display:flex;align-items:center;gap:8px}
+  .cm .d{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .cm .n{font-family:"Consolas","Liberation Mono",monospace;font-size:9px;color:var(--txt-faint)}
+  .cm.built{border-color:var(--built-line)}
+  .cm.built .d{background:var(--built);box-shadow:0 0 7px var(--built-line)}
+  .cm.vision{border-color:var(--vision-line);color:var(--txt-dim)}
+  .cm.vision .d{background:var(--vision)}
+
+  /* self-knowledge strip */
+  .strip{display:flex;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--built-line);border-radius:11px;padding:11px 16px;margin-bottom:20px}
+  .strip .st{font-weight:700;font-size:12px;color:var(--built);display:flex;align-items:center;gap:8px;padding-right:6px}
+  .strip .it{font-size:11px;color:var(--txt-dim)}
+  .strip .it b{color:var(--txt);font-weight:600}
+
+  /* generic layer panels */
+  .layer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 18px;margin-bottom:9px}
+  .layer.cross{border-color:var(--accent);background:linear-gradient(180deg,rgba(90,169,255,.06),transparent)}
+  .grid{display:grid;gap:12px}
   .g5{grid-template-columns:repeat(5,1fr)}
-  .g7{grid-template-columns:repeat(7,1fr)}
-  .g8{grid-template-columns:repeat(8,1fr)}
-  .cell .ch{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;margin-bottom:4px}
-  .cell .cd{font-size:10px;color:var(--txt-dim);line-height:1.4}
+  .g6{grid-template-columns:repeat(6,1fr)}
+  .cell .ch{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;margin-bottom:4px}
+  .cell .cd{font-size:9.5px;color:var(--txt-dim);line-height:1.4}
   .mini{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-  .mini.b{background:var(--built)}
-  .mini.p{background:var(--partial)}
-  .mini.v{background:var(--vision)}
+  .mini.b{background:var(--built)} .mini.p{background:var(--partial)} .mini.v{background:var(--vision)}
 
   /* dna */
-  .dna{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 18px;margin-top:18px}
+  .dna{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-top:18px}
   .dna .title{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13px;padding-right:6px}
-  .rule{font-family:"Consolas","Liberation Mono",monospace;font-size:11px;color:var(--txt-dim);background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:6px 11px}
-  .rule.ok{color:var(--built);border-color:var(--built-line)}
+  .rule{font-family:"Consolas","Liberation Mono",monospace;font-size:10.5px;color:var(--built);background:var(--panel-2);border:1px solid var(--built-line);border-radius:7px;padding:5px 10px}
+  .rule.new{color:var(--accent);border-color:rgba(90,169,255,.4)}
+  .rule.soon{color:var(--txt-dim);border-color:var(--line)}
 
-  .foot{margin-top:20px;font-size:11px;color:var(--txt-faint);font-family:"Consolas","Liberation Mono",monospace;text-align:center;line-height:1.7}
-  .arrow-row{display:flex;justify-content:center;margin:2px 0 18px;color:var(--txt-faint);font-size:14px;letter-spacing:6px}
+  .foot{margin-top:20px;font-size:11px;color:var(--txt-faint);font-family:"Consolas","Liberation Mono",monospace;text-align:center;line-height:1.75}
+  .foot b{color:var(--txt-dim)}
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
-    <h1>GENUS CORE<small>REIFEGRAD-KARTE · STAND v1.14</small></h1>
+    <h1>GENUS CORE<small>ARCHITEKTUR &amp; REIFEGRAD · STAND 2026-06-29</small></h1>
     <div class="legend">
       <div class="li"><span class="dot b"></span><div><b>Gebaut &amp; getestet</b><br><span>läuft im Code, durch Tests gedeckt</span></div></div>
-      <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, aber unvollständig</span></div></div>
-      <div class="li"><span class="dot v"></span><div><b>Nur Vision</b><br><span>geplant, noch kein Code</span></div></div>
+      <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, unvollständig</span></div></div>
+      <div class="li"><span class="dot v"></span><div><b>Vision</b><br><span>geplant, noch kein Code</span></div></div>
     </div>
   </header>
 
   <div class="principle">
     <div class="k">KERNPRINZIP</div>
-    <p>"GENUS ist ein governiertes System, das Beobachtungen in Erfahrungen und Erfahrungen in Verbesserungsvorschläge verwandelt."</p>
+    <p>Ein <b>gläserner, ledger-gegründeter Kern</b>: weiß mit Herkunft · schließt nachvollziehbar · erschafft verifizierbar — <i>viel Maschine, das LLM nur am Rand.</i></p>
   </div>
 
-  <div class="section-label">Kern-Pipeline — der Stoffwechsel</div>
-  <div class="pipeline">
-    <div class="core built"><span class="stat"></span><div class="num">1</div><h3>Observation Core</h3><div class="q">Was wurde wahrgenommen?</div><div class="out">observation_created</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">2</div><h3>Evidence Core</h3><div class="q">Was ist belegbar? Woher stammt es?</div><div class="out">evidence_recorded</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">3</div><h3>Belief Core</h3><div class="q">Was hält GENUS aktuell für plausibel?</div><div class="out">belief_projection · confidence decay</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">4</div><h3>State Core</h3><div class="q">Welcher Gesamtzustand entsteht aus vielen Beliefs?</div><div class="out">state_projection</div></div>
-    <div class="core vision"><span class="stat"></span><div class="num">5</div><h3>Transition Core</h3><div class="q">Welche Veränderung wäre möglich?</div><div class="out">— nicht gebaut</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">6</div><h3>Constraint Core</h3><div class="q">Darf diese Veränderung überhaupt weiter?</div><div class="out">constraint_checked · policy_evaluated</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">7</div><h3>Proposal Core</h3><div class="q">Was wird vorgeschlagen — und reviewt?</div><div class="out">proposal_log · review</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">8</div><h3>Ledger Core</h3><div class="q">Was ist nachweislich passiert?</div><div class="out">event_log · seals · anchors</div></div>
-    <div class="core built"><span class="stat"></span><div class="num">9</div><h3>Experience Core</h3><div class="q">Welche Muster wiederholen sich — auch in GENUS' eigenem Denken?</div><div class="out">experience_log · BeliefStability · Re-Charakterisierung · Surprise-Loop · Kalibrierung · Surprisal</div></div>
-  </div>
-  <div class="arrow-row">↓</div>
+  <div class="section-label">Der gläserne Kern in <b>drei Schichten</b> — die Ordnungsidee</div>
+  <div class="layers">
 
-  <div class="section-label">Querschnitt: Governance &amp; Sicherheit</div>
+    <div class="lyr w">
+      <div class="lh"><span class="lt">① WISSEN</span><span class="tag">VOLLENDET</span></div>
+      <div class="sub">Beobachten → glauben → wissen, <b>mit Herkunft, Vertrauen, Struktur</b>.</div>
+      <ul>
+        <li><span class="m ok">✓</span><div><b>Herkunft &amp; Beleg</b> — jede Tatsache rückführbar (roh, replay-stabil)</div></li>
+        <li><span class="m ok">✓</span><div><b>Quellen-Vertrauen</b> — read-time, recency-aware (nur lebende Quellen)</div></li>
+        <li><span class="m ok">✓</span><div><code>resolve</code> <b>regiert alle Konsumenten</b> — Regeln, Lernen, Vergleich</div></li>
+        <li><span class="m ok">✓</span><div><b>Widerspruch → Surprise → Inquiry</b> — der Lehrer-Loop</div></li>
+        <li><span class="m ok">✓</span><div><b>Zwei-Schichten-Wissen</b> — Wort<code>@lang</code> → <code>expresses</code> → sprach-neutrales <b>Konzept</b> (latein-verankert, mehrsprachig)</div></li>
+      </ul>
+      <div class="out">observation · evidence · assertion · relation · expresses</div>
+    </div>
+
+    <div class="lyr-arrow">→</div>
+
+    <div class="lyr s">
+      <div class="lh"><span class="lt">② SYSTEME</span><span class="tag">BEGONNEN</span></div>
+      <div class="sub">Regel-Domänen <b>lernen</b> + <b>schließen</b> — wo GENUS sich selbst prüfen kann.</div>
+      <ul>
+        <li><span class="m ok">✓</span><div><b>Inferenz</b> — Schluss-Primitiv: transitiv/symmetrisch, <b>mit Begründung</b>, Trust = schwächste Prämisse</div></li>
+        <li><span class="m ok">✓</span><div><b>Sinn-kohärentes Schließen</b> — über Konzepte; kein Sinn-Drift (kein „Hund is_a Bevölkerung")</div></li>
+        <li><span class="m ok">✓</span><div><b>Lernprogramme</b> — Vorhersage → Selbst-Test → Skill-Kurve, 24/7 (Wetter · Temp · Disk · Repo)</div></li>
+        <li><span class="m go">◐</span><div><b>Regel-Domänen</b> — Mathe · Spiel · Sprache · Code (frei wählbar, parallel)</div></li>
+      </ul>
+      <div class="out">infer · infer --lang · learning curve</div>
+    </div>
+
+    <div class="lyr-arrow">→</div>
+
+    <div class="lyr e">
+      <div class="lh"><span class="lt">③ ERSCHAFFEN</span><span class="tag">VISION</span></div>
+      <div class="sub">Verifizierbare Generativität — <b>erzeugen mit Beweis</b>. Der Gipfel.</div>
+      <ul>
+        <li><span class="m no">○</span><div><b>erzeugen → verifizieren</b> — der „vorhersagen→testen"-Loop, verallgemeinert</div></li>
+        <li><span class="m no">○</span><div><b>Komponieren + Suchen + Verifizieren</b> — geerdet, mit Herkunft</div></li>
+        <li><span class="m no">○</span><div><b>„Programmieren"</b> = Erschaffen, auf Code angewandt (governt, Mensch-merge)</div></li>
+      </ul>
+      <div class="out">— noch kein Code</div>
+    </div>
+
+  </div>
+
+  <div class="llm">
+    <span class="badge">⟂ LLM · QUERSCHNITT</span>
+    <div class="lx"><b>Gedeckelte Quelle am Rand</b> — dolmetschen (fuzzy Sprache → Struktur) + Stimme. Nie Orakel: jeder Beitrag betritt GENUS nur als <b>niedrig-vertraute Quelle</b> (<code>derivation: model:*</code>), governt. <b>Der Kern läuft ohne Modell.</b> Dockt an jede Schicht an, wann er gebraucht wird.</div>
+  </div>
+
+  <div class="arrow-row">▼ &nbsp; steht auf &nbsp; ▼</div>
+
+  <div class="section-label">Fundament: <b>der Stoffwechsel</b> — 9 event-sourced Cores, replay-stabil</div>
+  <div class="cores-mini">
+    <span class="cm built"><span class="d"></span><span class="n">1</span>Observation</span>
+    <span class="cm built"><span class="d"></span><span class="n">2</span>Evidence</span>
+    <span class="cm built"><span class="d"></span><span class="n">3</span>Belief</span>
+    <span class="cm built"><span class="d"></span><span class="n">4</span>State</span>
+    <span class="cm vision"><span class="d"></span><span class="n">5</span>Transition</span>
+    <span class="cm built"><span class="d"></span><span class="n">6</span>Constraint</span>
+    <span class="cm built"><span class="d"></span><span class="n">7</span>Proposal</span>
+    <span class="cm built"><span class="d"></span><span class="n">8</span>Ledger</span>
+    <span class="cm built"><span class="d"></span><span class="n">9</span>Experience</span>
+  </div>
+
+  <div class="strip">
+    <span class="st"><span class="dot b" style="box-shadow:none"></span>Weiß über sein eigenes Wissen</span>
+    <span class="it"><b>Kalibrierung</b> (Bayes — sind die „stabil"-Urteile belegt?)</span>
+    <span class="it">·&nbsp; <b>Surprisal</b> (Shannon — Bits, die ein Flip trägt)</span>
+    <span class="it">·&nbsp; <b>Lernen 24/7</b> (gelernte Halbwertszeit, Forecast-Skill)</span>
+  </div>
+
+  <div class="section-label">Querschnitt: <b>Governance &amp; Sicherheit</b> — alles ist gegated</div>
   <div class="layer cross">
     <div class="grid g6">
       <div class="cell"><div class="ch"><span class="mini b"></span>Constitutional Kernel</div><div class="cd">Constraints für Review, Regeln, Recovery</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Authority Matrix</div><div class="cd">Wer darf was, wo, wann?</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Room System</div><div class="cd">Kontexte, Räume, Zugriffsgrenzen</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Policy Engine</div><div class="cd">Governance v1: constraint + policy greifen</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Audit &amp; Trace</div><div class="cd">Ledger + Governance + Anchors + CI</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Authority Matrix</div><div class="cd">Wer darf was, wo, wann?</div></div>
+      <div class="cell"><div class="ch"><span class="mini v"></span>Room System</div><div class="cd">Kontexte, Räume, Zugriffsgrenzen</div></div>
       <div class="cell"><div class="ch"><span class="mini v"></span>Identity Core</div><div class="cd">Wer ist GENUS?</div></div>
     </div>
   </div>
-  <div class="arrow-row">↓</div>
-
-  <div class="section-label">Unterstützende Kernschichten</div>
-  <div class="layer">
-    <div class="grid g8">
-      <div class="cell"><div class="ch"><span class="mini v"></span>Meaning Engine</div><div class="cd">Bedeutung verstehen &amp; strukturieren</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Memory / Wissen-Core</div><div class="cd">Herkunft · Quellen-Vertrauen (read-time) · <code>resolve</code> regiert alles — WISSEN vollendet</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Graph Core</div><div class="cd">Relationen + Inferenz (Schluss, mit Begründung) · Wort→Konzept (mehrsprachig)</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Scheduler Core</div><div class="cd">Priorisierung, Reihenfolge</div></div>
-      <div class="cell"><div class="ch"><span class="mini v"></span>Worker Interface</div><div class="cd">Ausführung über Worker</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Maturation Core</div><div class="cd">Experience → RuleProposal → aktive Regel</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Learning Core</div><div class="cd">Lernprogramme: Vorhersage → Selbst-Test → Kurve (24/7)</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Monitoring Core</div><div class="cd">System-Vitals · Arbeit · Wetter · Uhr · Selbst-Betrieb</div></div>
-    </div>
-  </div>
-  <div class="arrow-row">↓</div>
 
   <div class="section-label">Infrastruktur &amp; Runtime</div>
   <div class="layer">
     <div class="grid g5">
-      <div class="cell"><div class="ch"><span class="mini b"></span>Habitat</div><div class="cd">X1 lokal · Pi live</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Database Layer</div><div class="cd">SQLite · append-only Ledger</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Habitat</div><div class="cd">X1 lokal · Pi live (24/7)</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Ledger / DB</div><div class="cd">SQLite · append-only · Projektionen by replay</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>CLI / Runtime</div><div class="cd">Click · synchron · deterministisch</div></div>
-      <div class="cell"><div class="ch"><span class="mini p"></span>Network Layer</div><div class="cd">Kern ohne HTTP · Status via deploy</div></div>
-      <div class="cell"><div class="ch"><span class="mini b"></span>Test &amp; Integrity</div><div class="cd">pytest · replay · contract checks</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Network Layer</div><div class="cd">Kern ohne HTTP · Membran am Rand · Status via deploy</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Test &amp; Integrity</div><div class="cd">pytest · replay · Membran-Reinheit (CI-Gate)</div></div>
     </div>
   </div>
 
   <div class="dna">
     <div class="title"><span class="dot b" style="box-shadow:none"></span>DNA — Goldene Regeln</div>
-    <span class="rule ok">Observation ≠ Evidence</span>
-    <span class="rule ok">Evidence ≠ Belief</span>
-    <span class="rule ok">Belief ≠ Truth</span>
-    <span class="rule ok">Ledger ≠ Memory</span>
-    <span class="rule ok">Model Output ≠ Knowledge</span>
-    <span class="rule ok">Proposal ≠ Change</span>
-    <span class="rule ok">Policy ≠ Decision</span>
-    <span class="rule ok">Review ≠ Activation</span>
-    <span class="rule">Transition ≠ Action</span>
+    <span class="rule">Observation ≠ Evidence</span>
+    <span class="rule">Evidence ≠ Belief</span>
+    <span class="rule">Belief ≠ Truth</span>
+    <span class="rule">Ledger ≠ Memory</span>
+    <span class="rule new">Wort ≠ Bedeutung</span>
+    <span class="rule new">Abgeleitet ≠ Behauptet</span>
+    <span class="rule">Model-Output ≠ Wissen</span>
+    <span class="rule">Proposal ≠ Change</span>
+    <span class="rule">Policy ≠ Decision</span>
+    <span class="rule">Review ≠ Activation</span>
+    <span class="rule soon">Transition ≠ Action</span>
   </div>
 
   <div class="foot">
-    grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen, aber unvollständig &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    Kern rund, Geist erwacht — prüft sich (Kalibrierung/Surprisal) &amp; lernt 24/7. WISSEN-Schicht VOLLENDET (Herkunft · Vertrauen · Auflösung regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur). Schicht SYSTEME BEGONNEN: Inferenz (Schluss-Primitiv, mit Begründung) + Zwei-Schichten-Wissen — sprach-getaggtes Wort <code>→ expresses →</code> sprach-neutrales Konzept (Hierarchie + Schließen konzept-seitig, latein-verankert). Mehrsprachig by design (erst Deutsch); die Sinn-Dimension wurde durch echte Daten erzwungen (kein Reißbrett). Das LLM bleibt ein Querschnitt, kein Ziel.
+    grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen &nbsp;·&nbsp; rot = Vision ohne Code<br>
+    <b>WISSEN vollendet</b> (Herkunft · Vertrauen · resolve regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur · Zwei-Schichten-Wissen). <b>SYSTEME begonnen</b>: Inferenz mit Begründung + sinn-kohärentes, mehrsprachiges Schließen über sprach-neutrale Konzepte — erst Deutsch, dann en/fr, irgendwann alle. Die Sinn-Dimension wurde durch echte Pi-Daten <b>erzwungen</b>, nicht am Reißbrett gewählt.
   </div>
 
 </div>
