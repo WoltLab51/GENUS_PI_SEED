@@ -15,11 +15,15 @@ from genus.sensor import (
 
 
 @pytest.fixture(autouse=True)
-def _isolate_pause(tmp_path, monkeypatch):
-    # Tests must never read the AMBIENT pause flag (e.g. a paused Pi during a deploy's test
-    # run, where GENUS_DB_PATH points at the real ledger). Pin the marker at a per-test temp
-    # path that does not exist -> is_paused() is False unless the test sets it itself.
+def _isolate_env(tmp_path, monkeypatch):
+    # Make every test hermetic against the ambient GENUS_* environment (e.g. a deploy run
+    # where they point at the live ledger). Each test gets its own temp DB path and pause
+    # marker, so tests that fall back to get_conn() never share a default genus.sqlite3
+    # (cross-test pollution) and never see the real pause state. Tests that set these
+    # themselves override these defaults.
+    monkeypatch.setenv("GENUS_DB_PATH", str(tmp_path / "genus.sqlite3"))
     monkeypatch.setenv("GENUS_PAUSE_FILE", str(tmp_path / "paused"))
+    monkeypatch.delenv("GENUS_CORE_ID", raising=False)
 
 
 @pytest.fixture
