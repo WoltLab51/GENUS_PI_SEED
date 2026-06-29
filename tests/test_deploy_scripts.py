@@ -42,6 +42,10 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
     assert "[TICK] status-publish" in script
+    # status-publish is STICKY: a persisted marker survives cron reinstalls that don't
+    # carry the env flag (the regression that silently dropped the daily status tick)
+    assert "status_publish.enabled" in script
+    assert "STATUS_PUBLISH" in script
     assert r"date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ" in script
 
 

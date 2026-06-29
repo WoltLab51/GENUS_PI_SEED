@@ -12,6 +12,15 @@ CRON_END="# END GENUS_PI_SEED"
 
 mkdir -p "$(dirname "$DB_PATH")" "$LOG_DIR"
 
+# Status-publish is STICKY: enabling it once (GENUS_ENABLE_STATUS_PUBLISH=1) persists a
+# marker on the Pi, so later reinstalls -- which may not carry the env flag -- keep the
+# tick instead of silently dropping it. Delete the marker to disable.
+STATUS_FLAG_FILE="${GENUS_STATUS_FLAG_FILE:-$(dirname "$DB_PATH")/status_publish.enabled}"
+if [ "${GENUS_ENABLE_STATUS_PUBLISH:-0}" = "1" ]; then
+    : > "$STATUS_FLAG_FILE"
+fi
+if [ -f "$STATUS_FLAG_FILE" ]; then STATUS_PUBLISH=1; else STATUS_PUBLISH=0; fi
+
 tmp_existing="$(mktemp)"
 tmp_new="$(mktemp)"
 cleanup() {
@@ -50,7 +59,7 @@ fi
     echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '27 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] doctor $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/doctor.log" 2>&1 && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
     echo '47 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] repo-observe $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_repo_on_pi.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
-    if [ "${GENUS_ENABLE_STATUS_PUBLISH:-0}" = "1" ]; then
+    if [ "$STATUS_PUBLISH" = "1" ]; then
         echo '37 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] status-publish $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/status.log" 2>&1 && ./deploy/pi_publish_status.sh >> "$GENUS_LOG_DIR/status.log" 2>&1'
     fi
     echo "$CRON_END"
@@ -68,10 +77,10 @@ if [ -n "${GENUS_CORE_ID:-}" ]; then
 else
     echo "[CRON] GENUS_CORE_ID not set; doctor will warn until it is configured"
 fi
-if [ "${GENUS_ENABLE_STATUS_PUBLISH:-0}" = "1" ]; then
-    echo "[CRON] status publish enabled"
+if [ "$STATUS_PUBLISH" = "1" ]; then
+    echo "[CRON] status publish enabled (sticky marker: $STATUS_FLAG_FILE)"
 else
-    echo "[CRON] status publish disabled (set GENUS_ENABLE_STATUS_PUBLISH=1)"
+    echo "[CRON] status publish disabled (enable once with GENUS_ENABLE_STATUS_PUBLISH=1; it then sticks)"
 fi
 echo "[CRON] current GENUS block:"
 crontab -l | awk -v begin="$CRON_BEGIN" -v end="$CRON_END" '
