@@ -52,19 +52,29 @@ if printf '%s' "$SEED" | grep -Eq '^Q[0-9]+$'; then
 else
     enc="$("$REPO_DIR/.venv/bin/python" -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$SEED")"
     wd_get "$API?action=wbsearchentities&search=$enc&language=$SEARCH_LANG&type=item&limit=7&format=json" "$TMP/search.json"
-    # Disambiguation: among the candidates, prefer the one whose canonical label EXACTLY
-    # matches the word -- so "Mond"->Moon (not the fuzzy "Monat"), "Sonne"->Sun (not generic
-    # "Stern"), "Blume"->the flower (not the botanist "Carl Ludwig Blume"). Fall back to the
-    # top hit for words whose Wikidata label differs from the common term (Hund->"Haushund").
+    # Disambiguation, two signals, both free from the search response:
+    #  (1) drop non-concept hits by their description -- family names, given names,
+    #      disambiguation pages, scholarly articles (these often carry the exact word as a
+    #      label, e.g. the surname "Hund" or the botanist matched on "Blume").
+    #  (2) among the survivors, prefer an EXACT label match -- so "Mond"->Moon (not fuzzy
+    #      "Monat"), "Sonne"->Sun (not generic "Stern"); else the top-ranked survivor.
+    # Falls back to the raw top hit only if every candidate looked like junk.
     QID="$(SEED="$SEED" "$REPO_DIR/.venv/bin/python" - "$TMP/search.json" <<'PY'
 import json, os, sys
 word = os.environ["SEED"].casefold()
+BAD = ("familienname", "vorname", "begriffsklärung", "wikimedia",
+       "wissenschaftlicher artikel", "asteroid", "song", "album", "film")
 try:
     hits = json.load(open(sys.argv[1])).get("search", [])
 except Exception:
     hits = []
-exact = [h["id"] for h in hits if h.get("label", "").casefold() == word]
-print(exact[0] if exact else (hits[0]["id"] if hits else ""))
+def is_concept(h):
+    d = h.get("description", "").casefold()
+    return not any(b in d for b in BAD)
+clean = [h for h in hits if is_concept(h)]
+exact = [h["id"] for h in clean if h.get("label", "").casefold() == word]
+pick = exact or [h["id"] for h in clean] or [h["id"] for h in hits]
+print(pick[0] if pick else "")
 PY
 )"
 fi
