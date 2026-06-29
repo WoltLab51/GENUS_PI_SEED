@@ -144,18 +144,44 @@ def _cadence_halflife(rows: list[dict]) -> float | None:
     return gaps[mid] if len(gaps) % 2 else (gaps[mid - 1] + gaps[mid]) / 2
 
 
+def _recencies(rows: list[dict]) -> dict[str, float]:
+    """Per-source recency weight ``2^(-age/H)`` relative to the freshest assertion for
+    this claim (H = the claim's median cadence). Too little history → all 1.0 (nothing
+    fades). The *single* definition of "how current is each source", shared by trust
+    and resolve, so a faded source is treated consistently everywhere.
+    """
+    latest = _latest_by_source(rows)
+    halflife = _cadence_halflife(rows)
+    times = {src: _parse_ts(row["created_at"]) for src, row in latest.items()}
+    reference = max((t for t in times.values() if t is not None), default=None)
+    recency: dict[str, float] = {}
+    for src in latest:
+        if halflife is None or reference is None or times[src] is None:
+            recency[src] = 1.0
+        else:
+            age = max((reference - times[src]).total_seconds(), 0.0)
+            recency[src] = 2 ** (-age / halflife)
+    return recency
+
+
 def _trust(by_claim: dict[str, list[dict]], source: str) -> float:
     agreements: list[float] = []
     for rows in by_claim.values():
+        live = {src for src, rec in _recencies(rows).items() if rec >= LIVE_RECENCY}
+        if source not in live:
+            continue  # a stale source is no current claimant here: it neither earns nor
+            # loses trust -- and (the fix) cannot drag a live source's trust down
         latest = _latest_by_source(rows)
-        mine = _to_float(latest.get(source, {}).get("value"))
+        mine = _to_float(latest[source]["value"])
         if mine is None:
             continue
+        # the agree/disagree band is the claim's own lived spread (full history); but
+        # agreement is judged only against the *live* peers, not faded ghosts
         tolerance = _tolerance([v for v in (_to_float(r["value"]) for r in rows) if v is not None])
-        for other, row in latest.items():
+        for other in live:
             if other == source:
                 continue
-            theirs = _to_float(row["value"])
+            theirs = _to_float(latest[other]["value"])
             if theirs is None:
                 continue
             agreements.append(1.0 if _agree(mine, theirs, tolerance) else 0.0)
@@ -176,26 +202,16 @@ def _resolve(by_claim: dict[str, list[dict]], claim_key: str) -> dict:
             "candidates": {},
             "contradiction": False,
         }
-    halflife = _cadence_halflife(rows)
-    times = {src: _parse_ts(row["created_at"]) for src, row in latest.items()}
-    reference = max((t for t in times.values() if t is not None), default=None)
-
-    def recency(src: str) -> float:
-        if halflife is None or reference is None or times[src] is None:
-            return 1.0
-        age = max((reference - times[src]).total_seconds(), 0.0)
-        return 2 ** (-age / halflife)
-
+    recency = _recencies(rows)
     candidates = {}
     for src, row in latest.items():
-        rec = recency(src)
         trust = _trust(by_claim, src)
         candidates[src] = {
             "value": row["value"],
             "trust": trust,
-            "recency": round(rec, 3),
-            "weight": round(trust * rec, 3),
-            "live": rec >= LIVE_RECENCY,
+            "recency": round(recency[src], 3),
+            "weight": round(trust * recency[src], 3),
+            "live": recency[src] >= LIVE_RECENCY,
         }
     chosen = max(candidates, key=lambda src: (candidates[src]["weight"], latest[src]["id"]))
     chosen_event = int(latest[chosen]["id"])

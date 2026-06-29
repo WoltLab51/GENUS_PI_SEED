@@ -105,6 +105,19 @@ def test_single_source_resolves_to_itself_behaviour_preserving():
     conn.close()
 
 
+def test_a_stale_source_does_not_drag_a_live_sources_trust():
+    conn = _fresh()
+    # hourly cadence: two fresh sources that agree + one stale, wildly-off source
+    _inject_assertion(conn, 18.0, "A", "2026-06-28T10:00:00.000Z")
+    _inject_assertion(conn, 18.0, "A", "2026-06-28T11:00:00.000Z")
+    _inject_assertion(conn, 18.1, "B", "2026-06-28T11:00:30.000Z")
+    _inject_assertion(conn, 99.0, "stale", "2026-06-28T02:00:00.000Z")
+    # A and B agree and are live; the faded ghost must NOT pull their trust down
+    assert sources.source_trust(conn, "A") == 1.0
+    assert sources.source_trust(conn, "B") == 1.0
+    conn.close()
+
+
 def test_a_stale_source_fades_and_raises_no_false_contradiction():
     conn = _fresh()
     # an hourly cadence with two fresh sources that agree
