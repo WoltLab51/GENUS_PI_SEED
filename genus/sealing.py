@@ -140,6 +140,47 @@ def verify_chain(conn) -> list[str]:
     return issues
 
 
+# The append-only guard (mirrors schema.sql). reseal must lift it to rewrite the chain
+# hashes, then restore it -- even on error.
+_PROTECTION = (("prevent_event_log_update", "UPDATE"), ("prevent_event_log_delete", "DELETE"))
+
+
+def reseal(conn) -> int:
+    """Repair the hash chain in place after an accidental fork (e.g. concurrent writers
+    that read the same head seal). Recompute prev_seal/seal for every post-epoch event in
+    id order, starting from the genesis digest. Event *content and order are untouched* --
+    only the chain hashes are made consistent again. This resets tamper-evidence over the
+    span, so it is a deliberate maintenance action, not routine. Returns the count resealed.
+    """
+    epoch = epoch_event(conn)
+    if epoch is None:
+        return 0
+    meta = json.loads(epoch["payload"])
+    prefix_max_id = int(meta["prefix_max_id"])
+    prev = meta["genesis_digest"]
+    resealed = 0
+    for name, _ in _PROTECTION:
+        conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+    try:
+        for row in _all_rows(conn):
+            if int(row["id"]) <= prefix_max_id:
+                continue  # the pre-epoch legacy prefix is covered by the genesis digest
+            seal = compute_seal(prev, row["event_type"], row["payload"])
+            conn.execute(
+                "UPDATE event_log SET prev_seal = ?, seal = ? WHERE id = ?",
+                (prev, seal, int(row["id"])),
+            )
+            prev = seal
+            resealed += 1
+    finally:
+        for name, op in _PROTECTION:
+            conn.execute(
+                f"CREATE TRIGGER IF NOT EXISTS {name} BEFORE {op} ON event_log "
+                f"BEGIN SELECT RAISE(ABORT, 'event_log is append-only'); END"
+            )
+    return resealed
+
+
 def _genesis_over_rows(rows) -> str:
     if not rows:
         return _sha(GENESIS_SEED)

@@ -220,6 +220,45 @@ def test_replay_is_deterministic_with_sealing(conn):
     assert events_after == events_before
 
 
+def test_reseal_repairs_a_forked_chain(conn):
+    _fill_sealed(conn, 4)
+    _drop_protection(conn)
+    ids = [
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM event_log WHERE seal IS NOT NULL ORDER BY id"
+        ).fetchall()
+    ]
+    # simulate a concurrency fork: a later event points at the wrong predecessor seal
+    conn.execute("UPDATE event_log SET prev_seal = 'forked' WHERE id = ?", (ids[2],))
+    assert any("prev_seal mismatch" in i for i in sealing.verify_chain(conn))
+
+    before = [
+        tuple(r)
+        for r in conn.execute(
+            "SELECT id, event_type, payload, created_at FROM event_log ORDER BY id"
+        ).fetchall()
+    ]
+    n = sealing.reseal(conn)
+
+    assert n >= 4
+    assert sealing.verify_chain(conn) == []  # the chain is repaired
+    after = [
+        tuple(r)
+        for r in conn.execute(
+            "SELECT id, event_type, payload, created_at FROM event_log ORDER BY id"
+        ).fetchall()
+    ]
+    assert after == before  # only the seals changed -- content and order untouched
+
+    raised = False  # reseal restores the append-only protection it had to lift
+    try:
+        conn.execute("UPDATE event_log SET payload = 'x' WHERE id = ?", (ids[0],))
+    except Exception:
+        raised = True
+    assert raised
+
+
 def test_ledger_sealing_cli(monkeypatch, cli_conn, conn):
     monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
     runner = CliRunner()

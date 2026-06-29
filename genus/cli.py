@@ -1154,6 +1154,35 @@ def ledger_verify() -> None:
         conn.close()
 
 
+@ledger_group.command("reseal")
+@click.option("--force", is_flag=True, help="reseal even if the chain currently verifies")
+def ledger_reseal(force: bool) -> None:
+    """Repair the seal chain after an accidental fork (e.g. concurrent writers). Recomputes
+    the chain hashes in id order; event content and order are untouched. Deliberate
+    maintenance — resets tamper-evidence over the span."""
+    conn = get_conn()
+    try:
+        if not sealing.is_active(conn):
+            click.echo("[SEAL] sealing not initialized")
+            return
+        issues = sealing.verify_chain(conn)
+        if not issues and not force:
+            click.echo("[SEAL] chain already verifies — nothing to reseal (use --force to reseal anyway)")
+            return
+        if issues:
+            click.echo(f"[SEAL] chain broken: {issues[0]} — resealing…")
+        n = sealing.reseal(conn)
+        conn.commit()
+        remaining = sealing.verify_chain(conn)
+        if remaining:
+            for issue in remaining:
+                click.echo(f"[SEAL] STILL FAIL {issue}")
+            raise click.ClickException("reseal did not produce a valid chain")
+        click.echo(f"[SEAL] resealed {n} event(s); chain now verifies, head={sealing.head(conn)['seal']}")
+    finally:
+        conn.close()
+
+
 @ledger_group.group("anchor")
 def ledger_anchor_group() -> None:
     pass

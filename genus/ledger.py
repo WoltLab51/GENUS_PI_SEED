@@ -7,6 +7,12 @@ from genus import sealing
 
 def append(conn, event_type: str, payload: dict) -> int:
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    # Serialize writers: grab the write lock BEFORE reading the head seal, so the
+    # read-head -> compute -> INSERT runs as one unit. Otherwise two concurrent appenders
+    # (overlapping cron ticks, membranes) read the same head seal and fork the hash chain.
+    # busy_timeout (see db.connect) makes the loser wait for this lock, then read the new head.
+    if not conn.in_transaction:
+        conn.execute("BEGIN IMMEDIATE")
     if event_type != sealing.EPOCH_EVENT and sealing.is_active(conn):
         previous = sealing.previous_head(conn)
         prev_seal = previous["seal"]
