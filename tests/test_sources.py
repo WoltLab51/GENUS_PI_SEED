@@ -611,3 +611,11 @@ def test_model_cannot_outrank_grounded_even_when_agreeing(monkeypatch):
     monkeypatch.setattr(sources, "_trust", lambda by_claim, source: 0.9)  # pretend high agreement
     reactors.observe_assertion(conn, "thing.x", "1", "model:llm")
     assert sources.source_trust(conn, "model:llm") == sources.MODEL_TRUST_SEED  # still capped
+
+
+def test_concept_meaning_includes_model_bound_gloss():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Q144", "defined_as", "ein Haustier (Embedder-gebunden)", "model:embedder")
+    c = sources.concept_meaning(conn, "Q144")
+    assert any("Embedder" in g for g in c["meaning"])   # the model's matched gloss surfaces

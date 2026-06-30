@@ -458,6 +458,11 @@ def concept_meaning(conn, qid: str) -> dict:
         for r in relations(conn, subject=w, predicate="primary_gloss"):
             if r["object"] not in meaning:
                 meaning.append(r["object"])
+    # meanings bound directly to the concept, sense-resolved (e.g. the edge embedder's matched
+    # gloss, source model:embedder -- capped, the weave weighs it). Provenance via `relations`.
+    for r in relations(conn, subject=qid, predicate="defined_as"):
+        if r["object"] not in meaning:
+            meaning.append(r["object"])
     parents = [r["object"] for r in relations(conn, subject=qid, predicate="is_a")]
     return {
         "concept": qid,
