@@ -62,7 +62,7 @@ def main() -> int:
     top = ranked[0][0]
     margin = cos(qv, ranked[0][1]) - (cos(qv, ranked[1][1]) if len(ranked) > 1 else 0.0)
 
-    print(f"[ASK] „{word}" im Sinn deiner Frage:")
+    print(f"[ASK] »{word}« im Sinn deiner Frage:")
     print(f"  → {top}")
     qid = gloss_concept.get(top)
     if qid:
