@@ -665,3 +665,15 @@ def test_companion_answers_verb_at_word_level():
     a = companion.answer(conn, "Was bedeutet laufen?")
     assert a["found"] and a["concept"] is None
     assert any("Beinen" in m for m in a["meaning"]) and "verb" in a["pos"]
+
+
+def test_companion_narrate_is_fluent_and_glassbox():
+    from genus import companion
+    a = {"found": True, "word": "Hund", "label": "Haushund", "concept": "Q144",
+         "pos": ["noun"], "meaning": ["Haustier, dessen Vorfahre der Wolf ist"],
+         "is_a": ["Q39201 (Heimtier)", "Q57814795 (domestiziertes Säugetier)"],
+         "languages": ["chien", "dog"]}
+    s = companion.narrate(a)
+    assert s.startswith("Unter »Hund« (Substantiv)") and "Haustier" in s
+    assert "Heimtier und domestiziertes Säugetier" in s and "Q39201" not in s   # labels, no Q-id
+    assert "chien" in s

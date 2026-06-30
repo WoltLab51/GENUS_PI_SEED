@@ -63,3 +63,34 @@ def answer(conn, question: str) -> dict:
     # word-level (e.g. a verb): its own glosses + part of speech, no concept node yet
     meaning = _objects(conn, found, "primary_gloss") or _objects(conn, found, "defined_as")
     return {**base, "concept": None, "label": found, "meaning": meaning, "is_a": []}
+
+
+_POS_DE = {"noun": "Substantiv", "verb": "Verb", "adjective": "Adjektiv", "adverb": "Adverb"}
+_LABEL = re.compile(r"^Q\d+\s*\((.*)\)$")
+
+
+def _join_de(items: list[str]) -> str:
+    items = list(items)
+    if len(items) <= 1:
+        return "".join(items)
+    return ", ".join(items[:-1]) + " und " + items[-1]
+
+
+def narrate(a: dict) -> str:
+    """A fluent, deterministic German answer composed from the verified facts -- a glass-box
+    voice (no generative model, nothing invented). The structure stays queryable behind it."""
+    if not a.get("found"):
+        return "Dazu kennt GENUS noch kein Wort."
+    pos = a.get("pos") or []
+    tag = f" ({_join_de([_POS_DE.get(p, p) for p in pos])})" if pos else ""
+    if a["meaning"]:
+        sentence = f"Unter »{a['word']}«{tag} versteht GENUS: {a['meaning'][0].rstrip('.')}"
+    else:
+        sentence = f"»{a['word']}«{tag} kennt GENUS, aber eine Bedeutung ist noch nicht erschlossen"
+    if a["is_a"]:
+        labels = [_LABEL.sub(r"\1", x) for x in a["is_a"]]
+        sentence += f"; es zählt zu {_join_de(labels)}"
+    sentence += "."
+    if a["languages"]:
+        sentence += f" In anderen Sprachen: {', '.join(a['languages'][:4])}."
+    return sentence

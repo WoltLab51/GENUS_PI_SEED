@@ -340,17 +340,9 @@ def ask_command(question: tuple[str, ...]) -> None:
 
 
 def _print_companion_answer(a: dict) -> None:
-    pos = f"  [{', '.join(a['pos'])}]" if a.get("pos") else ""
-    click.echo(f"[ASK] {a['word']} — {a['label']}{pos}:")
-    if a["meaning"]:
-        for m in a["meaning"][:3]:
-            click.echo(f"[ASK]   {m}")
-    else:
-        click.echo("[ASK]   (Bedeutung noch nicht gebrückt)")
-    if a["is_a"]:
-        click.echo(f"[ASK]   Oberbegriffe: {', '.join(a['is_a'])}")
-    if a["languages"]:
-        click.echo(f"[ASK]   in anderen Sprachen: {', '.join(a['languages'])}")
+    click.echo(f"[ASK] {companion.narrate(a)}")          # the glass-box voice
+    if a.get("concept"):
+        click.echo(f"[ASK] (Konzept {a['concept']} — `genus concept {a['concept']}` für die Herkunft)")
 
 
 @main.command("calibration")
