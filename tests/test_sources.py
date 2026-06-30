@@ -588,3 +588,26 @@ def test_concept_cli(monkeypatch):
     result = CliRunner().invoke(cli.main, ["concept", "Q144"])
     assert result.exit_code == 0, result.output
     assert "bedeutet" in result.output and "Wolf" in result.output
+
+
+def test_model_source_trust_capped_below_seed():
+    conn = _fresh()
+    assert sources.MODEL_TRUST_SEED < sources.SOURCE_TRUST_SEED
+    assert sources.source_trust(conn, "model:embedder") == sources.MODEL_TRUST_SEED  # capped
+    assert sources.source_trust(conn, "wikidata") == sources.SOURCE_TRUST_SEED        # grounded stays
+
+
+def test_model_relation_held_more_lightly_than_grounded():
+    conn = _fresh()
+    reactors.observe_relation(conn, "x", "is_a", "y", "model:embedder")
+    reactors.observe_relation(conn, "a", "is_a", "b", "wikidata")
+    model_only = sources.relation_confidence(conn, "x", "is_a", "y")["confidence"]
+    grounded = sources.relation_confidence(conn, "a", "is_a", "b")["confidence"]
+    assert model_only == sources.MODEL_TRUST_SEED and model_only < grounded
+
+
+def test_model_cannot_outrank_grounded_even_when_agreeing(monkeypatch):
+    conn = _fresh()
+    monkeypatch.setattr(sources, "_trust", lambda by_claim, source: 0.9)  # pretend high agreement
+    reactors.observe_assertion(conn, "thing.x", "1", "model:llm")
+    assert sources.source_trust(conn, "model:llm") == sources.MODEL_TRUST_SEED  # still capped

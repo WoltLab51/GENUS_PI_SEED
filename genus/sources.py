@@ -27,6 +27,13 @@ from datetime import datetime, timezone
 # track record against other sources, the learned agreement rate replaces this.
 SOURCE_TRUST_SEED = 0.5
 
+# A model is the least-trustworthy witness. A `model:*` source is capped at half the trust of
+# an unknown source, so its claims can corroborate or fill a gap but never outrank grounded
+# knowledge -- the model-contract's teeth (never an oracle). Structural (relative to the seed),
+# not a tuning knob.
+MODEL_SOURCE_PREFIX = "model:"
+MODEL_TRUST_SEED = SOURCE_TRUST_SEED / 2
+
 # A candidate counts as a *current* claimant only while it is at least this fresh
 # relative to the freshest source -- i.e. within one cadence (one freshness
 # half-life). Beyond that it fades and no longer drives selection or contradiction.
@@ -253,14 +260,18 @@ def source_trust(conn, source: str) -> float:
         ).fetchall()
     ]
     if not claims:
-        return SOURCE_TRUST_SEED  # e.g. a relation-only source like wikidata
-    placeholders = ",".join("?" for _ in claims)
-    rows = conn.execute(
-        "SELECT event_id AS id, claim_key, value, source, created_at "
-        f"FROM value_projection WHERE claim_key IN ({placeholders}) ORDER BY event_id",
-        claims,
-    ).fetchall()
-    return _trust(_group_by_claim([dict(row) for row in rows]), source)
+        trust = SOURCE_TRUST_SEED  # e.g. a relation-only source like wikidata
+    else:
+        placeholders = ",".join("?" for _ in claims)
+        rows = conn.execute(
+            "SELECT event_id AS id, claim_key, value, source, created_at "
+            f"FROM value_projection WHERE claim_key IN ({placeholders}) ORDER BY event_id",
+            claims,
+        ).fetchall()
+        trust = _trust(_group_by_claim([dict(row) for row in rows]), source)
+    if source.startswith(MODEL_SOURCE_PREFIX):
+        return min(trust, MODEL_TRUST_SEED)  # the least-trustworthy witness, capped below seed
+    return trust
 
 
 def relation_confidence(conn, subject: str, predicate: str, object: str) -> dict:
