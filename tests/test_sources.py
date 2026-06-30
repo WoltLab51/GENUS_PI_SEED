@@ -619,3 +619,39 @@ def test_concept_meaning_includes_model_bound_gloss():
     reactors.observe_relation(conn, "Q144", "defined_as", "ein Haustier (Embedder-gebunden)", "model:embedder")
     c = sources.concept_meaning(conn, "Q144")
     assert any("Embedder" in g for g in c["meaning"])   # the model's matched gloss surfaces
+
+
+def test_companion_answers_about_known_word():
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_mammal", "wikidata")
+    a = companion.answer(conn, "Was ist eigentlich ein Hund?")
+    assert a["found"] and a["word"] == "Hund" and a["concept"] == "Q144"
+    assert any("Wolf" in m for m in a["meaning"])
+
+
+def test_companion_unknown_word_falls_through():
+    from genus import companion
+    conn = _fresh()
+    assert companion.answer(conn, "Was ist ein Quux?")["found"] is False
+
+
+def test_companion_picks_last_known_content_word():
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Wort@de", "expresses", "Q_word", "wikidata")
+    reactors.observe_relation(conn, "laufen@de", "expresses", "Q_run", "wikidata")
+    a = companion.answer(conn, "Was bedeutet das Wort laufen?")  # asked word comes last
+    assert a["word"] == "laufen"
+
+
+def test_ask_cli_routes_to_companion(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["ask", "Was", "ist", "ein", "Hund?"])
+    assert result.exit_code == 0, result.output
+    assert "Wolf" in result.output and "Hund" in result.output

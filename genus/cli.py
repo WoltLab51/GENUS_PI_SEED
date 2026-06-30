@@ -8,6 +8,7 @@ import click
 
 from genus import (
     anchor,
+    companion,
     control,
     db,
     doctor as doctor_checks,
@@ -325,12 +326,30 @@ def atlas_facts_command() -> None:
 @main.command("ask")
 @click.argument("question", nargs=-1, required=True)
 def ask_command(question: tuple[str, ...]) -> None:
+    """Ask GENUS something — about a word it knows (its meaning), or about its own state."""
     conn = get_conn()
     try:
-        response = query.ask(conn, " ".join(question))
-        _print_ask_response(response)
+        q = " ".join(question)
+        knows = companion.answer(conn, q)          # first: does GENUS know a word in the question?
+        if knows["found"]:
+            _print_companion_answer(knows)
+        else:
+            _print_ask_response(query.ask(conn, q))  # else: the existing state/belief query
     finally:
         conn.close()
+
+
+def _print_companion_answer(a: dict) -> None:
+    click.echo(f"[ASK] {a['word']} — {a['label']}:")
+    if a["meaning"]:
+        for m in a["meaning"][:3]:
+            click.echo(f"[ASK]   {m}")
+    else:
+        click.echo("[ASK]   (Bedeutung noch nicht gebrückt)")
+    if a["is_a"]:
+        click.echo(f"[ASK]   Oberbegriffe: {', '.join(a['is_a'])}")
+    if a["languages"]:
+        click.echo(f"[ASK]   in anderen Sprachen: {', '.join(a['languages'])}")
 
 
 @main.command("calibration")
