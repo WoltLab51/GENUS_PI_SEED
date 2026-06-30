@@ -430,6 +430,34 @@ def characterize_knowledge(conn, weakest: int = 5) -> dict:
     }
 
 
+def concept_meaning(conn, qid: str) -> dict:
+    """Read-time bridge: what a concept MEANS, derived from the words that express it.
+
+    Deterministic and model-free, nothing stored. The *prominent* word -- the one whose
+    Wikidata ``expresses`` points here -- lends the concept its primary German gloss
+    (``primary_gloss``, from DBnary); ``is_a`` comes straight from the concept graph. So a bare
+    Q-id becomes askable ("was ist Q144?") in human language. Which gloss is *truly* primary is
+    later sharpened by the edge embedder; here it is honestly DBnary's first sense.
+    """
+    expressers = relations(conn, predicate="expresses", object=qid)
+    words = sorted({r["subject"] for r in expressers})
+    prominent = sorted({r["subject"] for r in expressers if r["source"] == "wikidata"})
+    meaning: list[str] = []
+    for w in (prominent or words):
+        for r in relations(conn, subject=w, predicate="primary_gloss"):
+            if r["object"] not in meaning:
+                meaning.append(r["object"])
+    parents = [r["object"] for r in relations(conn, subject=qid, predicate="is_a")]
+    return {
+        "concept": qid,
+        "label": display(conn, qid),
+        "words": words,
+        "prominent": prominent,
+        "meaning": meaning,
+        "is_a": parents,
+    }
+
+
 # --- Lexicon: the lexeme <-> concept layer (multilingual) -----------------------------
 # A *lexeme* is a language-tagged word, keyed "form@lang" (e.g. "Hund@de"); the language
 # rides on the word. A *concept* is language-neutral (e.g. the Latin "Canis"), and the

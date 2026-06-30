@@ -510,6 +510,27 @@ def knowledge_command(weakest: int) -> None:
         conn.close()
 
 
+@main.command("concept")
+@click.argument("qid")
+def concept_command(qid: str) -> None:
+    """What a concept MEANS — its German meaning, is_a, and the words that express it (read-time)."""
+    conn = get_conn()
+    try:
+        c = sources.concept_meaning(conn, qid)
+        click.echo(f"[CON] {c['label']}")
+        if c["meaning"]:
+            for g in c["meaning"]:
+                click.echo(f"[CON]   bedeutet: {g}")
+        else:
+            click.echo("[CON]   (noch keine Bedeutung gebrückt)")
+        if c["is_a"]:
+            click.echo(f"[CON]   is_a: {', '.join(sources.display(conn, p) for p in c['is_a'])}")
+        if c["words"]:
+            click.echo(f"[CON]   ausgedrückt durch: {', '.join(c['words'][:12])}")
+    finally:
+        conn.close()
+
+
 @main.command("gaps")
 @click.option("--limit", default=20, type=int, show_default=True)
 @click.option("--predicate", "predicates", multiple=True,

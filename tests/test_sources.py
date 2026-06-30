@@ -556,3 +556,35 @@ def test_governance_acquisition_allowed_cli(monkeypatch):
     result = CliRunner().invoke(cli.main, ["governance", "acquisition-allowed", "wikidata"])
     assert result.exit_code == 0, result.output
     assert "allowed" in result.output
+
+
+def test_concept_meaning_bridges_primary_gloss():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_mammal", "wikidata")
+    c = sources.concept_meaning(conn, "Q144")
+    assert "Hund@de" in c["words"] and c["prominent"] == ["Hund@de"]
+    assert any("Wolf" in g for g in c["meaning"])      # the concept now carries its meaning
+    assert "Q_mammal" in c["is_a"]
+
+
+def test_concept_meaning_uses_prominent_word_only():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")            # prominent
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier", "dbnary")
+    reactors.observe_relation(conn, "Köter@de", "expresses", "Q144", "wikidata-lexemes")   # secondary
+    reactors.observe_relation(conn, "Köter@de", "primary_gloss", "abwertend für Hund", "dbnary")
+    c = sources.concept_meaning(conn, "Q144")
+    assert c["prominent"] == ["Hund@de"]               # only the Wikidata-prominent word lends meaning
+    assert c["meaning"] == ["Haustier"]
+
+
+def test_concept_cli(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["concept", "Q144"])
+    assert result.exit_code == 0, result.output
+    assert "bedeutet" in result.output and "Wolf" in result.output

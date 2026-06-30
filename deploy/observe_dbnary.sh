@@ -60,7 +60,7 @@ print(f'''PREFIX ontolex: <http://www.w3.org/ns/lemon/ontolex#>
 PREFIX lexinfo: <http://www.lexinfo.net/ontology/2.0/lexinfo#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-SELECT DISTINCT ?pos ?def FROM <{graph}> WHERE {{
+SELECT DISTINCT ?s ?pos ?def FROM <{graph}> WHERE {{
   ?e ontolex:canonicalForm/ontolex:writtenRep "{word}"@{lang} ;
      lexinfo:partOfSpeech ?pos ; ontolex:sense ?s .
   OPTIONAL {{ ?s skos:definition/rdf:value ?def }}
@@ -80,24 +80,41 @@ POS = {"noun": "noun", "properNoun": "noun", "verb": "verb", "adjective": "adjec
        "adverb": "adverb", "preposition": "preposition", "conjunction": "conjunction",
        "pronoun": "pronoun", "numeral": "numeral", "interjection": "interjection",
        "article": "article"}
+POS_RANK = {"noun": 0, "verb": 1, "adjective": 2}   # prefer a noun sense as the primary
 subj = f"{word}@{lang}"
 out, seen_pos, seen_def = [], set(), set()
+senses = []  # (pos_rank, ordinal, gloss) -- to pick the primary sense
 try:
     rows = json.load(open(sys.argv[1], encoding="utf-8"))["results"]["bindings"]
 except Exception:
     rows = []
 for b in rows:
+    raw = b["pos"]["value"].rsplit("/", 1)[-1].rsplit("#", 1)[-1] if "pos" in b else "other"
     if "pos" in b:
-        p = b["pos"]["value"].rsplit("/", 1)[-1].rsplit("#", 1)[-1]
-        p = POS.get(p, p)
+        p = POS.get(raw, raw)
         if p not in seen_pos:
             seen_pos.add(p)
             out.append(f"{subj}\tpos\t{p}")
     if "def" in b:
         d = re.sub(r"\s+", " ", b["def"]["value"]).strip()[:maxd]
-        if d and "\t" not in d and d not in seen_def:
-            seen_def.add(d)
-            out.append(f"{subj}\tdefined_as\t{d}")
+        if d and "\t" not in d:
+            if d not in seen_def:
+                seen_def.add(d)
+                out.append(f"{subj}\tdefined_as\t{d}")
+            # Sense IRIs look like ...__ws_<group>_<word>__<POS>__<subsense>; order by the
+            # ws GROUP then the subsense (the trailing number alone ties -- many senses end
+            # in __1). Rank on the RAW POS so a common noun (Substantiv) beats a properNoun.
+            iri = b.get("s", {}).get("value", "")
+            grp = re.search(r"__ws_(\d+)", iri)
+            sub = re.search(r"(\d+)\s*$", iri)
+            senses.append((POS_RANK.get(raw, 9),
+                           int(grp.group(1)) if grp else 999,
+                           int(sub.group(1)) if sub else 999, d))
+# Primary sense = first group, first subsense, of the dominant POS: a deterministic, model-free
+# heuristic (Wiktionary lists the basic sense first). The embedder later refines which gloss
+# truly fits the prominent concept; for now this is the honest primary.
+if senses:
+    out.append(f"{subj}\tprimary_gloss\t{min(senses)[3]}")
 print("\n".join(out))
 PY
 )"
