@@ -39,14 +39,17 @@ learn_next() {
     case "$start" in ''|*[!0-9]*) start=0 ;; esac
     word="$(grep -vE '^#|^[[:space:]]*$' "$WORDLIST" | sed -n "$((start + 1))p" | tr -d '\r' | awk '{print $1}')"
     [ -n "$word" ] || return 1
-    # Two sources per word: the concept membrane (Wikidata Q-ids) AND the lexeme membrane
-    # (Wikidata L-ids -> same concepts) under a different source name. A shared
-    # `word@de -expresses-> Q` edge thus gains a second source -> its confidence rises above
-    # the seed (the self-checking weave ignites), and lexemes add word classes beyond nouns.
+    # Three sources per word, each a distinct voice the weave can weigh:
+    #  - concept membrane (Wikidata Q-ids): the clean concept backbone + is_a hierarchy
+    #  - lexeme membrane (Wikidata L-ids -> same concepts): corroborates expresses, adds pos
+    #  - dbnary membrane (German Wiktionary as RDF): the human-written MEANING layer
+    #    (defined_as, all word classes) -- bound sense-safe (no flat is_a), German edition only
+    # Shared edges (expresses, pos) gain a second/third source -> confidence rises above seed.
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
     GENUS_LEXEM_LANG=de "$SCRIPT_DIR/observe_lexem.sh" "$word" >/dev/null 2>&1 || true
+    GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
     echo "$((start + 1))" > "$CURSOR"
-    log "learned '$word' (#$((start + 1))) — concept + lexeme"
+    log "learned '$word' (#$((start + 1))) — concept + lexeme + dbnary"
     return 0
 }
 
