@@ -655,3 +655,13 @@ def test_ask_cli_routes_to_companion(monkeypatch):
     result = CliRunner().invoke(cli.main, ["ask", "Was", "ist", "ein", "Hund?"])
     assert result.exit_code == 0, result.output
     assert "Wolf" in result.output and "Hund" in result.output
+
+
+def test_companion_answers_verb_at_word_level():
+    from genus import companion
+    conn = _fresh()  # a verb has glosses + pos but usually no concept node
+    reactors.observe_relation(conn, "laufen@de", "primary_gloss", "sich auf den Beinen fortbewegen", "dbnary")
+    reactors.observe_relation(conn, "laufen@de", "pos", "verb", "wikidata-lexemes")
+    a = companion.answer(conn, "Was bedeutet laufen?")
+    assert a["found"] and a["concept"] is None
+    assert any("Beinen" in m for m in a["meaning"]) and "verb" in a["pos"]

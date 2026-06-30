@@ -340,7 +340,8 @@ def ask_command(question: tuple[str, ...]) -> None:
 
 
 def _print_companion_answer(a: dict) -> None:
-    click.echo(f"[ASK] {a['word']} — {a['label']}:")
+    pos = f"  [{', '.join(a['pos'])}]" if a.get("pos") else ""
+    click.echo(f"[ASK] {a['word']} — {a['label']}{pos}:")
     if a["meaning"]:
         for m in a["meaning"][:3]:
             click.echo(f"[ASK]   {m}")
