@@ -56,7 +56,10 @@ def main() -> int:
     emb = TextEmbedding(model_name=MODEL)
     e = lambda ts: list(emb.embed(ts))
     cos = lambda a, b: float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-    qv = e([QP + question])[0]
+    # embed the CONTEXT (the question minus the target word -- the word itself biases toward
+    # its dominant sense, drowning out the disambiguating context like "Bergwerk"/"Schienen")
+    context = " ".join(t for t in _WORD.findall(question) if t.lower() != word.lower())
+    qv = e([QP + context])[0]
     ranked = sorted(zip(glosses, e([PP + g for g in glosses])),
                     key=lambda gv: cos(qv, gv[1]), reverse=True)
     top = ranked[0][0]
