@@ -104,8 +104,9 @@ Fakten, Replay-stabil, Kern bleibt modell-frei.
 
 **Gelb:** Maturation-Pfad gebaut, aber schläft (idle Pi hat keinen Aktivitäts-Rhythmus, `active_rules=0`) · cli-Split nur teilweise
 **Grün, neu (2026-06-28):** **Schicht WISSEN vollendet** — Herkunft · Vertrauen (read-time) · `resolve` regiert alle Konsumenten · Widerspruch→Surprise-Loop · Lehrer-Loop · Struktur (Relationen).
-**Grün, neu (2026-06-29):** **Wissensgraph in den Kern verwoben** — der Struktur-Pfeiler prüft sich jetzt selbst: ① Confidence auf Relationen · ② Widerspruch→Surprise→Inquiry fürs Wissen · ③ Lehrer-Loop fürs Wissen · ④ Kalibrierung + Governance (`genus knowledge`/`acquisition-allowed`) · + Kadenz-Robustheitsfix. *Live-Befund:* der Graph ist 100 % einquellig → Confidence am Saatwert, Naht scharfgestellt-nicht-ausgelöst → die **zweite Quelle** ist der Zündschlüssel.
-**Rot — der nächste Schritt:** **Schicht SYSTEME** — Regel-Domänen lernen + schließen; danach Erschaffen; das LLM dockt als gedeckelte Quelle an, wann es gebraucht wird
+**Grün, neu (2026-06-29):** **Wissensgraph in den Kern verwoben** — der Struktur-Pfeiler prüft sich jetzt selbst: ① Confidence auf Relationen · ② Widerspruch→Surprise→Inquiry fürs Wissen · ③ Lehrer-Loop fürs Wissen · ④ Kalibrierung + Governance (`genus knowledge`/`acquisition-allowed`) · + Kadenz-Robustheitsfix.
+**Grün, neu (2026-06-30, v1.16):** **Sprache, Brücke & das LLM am Rand** — (a) **zweite + dritte Quelle**: Wikidata-Lexeme (`observe_lexem.sh`, korroboriert + Wortarten) und **DBnary**/dt. Wiktionary (`observe_dbnary.sh`, die menschliche Bedeutungs-Schicht, sense-safe gebunden) → die Naht *zündet* (live korroboriert); (b) **Sinn→Konzept-Brücke**: `genus concept <Q>` macht ein Konzept *ansprechbar* (deterministischer Primär-Sinn, read-time); (c) **erstes Modell am Rand**: ein lokaler **Embedder** (~100 MB, 14 ms/Pi) deutet Sinne (`disambiguate.py`) und schreibt Sinn→Konzept als **gedeckelte, graph-verifizierte `model:embedder`-Behauptung** (`bridge_senses.py`; `source_trust` deckelt `model:*` auf den halben Saatwert). Das **Tor zum Begleiter** — Kern blieb deterministisch/modell-frei.
+**Rot — der nächste Schritt:** **der Begleiter** (ask→answer: deuten + Konzept-Antwort + Stimme) und die **Schicht SYSTEME**; das LLM bleibt am Rand, gedeckelt
 
 ---
 
@@ -780,6 +781,25 @@ ein (alle read-time, kein Schema, kein Replay):
   — auch jenseits der Substantive) nicht nur Breite, sondern der **Zündschlüssel** der ganzen
   Naht.
 
+**Naht gezündet + Brücke + LLM am Rand (2026-06-30, v1.16):** Die Quellen-Frage gründlich
+geprüft (Ronny: *„ist das wirklich das beste Material?"*) — Duden (proprietär) und GermaNet
+(lizenziert) raus, OdeNet off-Pi als zu verrauscht verworfen; **DBnary** (dt. Wiktionary als
+sauberes RDF, SPARQL) gewann. Drei Quellen speisen den Graph: **Wikidata-Konzepte**
+(`observe_konzept`) · **Wikidata-Lexeme** (`observe_lexem`, korroboriert `expresses`, liefert
+Wortarten) · **DBnary** (`observe_dbnary`, die menschliche **Bedeutungs-Schicht** — `defined_as`
+pro Sinn, *sense-safe* gebunden: nur deutsche Ausgabe, kein wort-flaches `is_a`, sonst
+Sinn-Kontamination). Damit korroboriert die Naht *live*.
+**Sinn→Konzept-Brücke** — das Tor zum Begleiter, in Scheiben: **①** `genus concept <Q>` macht
+ein Konzept *ansprechbar* (deterministischer Primär-Sinn → prominentes Q, read-time, modell-frei);
+**②** `disambiguate.py` deutet on-demand, *welcher* Sinn zum Kontext passt (lokaler **Embedder**,
+~100 MB, 14 ms auf dem Pi, Cosinus-Abstand = Confidence); **③** der **Schreibpfad** — der Embedder
+wählt aus *echten* Kandidaten-Konzepten und schreibt die Bindung als **gedeckelte,
+graph-verifizierte `model:embedder`-Behauptung** (`bridge_senses.py`; `source_trust` deckelt
+`model:*` auf den halben Saatwert → nie ein Orakel). **Das erste Mal, dass ein Modell GENUS
+berührt** — am Rand, gläsern, gedeckelt; der Kern blieb deterministisch, sub-ms, modell-frei.
+Genau die „viel Maschine, LLM am Rand"-Architektur, real. *Offen:* der **Begleiter**
+(deuten + Konzept-Antwort + Stimme) und Volumen (echte Häufigkeitsliste).
+
 ---
 
 # Schicht SYSTEME — Regel-Domänen lernen + schließen (deterministisch)
@@ -868,14 +888,17 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
          regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur (Relationen)
   ⑥      Wissensgraph verwoben (2026-06-29) → der Graph PRÜFT SICH SELBST: Confidence ·
          Widerspruch→Surprise→Inquiry · Lehrer-Loop · Kalibrierung+Governance fürs Wissen
-         (Zündschlüssel offen: eine zweite unabhängige Quelle)
+  ⑦      Sprache · Brücke · LLM am Rand (2026-06-30, v1.16) → 3 Quellen korroborieren
+         (Lexeme + DBnary-Bedeutungen) · Konzepte ANSPRECHBAR (genus concept) · erstes
+         Modell am Rand: Embedder deutet & brückt, gedeckelt + graph-verifiziert → TOR ZUM BEGLEITER
 
 ── darüber: freie Reihenfolge, alles noch deterministisch & gläsern ──   ← JETZT HIER
+  Begleiter  ask→answer: deuten + Konzept-Antwort + Stimme (der fühlbare Nordstern)
   Systeme    Regel-Domänen lernen + schließen (Sprache · Schach · Code …)
   Erschaffen erzeugen MIT Beweis → der Gipfel  ("Programmieren" = das, auf Code)
 
-── Querschnitt, jederzeit andockbar (kein Phase, kein Ziel) ──
-  LLM        gedeckelte Quelle & Stimme für den offenen Schwanz — nie Orakel
+── Querschnitt, ANGEDOCKT (erstes Modell am Rand, v1.16) ──
+  LLM        Embedder deutet/brückt (model:embedder, gedeckelt) · später Stimme — nie Orakel
 ```
 
 ---

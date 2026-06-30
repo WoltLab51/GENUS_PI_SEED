@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genus-pi-seed"
-version = "1.15.0"
-description = "GENUS PI SEED v1.15.0 - the knowledge graph woven into the core's epistemic loops (relation confidence, knowledge contradiction->surprise->teacher-loop, calibration + governed acquisition) plus a cadence-robustness fix, on the self-reflecting 24/7-learning deterministic core"
+version = "1.16.0"
+description = "GENUS PI SEED v1.16.0 - multilingual knowledge acquisition (Wikidata Lexemes + German Wiktionary via DBnary), the sense->concept bridge that makes concepts askable (genus concept), and the FIRST model at the edge: a local embedder for WSD + a capped, graph-verified write-path (model:embedder) -- the doorway to the companion, on the self-checking glass-box core"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

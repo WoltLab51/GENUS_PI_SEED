@@ -160,8 +160,9 @@
         <li><span class="m ok">✓</span><div><b>Widerspruch → Surprise → Inquiry</b> — der Lehrer-Loop</div></li>
         <li><span class="m ok">✓</span><div><b>Zwei-Schichten-Wissen</b> — Wort<code>@lang</code> → <code>expresses</code> → sprach-neutrales <b>Konzept</b> (latein-verankert, mehrsprachig)</div></li>
         <li><span class="m ok">✓</span><div><b>Wissensgraph prüft sich selbst</b> — Confidence (Korroboration) · Widerspruch→Inquiry · Lehrer-Loop · Kalibrierung+Governance, jetzt auch für <code>Relationen</code></div></li>
+        <li><span class="m ok">✓</span><div><b>Bedeutung + ansprechbare Konzepte</b> — menschliche Definitionen (DBnary/Wiktionary, mehrsprachig); <code>genus concept &lt;Q&gt;</code> macht ein Konzept abfragbar (Sinn→Konzept-Brücke)</div></li>
       </ul>
-      <div class="out">observation · evidence · assertion · relation · expresses · confidence · knowledge</div>
+      <div class="out">observation · evidence · assertion · relation · expresses · confidence · concept · knowledge</div>
     </div>
 
     <div class="lyr-arrow">→</div>
@@ -194,8 +195,8 @@
   </div>
 
   <div class="llm">
-    <span class="badge">⟂ LLM · QUERSCHNITT</span>
-    <div class="lx"><b>Gedeckelte Quelle am Rand</b> — dolmetschen (fuzzy Sprache → Struktur) + Stimme. Nie Orakel: jeder Beitrag betritt GENUS nur als <b>niedrig-vertraute Quelle</b> (<code>derivation: model:*</code>), governt. <b>Der Kern läuft ohne Modell.</b> Dockt an jede Schicht an, wann er gebraucht wird.</div>
+    <span class="badge">⟂ LLM · QUERSCHNITT · erstes Andocken ✓</span>
+    <div class="lx"><b>Gedeckelte Quelle am Rand</b> — dolmetschen (fuzzy Sprache → Struktur) + Stimme. Nie Orakel: jeder Beitrag betritt GENUS nur als <b>niedrig-vertraute Quelle</b> (<code>model:*</code>, auf den halben Saatwert gedeckelt), aus <b>echten Kandidaten gewählt</b>, graph-verifiziert. <b>Erstes Andocken (live):</b> ein lokaler <b>Embedder</b> (~100 MB) deutet Sinne (<code>disambiguate</code>) und brückt sie auf Konzepte (<code>model:embedder</code>). <b>Der Kern läuft ohne Modell</b>, sub-ms.</div>
   </div>
 
   <div class="arrow-row">▼ &nbsp; steht auf &nbsp; ▼</div>
@@ -260,7 +261,7 @@
 
   <div class="foot">
     grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    <b>WISSEN vollendet</b> (Herkunft · Vertrauen · resolve regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur · Zwei-Schichten-Wissen). <b>Wissensgraph in den Kern verwoben</b> (2026-06-29): der Graph wächst nicht nur, er <b>prüft sich selbst</b> — Confidence, Widerspruch→Surprise→Lehrer-Loop, Kalibrierung+Governance für Relationen; live noch 100 % einquellig (Confidence am Saatwert), die <i>zweite Quelle</i> ist der Zündschlüssel. <b>SYSTEME begonnen</b>: Inferenz mit Begründung + sinn-kohärentes, mehrsprachiges Schließen über sprach-neutrale Konzepte — erst Deutsch, dann en/fr, irgendwann alle. Die Sinn-Dimension wurde durch echte Pi-Daten <b>erzwungen</b>, nicht am Reißbrett gewählt.
+    <b>WISSEN vollendet</b> (Herkunft · Vertrauen · resolve regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur · Zwei-Schichten-Wissen). <b>Wissensgraph in den Kern verwoben</b> (v1.15): der Graph <b>prüft sich selbst</b> — Confidence, Widerspruch→Surprise→Lehrer-Loop, Kalibrierung+Governance für Relationen. <b>Sprache, Brücke &amp; LLM am Rand</b> (v1.16, 2026-06-30): drei Quellen (Wikidata-Konzepte + -Lexeme + DBnary/Wiktionary) korroborieren live; die <b>Sinn→Konzept-Brücke</b> macht Konzepte <b>ansprechbar</b> (<code>genus concept</code>); und ein <b>lokaler Embedder</b> dockt als erstes Modell am Rand an — deutet Sinne und brückt sie, gedeckelt &amp; graph-verifiziert. Das ist das <i>Tor zum Begleiter</i>. <b>SYSTEME begonnen</b>: Inferenz mit Begründung + sinn-kohärentes, mehrsprachiges Schließen über sprach-neutrale Konzepte. Die Sinn-Dimension wurde durch echte Pi-Daten <b>erzwungen</b>, nicht am Reißbrett gewählt.
   </div>
 
 </div>

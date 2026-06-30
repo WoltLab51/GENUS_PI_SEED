@@ -3,7 +3,7 @@
 > Aus dem Code erzeugt via `genus atlas-facts`. Nicht von Hand editieren —
 > bei Code-Änderungen neu generieren; ein Test erzwingt die Aktualität.
 
-- **Version:** 1.15.0
+- **Version:** 1.16.0
 - **Sensor-Metriken (8):** repo.commits_per_day, repo.lines_changed_per_day, system.activity, system.cpu_percent, system.disk_percent, system.memory_percent, system.temperature, weather.temp_outside
 - **Beobachtungs-Reaktoren (3):** apply_threshold, apply_trend, apply_correlation
 - **Kognitions-Detektoren (2):** _activity_daily_rhythm_candidates, _belief_stability_candidates
