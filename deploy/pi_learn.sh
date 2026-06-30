@@ -28,6 +28,7 @@ DELAY="${GENUS_LEARN_DELAY:-2}"            # seconds between words -- politeness
 MAX_LOAD="${GENUS_LEARN_MAX_LOAD:-2.0}"    # step aside while the box is busy
 IDLE_SLEEP="${GENUS_LEARN_IDLE_SLEEP:-60}" # nap length while paused / busy / exhausted
 PAUSED="$(dirname "$DB_PATH")/paused"
+EMBED_PY="${GENUS_EMBED_PYTHON:-$GENUS_HOME/.genus/embed-venv/bin/python}"  # edge embedder (optional)
 
 mkdir -p "$LOG_DIR"
 log() { printf '[LRN] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -48,8 +49,13 @@ learn_next() {
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
     GENUS_LEXEM_LANG=de "$SCRIPT_DIR/observe_lexem.sh" "$word" >/dev/null 2>&1 || true
     GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
+    # The edge embedder then bridges the new word's concepts to their senses (capped
+    # model:embedder claim) -- only if installed (deploy/pi_install_embedder.sh); graceful else.
+    if [ -x "$EMBED_PY" ]; then
+        GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/bridge_senses.py" "$word" >/dev/null 2>&1 || true
+    fi
     echo "$((start + 1))" > "$CURSOR"
-    log "learned '$word' (#$((start + 1))) — concept + lexeme + dbnary"
+    log "learned '$word' (#$((start + 1))) — concept + lexeme + dbnary + bridge"
     return 0
 }
 

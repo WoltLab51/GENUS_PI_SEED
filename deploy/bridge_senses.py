@@ -45,47 +45,55 @@ def concept_desc(conn, qid):
     return " · ".join([german_label(conn, qid)] + [german_label(conn, p) for p in parents])
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        print("usage: bridge_senses.py <word>")
-        return 2
-    word = sys.argv[1]
+def bridge_word(conn, emb, word) -> int:
+    """Bridge one word's candidate concepts to their best-fitting glosses (shared model)."""
     subj = f"{word}@{LANG}"
-    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)   # read-only graph access
-    try:
-        glosses = [r[0] for r in conn.execute(
-            "SELECT DISTINCT object FROM relation_projection "
-            "WHERE subject = ? AND predicate = 'defined_as'", (subj,))]
-        cands = [r[0] for r in conn.execute(
-            "SELECT DISTINCT object FROM relation_projection "
-            "WHERE subject = ? AND predicate = 'expresses'", (subj,))]
-        descs = {q: concept_desc(conn, q) for q in cands}
-    finally:
-        conn.close()
+    glosses = [r[0] for r in conn.execute(
+        "SELECT DISTINCT object FROM relation_projection "
+        "WHERE subject = ? AND predicate = 'defined_as'", (subj,))]
+    cands = [r[0] for r in conn.execute(
+        "SELECT DISTINCT object FROM relation_projection "
+        "WHERE subject = ? AND predicate = 'expresses'", (subj,))]
     if not glosses or not cands:
-        print(f"[BRG] {subj}: keine Glossen/Kandidaten")
         return 0
-
-    emb = TextEmbedding(model_name=MODEL)
     embed = lambda ts: list(emb.embed(ts))
     cos = lambda a, b: float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
     gvecs = embed([PP + g for g in glosses])
-
     n = 0
     for q in cands:
-        qv = embed([QP + descs[q]])[0]
+        qv = embed([QP + concept_desc(conn, q)])[0]
         best = max(range(len(glosses)), key=lambda i: cos(qv, gvecs[i]))
         sim = cos(qv, gvecs[best])
         if sim < MIN_SIM:
             continue
-        gloss = glosses[best]
         if DRYRUN:
-            print(f"[BRG] {q}  ⟵{sim:.2f}⟶  {gloss[:56]}")
+            print(f"[BRG] {word}: {q}  ⟵{sim:.2f}⟶  {glosses[best][:52]}")
         else:
-            subprocess.run([GENUS, "relate", q, "defined_as", gloss, "--source", "model:embedder"],
-                           check=False, stdout=subprocess.DEVNULL)
+            subprocess.run([GENUS, "relate", q, "defined_as", glosses[best],
+                            "--source", "model:embedder"], check=False, stdout=subprocess.DEVNULL)
         n += 1
-    print(f"[BRG] {word}: {n} Konzept→Sinn-Bindung(en) "
+    return n
+
+
+def eligible_words(conn):
+    return [r[0].rsplit("@", 1)[0] for r in conn.execute(
+        "SELECT DISTINCT subject FROM relation_projection "
+        "WHERE predicate = 'defined_as' AND subject LIKE '%@' || ?", (LANG,))]
+
+
+def main() -> int:
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)   # read-only graph access
+    try:
+        words = sys.argv[1:] or eligible_words(conn)         # one word, or a full batch
+        emb = TextEmbedding(model_name=MODEL)                # load the model ONCE
+        total, touched = 0, 0
+        for word in words:
+            n = bridge_word(conn, emb, word)
+            total += n
+            touched += 1 if n else 0
+    finally:
+        conn.close()
+    print(f"[BRG] {total} Konzept→Sinn-Bindung(en) über {touched}/{len(words)} Wort(e) "
           f"({'dry-run' if DRYRUN else 'geschrieben als model:embedder'})")
     return 0
 
