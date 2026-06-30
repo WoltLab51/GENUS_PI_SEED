@@ -57,9 +57,10 @@ def answer(conn, question: str) -> dict:
     qid = _prominent_concept(conn, found)
     if qid is not None:
         c = sources.concept_meaning(conn, qid)
+        langs = list(dict.fromkeys(  # other-language forms, order-preserving dedup
+            w.rsplit("@", 1)[0] for w in c["words"] if not w.endswith("@de")))
         return {**base, "concept": qid, "label": c["label"], "meaning": c["meaning"],
-                "is_a": [sources.display(conn, p) for p in c["is_a"]],
-                "languages": [w.rsplit("@", 1)[0] for w in c["words"] if not w.endswith("@de")][:6]}
+                "is_a": [sources.display(conn, p) for p in c["is_a"]], "languages": langs[:6]}
     # word-level (e.g. a verb): its own glosses + part of speech, no concept node yet
     meaning = _objects(conn, found, "primary_gloss") or _objects(conn, found, "defined_as")
     return {**base, "concept": None, "label": found, "meaning": meaning, "is_a": []}

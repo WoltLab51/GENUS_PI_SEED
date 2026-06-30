@@ -59,6 +59,19 @@ learn_next() {
     return 0
 }
 
+# "Die Kette": when the word list is exhausted, GENUS grows from its OWN graph -- it learns a
+# concept it references as an is_a parent but has not climbed yet (gaps). So the hierarchy grows
+# itself, connected, with no external list. observe_konzept accepts a Q-id directly.
+learn_gap() {
+    local qid
+    qid="$(GENUS_DB_PATH="$DB_PATH" "$REPO_DIR/.venv/bin/genus" gaps --predicate is_a --limit 1 \
+           2>/dev/null | head -1)"
+    [ -n "$qid" ] || return 1
+    GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$qid" >/dev/null 2>&1 || true
+    log "climbed gap concept $qid (die Kette)"
+    return 0
+}
+
 if [ ! -f "$WORDLIST" ]; then log "no word list at $WORDLIST — nothing to learn"; exit 0; fi
 
 # Single step (for testing): GENUS_LEARN_ONCE=1
@@ -76,8 +89,10 @@ while true; do
     if awk "BEGIN{exit !($load1 > $MAX_LOAD)}"; then sleep "$IDLE_SLEEP"; continue; fi
     if learn_next; then
         sleep "$DELAY"
+    elif learn_gap; then
+        sleep "$DELAY"           # list done -> climb the graph's own gaps (die Kette)
     else
-        log "word list exhausted — idling (re-checking every ${IDLE_SLEEP}s for new words)"
+        log "word list exhausted and no open gaps — idling (re-checking every ${IDLE_SLEEP}s)"
         sleep "$IDLE_SLEEP"
     fi
 done
