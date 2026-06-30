@@ -52,7 +52,8 @@ def answer(conn, question: str) -> dict:
     if found is None:
         return {"found": False, "question": question}
 
-    base = {"found": True, "word": found, "languages": [], "pos": _objects(conn, found, "pos")}
+    base = {"found": True, "word": found, "languages": [],
+            "pos": sorted(set(_objects(conn, found, "pos")))}
     qid = _prominent_concept(conn, found)
     if qid is not None:
         c = sources.concept_meaning(conn, qid)
