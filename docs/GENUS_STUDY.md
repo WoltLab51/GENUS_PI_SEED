@@ -282,8 +282,8 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 >
 > **Phase C — Selbst-Optimierung gestartet.** GENUS *leitet* die Schwelle seines eigenen Denkens
 > aus der natürlichen Lücke in den eigenen Daten ab (is_a 237 vs. synonym 2 → **3**), statt aus der
-> Konstante, die ich getippt habe — reflexive Selbst-Kalibrierung ([[self-calibration-no-presets]]),
-> das Fundament von „optimiert sich selbst". Der abgeleitete Wert *gleicht* der Saat: GENUS
+> Konstante, die ich getippt habe — reflexive Selbst-Kalibrierung (Schwellen sind Saat, nicht
+> Gesetz — dasselbe Prinzip wie bei den Sensor-Schwellen), das Fundament von „optimiert sich selbst". Der abgeleitete Wert *gleicht* der Saat: GENUS
 > **bestätigt seine eigene Konstante** aus gelebten Daten (`genus knowledge` zeigt sie gläsern).
 > Ehrlich: die Quer-Prädikat-Kalibrierung ist pro Frage zu schwer (SQL +110 ms) → **Readout
 > on-demand**, der heiße Pfad behält die schnelle Saat (58 ms). 393 grün.
@@ -299,6 +299,20 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > `calibrated_symmetry_rate` (Mittelpunkt der breitesten Lücke), im Scan abgelegt, von `is_symmetric`
 > billig gelesen. Ehrlich: nach der is_a-Zyklen-Bereinigung hat nur noch `synonym` Spiegelungen →
 > ein Datenpunkt, keine Lücke → Saat-Fallback (open-world). Beide gläsern in `genus knowledge`.
-> 396 grün. **Als Nächstes:** SYSTEME in die Breite (Grammatik) oder tiefer in Phase C/D.
+> 396 grün.
+>
+> **SYSTEME in die Breite: eine echte zweite Regel-Domäne, Genus-Kongruenz aus Endungen.** Nicht
+> die frühere verworfene Idee eines Grammatik-„Konjugators" — kein Sprachwissen ist hartcodiert.
+> `genus/gender_rule.py` bewertet jede Kandidaten-Endung aus den neu erfassten
+> `grammatical_gender`-Fakten (Wikidata P5185, aus der schon vorhandenen Lexem-Abfrage, kein neuer
+> HTTP-Call), trennt verlässliche von rauschenden Endungen über dieselbe breiteste-Lücke-
+> Kalibrierung wie bei der Symmetrie, sagt unbekannte Nomen voraus und **verweigert eine Vermutung**
+> statt zu raten, wenn die Evidenz dünn ist. Leave-one-out-Selbst-Test (ein Nomen bestätigt nie
+> sich selbst). Mehrwertig by design: „Messer" trägt zwei echte Genera (Schneidwerkzeug/wer misst)
+> — Reichtum, keine Korruption, dasselbe Prinzip wie bei Wort-Homonymie. Live: Schwelle
+> selbst-kalibriert auf **0,92**, Selbst-Test **28/29 (97 %)**, eine echte Ausnahme (Gabel) ehrlich
+> ausgewiesen, korrekte Vorhersagen für nie gesehene Wörter (Vöglein, Bildung, Wahrheit,
+> Bekanntschaft). 408 grün. **Als Nächstes:** an den Begleiter anschließen; mehr Nomen seeden;
+> oder tiefer in Phase C/D.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
