@@ -52,18 +52,28 @@ def _edges(conn, predicate: str) -> dict[str, list[tuple[str, str]]]:
 
 
 def infer(conn, subject: str, predicate: str, max_depth: int = MAX_DEPTH,
-          edges: dict[str, list[tuple[str, str]]] | None = None) -> list[dict]:
+          edges: dict[str, list[tuple[str, str]]] | None = None,
+          transitive: bool | None = None, symmetric: bool | None = None) -> list[dict]:
     """Derive ``(subject, predicate, object)`` relations not directly asserted, each with
     its premise chain and a composed trust (the weakest premise). Transitive predicates
     chain (A→B, B→C ⇒ A→C); symmetric ones mirror (A→B ⇒ B→A). Read-only; returns only the
     *derived* edges, never the asserted ones. Pass a pre-built ``edges`` adjacency (from
     :func:`_edges`) to reuse across many calls -- it is identical for every subject of one
-    predicate, so building it once avoids rescanning the whole graph per call."""
-    if predicate not in TRANSITIVE_PREDICATES and predicate not in SYMMETRIC_PREDICATES:
-        return []
+    predicate, so building it once avoids rescanning the whole graph per call.
 
+    Whether ``predicate`` chains/mirrors is now **learned** (``is_transitive``/``is_symmetric``
+    from the graph's own vindications, seed as fallback) rather than a hardcoded set -- GENUS
+    reasons by the rules it has itself confirmed. Pass ``transitive``/``symmetric`` to decide once
+    and reuse the decision across a whole closure (as with ``edges``)."""
     if edges is None:
         edges = _edges(conn, predicate)
+    if transitive is None:
+        transitive = is_transitive(conn, predicate, edges)
+    if symmetric is None:
+        symmetric = is_symmetric(conn, predicate, edges)
+    if not transitive and not symmetric:
+        return []
+
     direct = {obj for obj, _ in edges.get(subject, [])}  # directly asserted from subject
 
     trust_cache: dict[str, float] = {}
@@ -75,7 +85,7 @@ def infer(conn, subject: str, predicate: str, max_depth: int = MAX_DEPTH,
 
     derived: dict[str, dict] = {}  # object -> {chain, trust}; first (shortest) wins
 
-    if predicate in TRANSITIVE_PREDICATES:
+    if transitive:
         queue = deque(
             (obj, [_premise(subject, predicate, obj, source)], trust_of(source))
             for obj, source in edges.get(subject, [])
@@ -96,7 +106,7 @@ def infer(conn, subject: str, predicate: str, max_depth: int = MAX_DEPTH,
                     seen.add(obj)
                     queue.append((obj, new_chain, composed))
 
-    if predicate in SYMMETRIC_PREDICATES:
+    if symmetric:
         for other, objs in edges.items():
             for obj, source in objs:
                 if obj == subject and other != subject and other not in direct and other not in derived:
@@ -131,6 +141,8 @@ def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
         return trust_cache[source]
 
     edges = _edges(conn, predicate)  # built once; reused for direct parents AND every closure below
+    transitive = is_transitive(conn, predicate, edges)   # the learned rule, decided once, reused
+    symmetric = is_symmetric(conn, predicate, edges)
     by_object: dict[str, dict] = {}  # ancestor concept -> {chain, trust}; shortest wins
     for expr in sources.relations(conn, subject=key, predicate=sources.EXPRESSES):
         concept = expr["object"]
@@ -144,7 +156,8 @@ def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
             for obj, source in edges.get(concept, [])
         ]
         ancestors += [(d["object"], d["chain"], d["trust"])
-                      for d in infer(conn, concept, predicate, edges=edges)]
+                      for d in infer(conn, concept, predicate, edges=edges,
+                                     transitive=transitive, symmetric=symmetric)]
 
         for obj, chain, sub_trust in ancestors:
             if obj in by_object or obj == concept:

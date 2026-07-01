@@ -209,3 +209,19 @@ def test_knowledge_report_surfaces_is_a_cycles(monkeypatch):
     result = CliRunner().invoke(cli.main, ["knowledge"])
     assert result.exit_code == 0, result.output
     assert "1 is_a cycle(s)" in result.output
+
+
+def test_infer_uses_learned_rule_not_only_the_seed():
+    conn = _fresh()  # 'broader' is NOT a seed, but the graph vindicates its transitivity
+    for a, b, c in [("A", "B", "C"), ("D", "E", "F"), ("G", "H", "I")]:
+        _rel(conn, a, "broader", b); _rel(conn, b, "broader", c); _rel(conn, a, "broader", c)
+    _rel(conn, "X", "broader", "Y"); _rel(conn, "Y", "broader", "Z")  # fresh chain, no direct X->Z
+    objs = {d["object"] for d in inference.infer(conn, "X", "broader")}
+    assert "Z" in objs                                       # derived because 'broader' was LEARNED transitive
+    assert "broader" not in inference.TRANSITIVE_PREDICATES   # ...not because a seed said so
+
+
+def test_infer_stays_empty_for_a_non_transitive_predicate():
+    conn = _fresh()
+    _rel(conn, "a", "likes", "b"); _rel(conn, "b", "likes", "c")   # no vindication, not a seed
+    assert inference.infer(conn, "a", "likes") == []
