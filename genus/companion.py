@@ -183,3 +183,56 @@ def narrate_relation(conn, r: dict) -> str:
         return s + f" (Vertrauen {r['trust']:.2f} — aus dem Wissensgraphen hergeleitet, nicht behauptet.)"
     return (f"Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von »{x}« zu "
             f"»{y}«. (Das heißt: unbekannt, nicht widerlegt.)")
+
+
+# --- the provenance trace ("genus why") ------------------------------------------------
+#
+# The thesis made tangible: every answer is rückführbar auf seine Herkunft. `trace` runs the
+# same routing as `ask` (relational, then word), but instead of the fluent voice it lays open
+# the *derivation* -- each edge with its source and read-time trust, and (for a chain) the
+# composed trust = the weakest premise. Nothing is a black box; the reasoning can be inspected.
+
+def trace(conn, question: str) -> dict:
+    """The full provenance behind what ``ask`` would answer -- a relation's premise chain, or
+    a word's grounding (expresses · meaning · is_a). ``{kind: "none"}`` if there's nothing to show."""
+    rel = relate(conn, question)
+    if rel.get("relational"):
+        return {"kind": "relation", **rel}
+    a = answer(conn, question)
+    if a.get("found"):
+        return {"kind": "word", "answer": a}
+    return {"kind": "none", "question": question}
+
+
+def _edge(conn, subject: str, predicate: str, object_: str, source: str) -> str:
+    t = sources.source_trust(conn, source)
+    return (f"{sources.display(conn, subject)} —{predicate}→ {sources.display(conn, object_)}"
+            f"   ← {source} (Vertrauen {t:.2f})")
+
+
+def render_trace(conn, t: dict) -> list[str]:
+    """The trace as human-readable lines -- glass-box, straight from the recorded graph."""
+    if t["kind"] == "relation":
+        if t["verdict"] != "yes":
+            return [f"Nichts zu belegen: GENUS findet keine is_a-Verbindung von »{t['subject']}« "
+                    f"zu »{t['object']}«."]
+        lines = [f"Warum »{t['subject']}« zu »{t['object']}« zählt — die Herleitung:"]
+        lines += ["  " + _edge(conn, p["subject"], p["predicate"], p["object"], p["source"])
+                  for p in t["chain"]]
+        lines.append(f"  ⇒ Vertrauen {t['trust']:.2f} — die schwächste Prämisse der Kette.")
+        return lines
+    if t["kind"] == "word":
+        a = t["answer"]
+        key = f"{a['word']}@de"
+        lines = [f"Woher GENUS »{a['word']}« kennt — die Herkunft:"]
+        for r in sources.relations(conn, subject=key, predicate=sources.EXPRESSES):
+            lines.append("  " + _edge(conn, key, "expresses", r["object"], r["source"]))
+        for pred in ("primary_gloss", "defined_as"):
+            for r in sources.relations(conn, subject=key, predicate=pred):
+                trust = sources.source_trust(conn, r["source"])
+                lines.append(f"  Bedeutung »{r['object']}«   ← {r['source']} (Vertrauen {trust:.2f})")
+        if a.get("concept"):
+            for r in sources.relations(conn, subject=a["concept"], predicate="is_a"):
+                lines.append("  " + _edge(conn, a["concept"], "is_a", r["object"], r["source"]))
+        return lines
+    return [f"Dazu kann GENUS nichts belegen — es kennt kein Wort in »{t['question']}«."]

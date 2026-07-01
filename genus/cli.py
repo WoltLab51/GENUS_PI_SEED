@@ -657,6 +657,18 @@ def why_decision_command(decision_id: int) -> None:
         conn.close()
 
 
+@why_group.command("answer")
+@click.argument("question", nargs=-1, required=True)
+def why_answer_command(question: tuple[str, ...]) -> None:
+    """The provenance behind an answer — origin, sources, trust, the whole chain (glass-box)."""
+    conn = get_conn()
+    try:
+        for line in companion.render_trace(conn, companion.trace(conn, " ".join(question))):
+            click.echo(f"[WHY] {line}")
+    finally:
+        conn.close()
+
+
 @main.group()
 def beliefs() -> None:
     pass

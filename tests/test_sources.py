@@ -756,3 +756,47 @@ def test_ask_cli_routes_relational_question(monkeypatch):
     result = CliRunner().invoke(cli.main, ["ask", "Ist", "ein", "Hund", "ein", "Säugetier?"])
     assert result.exit_code == 0, result.output
     assert "Ja." in result.output and "Säugetier" in result.output
+
+
+def test_why_relation_lays_open_every_premise():
+    from genus import companion
+    conn = _isa_graph()
+    t = companion.trace(conn, "Ist ein Hund ein Säugetier?")
+    assert t["kind"] == "relation" and t["verdict"] == "yes"
+    text = "\n".join(companion.render_trace(conn, t))
+    assert "expresses" in text and "is_a" in text          # every hop laid open
+    assert "wikidata" in text                               # the source is named
+    assert "schwächste Prämisse" in text                   # composed trust = weakest premise
+
+
+def test_why_word_shows_grounding_sources():
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    t = companion.trace(conn, "Was ist ein Hund?")
+    assert t["kind"] == "word"
+    text = "\n".join(companion.render_trace(conn, t))
+    assert "dbnary" in text and "Wolf" in text              # the meaning and where it came from
+    assert "expresses" in text and "is_a" in text           # grounding + hierarchy provenance
+
+
+def test_why_no_path_has_nothing_to_show():
+    from genus import companion
+    conn = _isa_graph()
+    text = "\n".join(companion.render_trace(conn, companion.trace(conn, "Ist ein Hund ein Reptil?")))
+    assert "Nichts zu belegen" in text
+
+
+def test_why_unknown_is_honest():
+    from genus import companion
+    conn = _isa_graph()
+    t = companion.trace(conn, "Was ist ein Quux?")
+    assert t["kind"] == "none" and "kennt kein Wort" in "\n".join(companion.render_trace(conn, t))
+
+
+def test_why_cli_traces_a_relation(monkeypatch):
+    conn = _isa_graph()
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["why", "answer", "Ist", "ein", "Hund", "ein", "Säugetier?"])
+    assert result.exit_code == 0, result.output
+    assert "[WHY]" in result.output and "Säugetier" in result.output and "Vertrauen" in result.output
