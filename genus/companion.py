@@ -68,6 +68,7 @@ def answer(conn, question: str) -> dict:
 
 _POS_DE = {"noun": "Substantiv", "verb": "Verb", "adjective": "Adjektiv", "adverb": "Adverb"}
 _LABEL = re.compile(r"^Q\d+\s*\((.*)\)$")
+_BARE_QID = re.compile(r"^Q\d+$")   # a concept with no label in any shown language
 
 
 def _join_de(items: list[str]) -> str:
@@ -88,9 +89,9 @@ def narrate(a: dict) -> str:
         sentence = f"Unter »{a['word']}«{tag} versteht GENUS: {a['meaning'][0].rstrip('.')}"
     else:
         sentence = f"»{a['word']}«{tag} kennt GENUS, aber eine Bedeutung ist noch nicht erschlossen"
-    if a["is_a"]:
-        labels = [_LABEL.sub(r"\1", x) for x in a["is_a"]]
-        sentence += f"; es zählt zu {_join_de(labels)}"
+    named = [_LABEL.sub(r"\1", x) for x in a["is_a"] if not _BARE_QID.match(x)]
+    if named:   # only human-nameable parents in the voice; a bare Q-id says nothing to a person
+        sentence += f"; es zählt zu {_join_de(named)}"
     sentence += "."
     if a["languages"]:
         sentence += f" In anderen Sprachen: {', '.join(a['languages'][:4])}."

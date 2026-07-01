@@ -691,6 +691,16 @@ def test_companion_narrate_is_fluent_and_glassbox():
     assert "chien" in s
 
 
+def test_companion_narrate_drops_unnameable_parents():
+    from genus import companion  # a verb's is_a often includes concepts with no label -> no raw Q-id
+    a = {"found": True, "word": "laufen", "label": "laufen", "concept": "Q105674",
+         "pos": ["verb"], "meaning": ["sich schnell fortbewegen"],
+         "is_a": ["Q106170525", "Q219067 (Fortbewegung)", "Q2535935"], "languages": []}
+    s = companion.narrate(a)
+    assert "Fortbewegung" in s                       # the one nameable parent is spoken
+    assert "Q106170525" not in s and "Q2535935" not in s   # the bare Q-ids are dropped
+
+
 def test_ask_state_query_wins_over_learned_word(monkeypatch):
     conn = _fresh()  # "Status" is a learned word, but the state query must take precedence
     reactors.observe_relation(conn, "Status@de", "expresses", "Q_status", "wikidata")
