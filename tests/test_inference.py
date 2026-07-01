@@ -172,3 +172,40 @@ def test_symmetry_needs_a_rate_not_just_a_count():
     ev = inference.symmetry_evidence(conn, "below")
     assert ev["mirrored"] >= 3                                # a raw count would wrongly pass
     assert inference.is_symmetric(conn, "below") is False     # but the RATE is too low -> not symmetric
+
+
+# --- the acyclicity self-check: a transitive hierarchy must be a DAG ---------------------
+
+def test_detects_is_a_cycles_of_any_length():
+    conn = _fresh()
+    _rel(conn, "dog", "is_a", "mammal"); _rel(conn, "mammal", "is_a", "animal")  # clean DAG spine
+    _rel(conn, "X", "is_a", "Y"); _rel(conn, "Y", "is_a", "X")                   # a 2-cycle
+    _rel(conn, "A", "is_a", "B"); _rel(conn, "B", "is_a", "C"); _rel(conn, "C", "is_a", "A")  # a 3-cycle
+    rings = inference.cycles(conn, "is_a")
+    assert len(rings) == 2                                    # the DAG spine contributes none
+    assert ["A", "B", "C"] in rings                           # each ring rooted at its smallest node (once)
+    assert any(set(r) == {"X", "Y"} for r in rings)
+    # the whole point: symmetry_evidence only ever meets the 2-cycle -- the 3-ring is invisible to it
+    assert inference.symmetry_evidence(conn, "is_a")["mirrored"] == 2   # only X<->Y mirrors
+    conn.close()
+
+
+def test_acyclic_hierarchy_has_no_cycles():
+    conn = _fresh()
+    for a, b in [("dog", "mammal"), ("cat", "mammal"), ("mammal", "animal"), ("animal", "organism")]:
+        _rel(conn, a, "is_a", b)                             # a healthy multi-parent DAG
+    assert inference.cycles(conn, "is_a") == []
+    conn.close()
+
+
+def test_knowledge_report_surfaces_is_a_cycles(monkeypatch):
+    conn = _fresh()  # the live shape: one source (Wikidata) asserting an is_a cycle both ways
+    _rel(conn, "Suppe", "is_a", "minestra", "wikidata")
+    _rel(conn, "minestra", "is_a", "Suppe", "wikidata")
+    k = sources.characterize_knowledge(conn)
+    assert len(k["is_a_cycles"]) == 1
+    assert set(k["is_a_cycles"][0]) == {"minestra", "Suppe"}
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["knowledge"])
+    assert result.exit_code == 0, result.output
+    assert "1 is_a cycle(s)" in result.output

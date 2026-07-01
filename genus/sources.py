@@ -416,10 +416,14 @@ def characterize_knowledge(conn, weakest: int = 5) -> dict:
     """The knowledge graph's epistemic self-report -- how much GENUS knows, and how surely.
 
     Read-time: the distinct relations it holds, how many rest on a single uncorroborated
-    source (held lightly), the mean confidence, the least-confident relations, and the open
-    knowledge-contradictions it has flagged but not yet settled. GENUS knowing *how sure it
-    knows* -- the calibration half of weaving the graph into the core.
+    source (held lightly), the mean confidence, the least-confident relations, the open
+    knowledge-contradictions it has flagged but not yet settled, and the **is_a cycles** --
+    structural self-contradictions in its own hierarchy (a transitive predicate must be acyclic;
+    see :func:`genus.inference.cycles`). GENUS knowing *how sure it knows* -- the calibration half
+    of weaving the graph into the core.
     """
+    from genus import inference  # local: inference imports sources at module load (avoid a cycle)
+
     triples: dict[tuple[str, str, str], set[str]] = {}
     for row in relations(conn):
         key = (row["subject"], row["predicate"], row["object"])
@@ -442,6 +446,7 @@ def characterize_knowledge(conn, weakest: int = 5) -> dict:
         "mean_confidence": round(sum(r["confidence"] for r in scored) / n, 3) if n else 0.0,
         "weakest": sorted(scored, key=lambda r: (r["confidence"], r["subject"], r["predicate"]))[:weakest],
         "open_contradictions": int(open_contradictions),
+        "is_a_cycles": inference.cycles(conn, "is_a"),  # structural self-contradictions (acyclicity)
     }
 
 

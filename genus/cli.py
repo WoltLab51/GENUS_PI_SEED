@@ -521,8 +521,14 @@ def knowledge_command(weakest: int) -> None:
         click.echo(
             f"[KNOW] {k['n_relations']} relation(s), mean confidence {k['mean_confidence']:.2f}, "
             f"{k['n_uncorroborated']} uncorroborated (single source), "
-            f"{k['open_contradictions']} open contradiction(s)"
+            f"{k['open_contradictions']} open contradiction(s), "
+            f"{len(k['is_a_cycles'])} is_a cycle(s)"
         )
+        if k["is_a_cycles"]:
+            click.echo("[KNOW] is_a cycles (structural self-contradictions — a hierarchy must be acyclic):")
+            for cycle in k["is_a_cycles"]:
+                ring = " -> ".join(sources.display(conn, n) for n in cycle) + " -> " + sources.display(conn, cycle[0])
+                click.echo(f"[KNOW]   {ring}")
         if k["weakest"]:
             click.echo("[KNOW] least confident:")
             for r in k["weakest"]:

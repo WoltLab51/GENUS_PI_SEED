@@ -180,6 +180,19 @@ def test_learner_wordlist_is_words_only():
     assert len(words) == len(set(words))     # no duplicates
 
 
+def test_is_a_cycle_resolution_retracts_only_the_clear_reversals():
+    script = (ROOT / "deploy" / "resolve_is_a_cycles.sh").read_text(encoding="utf-8")
+
+    # resolves via the existing retraction machinery, source-precisely (each edge is Wikidata-only)
+    assert "unrelate" in script
+    assert "--source wikidata" in script
+    # the three clearly-reversed 2-cycles: retract the wrong edge, keep the reverse subtype
+    for qid in ("Q41415", "Q118489612", "Q1137365", "Q854429", "Q1756942", "Q11348"):
+        assert qid in script
+    # the abstract 3-cycle stays FLAGGED, never blind-retracted ("nichts blind löschen")
+    assert "Q104450446" not in script and "Q340169" not in script and "Q17538423" not in script
+
+
 def test_clock_check_probes_ntp_and_records_operation_event():
     script = (ROOT / "deploy" / "pi_clock_check.sh").read_text(encoding="utf-8")
 

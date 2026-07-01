@@ -256,8 +256,15 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > mit A→C auch behauptet) ist die Transitivitäts-Vorhersage, von den Daten bestätigt; genug davon
 > → Regel gelernt, sonst die Saat. Read-time, gläsern. Live: is_a transitiv (220 Dreiecke),
 > synonym symmetrisch. Der reflexive Kern fing sofort einen Fehler in *meinem* Design (Symmetrie
-> braucht eine Rate, keine Absolutzahl) und deckte 6 echte is_a-Zyklen auf — die Studie als Labor,
-> jetzt auf die Vernunft selbst gerichtet. 381 grün. **Als Nächstes ①b:** die gelernten Regeln in
+> braucht eine Rate, keine Absolutzahl) und deckte echte is_a-Zyklen auf — die Studie als Labor,
+> jetzt auf die Vernunft selbst gerichtet. **①a′ (Azyklizität) geliefert & live:** ein transitives
+> Prädikat *muss* azyklisch sein (ein Ring ⇒ A is_a A, die Hierarchie kollabiert), also ist ein
+> Zyklus ein Selbst-Widerspruch. `symmetry_evidence` sah nur 2-Zyklen; der neue `inference.cycles`
+> findet Ringe *jeder* Länge (in `genus knowledge` ausgewiesen) und fand prompt einen **3er-Ring**,
+> den der Symmetrie-Check nicht sehen konnte. Der 4 Live-Ringe (alle aus Wikidata, das die
+> P279-Zyklen selbst trägt): 3 klare 2-Zyklen aufgelöst (falsche Gegenrichtung je Ring
+> zurückgenommen, off-Pi verifiziert → eine saubere Anwendung), der abstrakte 4. Ring bewusst
+> *markiert statt blind gelöscht*. 384 grün. **Als Nächstes ①b:** die gelernten Regeln in
 > `infer()` verdrahten (gelernt ersetzt Saat) + Überraschung bei Regel-Verletzung.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*

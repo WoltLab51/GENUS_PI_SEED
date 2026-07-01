@@ -226,3 +226,48 @@ def is_symmetric(conn, predicate: str, edges=None) -> bool:
             and ev["mirrored"] / ev["pairs"] >= MIN_SYMMETRY_RATE):
         return True
     return predicate in SYMMETRIC_PREDICATES
+
+
+# --- the acyclicity self-check: a transitive hierarchy must be a DAG ----------------------
+#
+# Transitivity has a structural consequence GENUS can check on itself. If a predicate is
+# transitive AND its edges close a cycle A->...->A, transitivity derives A is_a A and every node
+# in the ring collapses into every other -- the hierarchy stops telling anything apart. So a
+# transitive predicate must be ACYCLIC; a cycle is a self-contradiction in GENUS's own reasoning,
+# not a fact. `symmetry_evidence` only ever meets 2-cycles (mirrored pairs) as a by-product of
+# asking "is this symmetric?"; a real hierarchy can hide longer rings (A->B->C->A) it cannot see.
+# This is the honest, complete check -- cycles of ANY length. Read-time and glass-box: each cycle
+# is returned as its node ring so the contradiction can be shown and, where a direction is clearly
+# wrong, the offending edge retracted (`reactors.retract_relation`).
+
+# A hierarchy cycle longer than this is inconceivable; a recursion guard, not a semantic limit.
+_MAX_CYCLE_LEN = 64
+
+
+def cycles(conn, predicate: str, edges=None, limit: int = 100) -> list[list[str]]:
+    """Every simple cycle in the ``predicate`` graph -- the acyclicity self-check. Each cycle is a
+    list of nodes ``[a, b, c]`` meaning ``a->b->c->a``, rotated to start at its smallest node so a
+    ring is reported exactly once (never once per rotation). Empty for an acyclic graph (a DAG --
+    the healthy case). Bounded by ``limit`` cycles so the read stays cheap on a large graph; the
+    ``> start`` pruning means each ring is enumerated only from its minimum node."""
+    if edges is None:
+        edges = _edges(conn, predicate)
+    adj = {subj: sorted({obj for obj, _ in objs}) for subj, objs in edges.items()}
+    found: list[list[str]] = []
+
+    def walk(start: str, node: str, path: list[str], seen: set[str]) -> None:
+        if len(found) >= limit or len(path) > _MAX_CYCLE_LEN:
+            return
+        for nxt in adj.get(node, ()):
+            if nxt == start:              # closed the ring back to its minimum node
+                found.append(list(path))
+                if len(found) >= limit:
+                    return
+            elif nxt > start and nxt not in seen:  # only nodes above the root -> each ring once
+                walk(start, nxt, path + [nxt], seen | {nxt})
+
+    for start in sorted(adj):
+        if len(found) >= limit:
+            break
+        walk(start, start, [start], {start})
+    return found
