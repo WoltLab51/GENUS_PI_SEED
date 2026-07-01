@@ -447,6 +447,10 @@ def characterize_knowledge(conn, weakest: int = 5) -> dict:
         "weakest": sorted(scored, key=lambda r: (r["confidence"], r["subject"], r["predicate"]))[:weakest],
         "open_contradictions": int(open_contradictions),
         "is_a_cycles": inference.cycles(conn, "is_a"),  # structural self-contradictions (acyclicity)
+        # self-calibration turned on reasoning itself: the transitivity threshold GENUS derives
+        # from the natural gap in its own data (vs the seed it started from) -- glass-box readout.
+        "transitivity_threshold": inference.calibrated_transitivity_min(conn),
+        "transitivity_seed": inference.MIN_VINDICATIONS,
     }
 
 

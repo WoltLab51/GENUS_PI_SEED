@@ -268,8 +268,8 @@ def test_transitivity_threshold_is_calibrated_from_the_natural_gap():
         _rel(conn, f"w{i}", "weak", f"y{i}")
     thr = inference.calibrated_transitivity_min(conn)
     assert thr == 6 and thr != inference.MIN_VINDICATIONS      # DERIVED from the data (top of low group + 1), not the constant
-    assert inference.is_transitive(conn, "strong") is True     # 20 >= 6 -> learned transitive
-    assert inference.is_transitive(conn, "weak") is False      # 5 < 6 -> below the gap, and no seed
+    assert inference.is_transitive(conn, "strong", threshold=thr) is True   # 20 >= 6 -> above the gap
+    assert inference.is_transitive(conn, "weak", threshold=thr) is False    # 5 < 6 -> below the gap, no seed
 
 
 def test_calibration_falls_back_to_seed_when_population_too_thin():

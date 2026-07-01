@@ -261,11 +261,16 @@ def symmetry_evidence(conn, predicate: str, edges=None) -> dict:
 def is_transitive(conn, predicate: str, edges=None, threshold: int | None = None) -> bool:
     """Whether GENUS reasons transitively over ``predicate`` -- LEARNED from the graph once it has
     spoken (>= the threshold in closed triangles), else the seed hypothesis. Open-world: absence of
-    vindication is not proof against; it just leaves the seed standing. The threshold itself is now
-    *self-calibrated* from the natural gap in the data (``calibrated_transitivity_min``), not a
-    constant; pass ``threshold`` to reuse one calibration across a closure."""
+    vindication is not proof against; it just leaves the seed standing.
+
+    ``threshold`` defaults to the seed ``MIN_VINDICATIONS`` so the hot path stays cheap (one capped
+    evidence scan). The *self-calibrated* threshold (``calibrated_transitivity_min``, from the
+    natural gap in the data) is a glass-box readout GENUS can show and pass in explicitly; on the
+    live graph it equals the seed, so the derived value validates the constant rather than fighting
+    it. Wiring the derived value into every inference cheaply awaits a stored calibration (the
+    BeliefStability pattern) -- cross-predicate calibration is too heavy to recompute per query."""
     if threshold is None:
-        threshold = calibrated_transitivity_min(conn)
+        threshold = MIN_VINDICATIONS
     if transitivity_evidence(conn, predicate, edges, stop_at=threshold)["vindications"] >= threshold:
         return True
     return predicate in TRANSITIVE_PREDICATES
