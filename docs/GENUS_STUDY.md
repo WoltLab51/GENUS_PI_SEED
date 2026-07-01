@@ -271,7 +271,14 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > Vindikationen gelernt, Saat als Fallback) — GENUS leitet nach den Regeln her, die es selbst
 > bestätigt hat. Verhalten unverändert (is_a bleibt transitiv, jetzt *begründet*), aber ein
 > vindiziertes Nicht-Saat-Prädikat wird nun mitgeschlossen. Performance-sicher (Entscheidung
-> einmal pro Closure + Früh-Abbruch; Aufpreis ~9 ms). 387 grün. **Als Nächstes ①c:** Überraschung
-> bei Regel-Verletzung (ein neu behaupteter Zyklus verletzt die gelernte Azyklizität → Inquiry).
+> einmal pro Closure + Früh-Abbruch; Aufpreis ~9 ms). 387 grün.
+>
+> **①c geliefert & live — der reflexive Regel-Bogen ist rund.** `observe_relation` flaggt bei
+> jeder Assertion einen neuen is_a-**Zyklus** als Azyklizitäts-Verletzung → `contradiction_detected`
+> + Inquiry, genau wie ein Wissens-Widerspruch. Billig am Assertions-Punkt (`inference.reaches` =
+> gezielte, gebündelte BFS; 0,24 ms/is_a-Assertion live). Damit **lernt** GENUS die Regeln seines
+> Denkens (①a), **schließt** nach ihnen (①b) und **verteidigt** ihre Konsistenz (①c) — der Kern
+> prüft jetzt nicht nur seine Fakten, sondern seine eigene Vernunft. 391 grün. **Als Nächstes:**
+> SYSTEME in die Breite (weitere Regel-Domänen) *oder* der Sprung in **Phase C** (Selbst-Optimierung).
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
