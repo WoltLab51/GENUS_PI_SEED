@@ -25,6 +25,14 @@ SYMMETRIC_PREDICATES = {"synonym", "antonym"}
 # assumed -- a few independent vindications, like MIN_LIFECYCLE for beliefs. A seed, not a law.
 MIN_VINDICATIONS = 3
 
+# Symmetry needs a RATE, not a raw count: a symmetric predicate mirrors *systematically* (most
+# edges have their reverse), whereas a non-symmetric one shows only incidental mirrors -- e.g.
+# is_a had 6 mirrored pairs out of 6091 (0.1%), which are acyclic-violating CYCLES, not symmetry.
+# Transitivity, by contrast, stays a count: genuine transitivity yields a low closed-triangle rate
+# (sources rarely re-assert the grandparent edge), so absence of a high rate is expected there.
+# A seed threshold, to be self-calibrated from lived data later.
+MIN_SYMMETRY_RATE = 0.10
+
 # Structural bound on the chain length, so traversal can't run away (like the evidence
 # window). A safety bound, not an epistemic threshold.
 MAX_DEPTH = 6
@@ -210,7 +218,11 @@ def is_transitive(conn, predicate: str, edges=None) -> bool:
 
 
 def is_symmetric(conn, predicate: str, edges=None) -> bool:
-    """Whether GENUS mirrors ``predicate`` -- learned from mirrored pairs, else the seed."""
-    if symmetry_evidence(conn, predicate, edges)["mirrored"] >= MIN_VINDICATIONS:
+    """Whether GENUS mirrors ``predicate`` -- LEARNED when mirroring is *systematic* (enough
+    mirrored pairs AND a high enough rate), else the seed. The rate gate is what keeps a handful
+    of incidental is_a cycles from being mistaken for symmetry."""
+    ev = symmetry_evidence(conn, predicate, edges)
+    if (ev["mirrored"] >= MIN_VINDICATIONS and ev["pairs"]
+            and ev["mirrored"] / ev["pairs"] >= MIN_SYMMETRY_RATE):
         return True
     return predicate in SYMMETRIC_PREDICATES

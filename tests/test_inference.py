@@ -161,3 +161,14 @@ def test_learns_symmetry_from_mirrored_pairs():
     assert inference.symmetry_evidence(conn, "near")["mirrored"] >= 3
     assert inference.is_symmetric(conn, "near") is True         # learned, not a seed
     assert "near" not in inference.SYMMETRIC_PREDICATES
+
+
+def test_symmetry_needs_a_rate_not_just_a_count():
+    conn = _fresh()  # the live is_a case: many one-way edges + a few incidental cycles != symmetry
+    for i in range(200):
+        _rel(conn, f"n{i}", "below", f"n{i + 1}")            # 200 one-directional edges
+    for a, b in [("c1", "c2"), ("c3", "c4"), ("c5", "c6")]:
+        _rel(conn, a, "below", b); _rel(conn, b, "below", a)  # 3 incidental cycles (6 mirrors)
+    ev = inference.symmetry_evidence(conn, "below")
+    assert ev["mirrored"] >= 3                                # a raw count would wrongly pass
+    assert inference.is_symmetric(conn, "below") is False     # but the RATE is too low -> not symmetric
