@@ -343,6 +343,10 @@ def ask_command(question: tuple[str, ...]) -> None:
         if com.get("common"):
             click.echo(f"[ASK] {companion.narrate_common(conn, com)}")
             return
+        gen = companion.gender_question(conn, q)   # then: "welches Geschlecht hat X?"
+        if gen.get("gender_q"):
+            click.echo(f"[ASK] {companion.narrate_gender(gen)}")
+            return
         knows = companion.answer(conn, q)          # else: does GENUS know a word in the question?
         if knows["found"]:
             _print_companion_answer(knows)

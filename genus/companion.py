@@ -247,6 +247,53 @@ def narrate_common(conn, r: dict) -> str:
     return s + "."
 
 
+# --- grammatical gender questions ("Welches Geschlecht hat X?") ------------------------
+#
+# Known FACT beats induced RULE beats honest silence: if GENUS has actually recorded a noun's
+# gender (from Wikidata), it reports that -- never a guess where a fact is held. Only for a
+# noun with no recorded gender does it fall to the induced suffix rule (gender_rule.predict_gender,
+# Phase B SYSTEME breadth), clearly labelled as inferred, not certain. A noun can legitimately
+# carry more than one recorded gender (homonymous lexemes, e.g. "Messer") -- both are shown.
+
+_GENDER_PATTERNS = [
+    re.compile(r"\bwelches\s+geschlecht\s+hat\s+" + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwelchen\s+artikel\s+(?:hat|braucht)\s+" + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bder,?\s*die\s+oder\s+das\s+" + _TERM, re.I),
+]
+
+
+def gender_question(conn, question: str) -> dict:
+    """A grammatical-gender question about a German noun; ``{gender_q: False}`` if not one."""
+    for pattern in _GENDER_PATTERNS:
+        m = pattern.search(question)
+        if not m:
+            continue
+        tok = m.group(1)
+        for form in _forms(tok):
+            known = sorted({r["object"] for r in sources.relations(
+                conn, subject=f"{form}@de", predicate="grammatical_gender")})
+            if known:
+                return {"gender_q": True, "noun": form, "known": known}
+        from genus import gender_rule
+        for form in _forms(tok):
+            r = gender_rule.predict_gender(conn, f"{form}@de")
+            if r["found"]:
+                return {"gender_q": True, "noun": form, "known": [], "prediction": r}
+        return {"gender_q": True, "noun": tok, "known": [], "prediction": None}
+    return {"gender_q": False}
+
+
+def narrate_gender(r: dict) -> str:
+    if r["known"]:
+        return f"»{r['noun']}« ist {_join_de(r['known'])} (bekannt, aus der Quelle)."
+    p = r.get("prediction")
+    if p:
+        return (f"GENUS kennt »{r['noun']}« noch nicht, vermutet aber {p['gender']} "
+                f"— Regel: Endung „-{p['suffix']}\" ({p['reliability']:.0%} Trefferquote über "
+                f"{p['support']} bekannte Nomen; das ist eine Vermutung, kein Wissen).")
+    return f"GENUS kennt »{r['noun']}« nicht gut genug, um auch nur zu vermuten — es rät nicht."
+
+
 # --- the provenance trace ("genus why") ------------------------------------------------
 #
 # The thesis made tangible: every answer is rückführbar auf seine Herkunft. `trace` runs the

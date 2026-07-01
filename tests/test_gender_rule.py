@@ -122,3 +122,56 @@ def test_gender_rule_report_cli(monkeypatch):
     result = CliRunner().invoke(cli.main, ["gender-rule"])
     assert result.exit_code == 0, result.output
     assert "Bärchen" in result.output and "Ausnahmen" in result.output
+
+
+def test_companion_gender_question_reports_known_fact_over_guessing():
+    from genus import companion
+    conn = _fresh()
+    _gender(conn, "Hund", "maskulin")
+    r = companion.gender_question(conn, "Welches Geschlecht hat Hund?")
+    assert r["gender_q"] and r["known"] == ["maskulin"]
+    s = companion.narrate_gender(r)
+    assert "maskulin" in s and "bekannt" in s and "vermutet" not in s
+
+
+def test_companion_gender_question_shows_both_genders_of_a_homonym():
+    from genus import companion
+    conn = _fresh()
+    _gender(conn, "Messer", "neutrum")
+    _gender(conn, "Messer", "maskulin")
+    r = companion.gender_question(conn, "Welches Geschlecht hat Messer?")
+    assert r["known"] == ["maskulin", "neutrum"]           # both recorded senses, neither hidden
+
+
+def test_companion_gender_question_falls_back_to_a_labelled_prediction():
+    from genus import companion
+    conn = _seed_reliable_and_noisy(_fresh())
+    r = companion.gender_question(conn, "Welches Geschlecht hat Vögelchen?")   # unseen, -chen
+    assert r["gender_q"] and not r["known"] and r["prediction"]["gender"] == "neutrum"
+    s = companion.narrate_gender(r)
+    assert "vermutet" in s and "Vermutung, kein Wissen" in s     # clearly labelled, not stated as fact
+
+
+def test_companion_gender_question_withholds_honestly_when_unsure():
+    from genus import companion
+    conn = _fresh()
+    r = companion.gender_question(conn, "Welches Geschlecht hat Quuxikon?")
+    assert r["gender_q"] and not r["known"] and r["prediction"] is None
+    assert "rät nicht" in companion.narrate_gender(r)
+
+
+def test_gender_question_not_triggered_by_an_unrelated_question():
+    from genus import companion
+    conn = _fresh()
+    assert companion.gender_question(conn, "Was ist ein Hund?")["gender_q"] is False
+
+
+def test_ask_cli_routes_gender_question(monkeypatch):
+    from click.testing import CliRunner
+    from genus import cli
+    conn = _fresh()
+    _gender(conn, "Hund", "maskulin")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["ask", "Welches", "Geschlecht", "hat", "Hund?"])
+    assert result.exit_code == 0, result.output
+    assert "maskulin" in result.output
