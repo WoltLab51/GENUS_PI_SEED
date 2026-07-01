@@ -135,3 +135,29 @@ def test_relations_cli_renders_opaque_concepts_with_labels(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "Q726 (Pferd)" in result.output     # opaque Q-id rendered readable
     assert "Q729 (Tier)" in result.output       # object too
+
+
+def test_learns_transitivity_from_closed_triangles():
+    conn = _fresh()  # a NON-seed predicate, vindicated by closed triangles -> LEARNED transitive
+    for a, b, c in [("A", "B", "C"), ("D", "E", "F"), ("G", "H", "I")]:
+        _rel(conn, a, "broader", b); _rel(conn, b, "broader", c)
+        _rel(conn, a, "broader", c)                       # the transitive prediction, vindicated
+    ev = inference.transitivity_evidence(conn, "broader")
+    assert ev["vindications"] >= 3 and ev["examples"]
+    assert inference.is_transitive(conn, "broader") is True    # learned from the data
+    assert "broader" not in inference.TRANSITIVE_PREDICATES     # ...not assumed by a seed
+
+
+def test_transitivity_falls_back_to_seed_without_evidence():
+    conn = _fresh()
+    assert inference.is_transitive(conn, "is_a") is True        # a seed hypothesis stands
+    assert inference.is_transitive(conn, "likes") is False      # no seed, no evidence -> no
+
+
+def test_learns_symmetry_from_mirrored_pairs():
+    conn = _fresh()
+    for a, b in [("x", "y"), ("p", "q"), ("m", "n")]:
+        _rel(conn, a, "near", b); _rel(conn, b, "near", a)     # the mirror is asserted too
+    assert inference.symmetry_evidence(conn, "near")["mirrored"] >= 3
+    assert inference.is_symmetric(conn, "near") is True         # learned, not a seed
+    assert "near" not in inference.SYMMETRIC_PREDICATES

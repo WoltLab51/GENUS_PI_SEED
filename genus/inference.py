@@ -13,10 +13,17 @@ from collections import deque
 
 from genus import sources
 
-# Declarative inference rules -- the seed. Later these become taught/learned rule-specs;
-# the engine below stays fixed (it is the frame, given).
+# Declarative inference rules -- the SEED (the starting hypothesis before the graph has spoken).
+# These are no longer the last word: GENUS learns from its own graph which predicates actually
+# behave transitively/symmetrically (see transitivity_evidence / is_transitive below) and treats
+# the seed as a fallback only where evidence is thin -- self-calibration applied to the rules of
+# its OWN reasoning. The engine (traversal + justification) stays fixed; the rule-spec is learned.
 TRANSITIVE_PREDICATES = {"is_a", "part_of"}
 SYMMETRIC_PREDICATES = {"synonym", "antonym"}
+
+# Enough closed triangles / mirrored pairs to trust a rule as *learned* from the data rather than
+# assumed -- a few independent vindications, like MIN_LIFECYCLE for beliefs. A seed, not a law.
+MIN_VINDICATIONS = 3
 
 # Structural bound on the chain length, so traversal can't run away (like the evidence
 # window). A safety bound, not an epistemic threshold.
@@ -142,3 +149,68 @@ def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
          "trust": data["trust"], "chain": data["chain"]}
         for obj, data in sorted(by_object.items())
     ]
+
+
+# --- learning the rules of GENUS's own reasoning -------------------------------------------
+#
+# The first SYSTEME step: GENUS does not just USE inference rules, it LEARNS which ones hold,
+# from its own graph. Whether a predicate is transitive is a *hypothesis the data can vindicate*:
+# a closed triangle (A-P->B, B-P->C with A-P->C also asserted) is the transitive prediction
+# confirmed by an independent assertion. Count enough of those and the rule is learned; find none
+# and GENUS keeps only the seed hypothesis. Read-time and glass-box -- the vindications ARE the
+# reason. This turns the core's own machinery on the core's own reasoning (self-reference).
+
+def transitivity_evidence(conn, predicate: str, edges=None) -> dict:
+    """Evidence that ``predicate`` is transitive: closed triangles that vindicate the rule, out
+    of all 2-step chains that offered the chance. Returns a few example triangles for the trace."""
+    if edges is None:
+        edges = _edges(conn, predicate)
+    asserted = {(subj, obj) for subj, objs in edges.items() for obj, _ in objs}
+    chains = vindications = 0
+    examples: list[tuple[str, str, str]] = []
+    for a, objs in edges.items():
+        for b in {obj for obj, _ in objs}:
+            for c, _ in edges.get(b, []):
+                if c == a:
+                    continue
+                chains += 1
+                if (a, c) in asserted:
+                    vindications += 1
+                    if len(examples) < 5:
+                        examples.append((a, b, c))
+    return {"predicate": predicate, "vindications": vindications, "chains": chains, "examples": examples}
+
+
+def symmetry_evidence(conn, predicate: str, edges=None) -> dict:
+    """Evidence that ``predicate`` is symmetric: asserted edges whose mirror is also asserted."""
+    if edges is None:
+        edges = _edges(conn, predicate)
+    asserted = {(subj, obj) for subj, objs in edges.items() for obj, _ in objs}
+    pairs = mirrored = 0
+    examples: list[tuple[str, str]] = []
+    for a, objs in edges.items():
+        for b in {obj for obj, _ in objs}:
+            if a == b:
+                continue
+            pairs += 1
+            if (b, a) in asserted:
+                mirrored += 1
+                if len(examples) < 5:
+                    examples.append((a, b))
+    return {"predicate": predicate, "mirrored": mirrored, "pairs": pairs, "examples": examples}
+
+
+def is_transitive(conn, predicate: str, edges=None) -> bool:
+    """Whether GENUS reasons transitively over ``predicate`` -- LEARNED from the graph once it has
+    spoken (>= MIN_VINDICATIONS closed triangles), else the seed hypothesis. Open-world: absence
+    of vindication is not proof against; it just leaves the seed standing."""
+    if transitivity_evidence(conn, predicate, edges)["vindications"] >= MIN_VINDICATIONS:
+        return True
+    return predicate in TRANSITIVE_PREDICATES
+
+
+def is_symmetric(conn, predicate: str, edges=None) -> bool:
+    """Whether GENUS mirrors ``predicate`` -- learned from mirrored pairs, else the seed."""
+    if symmetry_evidence(conn, predicate, edges)["mirrored"] >= MIN_VINDICATIONS:
+        return True
+    return predicate in SYMMETRIC_PREDICATES
