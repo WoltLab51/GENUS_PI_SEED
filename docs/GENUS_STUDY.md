@@ -286,7 +286,14 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > das Fundament von „optimiert sich selbst". Der abgeleitete Wert *gleicht* der Saat: GENUS
 > **bestätigt seine eigene Konstante** aus gelebten Daten (`genus knowledge` zeigt sie gläsern).
 > Ehrlich: die Quer-Prädikat-Kalibrierung ist pro Frage zu schwer (SQL +110 ms) → **Readout
-> on-demand**, der heiße Pfad behält die schnelle Saat (58 ms). 393 grün. **Als Nächstes:** die
-> abgeleitete Schwelle *billig* verdrahten via **gespeicherter Kalibrierung** (BeliefStability-Muster).
+> on-demand**, der heiße Pfad behält die schnelle Saat (58 ms). 393 grün.
+>
+> **Und vollständig (gespeicherte Kalibrierung):** ein Scan-Detektor rechnet die Schwelle im
+> **Batch** und **legt sie als `RuleCalibration`-Experience ab**; `is_transitive` liest den
+> gespeicherten Wert billig (ein indizierter Lookup), Saat als Fallback. Jetzt *schließt* GENUS
+> nach der Schwelle, die es selbst abgeleitet hat, und der heiße Pfad bleibt schnell (~64 ms, kein
+> SQL pro Frage). Das BeliefStability-Muster, jetzt den Kern **optimierend** statt nur
+> charakterisierend — die erste Experience, die GENUS' eigene Vernunft *tunt*. 395 grün. **Als
+> Nächstes:** die Symmetrie-Rate analog kalibrieren; *oder* SYSTEME in die Breite.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
