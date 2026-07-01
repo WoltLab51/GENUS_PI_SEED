@@ -225,3 +225,34 @@ def test_infer_stays_empty_for_a_non_transitive_predicate():
     conn = _fresh()
     _rel(conn, "a", "likes", "b"); _rel(conn, "b", "likes", "c")   # no vindication, not a seed
     assert inference.infer(conn, "a", "likes") == []
+
+
+def test_reaches_is_targeted_and_directional():
+    conn = _fresh()
+    _rel(conn, "A", "is_a", "B"); _rel(conn, "B", "is_a", "C")
+    assert inference.reaches(conn, "A", "C", "is_a") is True     # A ->* C
+    assert inference.reaches(conn, "C", "A", "is_a") is False    # not the other way
+
+
+def test_closes_cycle_only_for_a_transitive_predicate():
+    conn = _fresh()
+    _rel(conn, "A", "friend", "B"); _rel(conn, "B", "friend", "C")   # 'friend' not transitive
+    assert inference.closes_cycle(conn, "C", "friend", "A") is False
+    _rel(conn, "X", "is_a", "Y"); _rel(conn, "Y", "is_a", "Z")       # is_a is (seed-)transitive
+    assert inference.closes_cycle(conn, "Z", "is_a", "X") is True
+
+
+def test_observe_relation_flags_a_new_is_a_cycle():
+    conn = _fresh()
+    reactors.observe_relation(conn, "A", "is_a", "B", "src")
+    reactors.observe_relation(conn, "B", "is_a", "C", "src")
+    r = reactors.observe_relation(conn, "C", "is_a", "A", "src")     # closes A->B->C->A
+    types = [e["event_type"] for e in r["events"]]
+    assert "contradiction_detected" in types and "inquiry_created" in types
+
+
+def test_observe_relation_does_not_flag_acyclic_is_a():
+    conn = _fresh()
+    reactors.observe_relation(conn, "A", "is_a", "B", "src")
+    r = reactors.observe_relation(conn, "B", "is_a", "C", "src")     # no ring
+    assert "contradiction_detected" not in [e["event_type"] for e in r["events"]]

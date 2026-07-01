@@ -289,3 +289,38 @@ def cycles(conn, predicate: str, edges=None, limit: int = 100) -> list[list[str]
             break
         walk(start, start, [start], {start})
     return found
+
+
+def reaches(conn, start: str, target: str, predicate: str, max_depth: int = MAX_DEPTH) -> bool:
+    """Does ``start`` reach ``target`` via ``predicate`` (start ->* target)? A bounded BFS over
+    indexed per-node lookups, so it touches only the path -- cheap enough to run at assertion time,
+    unlike building the whole adjacency. The depth bound matches the closure's."""
+    if start == target:
+        return True
+    seen = {start}
+    frontier = [start]
+    for _ in range(max_depth):
+        nxt: list[str] = []
+        for node in frontier:
+            for row in sources.relations(conn, subject=node, predicate=predicate):
+                obj = row["object"]
+                if obj == target:
+                    return True
+                if obj not in seen:
+                    seen.add(obj)
+                    nxt.append(obj)
+        if not nxt:
+            break
+        frontier = nxt
+    return False
+
+
+def closes_cycle(conn, subject: str, predicate: str, object_: str) -> bool:
+    """Would asserting ``subject -predicate-> object_`` close a ring? True iff ``object_`` already
+    reaches ``subject`` AND the predicate is (learned) transitive -- then subject→object→…→subject
+    derives ``subject is_a subject`` and the hierarchy collapses: a self-contradiction, not a fact.
+    Reachability is checked first (cheap, targeted); the transitivity decision only when a ring
+    actually formed (rare), so the common assertion stays fast."""
+    if not reaches(conn, object_, subject, predicate):
+        return False
+    return is_transitive(conn, predicate)
