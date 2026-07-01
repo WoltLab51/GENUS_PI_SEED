@@ -14,6 +14,7 @@ from genus import (
     doctor as doctor_checks,
     event_router,
     experience,
+    gender_rule,
     governance,
     inference,
     inquiries,
@@ -549,6 +550,49 @@ def knowledge_command(weakest: int) -> None:
                 click.echo(
                     f"[KNOW]   {sources.display(conn, r['subject'])} -[{r['predicate']}]-> "
                     f"{sources.display(conn, r['object'])}   conf {r['confidence']:.2f}  ({r['n_sources']} src)"
+                )
+    finally:
+        conn.close()
+
+
+@main.command("predict-gender")
+@click.argument("noun")
+def predict_gender_command(noun: str) -> None:
+    """Predict a German noun's grammatical gender from GENUS's own induced suffix rule — glass-
+    box (shows the rule, its reliability and support), withholds when the evidence is too thin
+    or too noisy to trust rather than guessing."""
+    conn = get_conn()
+    try:
+        form = noun if "@" in noun else f"{noun}@de"
+        r = gender_rule.predict_gender(conn, form)
+        if not r["found"]:
+            click.echo(f"[GEN] kein verlässlicher Hinweis für »{noun}« (Schwelle {r['cut']:.2f}) — GENUS rät nicht.")
+            return
+        click.echo(
+            f"[GEN] »{noun}« vermutlich {r['gender']} — Regel: Endung „-{r['suffix']}\" "
+            f"({r['reliability']:.0%} Trefferquote über {r['support']} bekannte Nomen, Schwelle {r['cut']:.2f})"
+        )
+    finally:
+        conn.close()
+
+
+@main.command("gender-rule")
+def gender_rule_command() -> None:
+    """GENUS's self-test report for the induced gender-by-suffix rule: leave-one-out accuracy
+    and the concrete exceptions a confident rule gets wrong (informative, not a defect)."""
+    conn = get_conn()
+    try:
+        r = gender_rule.self_test(conn)
+        if r["accuracy"] is None:
+            click.echo("[GEN] noch nicht genug Evidenz für einen Selbst-Test (genus predict-gender liefert erst mit mehr Nomen).")
+            return
+        click.echo(f"[GEN] Selbst-Test: {r['correct']}/{r['checked']} korrekt (Genauigkeit {r['accuracy']:.0%}), Schwelle {r['cut']:.2f}")
+        if r["exceptions"]:
+            click.echo("[GEN] Ausnahmen (die Regel sagt X vorher, GENUS kennt tatsächlich Y):")
+            for e in r["exceptions"]:
+                click.echo(
+                    f"[GEN]   {e['noun']}: Regel „-{e['rule']}\" ({e['rule_reliability']:.0%}) sagt "
+                    f"{e['predicted']} vorher, tatsächlich: {', '.join(e['actual'])}"
                 )
     finally:
         conn.close()
