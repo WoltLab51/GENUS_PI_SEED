@@ -536,6 +536,13 @@ def knowledge_command(weakest: int) -> None:
             click.echo(f"[KNOW] transitivity threshold: {thr} (self-calibrated, equals the seed — validated by the data)")
         else:
             click.echo(f"[KNOW] transitivity threshold: {thr} (self-calibrated from the natural gap; seed was {seed})")
+        srate, sseed = k["symmetry_rate"], k["symmetry_seed"]
+        if srate is None:
+            click.echo(f"[KNOW] symmetry rate: {sseed} (seed — not yet self-calibrated; run 'genus scan')")
+        elif abs(srate - sseed) < 1e-9:
+            click.echo(f"[KNOW] symmetry rate: {srate} (self-calibrated, equals the seed — validated by the data)")
+        else:
+            click.echo(f"[KNOW] symmetry rate: {srate} (self-calibrated from the natural gap; seed was {sseed})")
         if k["weakest"]:
             click.echo("[KNOW] least confident:")
             for r in k["weakest"]:

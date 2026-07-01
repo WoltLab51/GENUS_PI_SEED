@@ -33,8 +33,10 @@ TRANSITIVITY_CALIBRATION_KEY = "rule_calibration:transitivity"
 # is_a had 6 mirrored pairs out of 6091 (0.1%), which are acyclic-violating CYCLES, not symmetry.
 # Transitivity, by contrast, stays a count: genuine transitivity yields a low closed-triangle rate
 # (sources rarely re-assert the grandparent edge), so absence of a high rate is expected there.
-# A seed threshold, to be self-calibrated from lived data later.
+# A seed rate: the *active* value is self-calibrated (calibrated_symmetry_rate) and recorded by the
+# scan under this key, read cheaply on the hot path (stored_symmetry_rate) -- like transitivity.
 MIN_SYMMETRY_RATE = 0.10
+SYMMETRY_CALIBRATION_KEY = "rule_calibration:symmetry"
 
 # Structural bound on the chain length, so traversal can't run away (like the evidence
 # window). A safety bound, not an epistemic threshold.
@@ -278,6 +280,49 @@ def symmetry_evidence(conn, predicate: str, edges=None) -> dict:
     return {"predicate": predicate, "mirrored": mirrored, "pairs": pairs, "examples": examples}
 
 
+def _mirror_rates_per_predicate(conn) -> dict[str, float]:
+    """Mirror rate (mirrored / pairs) for every predicate at once, via indexed SQL -- the
+    population the symmetry rate is calibrated from (a systematic mirror sits far above the
+    incidental ones)."""
+    pairs = {r["predicate"]: r["n"] for r in conn.execute(
+        "SELECT predicate, COUNT(*) AS n FROM relation_projection WHERE subject <> object GROUP BY predicate"
+    )}
+    mirrored = {r["predicate"]: r["n"] for r in conn.execute(
+        "SELECT r1.predicate AS predicate, COUNT(*) AS n FROM relation_projection r1 "
+        "JOIN relation_projection r2 ON r2.predicate = r1.predicate "
+        "AND r2.subject = r1.object AND r2.object = r1.subject "
+        "WHERE r1.subject <> r1.object GROUP BY r1.predicate"
+    )}
+    return {p: mirrored.get(p, 0) / n for p, n in pairs.items() if n > 0}
+
+
+def calibrated_symmetry_rate(conn) -> float:
+    """The symmetry-rate cut GENUS learns from the natural gap in its own data (systematic mirrors
+    -- synonym ~0.23 -- sit far above incidental ones -- is_a ~0.001). The widest gap between the
+    positive rates gives the cut (its midpoint); falls back to the seed ``MIN_SYMMETRY_RATE`` when
+    the population is too thin. Self-calibration on the rules of reasoning, the symmetry twin of
+    ``calibrated_transitivity_min``."""
+    rates = sorted({r for r in _mirror_rates_per_predicate(conn).values() if r > 0})
+    if len(rates) < 2:
+        return MIN_SYMMETRY_RATE
+    _, lo, hi = max((rates[i + 1] - rates[i], rates[i], rates[i + 1]) for i in range(len(rates) - 1))
+    return round((lo + hi) / 2, 4)   # midpoint of the widest gap between incidental and systematic
+
+
+def stored_symmetry_rate(conn) -> float | None:
+    """The self-calibrated symmetry rate the scan has recorded (experience
+    ``rule_calibration:symmetry``), read with one cheap indexed lookup; ``None`` until first scan."""
+    row = conn.execute(
+        "SELECT pattern FROM experience_log WHERE experience_key = ?",
+        (SYMMETRY_CALIBRATION_KEY,),
+    ).fetchone()
+    if row is None:
+        return None
+    import json
+    value = json.loads(row["pattern"]).get("rate")
+    return float(value) if value is not None else None
+
+
 def is_transitive(conn, predicate: str, edges=None, threshold: int | None = None) -> bool:
     """Whether GENUS reasons transitively over ``predicate`` -- LEARNED from the graph once it has
     spoken (>= the threshold in closed triangles), else the seed hypothesis. Open-world: absence of
@@ -296,13 +341,18 @@ def is_transitive(conn, predicate: str, edges=None, threshold: int | None = None
     return predicate in TRANSITIVE_PREDICATES
 
 
-def is_symmetric(conn, predicate: str, edges=None) -> bool:
+def is_symmetric(conn, predicate: str, edges=None, rate: float | None = None) -> bool:
     """Whether GENUS mirrors ``predicate`` -- LEARNED when mirroring is *systematic* (enough
     mirrored pairs AND a high enough rate), else the seed. The rate gate is what keeps a handful
-    of incidental is_a cycles from being mistaken for symmetry."""
+    of incidental is_a cycles from being mistaken for symmetry. ``rate`` defaults to the value the
+    scan self-calibrated and recorded (``stored_symmetry_rate``, one cheap lookup), seed as
+    fallback -- so the hot path uses the *derived* cut, like transitivity."""
+    if rate is None:
+        rate = stored_symmetry_rate(conn)
+        if rate is None:
+            rate = MIN_SYMMETRY_RATE
     ev = symmetry_evidence(conn, predicate, edges)
-    if (ev["mirrored"] >= MIN_VINDICATIONS and ev["pairs"]
-            and ev["mirrored"] / ev["pairs"] >= MIN_SYMMETRY_RATE):
+    if ev["mirrored"] >= MIN_VINDICATIONS and ev["pairs"] and ev["mirrored"] / ev["pairs"] >= rate:
         return True
     return predicate in SYMMETRIC_PREDICATES
 

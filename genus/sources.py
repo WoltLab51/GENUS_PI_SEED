@@ -452,6 +452,8 @@ def characterize_knowledge(conn, weakest: int = 5) -> dict:
         # read cheaply); None until the first scan calibrates it -> the seed still stands.
         "transitivity_threshold": inference.stored_transitivity_threshold(conn),
         "transitivity_seed": inference.MIN_VINDICATIONS,
+        "symmetry_rate": inference.stored_symmetry_rate(conn),
+        "symmetry_seed": inference.MIN_SYMMETRY_RATE,
     }
 
 

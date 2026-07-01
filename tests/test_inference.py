@@ -309,3 +309,21 @@ def test_calibration_recharacterizes_when_the_threshold_changes():
         _rel(conn, f"s{i}", "strong", f"t{i}")
     experience.scan(conn)
     assert inference.stored_transitivity_threshold(conn) == 6         # recharacterized to the new value
+
+
+def test_symmetry_rate_is_calibrated_and_drives_the_hot_path():
+    from genus import experience
+    conn = _fresh()  # 'twin' systematic (rate 1.0), 'chain' incidental (low rate) -> gap between them
+    for a, b in [("a", "b"), ("c", "d"), ("e", "f"), ("g", "h")]:
+        _rel(conn, a, "twin", b); _rel(conn, b, "twin", a)            # all mirrored -> rate 1.0
+    for i in range(40):
+        _rel(conn, f"n{i}", "chain", f"n{i + 1}")                     # 40 one-way
+    for a, b in [("p1", "p2"), ("p3", "p4")]:
+        _rel(conn, a, "chain", b); _rel(conn, b, "chain", a)          # 2 incidental mirrors -> rate ~0.09
+    r = inference.calibrated_symmetry_rate(conn)
+    assert 0.09 < r < 1.0                                             # cut lands in the natural gap
+    assert inference.stored_symmetry_rate(conn) is None               # not recorded yet
+    experience.scan(conn)                                             # the periodic calibration runs
+    assert inference.stored_symmetry_rate(conn) == r                  # ...records the derived rate
+    assert inference.is_symmetric(conn, "twin") is True               # 1.0 >= cut -> symmetric
+    assert inference.is_symmetric(conn, "chain") is False             # ~0.09 < cut -> not (nor a seed)

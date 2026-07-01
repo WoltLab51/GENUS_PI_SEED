@@ -551,30 +551,45 @@ def _rule_calibration_candidates(conn) -> list[dict]:
     # batch, not per query. Recharacterises when the derived threshold changes.
     from genus import inference  # local: experience is imported broadly; avoid an import cycle
 
+    candidates: list[dict] = []
+
     counts = inference._vindications_per_predicate(conn)
-    if not counts:
-        return []  # no rule-evidence yet -> nothing to calibrate; the seed stands
-    threshold = inference.calibrated_transitivity_min(conn)
-    seed = inference.MIN_VINDICATIONS
-    origin = "derived from the natural gap" if threshold != seed else "validated equal to the seed"
-    return [
-        {
+    if counts:  # some closed-triangle evidence exists -> calibrate the transitivity threshold
+        threshold = inference.calibrated_transitivity_min(conn)
+        seed = inference.MIN_VINDICATIONS
+        origin = "derived from the natural gap" if threshold != seed else "validated equal to the seed"
+        candidates.append({
             "experience_key": inference.TRANSITIVITY_CALIBRATION_KEY,
             "experience_type": RULE_CALIBRATION_TYPE,
             "subject_key": "transitivity",
-            "pattern": {
-                "threshold": threshold,
-                "seed": seed,
-                "population": counts,
-                "classification": str(threshold),  # the key _maybe_recharacterize compares on
-            },
+            "pattern": {"threshold": threshold, "seed": seed, "population": counts,
+                        "classification": str(threshold)},  # the key _maybe_recharacterize compares on
             "supporting_events": [],
             "derivation": RULE_CALIBRATION_DERIVATION,
             "summary": f"transitivity threshold {threshold} ({origin}; population {counts})",
             "proposable": False,
             "characterization": str(threshold),  # re-record when the derived threshold changes
-        }
-    ]
+        })
+
+    mirror = {p: round(r, 4) for p, r in inference._mirror_rates_per_predicate(conn).items() if r > 0}
+    if mirror:  # some mirrored edges exist -> calibrate the symmetry rate
+        srate = inference.calibrated_symmetry_rate(conn)
+        sseed = inference.MIN_SYMMETRY_RATE
+        sorigin = "derived from the natural gap" if srate != sseed else "validated equal to the seed"
+        candidates.append({
+            "experience_key": inference.SYMMETRY_CALIBRATION_KEY,
+            "experience_type": RULE_CALIBRATION_TYPE,
+            "subject_key": "symmetry",
+            "pattern": {"rate": srate, "seed": sseed, "population": mirror,
+                        "classification": f"{srate:.4f}"},
+            "supporting_events": [],
+            "derivation": RULE_CALIBRATION_DERIVATION,
+            "summary": f"symmetry rate {srate} ({sorigin}; population {mirror})",
+            "proposable": False,
+            "characterization": f"{srate:.4f}",
+        })
+
+    return candidates
 
 
 DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates, _rule_calibration_candidates)
