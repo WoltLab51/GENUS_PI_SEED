@@ -218,7 +218,13 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > einer Antwort (jede Prämisse mit Quelle + read-time-Vertrauen; für ein Wort: expresses ·
 > Bedeutung · is_a, je mit Quelle). Macht die These *anfassbar* — bei „Was ist ein Hund?"
 > legt es alle Sinne offen (Haushund · Förderwagen · Möbel-Rollbrett · Schimpfwort · Sternbild
-> · Nachname), jeder mit Quelle: Reichtum, nicht Korruption. 371 Tests grün. Als Nächstes in
-> Phase A: **Breite** (Wortarten/Sprachen) · **Skalierung/Snapshots**.
+> · Nachname), jeder mit Quelle: Reichtum, nicht Korruption.
+>
+> **Breite-Auftakt geliefert & live: vergleichende Fragen** `genus ask "Was haben X und Y
+> gemeinsam?"` — findet, wo zwei is_a-Linien sich treffen (nächste *benennbare* gemeinsame
+> Oberkategorie zuerst; roher Q-id-Fall live gefunden + gefixt). Live: *Apfel & Birne → Obst*,
+> *Hund & Katze → domestiziertes Säugetier*, *Hund & Auto → Körper*. Reiner Reuse von
+> `infer_lexeme`, kein Plural-Problem (Singular-Nomen). 376 Tests grün. Als Nächstes in Phase
+> A: **Breite** weiter (Wortarten/Sprachen via POS-Quelle) · **Skalierung/Snapshots**.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
