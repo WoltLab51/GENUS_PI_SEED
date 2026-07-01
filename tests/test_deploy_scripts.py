@@ -281,3 +281,20 @@ def test_lexeme_membrane_captures_grammatical_gender_for_nouns():
     assert "Q1775415" in script and "feminin" in script
     assert "Q1775461" in script and "neutrum" in script
     assert 'cat == "Q1084"' in script   # gated to nouns -- gender is meaningless for verbs etc.
+
+
+def test_gender_backfill_is_resumable_and_skips_already_known():
+    script = (ROOT / "deploy" / "backfill_gender.sh").read_text(encoding="utf-8")
+
+    # one-time, resumable (own cursor -- distinct from the main learner's), respects pause/load
+    assert "backfill_gender.cursor" in script
+    assert "PAUSED" in script
+    assert "MAX_LOAD" in script
+    # idempotent: skips a noun that already has a recorded gender rather than re-fetching
+    assert "has_gender" in script
+    assert "grammatical_gender" in script
+    assert "already gendered" in script and "skipping" in script
+    # reuses the existing membrane -- no new fetch logic duplicated
+    assert "observe_lexem.sh" in script
+    # unlike pi_learn.sh's infinite loop, this one reports completion and stops
+    assert "backfill complete" in script
