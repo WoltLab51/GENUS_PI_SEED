@@ -2,11 +2,14 @@
 """Telegram bridge — a conversational membrane at the edge, nothing more.
 
 Long-polls Telegram's Bot API (outbound HTTPS only; no inbound port, no public server needed)
-and answers each allowed message with `genus.companion.respond` -- the exact same read-only
-routing `genus ask` uses (state -> relational -> comparative -> gender -> word -> help). The
-core is untouched: this is a new DOOR, not a new ROOM. Strictly answer-only -- no proposal,
-governance, pause/resume, or any state-changing command is reachable here, on purpose (Hände
-stay parked; this is a Mundstück).
+and answers each allowed message with `genus.companion.respond_in_conversation` -- the same
+read-only routing `genus ask` uses (state -> relational -> comparative -> gender -> word ->
+help), aware of the PREVIOUS message in the same chat so a bare "warum?"/"woher weißt du das?"
+retraces it instead of failing (per-chat state lives here in the membrane, in-process only --
+the ledger stays the source of epistemic truth, this is UX plumbing, not knowledge). The core is
+untouched: this is a new DOOR, not a new ROOM. Strictly answer-only -- no proposal, governance,
+pause/resume, or any state-changing command is reachable here, on purpose (Hände stay parked;
+this is a Mundstück).
 
 Security: a message is answered ONLY if its sender's Telegram user id is on the allow-list
 (GENUS_TELEGRAM_ALLOWED_IDS). Everyone else is silently ignored (logged, not replied to, so a
@@ -96,9 +99,18 @@ def _save_offset(offset: int) -> None:
         f.write(str(offset))
 
 
-def handle_update(conn, update: dict, allowed: set[int]) -> tuple[int, str] | None:
+def handle_update(
+    conn, update: dict, allowed: set[int], sessions: dict[int, str] | None = None
+) -> tuple[int, str] | None:
     """Pure logic, no network: given one Telegram update + the allow-list, decide whether to
-    answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer."""
+    answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer.
+
+    ``sessions`` (optional), keyed by chat_id, holds each conversation's last question so a bare
+    follow-up ("warum?", "woher weißt du das?") can be read against it (``companion.
+    respond_in_conversation``) instead of falling through to "kein Wort bekannt". In-process
+    only, forgotten on a restart -- an honest, small limitation: this is UX-session plumbing,
+    not knowledge, so it deliberately doesn't touch the ledger (Ledger != Memory). Omit
+    ``sessions`` for the plain, stateless behaviour (unchanged)."""
     from genus import companion
 
     message = update.get("message") or update.get("edited_message")
@@ -114,7 +126,12 @@ def handle_update(conn, update: dict, allowed: set[int]) -> tuple[int, str] | No
     question = message["text"]
     _log(f"question from {sender}: {question!r}")
     try:
-        answer = companion.respond(conn, question)
+        if sessions is None:
+            answer = companion.respond(conn, question)
+        else:
+            result = companion.respond_in_conversation(conn, question, sessions.get(chat_id))
+            answer = result["text"]
+            sessions[chat_id] = result["question"]
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering {question!r}: {exc}")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."
@@ -138,6 +155,7 @@ def main() -> int:
     conn.row_factory = sqlite3.Row
 
     offset = _load_offset()
+    sessions: dict[int, str] = {}   # chat_id -> last question; in-process only, see handle_update
     while True:
         try:
             updates = _get_updates(token, offset)
@@ -147,7 +165,7 @@ def main() -> int:
             continue
         for update in updates:
             offset = max(offset, update["update_id"] + 1)
-            result = handle_update(conn, update, allowed)
+            result = handle_update(conn, update, allowed, sessions)
             if result is not None:
                 chat_id, answer = result
                 try:

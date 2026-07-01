@@ -864,3 +864,52 @@ def test_why_cli_traces_a_relation(monkeypatch):
     result = CliRunner().invoke(cli.main, ["why", "answer", "Ist", "ein", "Hund", "ein", "Säugetier?"])
     assert result.exit_code == 0, result.output
     assert "[WHY]" in result.output and "Säugetier" in result.output and "Vertrauen" in result.output
+
+
+def test_why_followup_recognizes_the_closed_set_of_cue_phrases():
+    from genus import companion
+    for phrase in ("warum?", "Warum", "wieso??", "  weshalb ", "Woher weißt du das?",
+                   "woher kommt das", "Woher hast du das?"):
+        assert companion.is_why_followup(phrase), phrase
+    for phrase in ("warum ist ein Hund ein Säugetier?", "Was ist ein Hund?", ""):
+        assert not companion.is_why_followup(phrase), phrase
+
+
+def test_conversation_retraces_the_previous_relational_answer():
+    from genus import companion
+    conn = _isa_graph()
+    first = companion.respond_in_conversation(conn, "Ist ein Hund ein Säugetier?")
+    assert "Ja." in first["text"] and first["question"] == "Ist ein Hund ein Säugetier?"
+
+    followup = companion.respond_in_conversation(conn, "warum?", last_question=first["question"])
+    assert "Herleitung" in followup["text"] and "Vertrauen" in followup["text"]
+    assert "wikidata" in followup["text"]                    # the same sourced chain, retraced
+    assert followup["question"] == first["question"]         # still anchored on the same topic
+
+
+def test_conversation_retraces_the_previous_word_answer():
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    first = companion.respond_in_conversation(conn, "Was ist ein Hund?")
+    assert "Hund" in first["text"]
+
+    followup = companion.respond_in_conversation(conn, "Woher weißt du das?", last_question=first["question"])
+    assert "dbnary" in followup["text"] and "Wolf" in followup["text"]   # the grounding, not a re-explanation
+
+
+def test_followup_without_a_previous_question_falls_through_honestly():
+    from genus import companion
+    conn = _isa_graph()
+    result = companion.respond_in_conversation(conn, "warum?", last_question=None)
+    assert result["question"] == "warum?"
+    assert result["text"] == companion.respond(conn, "warum?")   # no state to retrace -> ordinary routing
+    assert "Herleitung" not in result["text"]                    # never mislabeled as a trace
+
+
+def test_a_real_question_is_never_mistaken_for_a_followup():
+    from genus import companion
+    conn = _isa_graph()
+    result = companion.respond_in_conversation(conn, "Was ist ein Hund?", last_question="Ist ein Hund ein Säugetier?")
+    assert "Herleitung" not in result["text"]          # routed through respond(), not the why-trace
+    assert result["question"] == "Was ist ein Hund?"   # a real question always overrides, never a stale one

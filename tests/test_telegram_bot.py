@@ -61,6 +61,42 @@ def test_a_bug_in_answering_is_caught_not_raised(monkeypatch):
     assert chat_id == 42 and "schiefgelaufen" in answer   # graceful, never crashes the loop
 
 
+def test_sessions_let_a_bare_followup_retrace_the_previous_answer():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Haustier@de", "expresses", "Q_pet", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_pet", "wikidata")
+    sessions: dict = {}
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "Ist ein Hund ein Haustier?"), allowed={42}, sessions=sessions)
+    chat_id, answer = telegram_bot.handle_update(conn, _msg(2, 42, "warum?"), allowed={42}, sessions=sessions)
+
+    assert chat_id == 42
+    assert "Herleitung" in answer and "wikidata" in answer   # retraced, not "kein Wort bekannt"
+
+
+def test_sessions_are_kept_separate_per_chat():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    sessions: dict = {}
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions)
+    # a DIFFERENT chat asks a bare followup with no history of its own -- must not see chat 42's question
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(2, 42, "warum?", chat_id=99), allowed={42}, sessions=sessions,
+    )
+    assert "Herleitung" not in answer   # chat 99 has no prior turn -> ordinary routing, not a stale trace
+
+
+def test_without_sessions_behaves_exactly_as_before():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    result = telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42})   # no sessions
+    assert result is not None and "Wolf" in result[1]
+
+
 def test_allowed_ids_parses_comma_separated_list(monkeypatch):
     monkeypatch.setenv("GENUS_TELEGRAM_ALLOWED_IDS", "111, 222 ,333")
     assert telegram_bot._allowed_ids() == {111, 222, 333}

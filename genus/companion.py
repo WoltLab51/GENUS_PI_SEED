@@ -34,6 +34,18 @@ def _known(conn, form: str) -> bool:
                or _objects(conn, form, "primary_gloss"))
 
 
+def _last_known_word(conn, question: str) -> str | None:
+    """The last word in ``question`` GENUS has anything recorded about (as written or
+    capitalised) -- in "Was ist ein X?" the asked-about word comes last."""
+    found: str | None = None
+    for tok in _WORD.findall(question):
+        for form in (tok, tok[:1].upper() + tok[1:]):
+            if _known(conn, form):
+                found = form
+                break
+    return found
+
+
 def answer(conn, question: str) -> dict:
     """Answer a question about a word GENUS knows; ``{found: False}`` if it knows no word in it.
 
@@ -43,12 +55,7 @@ def answer(conn, question: str) -> dict:
     carries its glosses + part of speech -- answered word-level so the companion reaches beyond
     nouns. A real parse of the question is the LLM's job at the edge later.
     """
-    found: str | None = None
-    for tok in _WORD.findall(question):
-        for form in (tok, tok[:1].upper() + tok[1:]):
-            if _known(conn, form):
-                found = form
-                break
+    found = _last_known_word(conn, question)
     if found is None:
         return {"found": False, "question": question}
 
@@ -325,6 +332,42 @@ def respond(conn, question: str) -> str:
             text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
         return text
     return state["answer"]  # the "unknown fixed query pattern" help, same fallback as the CLI
+
+
+# --- a bare follow-up, read against the PREVIOUS turn ------------------------------------
+#
+# The gap Ronny hit live: asking "GENUS why answer that?" right after an answer fell through to
+# a plain word-lookup, because every call to `respond` is stateless -- "that" means nothing on
+# its own. Deliberately narrow: a small, closed set of German provenance cue phrases, not general
+# coreference resolution (a genuinely harder problem; pronoun substitution like "und es?" is a
+# natural next slice, not built here). `companion.py` stays pure -- a caller across multiple
+# turns (the Telegram bridge) owns the actual per-chat state and threads it through.
+
+_WHY_FOLLOWUP = {
+    "warum", "wieso", "weshalb",
+    "woher weißt du das", "woher weisst du das",
+    "woher weißt du das denn", "woher weisst du das denn",
+    "woher kommt das", "woher hast du das",
+}
+
+
+def is_why_followup(question: str) -> bool:
+    """True for a bare provenance follow-up ("warum?", "woher weißt du das?", ...) -- it has no
+    subject of its own, but makes sense read against the PREVIOUS turn's question."""
+    return question.strip().strip("?!.").strip().lower() in _WHY_FOLLOWUP
+
+
+def respond_in_conversation(conn, question: str, last_question: str | None = None) -> dict:
+    """Like ``respond``, but aware of the PREVIOUS turn's question. A bare "warum?"/"woher weißt
+    du das?" reruns the exact same routing ``why`` would use for ``last_question`` -- correctly
+    retracing a relational chain or a word's grounding, whichever the previous turn actually
+    answered -- instead of falling through to "GENUS kennt kein Wort in ...". Returns
+    ``{"text": ..., "question": ...}``; a caller threads ``question`` forward as the next call's
+    ``last_question`` to keep the conversation anchored."""
+    if last_question and is_why_followup(question):
+        text = "\n".join(render_trace(conn, trace(conn, last_question)))
+        return {"text": text, "question": last_question}  # still "about" the same thing
+    return {"text": respond(conn, question), "question": question}
 
 
 # --- the provenance trace ("genus why") ------------------------------------------------
