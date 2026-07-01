@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from genus import sources
+from genus import inference, sources
 
 _WORD = re.compile(r"[\wäöüÄÖÜß]+", re.UNICODE)
 
@@ -95,3 +95,91 @@ def narrate(a: dict) -> str:
     if a["languages"]:
         sentence += f" In anderen Sprachen: {', '.join(a['languages'][:4])}."
     return sentence
+
+
+# --- relational questions ("Ist ein X ein Y?") -----------------------------------------
+#
+# A yes/no is_a question, answered by the *existing* inference primitive: map X to its
+# concept(s), walk the concept-level is_a hierarchy (sense-coherent by construction), and
+# check whether Y is among the ancestors. The answer is a derived edge, so it carries its
+# whole premise chain -- glass-box: GENUS shows *the way* from X to Y, and the trust is the
+# weakest premise. No model, nothing invented; the reasoning is the answer.
+
+_ART = r"(?:einen|einer|eine|ein|der|die|das|den|dem)"
+_TERM = r"([A-Za-zäöüÄÖÜß]+)"
+_REL_PATTERNS = [
+    re.compile(r"\bist\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _ART + r"?\s*art(?:\s+von)?\s+" + _TERM, re.I),
+    re.compile(r"\bist\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _ART + r"\s+" + _TERM, re.I),
+    re.compile(r"\bsind\s+" + _TERM + r"\s+" + _ART + r"?\s*" + _TERM, re.I),
+]
+_LABEL_IN = re.compile(r"^Q\d+\s*\((.*)\)$")
+
+
+def _forms(tok: str):
+    """The token as written and capitalised -- German nouns are stored capitalised."""
+    return (tok, tok[:1].upper() + tok[1:])
+
+
+def _concept_form(conn, tok: str) -> str | None:
+    """The written/capitalised form of ``tok`` that GENUS knows as a concept, if any."""
+    for form in _forms(tok):
+        if _prominent_concept(conn, form) is not None:
+            return form
+    return None
+
+
+def _concepts_of(conn, tok: str) -> tuple[set[str], str | None]:
+    """All concepts a word expresses, and the known form -- for the object side of the question."""
+    for form in _forms(tok):
+        qids = {r["object"] for r in sources.relations(conn, subject=f"{form}@de", predicate=sources.EXPRESSES)}
+        if qids:
+            return qids, form
+    return set(), None
+
+
+def _label(conn, node: str) -> str:
+    """A concept rendered as a plain German word (not a Q-id) for a readable path."""
+    m = _LABEL_IN.match(sources.display(conn, node))
+    return m.group(1) if m else node
+
+
+def _collapse(path: list[str]) -> list[str]:
+    out: list[str] = []
+    for p in path:
+        if not out or out[-1] != p:
+            out.append(p)
+    return out
+
+
+def relate(conn, question: str) -> dict:
+    """Answer a yes/no is_a question from the graph; ``{relational: False}`` if it isn't one
+    (or names something GENUS can't resolve, so a plain word-lookup should try instead)."""
+    for pattern in _REL_PATTERNS:
+        m = pattern.search(question)
+        if not m:
+            continue
+        x_form = _concept_form(conn, m.group(1))
+        y_concepts, y_form = _concepts_of(conn, m.group(2))
+        if x_form is None or not y_concepts:
+            continue  # not a relation GENUS can own -- fall through to the word companion
+        ancestors = inference.infer_lexeme(conn, x_form, "is_a", "de")
+        hits = [a for a in ancestors if a["object"] in y_concepts]
+        if hits:
+            best = min(hits, key=lambda a: len(a["chain"]))
+            return {"relational": True, "verdict": "yes", "subject": x_form, "object": y_form,
+                    "target": best["object"], "trust": best["trust"], "chain": best["chain"]}
+        return {"relational": True, "verdict": "no_path", "subject": x_form, "object": y_form}
+    return {"relational": False}
+
+
+def narrate_relation(conn, r: dict) -> str:
+    """Fluent, deterministic German for a relational answer -- glass-box: the path is shown."""
+    x, y = r["subject"], r["object"]
+    if r["verdict"] == "yes":
+        path = _collapse([x] + [_label(conn, p["object"]) for p in r["chain"]])
+        s = f"Ja. »{x}« zählt zu »{y}«."
+        if len(path) > 2:
+            s += f" Der Weg: {' → '.join(path)}."
+        return s + f" (Vertrauen {r['trust']:.2f} — aus dem Wissensgraphen hergeleitet, nicht behauptet.)"
+    return (f"Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von »{x}« zu "
+            f"»{y}«. (Das heißt: unbekannt, nicht widerlegt.)")

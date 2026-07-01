@@ -699,3 +699,60 @@ def test_ask_state_query_wins_over_learned_word(monkeypatch):
     result = CliRunner().invoke(cli.main, ["ask", "status"])
     assert result.exit_code == 0, result.output
     assert "Art und Weise" not in result.output   # not the word gloss -> the state answer instead
+
+
+def _isa_graph():
+    conn = _fresh()  # Hund -> Haustier -> Säugetier at concept level; Reptil is known but unconnected
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Haustier@de", "expresses", "Q_pet", "wikidata")
+    reactors.observe_relation(conn, "Säugetier@de", "expresses", "Q_mammal", "wikidata")
+    reactors.observe_relation(conn, "Reptil@de", "expresses", "Q_reptile", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_pet", "wikidata")
+    reactors.observe_relation(conn, "Q_pet", "is_a", "Q_mammal", "wikidata")
+    return conn
+
+
+def test_relate_yes_transitive_shows_the_way():
+    from genus import companion
+    conn = _isa_graph()
+    r = companion.relate(conn, "Ist ein Hund ein Säugetier?")
+    assert r["relational"] and r["verdict"] == "yes" and r["target"] == "Q_mammal"
+    assert len(r["chain"]) >= 2                       # expresses + is_a hops, glass-box
+    s = companion.narrate_relation(conn, r)
+    assert s.startswith("Ja.") and "Säugetier" in s and "→" in s   # the path is shown
+
+
+def test_relate_direct_parent_shows_no_multistep_path():
+    from genus import companion
+    conn = _isa_graph()
+    r = companion.relate(conn, "Ist ein Hund ein Haustier?")
+    assert r["verdict"] == "yes" and r["target"] == "Q_pet"
+    assert "→" not in companion.narrate_relation(conn, r)          # one hop, no way to trace out
+
+
+def test_relate_no_path_withholds_not_denies():
+    from genus import companion
+    conn = _isa_graph()   # both concepts known, but no is_a connection between them
+    r = companion.relate(conn, "Ist ein Hund ein Reptil?")
+    assert r["relational"] and r["verdict"] == "no_path"
+    assert "nicht widerlegt" in companion.narrate_relation(conn, r)  # open-world honesty
+
+
+def test_relate_unknown_terms_fall_through():
+    from genus import companion
+    conn = _isa_graph()
+    assert companion.relate(conn, "Ist ein Quux ein Blarg?")["relational"] is False
+
+
+def test_relate_is_case_lenient():
+    from genus import companion
+    conn = _isa_graph()
+    assert companion.relate(conn, "ist ein hund ein säugetier?")["verdict"] == "yes"
+
+
+def test_ask_cli_routes_relational_question(monkeypatch):
+    conn = _isa_graph()  # a relational question reaches the inference route, not the word lookup
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["ask", "Ist", "ein", "Hund", "ein", "Säugetier?"])
+    assert result.exit_code == 0, result.output
+    assert "Ja." in result.output and "Säugetier" in result.output
