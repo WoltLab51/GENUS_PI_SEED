@@ -7,17 +7,10 @@ set -Eeuo pipefail
 # in files outside the repo with restrictive permissions (0600), never in the world-readable
 # systemd unit file (0644) and never committed to git.
 #
-# Usage: deploy/pi_install_telegram_bot.sh <BOT_TOKEN> <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]
-
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <BOT_TOKEN> <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]" >&2
-    echo "  BOT_TOKEN: from @BotFather on Telegram" >&2
-    echo "  ALLOWED_TELEGRAM_USER_ID: your own numeric Telegram id (e.g. from @userinfobot)" >&2
-    exit 1
-fi
-
-BOT_TOKEN="$1"; shift
-ALLOWED_IDS="$(IFS=,; echo "$*")"
+# Usage: deploy/pi_install_telegram_bot.sh [BOT_TOKEN] <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]
+#   The token is OPTIONAL here if you've already placed it yourself in the token file -- the most
+#   private path: your secret goes straight from @BotFather onto this Pi, through no one else's
+#   hands. Detected by shape: a Telegram token contains a ':' (12345:ABC...), a user id is digits.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
@@ -29,14 +22,39 @@ TOKEN_FILE="$GENUS_HOME/.genus/telegram_bot_token"
 ENV_FILE="$GENUS_HOME/.genus/telegram_bot.env"
 SERVICE_PATH="/etc/systemd/system/genus-telegram-bot.service"
 
+# A first argument that looks like a token (contains ':') is used; otherwise every argument is a
+# user id and the token must already be in TOKEN_FILE (the private, pre-placed path).
+BOT_TOKEN=""
+if [ "$#" -ge 1 ]; then
+    case "$1" in
+        *:*) BOT_TOKEN="$1"; shift ;;
+    esac
+fi
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 [BOT_TOKEN] <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]" >&2
+    echo "  BOT_TOKEN is optional here if you placed it in $TOKEN_FILE yourself (chmod 600)." >&2
+    echo "  ALLOWED_TELEGRAM_USER_ID: your numeric Telegram id (from @userinfobot)." >&2
+    exit 1
+fi
+ALLOWED_IDS="$(IFS=,; echo "$*")"
+
 mkdir -p "$(dirname "$DB_PATH")" "$LOG_DIR"
 
-# The token: its own file, chmod 600, never in the unit file or an env var visible to `systemctl
-# show`. telegram_bot.py reads it from here automatically when GENUS_TELEGRAM_BOT_TOKEN isn't set.
+# The token lives in its own file, chmod 600, never in the world-readable unit file. Prefer a
+# token you pre-placed (so it never passed through the installer's arguments at all); only write
+# it here if you chose to pass it on the command line.
 umask 077
-printf '%s' "$BOT_TOKEN" > "$TOKEN_FILE"
+if [ -n "$BOT_TOKEN" ]; then
+    printf '%s' "$BOT_TOKEN" > "$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE"
+elif [ ! -s "$TOKEN_FILE" ]; then
+    echo "No token on the command line and $TOKEN_FILE is missing/empty." >&2
+    echo "Place your token there first (chmod 600), or pass it as the first argument." >&2
+    exit 1
+fi
 printf 'GENUS_TELEGRAM_ALLOWED_IDS=%s\n' "$ALLOWED_IDS" > "$ENV_FILE"
-chmod 600 "$TOKEN_FILE" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
 
 tmp_service="$(mktemp)"
 trap 'rm -f "$tmp_service"' EXIT
