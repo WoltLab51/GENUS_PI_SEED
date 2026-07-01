@@ -278,7 +278,15 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > + Inquiry, genau wie ein Wissens-Widerspruch. Billig am Assertions-Punkt (`inference.reaches` =
 > gezielte, gebündelte BFS; 0,24 ms/is_a-Assertion live). Damit **lernt** GENUS die Regeln seines
 > Denkens (①a), **schließt** nach ihnen (①b) und **verteidigt** ihre Konsistenz (①c) — der Kern
-> prüft jetzt nicht nur seine Fakten, sondern seine eigene Vernunft. 391 grün. **Als Nächstes:**
-> SYSTEME in die Breite (weitere Regel-Domänen) *oder* der Sprung in **Phase C** (Selbst-Optimierung).
+> prüft jetzt nicht nur seine Fakten, sondern seine eigene Vernunft. 391 grün.
+>
+> **Phase C — Selbst-Optimierung gestartet.** GENUS *leitet* die Schwelle seines eigenen Denkens
+> aus der natürlichen Lücke in den eigenen Daten ab (is_a 237 vs. synonym 2 → **3**), statt aus der
+> Konstante, die ich getippt habe — reflexive Selbst-Kalibrierung ([[self-calibration-no-presets]]),
+> das Fundament von „optimiert sich selbst". Der abgeleitete Wert *gleicht* der Saat: GENUS
+> **bestätigt seine eigene Konstante** aus gelebten Daten (`genus knowledge` zeigt sie gläsern).
+> Ehrlich: die Quer-Prädikat-Kalibrierung ist pro Frage zu schwer (SQL +110 ms) → **Readout
+> on-demand**, der heiße Pfad behält die schnelle Saat (58 ms). 393 grün. **Als Nächstes:** die
+> abgeleitete Schwelle *billig* verdrahten via **gespeicherter Kalibrierung** (BeliefStability-Muster).
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
