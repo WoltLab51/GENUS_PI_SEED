@@ -8,7 +8,6 @@ REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 FAIL_FILE="${GENUS_NETWORK_FAILURE_FILE:-$GENUS_HOME/.genus/network-watchdog.failures}"
-REBOOT_THRESHOLD="${GENUS_NETWORK_REBOOT_THRESHOLD:-3}"
 TARGET="${GENUS_NETWORK_TARGET:-}"
 
 mkdir -p "$LOG_DIR" "$(dirname "$FAIL_FILE")"
@@ -159,7 +158,20 @@ esac
 failures=$((failures + 1))
 printf '%s\n' "$failures" > "$FAIL_FILE"
 
-if [ "$failures" -ge "$REBOOT_THRESHOLD" ]; then
+# The reboot threshold is GENUS's own, self-calibrated from its outage history (governance's
+# widest-gap derivation) -- ask it live instead of carrying a second, separately-typed copy of
+# the number here. GENUS_NETWORK_REBOOT_THRESHOLD stays as an explicit manual override; a failed
+# or pre-migration lookup falls back to the seed (3), same as the core does internally.
+if [ -n "${GENUS_NETWORK_REBOOT_THRESHOLD:-}" ]; then
+    reboot_threshold="$GENUS_NETWORK_REBOOT_THRESHOLD"
+else
+    reboot_threshold="$(run_genus governance reboot-threshold --value-only 2>/dev/null || true)"
+    case "$reboot_threshold" in
+        ''|*[!0-9]*) reboot_threshold=3 ;;
+    esac
+fi
+
+if [ "$failures" -ge "$reboot_threshold" ]; then
     action="reboot"
 else
     action="restart_network"

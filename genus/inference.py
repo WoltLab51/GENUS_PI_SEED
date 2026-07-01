@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from genus import sources
+from genus import self_calibration, sources
 
 # Declarative inference rules -- the SEED (the starting hypothesis before the graph has spoken).
 # These are no longer the last word: GENUS learns from its own graph which predicates actually
@@ -237,11 +237,9 @@ def calibrated_transitivity_min(conn) -> int:
     is transitive when it sits above the incidental group. Falls back to the seed MIN_VINDICATIONS
     when the population is too thin to show a gap. Self-calibration turned on the rules of reasoning
     themselves: the parameter is derived, not decreed (see [[self-calibration-no-presets]])."""
-    counts = sorted({n for n in _vindications_per_predicate(conn).values() if n > 0})
-    if len(counts) < 2:
-        return MIN_VINDICATIONS
-    _, low = max((counts[i + 1] - counts[i], counts[i]) for i in range(len(counts) - 1))
-    return low + 1   # transitive: strictly above the incidental (low) group across the widest gap
+    return self_calibration.widest_gap_count_threshold(
+        _vindications_per_predicate(conn).values(), MIN_VINDICATIONS
+    )
 
 
 def stored_transitivity_threshold(conn) -> int | None:
@@ -302,11 +300,9 @@ def calibrated_symmetry_rate(conn) -> float:
     positive rates gives the cut (its midpoint); falls back to the seed ``MIN_SYMMETRY_RATE`` when
     the population is too thin. Self-calibration on the rules of reasoning, the symmetry twin of
     ``calibrated_transitivity_min``."""
-    rates = sorted({r for r in _mirror_rates_per_predicate(conn).values() if r > 0})
-    if len(rates) < 2:
-        return MIN_SYMMETRY_RATE
-    _, lo, hi = max((rates[i + 1] - rates[i], rates[i], rates[i + 1]) for i in range(len(rates) - 1))
-    return round((lo + hi) / 2, 4)   # midpoint of the widest gap between incidental and systematic
+    return self_calibration.widest_gap_rate_cut(
+        _mirror_rates_per_predicate(conn).values(), MIN_SYMMETRY_RATE
+    )
 
 
 def stored_symmetry_rate(conn) -> float | None:

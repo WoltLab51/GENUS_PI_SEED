@@ -135,6 +135,61 @@ def test_reboot_recovery_is_rate_limited_by_governance(conn):
     ).fetchone()["count"] == 1
 
 
+def test_reboot_threshold_derives_from_completed_episode_history(conn):
+    # five short, self-resolving episodes (length 1) and one long one (length 8) -> a real gap
+    for _ in range(5):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)
+        operation.record_network_check(conn, operation.STATUS_OK, "t")
+    for f in range(1, 9):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=f)
+    operation.record_network_check(conn, operation.STATUS_OK, "t")  # closes the long episode
+
+    report = governance.reboot_threshold_report(conn)
+    assert report["episodes"] == 6
+    assert report["derived"] is True
+    assert report["threshold"] == 2   # widest gap between {1, 8} -> low=1 -> 1+1, not the seed 3
+    assert governance.calibrated_reboot_threshold(conn) == 2
+
+
+def test_reboot_threshold_falls_back_to_seed_with_too_little_history(conn):
+    for _ in range(3):   # fewer than MIN_RECOVERY_EPISODES
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)
+        operation.record_network_check(conn, operation.STATUS_OK, "t")
+
+    report = governance.reboot_threshold_report(conn)
+    assert report["derived"] is False
+    assert report["threshold"] == governance.RECOVERY_REBOOT_MIN_FAILURES
+
+
+def test_reboot_threshold_excludes_an_unresolved_ongoing_episode(conn):
+    for _ in range(5):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)
+        operation.record_network_check(conn, operation.STATUS_OK, "t")
+    for f in range(1, 9):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=f)
+    operation.record_network_check(conn, operation.STATUS_OK, "t")   # 6 completed episodes
+    operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)  # still open, no ok yet
+
+    report = governance.reboot_threshold_report(conn)
+    assert report["episodes"] == 6           # the open run is not counted
+    assert report["threshold"] == 2          # unaffected by the open tail
+
+
+def test_reboot_policy_uses_the_calibrated_threshold_not_the_seed(conn):
+    for _ in range(5):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)
+        operation.record_network_check(conn, operation.STATUS_OK, "t")
+    for f in range(1, 9):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=f)
+    operation.record_network_check(conn, operation.STATUS_OK, "t")   # calibrates the threshold to 2
+
+    # failures=2 would be BLOCKED under the seed (3) but ALLOWED under the calibrated value (2)
+    result = operation.record_network_check(
+        conn, operation.STATUS_FAIL, "192.168.178.1", failures=2, action=operation.ACTION_REBOOT,
+    )
+    assert result["recovery"]["verdict"]["decision"] == governance.ALLOWED
+
+
 def test_recovery_action_requires_failed_check(conn):
     try:
         operation.record_network_check(

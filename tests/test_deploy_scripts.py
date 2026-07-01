@@ -258,6 +258,12 @@ def test_network_watchdog_records_operation_events_and_governed_recovery():
     assert "operation recovery-result" in watchdog
     assert "--action \"$action\"" in watchdog
     assert "systemctl reboot" in watchdog
+    # the reboot threshold is GENUS's own self-calibrated value, asked live each time -- no
+    # second, separately-typed copy of the number lives in the script; a manual override and a
+    # numeric-safe fallback both still work if the lookup is unavailable
+    assert "governance reboot-threshold --value-only" in watchdog
+    assert "GENUS_NETWORK_REBOOT_THRESHOLD" in watchdog
+    assert "reboot_threshold=3" in watchdog
     # supervisor role: the watchdog also keeps the background learner alive (no extra sudo)
     assert "ensure_learner" in watchdog
     assert "pi_learn.sh" in watchdog

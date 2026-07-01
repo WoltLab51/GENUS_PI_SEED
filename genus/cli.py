@@ -1053,6 +1053,27 @@ def governance_acquisition_allowed(source: str) -> None:
         conn.close()
 
 
+@governance_group.command("reboot-threshold")
+@click.option("--value-only", is_flag=True, help="Print only the integer (for scripts).")
+def governance_reboot_threshold(value_only: bool) -> None:
+    """The current reboot-recovery threshold -- self-calibrated from GENUS's own outage history,
+    the seed as fallback while there isn't enough of it yet. The network watchdog reads this
+    (--value-only) each tick instead of carrying its own separate copy of the number."""
+    conn = get_conn()
+    try:
+        report = governance.reboot_threshold_report(conn)
+        if value_only:
+            click.echo(report["threshold"])
+            return
+        basis = "derived from data" if report["derived"] else "seed (not enough data yet)"
+        click.echo(
+            f"[GOV] reboot threshold: {report['threshold']} consecutive failures "
+            f"({basis}, {report['episodes']} completed outage episode(s) observed)"
+        )
+    finally:
+        conn.close()
+
+
 @operation_group.command("network-check")
 @click.option(
     "--status",

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from genus import ledger, state
+from genus import ledger, self_calibration, state
 from genus.proposal_types import RULE_PROPOSAL
 
 
@@ -32,7 +32,16 @@ POLICY_REBOOT_COOLDOWN = "policy:reboot_cooldown_v1"
 RECOVERY_RESTART_NETWORK = "restart_network"
 RECOVERY_REBOOT = "reboot"
 RECOVERY_ACTIONS = {RECOVERY_RESTART_NETWORK, RECOVERY_REBOOT}
+# The SEED for how many consecutive gateway failures justify a reboot -- no longer the last word:
+# calibrated_reboot_threshold() derives the real cut from GENUS's own recovery history once there
+# is enough of it (MIN_RECOVERY_EPISODES), the same self-calibration already applied to the
+# reasoning rules (transitivity/symmetry). This is the one place GENUS truly ACTS on the world;
+# until now it was the only threshold in the core still typed in by hand.
 RECOVERY_REBOOT_MIN_FAILURES = 3
+MIN_RECOVERY_EPISODES = 5
+# How long to wait between successive reboots -- a fixed safety margin against a reboot-loop,
+# not a "what's typical for this Pi" question, so it deliberately stays a constant (per the
+# relative-vs-absolute criterion in [[self-calibration-no-presets]]).
 RECOVERY_REBOOT_COOLDOWN_SECONDS = 3600
 
 
@@ -494,15 +503,17 @@ def _evaluate_operation_recovery_policies(
     if action != RECOVERY_REBOOT:
         threshold_result = PASS
         threshold_reason = "reboot guard only applies to reboot recovery"
-    elif int(failures) >= RECOVERY_REBOOT_MIN_FAILURES:
-        threshold_result = PASS
-        threshold_reason = "network failure threshold reached"
     else:
-        threshold_result = POLICY_BLOCK
-        threshold_reason = (
-            "reboot recovery requires at least "
-            f"{RECOVERY_REBOOT_MIN_FAILURES} consecutive failures"
-        )
+        threshold = calibrated_reboot_threshold(conn)
+        if int(failures) >= threshold:
+            threshold_result = PASS
+            threshold_reason = "network failure threshold reached"
+        else:
+            threshold_result = POLICY_BLOCK
+            threshold_reason = (
+                "reboot recovery requires at least "
+                f"{threshold} consecutive failures"
+            )
     cooldown_result = _evaluate_reboot_cooldown(conn, action)
     return [
         {
@@ -512,6 +523,56 @@ def _evaluate_operation_recovery_policies(
         },
         cooldown_result,
     ]
+
+
+def calibrated_reboot_threshold(conn) -> int:
+    """How many consecutive gateway failures GENUS requires before allowing reboot recovery,
+    learned from the natural gap in GENUS's own outage history instead of the typed-in
+    RECOVERY_REBOOT_MIN_FAILURES. Most outage episodes are short (a blip, or restart_network
+    already fixed it); a real outage that needed the harsher remedy sits far above them -- the
+    widest gap between completed episode lengths is the cut. Falls back to the seed when there
+    are too few completed episodes to show a real pattern (an idle, stable Pi rightly keeps the
+    seed). Read on demand: recovery attempts are rare, so there is no hot-path cost to justify a
+    stored/batched calibration like the reasoning rules (see [[self-calibration-no-presets]])."""
+    return reboot_threshold_report(conn)["threshold"]
+
+
+def reboot_threshold_report(conn) -> dict:
+    """Glass-box readout behind calibrated_reboot_threshold: the active value, how many completed
+    outage episodes it's derived from, and whether it's actually derived or still the seed."""
+    lengths = _recovery_episode_lengths(conn)
+    derived = len(lengths) >= MIN_RECOVERY_EPISODES
+    threshold = (
+        self_calibration.widest_gap_count_threshold(lengths, RECOVERY_REBOOT_MIN_FAILURES)
+        if derived else RECOVERY_REBOOT_MIN_FAILURES
+    )
+    return {"threshold": threshold, "episodes": len(lengths), "derived": derived}
+
+
+def _recovery_episode_lengths(conn) -> list[int]:
+    """Length (consecutive failed checks) of every COMPLETED network-outage episode -- a run of
+    failed network.gateway checks followed by an ok check. An episode still failing at the most
+    recent check is excluded (unresolved, its true length isn't known yet) -- open-world, like
+    every other calibration in the core."""
+    rows = conn.execute(
+        """
+        SELECT json_extract(payload, '$.status') AS status,
+               json_extract(payload, '$.payload.failures') AS failures
+        FROM event_log
+        WHERE event_type = 'operation_check_recorded'
+          AND json_extract(payload, '$.check_key') = 'network.gateway'
+        ORDER BY id ASC
+        """
+    ).fetchall()
+    lengths: list[int] = []
+    run_max = 0
+    for row in rows:
+        if row["status"] == "fail":
+            run_max = max(run_max, int(row["failures"] or 0))
+        elif run_max > 0:
+            lengths.append(run_max)
+            run_max = 0
+    return lengths
 
 
 def _evaluate_reboot_cooldown(conn, action: str) -> dict:

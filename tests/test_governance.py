@@ -230,6 +230,19 @@ def test_governance_cli(monkeypatch, cli_conn, conn):
     assert "constraint_checked:" in why.output
 
 
+def test_reboot_threshold_cli(monkeypatch, cli_conn, conn):
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+
+    plain = CliRunner().invoke(cli.main, ["governance", "reboot-threshold"])
+    value_only = CliRunner().invoke(cli.main, ["governance", "reboot-threshold", "--value-only"])
+
+    assert plain.exit_code == 0
+    assert "reboot threshold: 3 consecutive failures" in plain.output
+    assert "seed (not enough data yet)" in plain.output
+    assert value_only.exit_code == 0
+    assert value_only.output.strip() == "3"
+
+
 def test_query_status_counts_decisions(conn):
     proposal_id = create_elevated_pressure_proposal(conn)
     proposals.review_proposal_governed(conn, proposal_id, "accepted")
