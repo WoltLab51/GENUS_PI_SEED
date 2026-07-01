@@ -212,7 +212,13 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > `genus ask "Ist ein Hund ein Säugetier?"` → *„Ja. Der Weg: Hund → Haushund → domestiziertes
 > Säugetier → Säugetier. (Vertrauen 0.50 — aus dem Wissensgraphen hergeleitet, nicht
 > behauptet.)"* Reiner Reuse des Inferenz-Primitivs, gläsern (der Weg wird gezeigt),
-> open-world-ehrlich (kein Weg → „unbekannt, nicht widerlegt"), 366 Tests grün. Als Nächstes
-> in Phase A: Breite (Wortarten/Sprachen) · Skalierung/Snapshots · `genus why`.
+> open-world-ehrlich (kein Weg → „unbekannt, nicht widerlegt").
+>
+> **Und Phase A ◎/③ geliefert & live: `genus why answer`** — die volle Herkunfts-Spur hinter
+> einer Antwort (jede Prämisse mit Quelle + read-time-Vertrauen; für ein Wort: expresses ·
+> Bedeutung · is_a, je mit Quelle). Macht die These *anfassbar* — bei „Was ist ein Hund?"
+> legt es alle Sinne offen (Haushund · Förderwagen · Möbel-Rollbrett · Schimpfwort · Sternbild
+> · Nachname), jeder mit Quelle: Reichtum, nicht Korruption. 371 Tests grün. Als Nächstes in
+> Phase A: **Breite** (Wortarten/Sprachen) · **Skalierung/Snapshots**.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
