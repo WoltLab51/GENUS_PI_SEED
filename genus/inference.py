@@ -36,15 +36,19 @@ def _edges(conn, predicate: str) -> dict[str, list[tuple[str, str]]]:
     return adjacency
 
 
-def infer(conn, subject: str, predicate: str, max_depth: int = MAX_DEPTH) -> list[dict]:
+def infer(conn, subject: str, predicate: str, max_depth: int = MAX_DEPTH,
+          edges: dict[str, list[tuple[str, str]]] | None = None) -> list[dict]:
     """Derive ``(subject, predicate, object)`` relations not directly asserted, each with
     its premise chain and a composed trust (the weakest premise). Transitive predicates
     chain (A→B, B→C ⇒ A→C); symmetric ones mirror (A→B ⇒ B→A). Read-only; returns only the
-    *derived* edges, never the asserted ones."""
+    *derived* edges, never the asserted ones. Pass a pre-built ``edges`` adjacency (from
+    :func:`_edges`) to reuse across many calls -- it is identical for every subject of one
+    predicate, so building it once avoids rescanning the whole graph per call."""
     if predicate not in TRANSITIVE_PREDICATES and predicate not in SYMMETRIC_PREDICATES:
         return []
 
-    edges = _edges(conn, predicate)
+    if edges is None:
+        edges = _edges(conn, predicate)
     direct = {obj for obj, _ in edges.get(subject, [])}  # directly asserted from subject
 
     trust_cache: dict[str, float] = {}
@@ -111,6 +115,7 @@ def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
             trust_cache[source] = sources.source_trust(conn, source)
         return trust_cache[source]
 
+    edges = _edges(conn, predicate)  # built once; reused for direct parents AND every closure below
     by_object: dict[str, dict] = {}  # ancestor concept -> {chain, trust}; shortest wins
     for expr in sources.relations(conn, subject=key, predicate=sources.EXPRESSES):
         concept = expr["object"]
@@ -118,14 +123,13 @@ def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
         head_trust = trust_of(expr["source"])
 
         # From the word's view *everything* is derived: direct concept parents first
-        # (shortest chains), then the transitive ancestors.
+        # (shortest chains), then the transitive ancestors. Both read from the one adjacency.
         ancestors: list[tuple[str, list[dict], float]] = [
-            (direct["object"],
-             [_premise(concept, predicate, direct["object"], direct["source"])],
-             trust_of(direct["source"]))
-            for direct in sources.relations(conn, subject=concept, predicate=predicate)
+            (obj, [_premise(concept, predicate, obj, source)], trust_of(source))
+            for obj, source in edges.get(concept, [])
         ]
-        ancestors += [(d["object"], d["chain"], d["trust"]) for d in infer(conn, concept, predicate)]
+        ancestors += [(d["object"], d["chain"], d["trust"])
+                      for d in infer(conn, concept, predicate, edges=edges)]
 
         for obj, chain, sub_trust in ancestors:
             if obj in by_object or obj == concept:
