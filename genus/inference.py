@@ -181,9 +181,11 @@ def infer_lexeme(conn, form: str, predicate: str, lang: str) -> list[dict]:
 # and GENUS keeps only the seed hypothesis. Read-time and glass-box -- the vindications ARE the
 # reason. This turns the core's own machinery on the core's own reasoning (self-reference).
 
-def transitivity_evidence(conn, predicate: str, edges=None) -> dict:
+def transitivity_evidence(conn, predicate: str, edges=None, stop_at: int | None = None) -> dict:
     """Evidence that ``predicate`` is transitive: closed triangles that vindicate the rule, out
-    of all 2-step chains that offered the chance. Returns a few example triangles for the trace."""
+    of all 2-step chains that offered the chance. Returns a few example triangles for the trace.
+    ``stop_at`` returns as soon as that many vindications are found -- the *decision* only needs
+    to know the threshold is met, so is_transitive need not scan the whole graph on the hot path."""
     if edges is None:
         edges = _edges(conn, predicate)
     asserted = {(subj, obj) for subj, objs in edges.items() for obj, _ in objs}
@@ -199,6 +201,9 @@ def transitivity_evidence(conn, predicate: str, edges=None) -> dict:
                     vindications += 1
                     if len(examples) < 5:
                         examples.append((a, b, c))
+                    if stop_at is not None and vindications >= stop_at:
+                        return {"predicate": predicate, "vindications": vindications,
+                                "chains": chains, "examples": examples}
     return {"predicate": predicate, "vindications": vindications, "chains": chains, "examples": examples}
 
 
@@ -225,7 +230,7 @@ def is_transitive(conn, predicate: str, edges=None) -> bool:
     """Whether GENUS reasons transitively over ``predicate`` -- LEARNED from the graph once it has
     spoken (>= MIN_VINDICATIONS closed triangles), else the seed hypothesis. Open-world: absence
     of vindication is not proof against; it just leaves the seed standing."""
-    if transitivity_evidence(conn, predicate, edges)["vindications"] >= MIN_VINDICATIONS:
+    if transitivity_evidence(conn, predicate, edges, stop_at=MIN_VINDICATIONS)["vindications"] >= MIN_VINDICATIONS:
         return True
     return predicate in TRANSITIVE_PREDICATES
 
