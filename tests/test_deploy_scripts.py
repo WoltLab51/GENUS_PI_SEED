@@ -298,3 +298,26 @@ def test_gender_backfill_is_resumable_and_skips_already_known():
     assert "observe_lexem.sh" in script
     # unlike pi_learn.sh's infinite loop, this one reports completion and stops
     assert "backfill complete" in script
+
+
+def test_telegram_bot_installer_keeps_the_token_out_of_the_unit_file():
+    script = (ROOT / "deploy" / "pi_install_telegram_bot.sh").read_text(encoding="utf-8")
+    # secrets live in their own 0600 files, never inline in the world-readable systemd unit
+    assert "chmod 600" in script
+    assert "TOKEN_FILE" in script
+    assert "GENUS_TELEGRAM_ALLOWED_IDS" in script
+    assert "$BOT_TOKEN" not in script.split("ExecStart=")[1].split("\n")[0]  # not in ExecStart line
+    # normal priority (responsive), unlike the deliberately idle-priority learner
+    assert "CPUSchedulingPolicy=idle" not in script
+    assert "Restart=always" in script
+
+
+def test_telegram_bot_answers_only_never_writes():
+    script = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
+    # answer-only membrane: routes through companion.respond (read-only), never touches
+    # pause/resume, governance, teach-relation, or any state-changing command
+    assert "companion.respond" in script
+    assert "allow" in script.lower()
+    for forbidden in ("import governance", "import proposals", "control.pause", "control.resume",
+                      "teach_relation", "record_proposal"):
+        assert forbidden not in script

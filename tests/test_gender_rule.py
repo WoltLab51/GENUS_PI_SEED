@@ -175,3 +175,43 @@ def test_ask_cli_routes_gender_question(monkeypatch):
     result = CliRunner().invoke(cli.main, ["ask", "Welches", "Geschlecht", "hat", "Hund?"])
     assert result.exit_code == 0, result.output
     assert "maskulin" in result.output
+
+
+def test_respond_routes_state_query_as_plain_text():
+    from genus import companion
+    conn = _fresh()
+    s = companion.respond(conn, "status")
+    assert "projection summary" in s and "[ASK]" not in s and "[BLF]" not in s  # plain, no CLI tags
+
+
+def test_respond_routes_relational_question():
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Säugetier@de", "expresses", "Q_s", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_s", "wikidata")
+    s = companion.respond(conn, "Ist ein Hund ein Säugetier?")
+    assert "Ja." in s and "Säugetier" in s
+
+
+def test_respond_routes_gender_question():
+    from genus import companion
+    conn = _fresh()
+    _gender(conn, "Hund", "maskulin")
+    assert "maskulin" in companion.respond(conn, "Welches Geschlecht hat Hund?")
+
+
+def test_respond_routes_word_definition_with_concept_hint():
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    s = companion.respond(conn, "Was ist ein Hund?")
+    assert "Wolf" in s and "genus concept Q144" in s
+
+
+def test_respond_falls_back_to_help_when_nothing_matches():
+    from genus import companion
+    conn = _fresh()
+    s = companion.respond(conn, "Quuxikon Blarg?")
+    assert "unknown fixed query pattern" in s or "kennt kein Wort" not in s  # the query.ask help text

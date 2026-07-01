@@ -294,6 +294,39 @@ def narrate_gender(r: dict) -> str:
     return f"GENUS kennt »{r['noun']}« nicht gut genug, um auch nur zu vermuten — es rät nicht."
 
 
+# --- a single shared answer, for any conversational channel -----------------------------
+#
+# `cli.ask_command` has its own routing (terminal-log formatting, [ASK]/[BLF]/... tags -- left
+# untouched, well-tested). `respond` is the same underlying routing order, rendered as plain
+# text for a channel where that log-tag style would look odd (e.g. a chat bridge like Telegram).
+# Read-only, no side effects -- identical data functions, a different voice for a different room.
+
+def respond(conn, question: str) -> str:
+    """The full conversational answer to ``question``: state -> relational -> comparative ->
+    gender -> word -> help, in that order (matches ``cli.ask_command``). Plain text, no CLI tags."""
+    from genus import query  # local: keeps companion's import-time surface a leaf otherwise
+
+    state = query.ask(conn, question)
+    if state.get("kind") != "unknown":
+        return state["answer"]
+    rel = relate(conn, question)
+    if rel.get("relational"):
+        return narrate_relation(conn, rel)
+    com = common(conn, question)
+    if com.get("common"):
+        return narrate_common(conn, com)
+    gen = gender_question(conn, question)
+    if gen.get("gender_q"):
+        return narrate_gender(gen)
+    a = answer(conn, question)
+    if a["found"]:
+        text = narrate(a)
+        if a.get("concept"):
+            text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
+        return text
+    return state["answer"]  # the "unknown fixed query pattern" help, same fallback as the CLI
+
+
 # --- the provenance trace ("genus why") ------------------------------------------------
 #
 # The thesis made tangible: every answer is rückführbar auf seine Herkunft. `trace` runs the
