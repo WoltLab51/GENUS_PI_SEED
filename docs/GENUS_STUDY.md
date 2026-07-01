@@ -224,7 +224,17 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > gemeinsam?"` — findet, wo zwei is_a-Linien sich treffen (nächste *benennbare* gemeinsame
 > Oberkategorie zuerst; roher Q-id-Fall live gefunden + gefixt). Live: *Apfel & Birne → Obst*,
 > *Hund & Katze → domestiziertes Säugetier*, *Hund & Auto → Körper*. Reiner Reuse von
-> `infer_lexeme`, kein Plural-Problem (Singular-Nomen). 376 Tests grün. Als Nächstes in Phase
-> A: **Breite** weiter (Wortarten/Sprachen via POS-Quelle) · **Skalierung/Snapshots**.
+> `infer_lexeme`, kein Plural-Problem (Singular-Nomen). 376 Tests grün.
+>
+> **Skalierung gemessen (statt geraten) — und der Befund kehrte die Hypothese um.** Bei 171k
+> Events: Definitionen/Trust ≤ 0,5 ms, aber relationale Fragen 273 ms und vergleichende 545 ms.
+> *Nicht* die Projektionen (die sind materialisiert, sub-ms) — die **Inferenz** baute die
+> komplette is_a-Adjazenz (~30 ms) bei *jedem* Aufruf neu, `infer_lexeme` einmal pro Konzept
+> (Hund → 8×). Ein Snapshot-Bau hätte hier nichts gebracht. Fix: Adjazenz **einmal** bauen +
+> wiederverwenden → **32 ms / 71 ms** (8×), Semantik identisch. Lehre: erst messen, dann der
+> *minimale* Eingriff am echten Leck. (Offen, aber unkritisch: `genus knowledge` /
+> characterize_knowledge 2,2 s — ein Diagnose-Befehl, nicht der interaktive Pfad.)
+>
+> Als Nächstes in Phase A: **Breite** weiter (Wortarten/Sprachen via POS-Quelle).
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
