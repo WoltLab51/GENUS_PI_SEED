@@ -1065,7 +1065,7 @@ def governance_reboot_threshold(value_only: bool) -> None:
         if value_only:
             click.echo(report["threshold"])
             return
-        basis = "derived from data" if report["derived"] else "seed (not enough data yet)"
+        basis = "derived from data" if report["derived"] else "seed (no distinguishing pattern yet)"
         click.echo(
             f"[GOV] reboot threshold: {report['threshold']} consecutive failures "
             f"({basis}, {report['episodes']} completed outage episode(s) observed)"

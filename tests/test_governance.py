@@ -238,7 +238,7 @@ def test_reboot_threshold_cli(monkeypatch, cli_conn, conn):
 
     assert plain.exit_code == 0
     assert "reboot threshold: 3 consecutive failures" in plain.output
-    assert "seed (not enough data yet)" in plain.output
+    assert "seed (no distinguishing pattern yet)" in plain.output
     assert value_only.exit_code == 0
     assert value_only.output.strip() == "3"
 

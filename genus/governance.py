@@ -539,9 +539,14 @@ def calibrated_reboot_threshold(conn) -> int:
 
 def reboot_threshold_report(conn) -> dict:
     """Glass-box readout behind calibrated_reboot_threshold: the active value, how many completed
-    outage episodes it's derived from, and whether it's actually derived or still the seed."""
+    outage episodes it's derived from, and whether it's actually derived or still the seed.
+    ``derived`` requires BOTH enough episodes (MIN_RECOVERY_EPISODES) AND a real gap between at
+    least two distinct lengths -- five episodes that were all equally short is honestly still "no
+    pattern yet", not a derivation, even though the sample count alone would clear the bar."""
     lengths = _recovery_episode_lengths(conn)
-    derived = len(lengths) >= MIN_RECOVERY_EPISODES
+    enough_samples = len(lengths) >= MIN_RECOVERY_EPISODES
+    shows_a_gap = len({n for n in lengths if n > 0}) >= 2
+    derived = enough_samples and shows_a_gap
     threshold = (
         self_calibration.widest_gap_count_threshold(lengths, RECOVERY_REBOOT_MIN_FAILURES)
         if derived else RECOVERY_REBOOT_MIN_FAILURES

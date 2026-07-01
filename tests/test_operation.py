@@ -161,6 +161,20 @@ def test_reboot_threshold_falls_back_to_seed_with_too_little_history(conn):
     assert report["threshold"] == governance.RECOVERY_REBOOT_MIN_FAILURES
 
 
+def test_reboot_threshold_stays_at_seed_when_episodes_show_no_gap(conn):
+    # enough SAMPLES (>= MIN_RECOVERY_EPISODES) but every episode is equally short -- no distinct
+    # values to show a gap, so this is honestly still "no pattern yet", not a real derivation
+    # (this is the live shape found on the actual Pi: five outages, all one failed check long)
+    for _ in range(5):
+        operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)
+        operation.record_network_check(conn, operation.STATUS_OK, "t")
+
+    report = governance.reboot_threshold_report(conn)
+    assert report["episodes"] == 5
+    assert report["derived"] is False
+    assert report["threshold"] == governance.RECOVERY_REBOOT_MIN_FAILURES
+
+
 def test_reboot_threshold_excludes_an_unresolved_ongoing_episode(conn):
     for _ in range(5):
         operation.record_network_check(conn, operation.STATUS_FAIL, "t", failures=1)
