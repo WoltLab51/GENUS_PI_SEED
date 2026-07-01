@@ -338,6 +338,10 @@ def ask_command(question: tuple[str, ...]) -> None:
         if rel.get("relational"):
             click.echo(f"[ASK] {companion.narrate_relation(conn, rel)}")
             return
+        com = companion.common(conn, q)            # then: "was haben X und Y gemeinsam?"
+        if com.get("common"):
+            click.echo(f"[ASK] {companion.narrate_common(conn, com)}")
+            return
         knows = companion.answer(conn, q)          # else: does GENUS know a word in the question?
         if knows["found"]:
             _print_companion_answer(knows)

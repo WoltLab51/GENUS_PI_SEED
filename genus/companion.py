@@ -138,9 +138,16 @@ def _concepts_of(conn, tok: str) -> tuple[set[str], str | None]:
 
 
 def _label(conn, node: str) -> str:
-    """A concept rendered as a plain German word (not a Q-id) for a readable path."""
-    m = _LABEL_IN.match(sources.display(conn, node))
-    return m.group(1) if m else node
+    """A concept rendered as a plain German word (not a Q-id) for a readable path -- the
+    canonical label if the graph has one, else any German word expressing it, else the node."""
+    shown = sources.display(conn, node)
+    m = _LABEL_IN.match(shown)
+    if m:
+        return m.group(1)
+    if shown != node:              # display appended something in another form
+        return shown
+    words = sources.lexicalize(conn, node, "de")   # a bare concept id -> lexicalize it
+    return words[0] if words else node
 
 
 def _collapse(path: list[str]) -> list[str]:
@@ -183,6 +190,59 @@ def narrate_relation(conn, r: dict) -> str:
         return s + f" (Vertrauen {r['trust']:.2f} — aus dem Wissensgraphen hergeleitet, nicht behauptet.)"
     return (f"Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von »{x}« zu "
             f"»{y}«. (Das heißt: unbekannt, nicht widerlegt.)")
+
+
+# --- comparative questions ("Was haben X und Y gemeinsam?") ----------------------------
+#
+# The mirror of "ist ein X ein Y?": instead of asking whether one lies above the other, it
+# finds where their is_a lines *meet* -- the shared ancestors, closest first. Pure reuse of
+# infer_lexeme (both terms singular nouns, so no plural morphology), sense-coherent by
+# construction, glass-box (the shared category is a real graph node).
+
+_COMMON_PATTERNS = [
+    re.compile(r"\bwas\s+haben\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+gemeinsam", re.I),
+    re.compile(r"\bwas\s+ist\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+gemeinsam", re.I),
+    re.compile(r"\bgemeinsam(?:keit(?:en)?)?\s+(?:von|zwischen)\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwas\s+verbindet\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM, re.I),
+]
+
+
+def _ancestor_depths(conn, form: str) -> dict[str, int]:
+    """{concept: closest chain-depth} — the word's own concept(s) (depth 0) plus every is_a
+    ancestor, so two words' sets can be intersected to find where their lines meet."""
+    depths: dict[str, int] = {}
+    for expr in sources.relations(conn, subject=f"{form}@de", predicate=sources.EXPRESSES):
+        depths.setdefault(expr["object"], 0)
+    for a in inference.infer_lexeme(conn, form, "is_a", "de"):
+        d = len(a["chain"])
+        if depths.get(a["object"], 1 << 30) > d:
+            depths[a["object"]] = d
+    return depths
+
+
+def common(conn, question: str) -> dict:
+    """The shared is_a ancestors of two words, closest first; ``{common: False}`` if not asked."""
+    for pattern in _COMMON_PATTERNS:
+        m = pattern.search(question)
+        if not m:
+            continue
+        x, y = _concept_form(conn, m.group(1)), _concept_form(conn, m.group(2))
+        if x is None or y is None:
+            continue
+        dx, dy = _ancestor_depths(conn, x), _ancestor_depths(conn, y)
+        shared = sorted(set(dx) & set(dy), key=lambda c: dx[c] + dy[c])
+        return {"common": True, "found": bool(shared), "x": x, "y": y, "shared": shared}
+    return {"common": False}
+
+
+def narrate_common(conn, r: dict) -> str:
+    if not r["found"]:
+        return f"GENUS findet keine gemeinsame Oberkategorie von »{r['x']}« und »{r['y']}«."
+    labels = _collapse([_label(conn, c) for c in r["shared"]])[:3]
+    s = f"»{r['x']}« und »{r['y']}« haben gemeinsam: beide zählen zu {labels[0]}"
+    if len(labels) > 1:
+        s += f" (und weiter zu {_join_de(labels[1:])})"
+    return s + "."
 
 
 # --- the provenance trace ("genus why") ------------------------------------------------

@@ -758,6 +758,50 @@ def test_ask_cli_routes_relational_question(monkeypatch):
     assert "Ja." in result.output and "Säugetier" in result.output
 
 
+def _kinship_graph():
+    conn = _fresh()  # Hund & Katze meet at Säugetier (→ Tier); Auto is unrelated
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q_hund", "wikidata")
+    reactors.observe_relation(conn, "Katze@de", "expresses", "Q_katze", "wikidata")
+    reactors.observe_relation(conn, "Säugetier@de", "expresses", "Q_saeug", "wikidata")
+    reactors.observe_relation(conn, "Tier@de", "expresses", "Q_tier", "wikidata")
+    reactors.observe_relation(conn, "Auto@de", "expresses", "Q_auto", "wikidata")
+    reactors.observe_relation(conn, "Q_hund", "is_a", "Q_saeug", "wikidata")
+    reactors.observe_relation(conn, "Q_katze", "is_a", "Q_saeug", "wikidata")
+    reactors.observe_relation(conn, "Q_saeug", "is_a", "Q_tier", "wikidata")
+    return conn
+
+
+def test_common_finds_closest_shared_ancestor():
+    from genus import companion
+    conn = _kinship_graph()
+    r = companion.common(conn, "Was haben ein Hund und eine Katze gemeinsam?")
+    assert r["common"] and r["found"] and r["shared"][0] == "Q_saeug"   # Säugetier is closest
+    s = companion.narrate_common(conn, r)
+    assert "Säugetier" in s and "Tier" in s                             # closest, then the farther one
+
+
+def test_common_none_when_unrelated():
+    from genus import companion
+    conn = _kinship_graph()
+    r = companion.common(conn, "Was haben ein Hund und ein Auto gemeinsam?")
+    assert r["common"] and r["found"] is False
+    assert "keine gemeinsame" in companion.narrate_common(conn, r)
+
+
+def test_common_not_triggered_by_plain_question():
+    from genus import companion
+    conn = _kinship_graph()
+    assert companion.common(conn, "Was ist ein Hund?")["common"] is False
+
+
+def test_ask_cli_routes_comparative(monkeypatch):
+    conn = _kinship_graph()
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["ask", "Was", "haben", "Hund", "und", "Katze", "gemeinsam?"])
+    assert result.exit_code == 0, result.output
+    assert "gemeinsam" in result.output and "Säugetier" in result.output
+
+
 def test_why_relation_lays_open_every_premise():
     from genus import companion
     conn = _isa_graph()
