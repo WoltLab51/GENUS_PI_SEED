@@ -235,6 +235,17 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > *minimale* Eingriff am echten Leck. (Offen, aber unkritisch: `genus knowledge` /
 > characterize_knowledge 2,2 s — ein Diagnose-Befehl, nicht der interaktive Pfad.)
 >
-> Als Nächstes in Phase A: **Breite** weiter (Wortarten/Sprachen via POS-Quelle).
+> **Breite in die Wortarten geliefert & live:** der Begleiter reicht jetzt *über Nomen hinaus*
+> — Verben & Adjektive. Zwei frequenzsortierte Lemma-Listen (kleingeschrieben, kein Casing-
+> Problem) aus Universal Dependencies German-GSD (`wortschatz_de_verben.txt` 1437,
+> `wortschatz_de_adjektive.txt` 1975), und der Lerner zieht **im Round-Robin** über alle Listen
+> (Nomen → Verb → Adjektiv → …), sodass die Wortarten von Anfang an interleaven; die Kette folgt,
+> wenn alle Listen erschöpft sind. Live: *„Was bedeutet laufen?"* → „Unter »laufen« (Verb) …; es
+> zählt zu Sport." (Ein weiterer roher-Q-id-Fall in der Definitions-Stimme kam dabei ans Licht +
+> wurde gefixt — dieselbe Glasscheiben-Regel wie beim Vergleich.) 377 Tests grün.
+>
+> **Damit ist Phase A im Kern rund:** reichere Fragen (relational · vergleichend) · `genus why` ·
+> Skalierung gemessen & gesund · Breite in die Wortarten. Optional offen: weitere *Sprachen*
+> (en/fr über die sprachneutralen Konzepte). Als Nächstes der große Schritt: **Phase B — SYSTEME.**
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
