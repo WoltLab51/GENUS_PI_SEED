@@ -78,6 +78,11 @@ POS = {
     "Q4833830": "preposition", "Q36484": "conjunction", "Q147276": "pronoun",
     "Q103184": "numeral", "Q380012": "interjection", "Q468801": "article",
 }
+# German grammatical gender (P5185, a claim on the LEXEME itself -- not per-sense) -- the raw
+# material for SYSTEME's second rule-domain (gender-by-suffix induction). Only meaningful for
+# nouns; German is grammatical-gender-marked so this is a real, queryable lexical fact, not an
+# inference.
+GENDER = {"Q499327": "maskulin", "Q1775415": "feminin", "Q1775461": "neutrum"}
 out, seen = [], set()
 try:
     entities = json.load(open(sys.argv[1])).get("entities", {})
@@ -93,6 +98,13 @@ for lid, ent in entities.items():
     cat = ent.get("lexicalCategory")
     if cat:
         out.append("%s\tpos\t%s" % (subj, POS.get(cat, cat)))
+    if cat == "Q1084":  # noun -- grammatical gender only applies here
+        for claim in ent.get("claims", {}).get("P5185", []):
+            dv = claim.get("mainsnak", {}).get("datavalue")
+            if dv:
+                gender = GENDER.get(dv["value"]["id"])
+                if gender:
+                    out.append("%s\tgrammatical_gender\t%s" % (subj, gender))
     for sense in ent.get("senses", []):
         for claim in sense.get("claims", {}).get("P5137", []):
             dv = claim.get("mainsnak", {}).get("datavalue")

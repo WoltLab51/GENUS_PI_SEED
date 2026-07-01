@@ -266,3 +266,18 @@ def test_network_watchdog_records_operation_events_and_governed_recovery():
     assert "genus-network-watchdog.service" in installer
     assert "OnUnitActiveSec=5min" in installer
     assert "GENUS_USER" in installer
+
+
+def test_lexeme_membrane_captures_grammatical_gender_for_nouns():
+    script = (ROOT / "deploy" / "observe_lexem.sh").read_text(encoding="utf-8")
+
+    # P5185 (grammatical gender) is a claim on the LEXEME itself, verified live against Wikidata
+    # (Hund->masculine, Katze->feminine, Sonne->feminine, Mädchen/Fräulein->neuter (-chen/-lein
+    # always neuter, overriding natural gender)) -- the raw material for SYSTEME's 2nd rule-domain
+    # (gender-by-suffix induction). Only meaningful for nouns (lexicalCategory Q1084).
+    assert "P5185" in script
+    assert "grammatical_gender" in script
+    assert "Q499327" in script and "maskulin" in script
+    assert "Q1775415" in script and "feminin" in script
+    assert "Q1775461" in script and "neutrum" in script
+    assert 'cat == "Q1084"' in script   # gated to nouns -- gender is meaningless for verbs etc.
