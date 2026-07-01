@@ -264,7 +264,14 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > den der Symmetrie-Check nicht sehen konnte. Der 4 Live-Ringe (alle aus Wikidata, das die
 > P279-Zyklen selbst trägt): 3 klare 2-Zyklen aufgelöst (falsche Gegenrichtung je Ring
 > zurückgenommen, off-Pi verifiziert → eine saubere Anwendung), der abstrakte 4. Ring bewusst
-> *markiert statt blind gelöscht*. 385 grün. **Als Nächstes ①b:** die gelernten Regeln in
-> `infer()` verdrahten (gelernt ersetzt Saat) + Überraschung bei Regel-Verletzung.
+> *markiert statt blind gelöscht*. 385 grün.
+>
+> **①b geliefert & live: `infer()` schließt nach den *gelernten* Regeln.** Statt der
+> hartcodierten Menge konsultiert die Inferenz `is_transitive`/`is_symmetric` (aus den eigenen
+> Vindikationen gelernt, Saat als Fallback) — GENUS leitet nach den Regeln her, die es selbst
+> bestätigt hat. Verhalten unverändert (is_a bleibt transitiv, jetzt *begründet*), aber ein
+> vindiziertes Nicht-Saat-Prädikat wird nun mitgeschlossen. Performance-sicher (Entscheidung
+> einmal pro Closure + Früh-Abbruch; Aufpreis ~9 ms). 387 grün. **Als Nächstes ①c:** Überraschung
+> bei Regel-Verletzung (ein neu behaupteter Zyklus verletzt die gelernte Azyklizität → Inquiry).
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
