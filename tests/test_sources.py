@@ -360,7 +360,8 @@ def test_confidence_cli_shows_corroborated_value(monkeypatch):
     assert "confidence 0.75" in result.output
 
 
-def test_functional_predicate_contradiction_raises_inquiry():
+def test_functional_predicate_contradiction_raises_inquiry(monkeypatch):
+    monkeypatch.setattr(sources, "FUNCTIONAL_PREDICATES", {"label"})   # a functional predicate
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "label", "Q144", "wikidata")
     r = reactors.observe_relation(conn, "Hund@de", "label", "Q999", "other")  # disagrees on the label
@@ -368,6 +369,14 @@ def test_functional_predicate_contradiction_raises_inquiry():
     assert "contradiction_detected" in types and "inquiry_created" in types
     assert reactors._open_source_contradiction(conn, "Hund@de|label")
     assert sources.relation_contradiction(conn, "Hund@de", "label")["contradiction"] is True
+
+
+def test_label_not_functional_by_default_no_false_contradiction():
+    conn = _fresh()  # a word labels many concepts (homonymy) -> no contradiction by default
+    reactors.observe_relation(conn, "Bank@de", "label", "Q_bench", "wikidata")
+    r = reactors.observe_relation(conn, "Bank@de", "label", "Q_money", "wikidata-lexemes")
+    assert "contradiction_detected" not in [e["event_type"] for e in r["events"]]
+    assert sources.relation_contradiction(conn, "Bank@de", "label")["contradiction"] is False
 
 
 def test_nonfunctional_predicate_allows_many_objects():
@@ -378,7 +387,8 @@ def test_nonfunctional_predicate_allows_many_objects():
     assert sources.relation_contradiction(conn, "Hund", "is_a")["contradiction"] is False
 
 
-def test_teach_relation_settles_inquiry_and_corrects_functional():
+def test_teach_relation_settles_inquiry_and_corrects_functional(monkeypatch):
+    monkeypatch.setattr(sources, "FUNCTIONAL_PREDICATES", {"label"})
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "label", "Q999", "wikidata")  # wrong
     reactors.observe_relation(conn, "Hund@de", "label", "Q144", "other")     # right -> raises inquiry
@@ -401,6 +411,7 @@ def test_teach_relation_nonfunctional_adds_without_retract():
 
 
 def test_teach_relation_cli(monkeypatch):
+    monkeypatch.setattr(sources, "FUNCTIONAL_PREDICATES", {"label"})
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "label", "Q999", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "label", "Q144", "other")
@@ -509,7 +520,8 @@ def test_characterize_knowledge_reports_epistemic_state():
     assert k["weakest"][0]["subject"] == "Katze"       # least confident surfaced first
 
 
-def test_characterize_knowledge_counts_open_contradictions():
+def test_characterize_knowledge_counts_open_contradictions(monkeypatch):
+    monkeypatch.setattr(sources, "FUNCTIONAL_PREDICATES", {"label"})
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "label", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "label", "Q999", "other")  # raises a relation contradiction
@@ -677,3 +689,13 @@ def test_companion_narrate_is_fluent_and_glassbox():
     assert s.startswith("Unter »Hund« (Substantiv)") and "Haustier" in s
     assert "Heimtier und domestiziertes Säugetier" in s and "Q39201" not in s   # labels, no Q-id
     assert "chien" in s
+
+
+def test_ask_state_query_wins_over_learned_word(monkeypatch):
+    conn = _fresh()  # "Status" is a learned word, but the state query must take precedence
+    reactors.observe_relation(conn, "Status@de", "expresses", "Q_status", "wikidata")
+    reactors.observe_relation(conn, "Status@de", "primary_gloss", "Art und Weise, wie etwas ist", "dbnary")
+    monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    result = CliRunner().invoke(cli.main, ["ask", "status"])
+    assert result.exit_code == 0, result.output
+    assert "Art und Weise" not in result.output   # not the word gloss -> the state answer instead

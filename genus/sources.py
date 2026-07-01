@@ -306,10 +306,14 @@ def relation_confidence(conn, subject: str, predicate: str, object: str) -> dict
     }
 
 
-# Predicates where a subject should have ONE object, so competing objects are a
-# contradiction (like disagreeing value sources). Non-functional predicates -- is_a,
-# expresses, synonym -- legitimately allow many objects (multiple parents, polysemy).
-FUNCTIONAL_PREDICATES = {"label"}
+# Predicates where a subject genuinely has ONE object, so competing objects are a real
+# contradiction. Most knowledge predicates are NOT functional -- is_a (many parents),
+# expresses (polysemy), synonym -- and neither is `label`: a WORD is the label of many
+# concepts (homonymy -- "Bank@de" labels the bench AND the financial institution). Treating
+# `label` as functional flagged normal cross-lingual homonymy as conflicts (153 false inquiries
+# at scale), so nothing is functional here today; the machinery stays, ready for a truly
+# one-to-one predicate. (Value claims keep their own contradiction check in observe_assertion.)
+FUNCTIONAL_PREDICATES: set[str] = set()
 
 
 def relation_contradiction(conn, subject: str, predicate: str) -> dict:

@@ -326,15 +326,19 @@ def atlas_facts_command() -> None:
 @main.command("ask")
 @click.argument("question", nargs=-1, required=True)
 def ask_command(question: tuple[str, ...]) -> None:
-    """Ask GENUS something — about a word it knows (its meaning), or about its own state."""
+    """Ask GENUS something — about its own state (status/zustand/…) or about a word it knows."""
     conn = get_conn()
     try:
         q = " ".join(question)
-        knows = companion.answer(conn, q)          # first: does GENUS know a word in the question?
+        state = query.ask(conn, q)                 # first: a recognised state/belief query?
+        if state.get("kind") != "unknown":
+            _print_ask_response(state)
+            return
+        knows = companion.answer(conn, q)          # else: does GENUS know a word in the question?
         if knows["found"]:
             _print_companion_answer(knows)
         else:
-            _print_ask_response(query.ask(conn, q))  # else: the existing state/belief query
+            _print_ask_response(state)             # neither -> the "unknown pattern" help
     finally:
         conn.close()
 
