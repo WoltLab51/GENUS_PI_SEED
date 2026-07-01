@@ -230,7 +230,8 @@ def common(conn, question: str) -> dict:
         if x is None or y is None:
             continue
         dx, dy = _ancestor_depths(conn, x), _ancestor_depths(conn, y)
-        shared = sorted(set(dx) & set(dy), key=lambda c: dx[c] + dy[c])
+        ordered = sorted(set(dx) & set(dy), key=lambda c: dx[c] + dy[c])
+        shared = [c for c in ordered if _label(conn, c) != c]   # only human-nameable categories
         return {"common": True, "found": bool(shared), "x": x, "y": y, "shared": shared}
     return {"common": False}
 

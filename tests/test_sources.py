@@ -780,6 +780,16 @@ def test_common_finds_closest_shared_ancestor():
     assert "Säugetier" in s and "Tier" in s                             # closest, then the farther one
 
 
+def test_common_skips_unnameable_ancestors():
+    from genus import companion
+    conn = _kinship_graph()  # insert a wordless concept between Säugetier and Tier
+    reactors.observe_relation(conn, "Q_saeug", "is_a", "Q_nolabel", "wikidata")
+    reactors.observe_relation(conn, "Q_nolabel", "is_a", "Q_tier", "wikidata")
+    r = companion.common(conn, "Was haben ein Hund und eine Katze gemeinsam?")
+    assert "Q_nolabel" not in r["shared"]                       # no raw Q-id reaches a human
+    assert "Q_saeug" in r["shared"] and "Q_tier" in r["shared"]  # the nameable ones stay
+
+
 def test_common_none_when_unrelated():
     from genus import companion
     conn = _kinship_graph()
