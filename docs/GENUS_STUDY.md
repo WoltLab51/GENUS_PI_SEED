@@ -208,4 +208,11 @@ Reuse der Inferenz, Tage, sofort fühlbar) — sie aktiviert den ganzen Stack, m
 Begleiter greifbar und ist zugleich ehrliche Studie (prüft, ob der Konzept-Graph relational
 trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebbar* macht.
 
+> **Status 2026-07-01 — Phase A ① geliefert & live.** Die relationalen Fragen laufen:
+> `genus ask "Ist ein Hund ein Säugetier?"` → *„Ja. Der Weg: Hund → Haushund → domestiziertes
+> Säugetier → Säugetier. (Vertrauen 0.50 — aus dem Wissensgraphen hergeleitet, nicht
+> behauptet.)"* Reiner Reuse des Inferenz-Primitivs, gläsern (der Weg wird gezeigt),
+> open-world-ehrlich (kein Weg → „unbekannt, nicht widerlegt"), 366 Tests grün. Als Nächstes
+> in Phase A: Breite (Wortarten/Sprachen) · Skalierung/Snapshots · `genus why`.
+
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
