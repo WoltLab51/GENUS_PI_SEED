@@ -293,7 +293,12 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > gespeicherten Wert billig (ein indizierter Lookup), Saat als Fallback. Jetzt *schließt* GENUS
 > nach der Schwelle, die es selbst abgeleitet hat, und der heiße Pfad bleibt schnell (~64 ms, kein
 > SQL pro Frage). Das BeliefStability-Muster, jetzt den Kern **optimierend** statt nur
-> charakterisierend — die erste Experience, die GENUS' eigene Vernunft *tunt*. 395 grün. **Als
-> Nächstes:** die Symmetrie-Rate analog kalibrieren; *oder* SYSTEME in die Breite.
+> charakterisierend — die erste Experience, die GENUS' eigene Vernunft *tunt*. 395 grün.
+>
+> **Und die Symmetrie-Rate genauso — beide Parameter der Vernunft sind jetzt selbst-kalibriert.**
+> `calibrated_symmetry_rate` (Mittelpunkt der breitesten Lücke), im Scan abgelegt, von `is_symmetric`
+> billig gelesen. Ehrlich: nach der is_a-Zyklen-Bereinigung hat nur noch `synonym` Spiegelungen →
+> ein Datenpunkt, keine Lücke → Saat-Fallback (open-world). Beide gläsern in `genus knowledge`.
+> 396 grün. **Als Nächstes:** SYSTEME in die Breite (Grammatik) oder tiefer in Phase C/D.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
