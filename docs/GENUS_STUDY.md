@@ -318,7 +318,17 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > epistemische Rangordnung wie im ganzen Kern — bekanntes Faktum > induzierte Regel > ehrliches
 > Schweigen. Ein bekanntes Genus wird berichtet (bei „Messer" beide echten Sinne, keiner
 > versteckt); nur bei wirklich unbekannten Nomen greift die klar als „Vermutung, kein Wissen"
-> markierte Vorhersage; sonst verweigert GENUS. Live verifiziert end-to-end. 414 grün. **Als
-> Nächstes:** mehr Nomen seeden/organisch wachsen lassen; oder tiefer in Phase C/D.
+> markierte Vorhersage; sonst verweigert GENUS. Live verifiziert end-to-end. 414 grün.
+>
+> **Tiefer in Phase C: ein systematischer Sweep statt Einzelfunde.** Jede Konstante im Kern
+> geprüft; fast alles korrekt eingeordnet. Der eine echte Fund: CPU/Memory-Schwellen *könnten*
+> aussehen wie Kandidaten für Selbst-Kalibrierung (wie Repo-Churn/Thermal), aber die echten Daten
+> (15+ Tage, ~5000 Messungen) zeigen: Kalibrieren wäre hier **falsch** — nicht weil zu wenig Daten
+> da sind, sondern weil CPU/Memory-Prozent eine **absolute** Bedeutung tragen (80 % heißt überall
+> dasselbe), während Churn/Thermal **relativ** zur eigenen Geschichte sind. Eine absolute Größe an
+> einen meist ruhigen Pi zu kalibrieren würde Fehlalarme erzeugen, keine Willkür beseitigen. Das
+> **geschärfte Kriterium** (relativ vs. absolut, nicht „genug Daten?") ist der eigentliche Ertrag —
+> eine präzisere Theorie für jeden künftigen Audit. 414 grün. **Als Nächstes:** mehr Nomen seeden;
+> oder tiefer in Phase D.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
