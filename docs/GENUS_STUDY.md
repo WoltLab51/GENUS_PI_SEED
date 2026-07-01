@@ -312,7 +312,13 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > — Reichtum, keine Korruption, dasselbe Prinzip wie bei Wort-Homonymie. Live: Schwelle
 > selbst-kalibriert auf **0,92**, Selbst-Test **28/29 (97 %)**, eine echte Ausnahme (Gabel) ehrlich
 > ausgewiesen, korrekte Vorhersagen für nie gesehene Wörter (Vöglein, Bildung, Wahrheit,
-> Bekanntschaft). 408 grün. **Als Nächstes:** an den Begleiter anschließen; mehr Nomen seeden;
-> oder tiefer in Phase C/D.
+> Bekanntschaft). 408 grün.
+>
+> **An den Begleiter angeschlossen: `genus ask "Welches Geschlecht hat X?"`.** Dieselbe
+> epistemische Rangordnung wie im ganzen Kern — bekanntes Faktum > induzierte Regel > ehrliches
+> Schweigen. Ein bekanntes Genus wird berichtet (bei „Messer" beide echten Sinne, keiner
+> versteckt); nur bei wirklich unbekannten Nomen greift die klar als „Vermutung, kein Wissen"
+> markierte Vorhersage; sonst verweigert GENUS. Live verifiziert end-to-end. 414 grün. **Als
+> Nächstes:** mehr Nomen seeden/organisch wachsen lassen; oder tiefer in Phase C/D.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
