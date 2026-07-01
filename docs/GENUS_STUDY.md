@@ -335,8 +335,12 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > Fragen (dieselbe Routing-Reihenfolge wie `genus ask`), `deploy/telegram_bot.py` bringt sie über
 > Telegram herein und hinaus. Bewusst eng gehalten: nur lesend (kein Governance/Pause/Lehrer-Loop
 > erreichbar — „Hände" bleiben geparkt, das ist ein Mundstück), nur eine Positivliste erlaubter
-> Telegram-IDs bekommt Antworten, kein eingehender Port, Token nie im Repo. 432 grün, deployed,
-> noch nicht gestartet (wartet auf Ronnys Zugangsdaten). **Als Nächstes:** live schalten +
-> verifizieren; dann mehr Nomen seeden oder tiefer in Phase D.
+> Telegram-IDs bekommt Antworten, kein eingehender Port, Token nie im Repo. **Live seit
+> 2026-07-01** — Ronny stellt Fragen über Telegram, GENUS antwortet aus dem eigenen Graphen
+> („Was ist eine Banane?", „Hund?", „Was ist schön?"). Und **dauerhaft**: derselbe
+> Netz-Watchdog, der den Lerner am Leben hält, hält jetzt auch die Brücke am Leben (eigene
+> transiente systemd-Einheit, normale statt idle-Priorität, weil sie einem Menschen antwortet)
+> — sie übersteht Absturz und Neustart. 433 grün. **Als Nächstes:** mehr Nomen seeden oder
+> tiefer in Phase D.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*

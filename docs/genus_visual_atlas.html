@@ -759,7 +759,7 @@
 </svg></div>
 
 <div class="card"><h3>㉖ Der Begleiter antwortet — genus ask</h3>
-<p>Eine Frage, vier mögliche Wege: Zustand, Beziehung, Vergleich, Wort — deterministisch geroutet, nie geraten. <code>genus why</code> zeigt danach die volle Herkunfts-Spur.</p>
+<p>Eine Frage, deterministisch geroutet, nie geraten: Zustand → Beziehung → Vergleich → Genus (㉘) → Wort. <code>genus why</code> zeigt danach die volle Herkunfts-Spur. Dieselbe Antwort ist jetzt auch <b>über Telegram</b> erreichbar (㉙). <span style="color:#8a8578">Das Bild zeigt vier der Wege; die Genus-Frage kam später dazu.</span></p>
 <svg viewBox="0 0 680 380" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
 <title>Der Begleiter antwortet</title><desc>genus ask routet eine Frage über vier Stufen; genus why zeigt die Herleitung.</desc>
 <defs><marker id="a26" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5F5E5A"/></marker></defs>
@@ -868,6 +868,57 @@
 <text x="34" y="366" font-size="9" font-style="italic" fill="#5F5E5A">Ausnahmen sind lehrreiche Fakten, keine Defekte — genau wie „Hund" auch Förderwagen bedeuten kann.</text>
 
 <text x="20" y="400" font-size="9.5" font-style="italic" fill="#6b6455">genus predict-gender · genus gender-rule · genus ask "Welches Geschlecht hat X?" — 414 Tests grün.</text>
+</svg></div>
+
+<div class="card"><h3>㉙ Die erste Außentür — GENUS über Telegram</h3>
+<p>Ronny fragte: „Kann ich mit GENUS schreiben?" — jetzt ja, über Telegram. Eine neue <b>Membran</b>, kein Kern-Eingriff: derselbe <code>companion.respond()</code> wie <code>genus ask</code>, nur als Chat. Bewusst eng: <b>rein lesend</b> (ein Mundstück, keine Hände), nur eine <b>Positivliste</b>, kein eingehender Port — und derselbe Watchdog hält sie am Leben.</p>
+<svg viewBox="0 0 680 380" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+<title>Die erste Außentür — GENUS über Telegram</title><desc>Ronny fragt über Telegram; eine lesende Membran reicht die Frage an companion.respond, die Antwort kommt aus dem eigenen Graphen zurück; eine Positivliste lässt nur Ronny durch; der Watchdog hält die Brücke am Leben.</desc>
+<defs><marker id="a29" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5F5E5A"/></marker>
+<marker id="a29b" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0F6E56"/></marker></defs>
+<text x="20" y="24" font-size="16" font-weight="700" fill="#2C2C2A">Die erste Außentür — über Telegram</text>
+<text x="20" y="42" font-size="11" fill="#5F5E5A">companion.respond als Chat — lesend, Positivliste, Watchdog-gehalten</text>
+
+<rect x="20" y="66" width="150" height="52" rx="8" fill="#EFEAE0" stroke="#8a7f66"/>
+<text x="95" y="88" font-size="10.5" font-weight="700" text-anchor="middle" fill="#4a4636">Ronny (Telegram)</text>
+<text x="95" y="104" font-size="8" text-anchor="middle" fill="#6b6455">nur seine numerische ID</text>
+
+<rect x="255" y="66" width="170" height="52" rx="8" fill="#F0F6FA" stroke="#0F6E56" stroke-width="1.4"/>
+<text x="340" y="86" font-size="10" font-weight="700" text-anchor="middle" fill="#04342C">Membran: telegram_bot.py</text>
+<text x="340" y="101" font-size="8" text-anchor="middle" fill="#2a4540">HTTPS nur ausgehend · kein Port</text>
+<text x="340" y="112" font-size="8" text-anchor="middle" fill="#2a4540">Token außerhalb des Repos (0600)</text>
+
+<rect x="510" y="66" width="150" height="52" rx="8" fill="#EEEDFE" stroke="#3C3489" stroke-width="1.4"/>
+<text x="585" y="86" font-size="10" font-weight="700" text-anchor="middle" fill="#26215C">Kern: companion.respond</text>
+<text x="585" y="101" font-size="8" text-anchor="middle" fill="#3C3489">Antwort aus dem eigenen</text>
+<text x="585" y="112" font-size="8" text-anchor="middle" fill="#3C3489">Graphen (dieselbe wie genus ask)</text>
+
+<line x1="170" y1="84" x2="253" y2="84" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a29)"/>
+<text x="211" y="78" font-size="8" text-anchor="middle" fill="#5F5E5A">Frage</text>
+<line x1="425" y1="84" x2="508" y2="84" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a29)"/>
+<line x1="508" y1="106" x2="425" y2="106" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#a29b)"/>
+<line x1="253" y1="106" x2="170" y2="106" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#a29b)"/>
+<text x="340" y="134" font-size="8" text-anchor="middle" fill="#0F6E56">Antwort ←</text>
+
+<rect x="20" y="150" width="315" height="64" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.3"/>
+<text x="34" y="170" font-size="10" font-weight="700" fill="#412402">Positivliste (die Wache)</text>
+<text x="34" y="187" font-size="8.5" fill="#633806">nur Ronnys ID bekommt eine Antwort —</text>
+<text x="34" y="200" font-size="8.5" fill="#633806">alle anderen werden schweigend ignoriert</text>
+<text x="34" y="211" font-size="8" font-style="italic" fill="#7a5a2a">(kein Hinweis, ein Fremder lernt nichts)</text>
+
+<rect x="345" y="150" width="315" height="64" rx="8" fill="#F2F8F3" stroke="#3B6D11" stroke-width="1.3"/>
+<text x="359" y="170" font-size="10" font-weight="700" fill="#27500A">Mundstück, keine Hände</text>
+<text x="359" y="187" font-size="8.5" fill="#3a4a30">kein Governance / Pause / Lehrer erreichbar —</text>
+<text x="359" y="200" font-size="8.5" fill="#3a4a30">rein lesend, per Test abgesichert</text>
+<text x="359" y="211" font-size="8" font-style="italic" fill="#4a6a2a">der Kern bleibt unberührt (Membran-Reinheit)</text>
+
+<rect x="20" y="230" width="640" height="76" rx="8" fill="#04342C"/>
+<text x="34" y="252" font-size="10.5" font-weight="700" fill="#8FE3C4">Derselbe Netz-Watchdog hält die Brücke am Leben</text>
+<text x="34" y="270" font-size="9" fill="#Bfe6d7">ensure_telegram_bot(): eigene transiente systemd-Unit · normale Priorität (antwortet einem Menschen) ·</text>
+<text x="34" y="284" font-size="9" fill="#Bfe6d7">No-op wenn schon läuft (kein Duplikat) · No-op wenn nicht eingerichtet · kein passwortloses sudo nötig</text>
+<text x="34" y="300" font-size="9" font-weight="700" fill="#8FE3C4">Übersteht Absturz + Neustart — live bewiesen (gekillt → nächster Tick startet sie neu).</text>
+
+<text x="20" y="336" font-size="9.5" font-style="italic" fill="#6b6455">Live: „Was ist eine Banane?", „Hund?", „Was ist schön?" — beantwortet aus dem eigenen Graphen. 433 Tests grün.</text>
 </svg></div>
 
 </section>
