@@ -414,7 +414,21 @@ def _normalize(value: str) -> str:
 
 
 def _matches(question: str, patterns: tuple[str, ...]) -> bool:
-    return any(pattern in question for pattern in patterns)
+    """Fixed patterns are terse COMMANDS, not conversation. A multi-word phrase ("was ist
+    offen") is specific enough to match anywhere in the question; a single word ("status",
+    "netzwerk", "fragen") matches only when the question itself is command-like -- at most two
+    tokens, with the pattern as a whole token. Plain substring matching hijacked natural
+    questions ("Was ist ein Netzwerk?" got the operations count instead of the word the
+    companion knows) -- the same shadowing class as the learned word "Status" once hiding the
+    status command, now closed from both directions."""
+    tokens = question.split()
+    for pattern in patterns:
+        if " " in pattern:
+            if pattern in question:
+                return True
+        elif len(tokens) <= 2 and pattern in tokens:
+            return True
+    return False
 
 
 def _get_event(conn, event_id: int) -> dict:

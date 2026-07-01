@@ -898,6 +898,77 @@ def test_conversation_retraces_the_previous_word_answer():
     assert "dbnary" in followup["text"] and "Wolf" in followup["text"]   # the grounding, not a re-explanation
 
 
+def test_natural_question_reaches_the_word_not_the_command_table():
+    from genus import companion  # the "Was ist ein Netzwerk?" shadowing bug, end-to-end
+    conn = _fresh()
+    reactors.observe_relation(conn, "Netzwerk@de", "expresses", "Q1301371", "wikidata")
+    reactors.observe_relation(conn, "Netzwerk@de", "primary_gloss", "Verbund verbundener Systeme", "dbnary")
+    text = companion.respond(conn, "Was ist ein Netzwerk?")
+    assert "Verbund" in text
+    assert "operation record" not in text
+
+
+def test_companion_tells_its_open_questions_in_german():
+    from genus import companion, inquiries
+    conn = _fresh()
+    # two stability surprises on the SAME claim (must group to one spoken line with a count)
+    for i in (1, 2):
+        inquiries.record_inquiry_created_event(
+            conn, inquiry_id=i, inquiry_type="StabilityInquiry", claim_key="weather.trend",
+            source_belief=None, source_event=1, question_key="stability.unexpected_flip",
+            payload={"expected": "stable", "observed": "flipped"},
+        )
+    # and the real flagged is_a ring, with labelled concepts (label edge = Wort@de -label-> Q)
+    reactors.observe_relation(conn, "Datenträger@de", "label", "Q101", "wikidata")
+    reactors.observe_relation(conn, "Medien@de", "label", "Q202", "wikidata")
+    inquiries.record_inquiry_created_event(
+        conn, inquiry_id=3, inquiry_type="SourceContradiction", claim_key="Q101|is_a|Q202|acyclic",
+        source_belief=None, source_event=1, question_key="source.contradiction",
+        payload={"kind": "acyclicity_violation", "subject": "Q101", "object": "Q202", "predicate": "is_a"},
+    )
+
+    text = companion.respond(conn, "Was beschäftigt dich gerade?")
+
+    assert "Mich beschäftigen gerade 2 Dinge" in text
+    assert "weather.trend" in text and "2-mal" in text          # grouped, not two lines
+    assert "Kreis" in text and "Datenträger" in text and "Medien" in text
+    assert "Q101" not in text                                    # labels, never raw Q-ids
+    assert "genus teach" in text                                 # the honest read-only note
+
+
+def test_companion_with_nothing_open_says_so():
+    from genus import companion
+    conn = _fresh()
+    assert "nichts Offenes" in companion.respond(conn, "Hast du Fragen?")
+
+
+def test_voice_hedges_a_weakly_backed_meaning():
+    from genus import companion  # meaning carried only by the capped model bridge (0.25 < seed)
+    conn = _fresh()
+    reactors.observe_relation(conn, "Blub@de", "primary_gloss", "eine Testbedeutung", "model:embedder")
+    a = companion.answer(conn, "Was ist ein Blub?")
+    assert a["meaning_confidence"] < 0.5
+    assert "unsicher" in companion.narrate(a)
+
+
+def test_voice_names_independent_corroboration():
+    from genus import companion  # two independent sources carry the same gloss (0.75 > seed)
+    conn = _fresh()
+    reactors.observe_relation(conn, "Blub@de", "primary_gloss", "eine Testbedeutung", "dbnary")
+    reactors.observe_relation(conn, "Blub@de", "primary_gloss", "eine Testbedeutung", "wikidata-lexemes")
+    a = companion.answer(conn, "Was ist ein Blub?")
+    assert a["meaning_sources"] == 2
+    assert "mehrfach unabhängig belegt" in companion.narrate(a)
+
+
+def test_voice_stays_neutral_for_an_ordinary_single_source():
+    from genus import companion  # one seed-trust source = the normal case, no crying wolf
+    conn = _fresh()
+    reactors.observe_relation(conn, "Blub@de", "primary_gloss", "eine Testbedeutung", "dbnary")
+    s = companion.narrate(companion.answer(conn, "Was ist ein Blub?"))
+    assert "unsicher" not in s and "mehrfach" not in s
+
+
 def test_followup_without_a_previous_question_falls_through_honestly():
     from genus import companion
     conn = _isa_graph()

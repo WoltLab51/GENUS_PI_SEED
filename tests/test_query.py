@@ -34,6 +34,32 @@ def test_unknown_ask_returns_supported_patterns(conn):
     assert response["supported"]
 
 
+def test_single_word_patterns_do_not_hijack_natural_questions(conn):
+    # single-word patterns are terse commands -- inside a natural sentence they must NOT fire,
+    # so the question can flow on to the companion (the "Was ist ein Netzwerk?" shadowing bug)
+    assert query.ask(conn, "Was ist ein Netzwerk?")["kind"] == "unknown"
+    assert query.ask(conn, "Kann ich dich etwas fragen?")["kind"] == "unknown"
+    assert query.ask(conn, "Welche Regel gilt hier?")["kind"] == "unknown"
+
+
+def test_single_word_patterns_still_work_as_terse_commands(conn):
+    assert query.ask(conn, "status")["kind"] == "status"
+    assert query.ask(conn, "netzwerk")["kind"] == "operations"
+    assert query.ask(conn, "welche proposals")["kind"] == "pending_proposals"
+    assert query.ask(conn, "fragen")["kind"] == "open_inquiries"
+
+
+def test_single_word_patterns_match_whole_tokens_only(conn):
+    # "netzwerkkarte" is one token but a DIFFERENT word -- substring must not fire
+    assert query.ask(conn, "netzwerkkarte")["kind"] == "unknown"
+
+
+def test_phrase_patterns_still_match_inside_sentences(conn):
+    # multi-word phrases are specific enough to keep substring semantics
+    assert query.ask(conn, "zeig mir mal was ist offen bei dir")["kind"] == "open_inquiries"
+    assert query.ask(conn, "sag mal, was glaubst du eigentlich?")["kind"] == "active_beliefs"
+
+
 def test_explain_belief_includes_evidence_and_observations(conn):
     for _ in range(3):
         observe_cpu_value(conn, 92.0)

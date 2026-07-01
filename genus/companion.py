@@ -9,6 +9,7 @@ fluent. Here the knowing + a clean template are enough -- and the whole thing st
 """
 from __future__ import annotations
 
+import json
 import re
 
 from genus import inference, sources
@@ -67,10 +68,34 @@ def answer(conn, question: str) -> dict:
         langs = list(dict.fromkeys(  # other-language forms, order-preserving dedup
             w.rsplit("@", 1)[0] for w in c["words"] if not w.endswith("@de")))
         return {**base, "concept": qid, "label": c["label"], "meaning": c["meaning"],
-                "is_a": [sources.display(conn, p) for p in c["is_a"]], "languages": langs[:6]}
+                "is_a": [sources.display(conn, p) for p in c["is_a"]], "languages": langs[:6],
+                **_meaning_grounding(conn, found, qid, c["meaning"])}
     # word-level (e.g. a verb): its own glosses + part of speech, no concept node yet
     meaning = _objects(conn, found, "primary_gloss") or _objects(conn, found, "defined_as")
-    return {**base, "concept": None, "label": found, "meaning": meaning, "is_a": []}
+    return {**base, "concept": None, "label": found, "meaning": meaning, "is_a": [],
+            **_meaning_grounding(conn, found, None, meaning)}
+
+
+def _meaning_grounding(conn, word: str, qid: str | None, meaning) -> dict:
+    """How well the SHOWN meaning is backed: its read-time relation-confidence and how many
+    independent sources carry it. Tiers are structural, relative to the trust seed -- no new
+    constant: below seed = a weak lone witness (e.g. only the capped model bridge), above seed
+    = independent corroboration. Empty when no edge matches (then the voice stays neutral --
+    missing metadata is not evidence of weakness)."""
+    gloss = meaning[0] if meaning else None
+    if not gloss:
+        return {}
+    best: dict | None = None
+    candidates = [(f"{word}@de", "primary_gloss"), (f"{word}@de", "defined_as")]
+    if qid:
+        candidates.append((qid, "defined_as"))
+    for subject, predicate in candidates:
+        c = sources.relation_confidence(conn, subject, predicate, gloss)
+        if c["n_sources"] and (best is None or c["confidence"] > best["confidence"]):
+            best = c
+    if best is None:
+        return {}
+    return {"meaning_confidence": best["confidence"], "meaning_sources": best["n_sources"]}
 
 
 _POS_DE = {"noun": "Substantiv", "verb": "Verb", "adjective": "Adjektiv", "adverb": "Adverb"}
@@ -100,6 +125,15 @@ def narrate(a: dict) -> str:
     if named:   # only human-nameable parents in the voice; a bare Q-id says nothing to a person
         sentence += f"; es zählt zu {_join_de(named)}"
     sentence += "."
+    # Tiered honesty, relative to the trust seed (no new constant): a meaning carried only by
+    # a below-seed witness (e.g. the capped model bridge) is said WITH the doubt; independent
+    # corroboration may say so; the ordinary single-source case stays neutral -- hedging
+    # everything at seed would be crying wolf, not honesty.
+    conf, n = a.get("meaning_confidence"), a.get("meaning_sources", 0)
+    if conf is not None and conf < sources.SOURCE_TRUST_SEED:
+        sentence += " Bei dieser Bedeutung bin ich noch unsicher — sie ist erst schwach belegt."
+    elif n >= 2:
+        sentence += " Diese Bedeutung ist mehrfach unabhängig belegt."
     if a["languages"]:
         sentence += f" In anderen Sprachen: {', '.join(a['languages'][:4])}."
     return sentence
@@ -316,6 +350,8 @@ def respond(conn, question: str) -> str:
     state = query.ask(conn, question)
     if state.get("kind") != "unknown":
         return state["answer"]
+    if inquiries_question(question):
+        return narrate_inquiries(conn, open_questions(conn))
     rel = relate(conn, question)
     if rel.get("relational"):
         return narrate_relation(conn, rel)
@@ -332,6 +368,83 @@ def respond(conn, question: str) -> str:
             text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
         return text
     return state["answer"]  # the "unknown fixed query pattern" help, same fallback as the CLI
+
+
+# --- GENUS's own open questions ("Was beschäftigt dich?") --------------------------------
+#
+# The companion is a Gegenüber, not only an Auskunftei: GENUS genuinely has open questions
+# (inquiries -- contradictions it can't settle, stability surprises), and here they get a
+# German voice. Deliberately PULL only: GENUS tells what it wonders about when *asked* -- an
+# unprompted interjection (push) is a separate, conscious decision. Read-only: answering an
+# inquiry is the teacher-loop, a WRITE, and stays at the terminal (the Telegram membrane is a
+# Mundstück by design).
+
+_INQUIRY_CUES = (
+    "was beschäftigt dich", "was beschaeftigt dich",
+    "hast du fragen", "hast du offene fragen", "hast du noch fragen",
+    "welche fragen hast du", "was fragst du dich",
+    "gibt es offene fragen", "was ist dir unklar",
+    "worüber denkst du nach", "worueber denkst du nach",
+)
+
+
+def inquiries_question(question: str) -> bool:
+    """True when the question asks about GENUS's OWN open questions."""
+    q = question.casefold()
+    return any(cue in q for cue in _INQUIRY_CUES)
+
+
+def open_questions(conn) -> dict:
+    """GENUS's open inquiries, grouped by (type, claim) so ten repeats of the same surprise
+    become one speakable concern with a count -- the raw rows stay in ``genus inquiries``."""
+    from genus import inquiries as inq
+
+    groups: dict[tuple[str, str], dict] = {}
+    for row in inq.list_inquiries(conn, include_all=False):
+        key = (row["inquiry_type"], row["claim_key"])
+        g = groups.setdefault(key, {
+            "inquiry_type": row["inquiry_type"], "claim_key": row["claim_key"],
+            "payload": json.loads(row["payload"] or "{}"), "count": 0,
+        })
+        g["count"] += 1
+    return {"groups": list(groups.values())}
+
+
+def _speak_inquiry(conn, g: dict) -> str:
+    """One open concern as a German sentence -- type-specific, labels instead of Q-ids."""
+    t, claim, p = g["inquiry_type"], g["claim_key"], g["payload"]
+    times = f" ({g['count']}-mal aufgefallen)" if g["count"] > 1 else ""
+    if t == "StabilityInquiry":
+        return f"»{claim}« hat sich geändert, obwohl ich es für stabil hielt{times}."
+    if t == "SourceContradiction" and p.get("kind") == "acyclicity_violation":
+        parts = claim.split("|")
+        subj = p.get("subject") or (parts[0] if parts else claim)
+        obj = p.get("object") or (parts[2] if len(parts) > 2 else "")
+        return (f"In meiner Begriffs-Hierarchie steckt ein Kreis: {_label(conn, subj)} und "
+                f"{_label(conn, obj)} stehen gegenseitig als Oberbegriff da — eine Richtung "
+                f"muss falsch sein, und ich weiß nicht, welche{times}.")
+    if t == "SourceContradiction":
+        return f"Zwei Quellen, denen ich vertraue, widersprechen sich bei »{claim}«{times}."
+    if t == "CauseInquiry":
+        return f"Mein Zustand hat sich geändert und ich kenne die Ursache nicht (»{claim}«){times}."
+    if t == "ExpectationInquiry":
+        return f"»{claim}« verhält sich anders, als mein gelernter Rhythmus erwartet{times}."
+    return f"»{claim}« ({t}){times}."
+
+
+def narrate_inquiries(conn, oq: dict) -> str:
+    """The open concerns as fluent German -- and the honest note that answering them happens
+    at the terminal, because this channel deliberately cannot write."""
+    groups = oq["groups"]
+    if not groups:
+        return "Gerade beschäftigt mich nichts Offenes — alle meine Fragen sind beantwortet."
+    header = ("Mich beschäftigt gerade eine Sache:" if len(groups) == 1
+              else f"Mich beschäftigen gerade {len(groups)} Dinge:")
+    lines = [header]
+    lines += ["• " + _speak_inquiry(conn, g) for g in groups]
+    lines.append("(Antworten kann ich hier nicht entgegennehmen — das geht am Terminal: "
+                 "„genus inquiries\" und „genus teach\".)")
+    return "\n".join(lines)
 
 
 # --- a bare follow-up, read against the PREVIOUS turn ------------------------------------
