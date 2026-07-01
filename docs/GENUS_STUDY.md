@@ -328,7 +328,15 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 > dasselbe), während Churn/Thermal **relativ** zur eigenen Geschichte sind. Eine absolute Größe an
 > einen meist ruhigen Pi zu kalibrieren würde Fehlalarme erzeugen, keine Willkür beseitigen. Das
 > **geschärfte Kriterium** (relativ vs. absolut, nicht „genug Daten?") ist der eigentliche Ertrag —
-> eine präzisere Theorie für jeden künftigen Audit. 414 grün. **Als Nächstes:** mehr Nomen seeden;
-> oder tiefer in Phase D.
+> eine präzisere Theorie für jeden künftigen Audit. 414 grün.
+>
+> **→ NACH AUSSEN: die erste Tür.** Ronny fragte, ob er „mit GENUS schreiben" könnte, vielleicht
+> über Telegram. Ja — als neue Membran, kein Kern-Eingriff: `companion.respond()` beantwortet
+> Fragen (dieselbe Routing-Reihenfolge wie `genus ask`), `deploy/telegram_bot.py` bringt sie über
+> Telegram herein und hinaus. Bewusst eng gehalten: nur lesend (kein Governance/Pause/Lehrer-Loop
+> erreichbar — „Hände" bleiben geparkt, das ist ein Mundstück), nur eine Positivliste erlaubter
+> Telegram-IDs bekommt Antworten, kein eingehender Port, Token nie im Repo. 432 grün, deployed,
+> noch nicht gestartet (wartet auf Ronnys Zugangsdaten). **Als Nächstes:** live schalten +
+> verifizieren; dann mehr Nomen seeden oder tiefer in Phase D.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
