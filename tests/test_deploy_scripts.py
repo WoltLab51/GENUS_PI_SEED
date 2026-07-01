@@ -321,3 +321,19 @@ def test_telegram_bot_answers_only_never_writes():
     for forbidden in ("import governance", "import proposals", "control.pause", "control.resume",
                       "teach_relation", "record_proposal"):
         assert forbidden not in script
+
+
+def test_watchdog_supervises_the_telegram_bot_at_normal_priority():
+    script = (ROOT / "deploy" / "pi_network_watchdog.sh").read_text(encoding="utf-8")
+    # the watchdog keeps the bridge alive like the learner, but responsive (not idle-scheduled)
+    assert "ensure_telegram_bot" in script
+    assert "deploy/telegram_bot.py" in script
+    # a no-op unless configured: needs both the token file and the allow-list env file
+    assert "telegram_bot_token" in script and "telegram_bot.env" in script
+    # reads the allow-list by grep, never by sourcing/executing the env file
+    assert "GENUS_TELEGRAM_ALLOWED_IDS=" in script
+    # the bot's systemd-run must NOT carry the learner's idle scheduling (it should be responsive);
+    # the idle properties belong only to ensure_learner, above ensure_telegram_bot
+    bot_fn = script.split("ensure_telegram_bot()")[1].split("json_field()")[0]
+    assert "CPUSchedulingPolicy=idle" not in bot_fn
+    assert "Nice=19" not in bot_fn

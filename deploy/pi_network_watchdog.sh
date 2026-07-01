@@ -66,6 +66,33 @@ ensure_learner() {
         bash "$learner" || log "could not start learner"
 }
 
+# Also keep the Telegram bridge alive (only if configured). NORMAL priority -- it answers a human,
+# so it should feel responsive, unlike the deliberately idle learner. A no-op unless BOTH the token
+# file and the allow-list env file exist (so an un-set-up Pi does nothing). The allowed id(s) come
+# from the env file, read with grep (no sourcing -- the file is never executed). Read-only
+# companion; deliberately NOT gated on pause (it responds on demand, it is not autonomous work).
+ensure_telegram_bot() {
+    local bot="$REPO_DIR/deploy/telegram_bot.py"
+    local token_file="$GENUS_HOME/.genus/telegram_bot_token"
+    local env_file="$GENUS_HOME/.genus/telegram_bot.env"
+    if [ ! -f "$bot" ] || [ ! -s "$token_file" ] || [ ! -f "$env_file" ]; then return 0; fi
+    if pgrep -f "deploy/telegram_bot.py" >/dev/null 2>&1; then return 0; fi
+    if ! command -v systemd-run >/dev/null 2>&1; then return 0; fi
+    local allowed_ids
+    allowed_ids="$(grep -E '^GENUS_TELEGRAM_ALLOWED_IDS=' "$env_file" | tail -1 | cut -d= -f2-)"
+    if [ -z "$allowed_ids" ]; then return 0; fi
+    log "telegram bridge down — starting it (normal priority, own transient unit)"
+    systemd-run --quiet --collect \
+        --uid="$GENUS_USER" \
+        --property="StandardOutput=append:$LOG_DIR/telegram_bot.log" \
+        --property="StandardError=append:$LOG_DIR/telegram_bot.log" \
+        --setenv=GENUS_DB_PATH="$DB_PATH" \
+        --setenv=GENUS_LOG_DIR="$LOG_DIR" \
+        --setenv=GENUS_TELEGRAM_TOKEN_FILE="$token_file" \
+        --setenv=GENUS_TELEGRAM_ALLOWED_IDS="$allowed_ids" \
+        "$REPO_DIR/.venv/bin/python" "$bot" || log "could not start telegram bridge"
+}
+
 json_field() {
     GENUS_JSON_INPUT="$(cat)" "$REPO_DIR/.venv/bin/python" -c '
 import json
@@ -101,8 +128,9 @@ restart_network_service() {
     fi
 }
 
-# Keep the learner alive every tick (before the network check, so it runs regardless).
+# Keep the background jobs alive every tick (before the network check, so they run regardless).
 ensure_learner
+ensure_telegram_bot
 
 target="$(detect_target)"
 if [ -z "$target" ]; then
