@@ -207,6 +207,38 @@ def transitivity_evidence(conn, predicate: str, edges=None, stop_at: int | None 
     return {"predicate": predicate, "vindications": vindications, "chains": chains, "examples": examples}
 
 
+def _vindications_per_predicate(conn) -> dict[str, int]:
+    """Closed-triangle counts for every predicate at once, in one indexed query (no per-predicate
+    adjacency building) -- the population the transitivity threshold is calibrated from."""
+    rows = conn.execute(
+        """
+        SELECT r1.predicate AS predicate, COUNT(*) AS n
+        FROM relation_projection r1
+        JOIN relation_projection r2
+          ON r2.subject = r1.object AND r2.predicate = r1.predicate
+        JOIN relation_projection r3
+          ON r3.subject = r1.subject AND r3.object = r2.object AND r3.predicate = r1.predicate
+        WHERE r1.object <> r1.subject AND r2.object <> r1.subject
+        GROUP BY r1.predicate
+        """
+    ).fetchall()
+    return {row["predicate"]: row["n"] for row in rows}
+
+
+def calibrated_transitivity_min(conn) -> int:
+    """The transitivity threshold GENUS learns from the natural gap in its OWN data, instead of a
+    typed-in constant. Closed-triangle counts across predicates fall into a low (incidental) and a
+    high (rule-like) group; the widest gap between the positive counts is the cut, and a predicate
+    is transitive when it sits above the incidental group. Falls back to the seed MIN_VINDICATIONS
+    when the population is too thin to show a gap. Self-calibration turned on the rules of reasoning
+    themselves: the parameter is derived, not decreed (see [[self-calibration-no-presets]])."""
+    counts = sorted({n for n in _vindications_per_predicate(conn).values() if n > 0})
+    if len(counts) < 2:
+        return MIN_VINDICATIONS
+    _, low = max((counts[i + 1] - counts[i], counts[i]) for i in range(len(counts) - 1))
+    return low + 1   # transitive: strictly above the incidental (low) group across the widest gap
+
+
 def symmetry_evidence(conn, predicate: str, edges=None) -> dict:
     """Evidence that ``predicate`` is symmetric: asserted edges whose mirror is also asserted."""
     if edges is None:
@@ -226,11 +258,15 @@ def symmetry_evidence(conn, predicate: str, edges=None) -> dict:
     return {"predicate": predicate, "mirrored": mirrored, "pairs": pairs, "examples": examples}
 
 
-def is_transitive(conn, predicate: str, edges=None) -> bool:
+def is_transitive(conn, predicate: str, edges=None, threshold: int | None = None) -> bool:
     """Whether GENUS reasons transitively over ``predicate`` -- LEARNED from the graph once it has
-    spoken (>= MIN_VINDICATIONS closed triangles), else the seed hypothesis. Open-world: absence
-    of vindication is not proof against; it just leaves the seed standing."""
-    if transitivity_evidence(conn, predicate, edges, stop_at=MIN_VINDICATIONS)["vindications"] >= MIN_VINDICATIONS:
+    spoken (>= the threshold in closed triangles), else the seed hypothesis. Open-world: absence of
+    vindication is not proof against; it just leaves the seed standing. The threshold itself is now
+    *self-calibrated* from the natural gap in the data (``calibrated_transitivity_min``), not a
+    constant; pass ``threshold`` to reuse one calibration across a closure."""
+    if threshold is None:
+        threshold = calibrated_transitivity_min(conn)
+    if transitivity_evidence(conn, predicate, edges, stop_at=threshold)["vindications"] >= threshold:
         return True
     return predicate in TRANSITIVE_PREDICATES
 

@@ -256,3 +256,25 @@ def test_observe_relation_does_not_flag_acyclic_is_a():
     reactors.observe_relation(conn, "A", "is_a", "B", "src")
     r = reactors.observe_relation(conn, "B", "is_a", "C", "src")     # no ring
     assert "contradiction_detected" not in [e["event_type"] for e in r["events"]]
+
+
+def test_transitivity_threshold_is_calibrated_from_the_natural_gap():
+    conn = _fresh()  # 'strong' rule-like (20 triangles), 'weak' incidental (5) -> gap between them
+    for i in range(20):
+        _rel(conn, f"s{i}", "strong", f"m{i}"); _rel(conn, f"m{i}", "strong", f"t{i}")
+        _rel(conn, f"s{i}", "strong", f"t{i}")
+    for i in range(5):
+        _rel(conn, f"w{i}", "weak", f"x{i}"); _rel(conn, f"x{i}", "weak", f"y{i}")
+        _rel(conn, f"w{i}", "weak", f"y{i}")
+    thr = inference.calibrated_transitivity_min(conn)
+    assert thr == 6 and thr != inference.MIN_VINDICATIONS      # DERIVED from the data (top of low group + 1), not the constant
+    assert inference.is_transitive(conn, "strong") is True     # 20 >= 6 -> learned transitive
+    assert inference.is_transitive(conn, "weak") is False      # 5 < 6 -> below the gap, and no seed
+
+
+def test_calibration_falls_back_to_seed_when_population_too_thin():
+    conn = _fresh()  # only one predicate with triangles -> no gap to read -> seed threshold
+    for i in range(4):
+        _rel(conn, f"a{i}", "only", f"b{i}"); _rel(conn, f"b{i}", "only", f"c{i}")
+        _rel(conn, f"a{i}", "only", f"c{i}")
+    assert inference.calibrated_transitivity_min(conn) == inference.MIN_VINDICATIONS
