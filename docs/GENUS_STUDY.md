@@ -246,6 +246,18 @@ trägt). Ein warmer, sicherer Auftakt, der Phase B (den Sprung) nachher *erlebba
 >
 > **Damit ist Phase A im Kern rund:** reichere Fragen (relational · vergleichend) · `genus why` ·
 > Skalierung gemessen & gesund · Breite in die Wortarten. Optional offen: weitere *Sprachen*
-> (en/fr über die sprachneutralen Konzepte). Als Nächstes der große Schritt: **Phase B — SYSTEME.**
+> (en/fr über die sprachneutralen Konzepte).
+>
+> **Phase B — SYSTEME gestartet (der Denk-Sprung).** Domänen-Entscheidung: *nicht* ein
+> Grammatik-Spielzeug (ein Konjugator ist trivial, das würde den Kern nicht einbinden), sondern
+> **GENUS lernt die Regeln seines eigenen Denkens** — der tiefste Selbstbezug, datenlos, und der
+> vom Code selbst vorgesehene nächste Schritt. **①a geliefert & live:** aus dem eigenen Graphen
+> bewertet GENUS, ob ein Prädikat transitiv/symmetrisch ist — ein *geschlossenes Dreieck* (A→B→C
+> mit A→C auch behauptet) ist die Transitivitäts-Vorhersage, von den Daten bestätigt; genug davon
+> → Regel gelernt, sonst die Saat. Read-time, gläsern. Live: is_a transitiv (220 Dreiecke),
+> synonym symmetrisch. Der reflexive Kern fing sofort einen Fehler in *meinem* Design (Symmetrie
+> braucht eine Rate, keine Absolutzahl) und deckte 6 echte is_a-Zyklen auf — die Studie als Labor,
+> jetzt auf die Vernunft selbst gerichtet. 381 grün. **Als Nächstes ①b:** die gelernten Regeln in
+> `infer()` verdrahten (gelernt ersetzt Saat) + Überraschung bei Regel-Verletzung.
 
 *Diese Studie ist ein Vorschlag zum Steuern, kein Beschluss. Der Weg gehört Ronny.*
