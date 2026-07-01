@@ -22,8 +22,11 @@ TRANSITIVE_PREDICATES = {"is_a", "part_of"}
 SYMMETRIC_PREDICATES = {"synonym", "antonym"}
 
 # Enough closed triangles / mirrored pairs to trust a rule as *learned* from the data rather than
-# assumed -- a few independent vindications, like MIN_LIFECYCLE for beliefs. A seed, not a law.
+# assumed -- a few independent vindications, like MIN_LIFECYCLE for beliefs. A seed, not a law:
+# the *active* value is self-calibrated (calibrated_transitivity_min) and recorded by the periodic
+# scan under this experience key, so the hot path reads it cheaply (stored_transitivity_threshold).
 MIN_VINDICATIONS = 3
+TRANSITIVITY_CALIBRATION_KEY = "rule_calibration:transitivity"
 
 # Symmetry needs a RATE, not a raw count: a symmetric predicate mirrors *systematically* (most
 # edges have their reverse), whereas a non-symmetric one shows only incidental mirrors -- e.g.
@@ -239,6 +242,23 @@ def calibrated_transitivity_min(conn) -> int:
     return low + 1   # transitive: strictly above the incidental (low) group across the widest gap
 
 
+def stored_transitivity_threshold(conn) -> int | None:
+    """The self-calibrated threshold the periodic scan has RECORDED (experience
+    ``rule_calibration:transitivity``), read here with a single indexed lookup so the hot path
+    uses the derived value without recomputing the heavy cross-predicate calibration per query.
+    ``None`` when no calibration has been recorded yet -- then the seed stands. This is the
+    BeliefStability pattern: batch-compute the characterization, record it, read it cheaply."""
+    row = conn.execute(
+        "SELECT pattern FROM experience_log WHERE experience_key = ?",
+        (TRANSITIVITY_CALIBRATION_KEY,),
+    ).fetchone()
+    if row is None:
+        return None
+    import json
+    value = json.loads(row["pattern"]).get("threshold")
+    return int(value) if value is not None else None
+
+
 def symmetry_evidence(conn, predicate: str, edges=None) -> dict:
     """Evidence that ``predicate`` is symmetric: asserted edges whose mirror is also asserted."""
     if edges is None:
@@ -263,14 +283,14 @@ def is_transitive(conn, predicate: str, edges=None, threshold: int | None = None
     spoken (>= the threshold in closed triangles), else the seed hypothesis. Open-world: absence of
     vindication is not proof against; it just leaves the seed standing.
 
-    ``threshold`` defaults to the seed ``MIN_VINDICATIONS`` so the hot path stays cheap (one capped
-    evidence scan). The *self-calibrated* threshold (``calibrated_transitivity_min``, from the
-    natural gap in the data) is a glass-box readout GENUS can show and pass in explicitly; on the
-    live graph it equals the seed, so the derived value validates the constant rather than fighting
-    it. Wiring the derived value into every inference cheaply awaits a stored calibration (the
-    BeliefStability pattern) -- cross-predicate calibration is too heavy to recompute per query."""
+    ``threshold`` defaults to the value the periodic scan has self-calibrated and recorded
+    (``stored_transitivity_threshold``, read with one cheap indexed lookup), falling back to the
+    seed ``MIN_VINDICATIONS`` when nothing is recorded yet. So the hot path reasons by the *derived*
+    threshold without paying the heavy cross-predicate calibration per query."""
     if threshold is None:
-        threshold = MIN_VINDICATIONS
+        threshold = stored_transitivity_threshold(conn)
+        if threshold is None:
+            threshold = MIN_VINDICATIONS
     if transitivity_evidence(conn, predicate, edges, stop_at=threshold)["vindications"] >= threshold:
         return True
     return predicate in TRANSITIVE_PREDICATES

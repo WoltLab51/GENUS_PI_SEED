@@ -278,3 +278,34 @@ def test_calibration_falls_back_to_seed_when_population_too_thin():
         _rel(conn, f"a{i}", "only", f"b{i}"); _rel(conn, f"b{i}", "only", f"c{i}")
         _rel(conn, f"a{i}", "only", f"c{i}")
     assert inference.calibrated_transitivity_min(conn) == inference.MIN_VINDICATIONS
+
+
+def test_scan_records_calibration_and_hot_path_reasons_by_it():
+    from genus import experience
+    conn = _fresh()  # 'strong' rule-like (20), 'weak' incidental (5) -> derived threshold 6
+    for i in range(20):
+        _rel(conn, f"s{i}", "strong", f"m{i}"); _rel(conn, f"m{i}", "strong", f"t{i}")
+        _rel(conn, f"s{i}", "strong", f"t{i}")
+    for i in range(5):
+        _rel(conn, f"w{i}", "weak", f"x{i}"); _rel(conn, f"x{i}", "weak", f"y{i}")
+        _rel(conn, f"w{i}", "weak", f"y{i}")
+    assert inference.stored_transitivity_threshold(conn) is None      # nothing recorded yet
+    experience.scan(conn)                                             # the periodic calibration runs
+    assert inference.stored_transitivity_threshold(conn) == 6         # ...records the derived value
+    assert inference.is_transitive(conn, "strong") is True           # hot path reasons by the STORED 6
+    assert inference.is_transitive(conn, "weak") is False             # 5 < 6 (would be True under the seed 3!)
+
+
+def test_calibration_recharacterizes_when_the_threshold_changes():
+    from genus import experience
+    conn = _fresh()
+    for i in range(5):   # only one chaining predicate -> no gap -> seed threshold recorded
+        _rel(conn, f"w{i}", "weak", f"x{i}"); _rel(conn, f"x{i}", "weak", f"y{i}")
+        _rel(conn, f"w{i}", "weak", f"y{i}")
+    experience.scan(conn)
+    assert inference.stored_transitivity_threshold(conn) == inference.MIN_VINDICATIONS
+    for i in range(20):  # a rule-like predicate appears -> a gap opens -> threshold shifts
+        _rel(conn, f"s{i}", "strong", f"m{i}"); _rel(conn, f"m{i}", "strong", f"t{i}")
+        _rel(conn, f"s{i}", "strong", f"t{i}")
+    experience.scan(conn)
+    assert inference.stored_transitivity_threshold(conn) == 6         # recharacterized to the new value

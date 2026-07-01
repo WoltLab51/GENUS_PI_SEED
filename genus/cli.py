@@ -530,8 +530,12 @@ def knowledge_command(weakest: int) -> None:
                 ring = " -> ".join(sources.display(conn, n) for n in cycle) + " -> " + sources.display(conn, cycle[0])
                 click.echo(f"[KNOW]   {ring}")
         thr, seed = k["transitivity_threshold"], k["transitivity_seed"]
-        origin = "self-calibrated from the natural gap in the data" if thr != seed else f"= seed {seed}, validated by the data"
-        click.echo(f"[KNOW] transitivity threshold: {thr} ({origin})")
+        if thr is None:
+            click.echo(f"[KNOW] transitivity threshold: {seed} (seed — not yet self-calibrated; run 'genus scan')")
+        elif thr == seed:
+            click.echo(f"[KNOW] transitivity threshold: {thr} (self-calibrated, equals the seed — validated by the data)")
+        else:
+            click.echo(f"[KNOW] transitivity threshold: {thr} (self-calibrated from the natural gap; seed was {seed})")
         if k["weakest"]:
             click.echo("[KNOW] least confident:")
             for r in k["weakest"]:

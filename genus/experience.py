@@ -26,6 +26,14 @@ MIN_LIFECYCLE_UPDATES = 10  # premise of meaning: enough lifecycle to judge vola
 STABILITY_INQUIRY_TYPE = "StabilityInquiry"
 STABILITY_QUESTION_KEY = "stability.unexpected_flip"
 
+# RuleCalibration: GENUS tuning a parameter of its OWN reasoning. The transitivity threshold is
+# derived from the natural gap in the graph's vindication counts and recorded here, so the hot
+# path reads it cheaply (inference.stored_transitivity_threshold) instead of recomputing the heavy
+# cross-predicate calibration per query. The first experience that OPTIMISES the core, not just
+# characterises it -- the seed of "self-optimising".
+RULE_CALIBRATION_TYPE = "RuleCalibration"
+RULE_CALIBRATION_DERIVATION = "rule:rule_calibration_v1"
+
 
 def scan(conn) -> list[dict]:
     # The mind grows by registering detectors, not by rewriting scan. Each is a
@@ -536,4 +544,37 @@ def _largest_gap(ordered: list[float]) -> tuple[float, float]:
 
 
 # Cognition detector registry: each is a pure function conn -> candidates.
-DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates)
+def _rule_calibration_candidates(conn) -> list[dict]:
+    # GENUS tunes a parameter of its OWN reasoning: the transitivity threshold, derived from the
+    # natural gap in its vindication counts (inference.calibrated_transitivity_min). Recorded here,
+    # in the periodic scan, so the hot path reads it cheaply -- the heavy cross-predicate scan runs
+    # batch, not per query. Recharacterises when the derived threshold changes.
+    from genus import inference  # local: experience is imported broadly; avoid an import cycle
+
+    counts = inference._vindications_per_predicate(conn)
+    if not counts:
+        return []  # no rule-evidence yet -> nothing to calibrate; the seed stands
+    threshold = inference.calibrated_transitivity_min(conn)
+    seed = inference.MIN_VINDICATIONS
+    origin = "derived from the natural gap" if threshold != seed else "validated equal to the seed"
+    return [
+        {
+            "experience_key": inference.TRANSITIVITY_CALIBRATION_KEY,
+            "experience_type": RULE_CALIBRATION_TYPE,
+            "subject_key": "transitivity",
+            "pattern": {
+                "threshold": threshold,
+                "seed": seed,
+                "population": counts,
+                "classification": str(threshold),  # the key _maybe_recharacterize compares on
+            },
+            "supporting_events": [],
+            "derivation": RULE_CALIBRATION_DERIVATION,
+            "summary": f"transitivity threshold {threshold} ({origin}; population {counts})",
+            "proposable": False,
+            "characterization": str(threshold),  # re-record when the derived threshold changes
+        }
+    ]
+
+
+DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates, _rule_calibration_candidates)
