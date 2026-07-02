@@ -1044,3 +1044,69 @@ def test_deuter_chitchat_and_relation_guesses_are_not_actionable():
                   None):
         result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=lambda q, g=guess: g)
         assert result == baseline
+
+
+def test_remember_command_recognizes_the_cue_phrases_and_extracts_the_fact():
+    from genus import companion
+    for question, expected in [
+        ("Merke dir: ich habe zwei Hunde", "ich habe zwei Hunde"),
+        ("merk dir ich mag Kaffee", "ich mag Kaffee"),
+        ("Denk dran: mein Geburtstag ist im Mai.", "mein Geburtstag ist im Mai"),
+        ("notiere dir, ich wohne in Berlin", "ich wohne in Berlin"),
+    ]:
+        assert companion.remember_command(question) == expected
+    for question in ("Was ist ein Hund?", "erinnerst du dich an mich", ""):
+        assert companion.remember_command(question) is None
+
+
+def test_remember_and_recall_round_trip():
+    from genus import companion
+    conn = _isa_graph()
+    assert companion.personal_facts(conn) == []
+    # "Zebra" sorts AFTER "Apfel" alphabetically but was told FIRST -- pins insertion order,
+    # not sources.relations()'s alphabetical-by-object order (a real bug caught locally)
+    companion.remember(conn, "Zebra mag ich am liebsten im Zoo")
+    companion.remember(conn, "Apfelsaft trinke ich jeden Morgen")
+    assert companion.personal_facts(conn) == [
+        "Zebra mag ich am liebsten im Zoo", "Apfelsaft trinke ich jeden Morgen",
+    ]
+
+
+def test_recall_question_is_recognized():
+    from genus import companion
+    for q in ("Was weißt du über mich?", "was weisst du von mir", "Kennst du mich?"):
+        assert companion.is_recall_question(q)
+    assert not companion.is_recall_question("Was ist ein Hund?")
+
+
+def test_narrate_personal_facts_handles_zero_one_many():
+    from genus import companion
+    assert "noch nichts" in companion.narrate_personal_facts([])
+    assert "Einzige" in companion.narrate_personal_facts(["ich mag Kaffee"])
+    many = companion.narrate_personal_facts(["A", "B"])
+    assert "A" in many and "B" in many and "Das weiß ich über dich" in many
+
+
+def test_remembering_is_a_human_source_with_full_trust_not_capped():
+    from genus import companion, sources
+    conn = _isa_graph()
+    companion.remember(conn, "ich mag Kaffee")
+    assert sources.source_trust(conn, "ronny") >= sources.SOURCE_TRUST_SEED  # never model-capped
+
+
+def test_respond_remembers_and_recalls_end_to_end():
+    from genus import companion
+    conn = _isa_graph()
+    gemerkt = companion.respond(conn, "Merke dir: ich habe zwei Hunde")
+    assert "Gemerkt" in gemerkt and "zwei Hunde" in gemerkt
+    erinnerung = companion.respond(conn, "Was weißt du über mich?")
+    assert "zwei Hunde" in erinnerung
+
+
+def test_remember_command_always_takes_priority_over_other_routing():
+    from genus import companion
+    conn = _isa_graph()
+    # the fact text itself contains "status" -- a fixed state-pattern word -- and must NOT be
+    # hijacked by query.ask's command matching (the routing-shadowing class from earlier)
+    result = companion.respond(conn, "Merke dir: mein Status-Update ist fertig")
+    assert "Gemerkt" in result and "Status-Update" in result

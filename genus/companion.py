@@ -335,18 +335,106 @@ def narrate_gender(r: dict) -> str:
     return f"GENUS kennt »{r['noun']}« nicht gut genug, um auch nur zu vermuten — es rät nicht."
 
 
+# --- personal memory ("Merke dir: ...") --------------------------------------------------
+#
+# The first slice of Personen-Gedächtnis: Ronny told the companion once and for all it should
+# actually remember him ("auf jeden Fall!"). Deliberately EXPLICIT, not automatic extraction
+# from ordinary conversation -- inferring facts from freeform chat is a much harder, far more
+# error-prone problem (a whole separate model role); this is the honest, controllable first
+# step, matching the same discipline as the Deuter (small, capped, real). A remembered fact is
+# an ORDINARY relation (person:ronny -personal_fact-> "<what Ronny said>"), reusing the exact
+# same provenanced machinery as every other fact GENUS holds -- no new event type, no new
+# schema. Source "ronny" is a HUMAN source (uncapped, like the teacher-loop), not a model:*
+# source. "person:ronny" is a namespaced subject key (like a Wikidata Q-id or a model: source
+# prefix) -- this Kern belongs to exactly one person, per the Föderation principle (one core
+# per person, never multi-tenant within one), so there is deliberately no per-user parameter.
+
+PERSON_SUBJECT = "person:ronny"
+PERSONAL_FACT = "personal_fact"
+_REMEMBER_CUE = re.compile(
+    r"^\s*(?:merke?\s+dir|denk\s+dran|notier(?:e)?\s+dir)\s*[:,]?\s*(.+?)\s*[.!]?\s*$",
+    re.IGNORECASE,
+)
+_RECALL_CUES = (
+    "was weißt du über mich", "was weisst du über mich",
+    "was weißt du von mir", "was weisst du von mir",
+    "erzähl mir was du über mich weißt", "erzähl mir was du über mich weisst",
+    "kennst du mich",
+)
+
+
+def remember_command(question: str) -> str | None:
+    """The fact to remember, if ``question`` is an explicit "merke dir: ..." instruction --
+    ``None`` for an ordinary question. Only ever fires on this small, closed set of German cue
+    phrases; everything else is left to the normal routing untouched."""
+    m = _REMEMBER_CUE.match(question)
+    fact = m.group(1).strip() if m else ""
+    return fact or None
+
+
+def remember(conn, fact: str) -> int:
+    """Records a fact Ronny explicitly asked GENUS to remember -- an ordinary, provenanced
+    relation, source="ronny" (a human source, full trust, like the teacher-loop)."""
+    from genus import reactors  # local: keeps companion's import-time surface a leaf otherwise
+    result = reactors.observe_relation(conn, PERSON_SUBJECT, PERSONAL_FACT, fact, "ronny")
+    return result["event_id"]
+
+
+def personal_facts(conn) -> list[str]:
+    """Everything GENUS has been explicitly asked to remember about Ronny, oldest first.
+
+    A dedicated query, not ``sources.relations()`` -- that orders alphabetically by object
+    (right for graph traversal, wrong here: two facts would sort by their TEXT, not by when
+    they were told to GENUS, which looked like silent shuffling). Ordered by the projection's
+    own ``id`` (insertion order), the simplest faithful proxy for "when was this remembered".
+    """
+    rows = conn.execute(
+        "SELECT object FROM relation_projection WHERE subject = ? AND predicate = ? ORDER BY id",
+        (PERSON_SUBJECT, PERSONAL_FACT),
+    ).fetchall()
+    return [row["object"] for row in rows]
+
+
+def is_recall_question(question: str) -> bool:
+    """True for a bare "was weißt du über mich?"-style question. Uses ``.lower()``, not
+    ``.casefold()`` (matching ``is_why_followup``'s convention) -- casefold would turn German
+    "ß" into "ss" and silently break a cue phrase spelled with the real letter (caught live:
+    the "ß" cue never matched its own casefolded question)."""
+    q = question.strip().strip("?!.").lower()
+    return any(cue in q for cue in _RECALL_CUES)
+
+
+def narrate_personal_facts(facts: list[str]) -> str:
+    if not facts:
+        return "Bisher weiß ich noch nichts über dich — sag mir „merke dir: …“, und ich behalte es."
+    if len(facts) == 1:
+        return f"Das Einzige, was ich über dich weiß: {facts[0]}"
+    lines = ["Das weiß ich über dich:"]
+    lines += [f"• {f}" for f in facts]
+    return "\n".join(lines)
+
+
 # --- a single shared answer, for any conversational channel -----------------------------
 #
 # `cli.ask_command` has its own routing (terminal-log formatting, [ASK]/[BLF]/... tags -- left
 # untouched, well-tested). `respond` is the same underlying routing order, rendered as plain
 # text for a channel where that log-tag style would look odd (e.g. a chat bridge like Telegram).
-# Read-only, no side effects -- identical data functions, a different voice for a different room.
+# Read-only except for one deliberate, explicit exception: "merke dir: ..." (personal memory) --
+# every other branch is a pure read, identical data functions, a different voice for a room.
 
 def respond(conn, question: str) -> str:
-    """The full conversational answer to ``question``: state -> relational -> comparative ->
-    gender -> word -> help, in that order (matches ``cli.ask_command``). Plain text, no CLI tags."""
+    """The full conversational answer to ``question``: remember -> recall -> state ->
+    relational -> comparative -> gender -> word -> help, in that order (the personal-memory
+    checks run first so they can never be shadowed by a fixed pattern or a known word; the rest
+    matches ``cli.ask_command``). Plain text, no CLI tags."""
     from genus import query  # local: keeps companion's import-time surface a leaf otherwise
 
+    fact = remember_command(question)
+    if fact is not None:
+        remember(conn, fact)
+        return f"Gemerkt: „{fact}“"
+    if is_recall_question(question):
+        return narrate_personal_facts(personal_facts(conn))
     state = query.ask(conn, question)
     if state.get("kind") != "unknown":
         return state["answer"]
