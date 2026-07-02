@@ -111,8 +111,11 @@ def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
     assert "Wolf" in answer and "Sprachmodell gedeutet" in answer
 
 
-def test_bot_stays_honest_when_the_deuter_is_not_installed():
-    # the real deuter.interpret() returns None when the model file isn't present (e.g. in CI/dev)
+def test_bot_stays_honest_when_the_deuter_is_not_installed(monkeypatch):
+    import deuter
+    # force the "not installed" case explicitly -- on a machine where the model IS installed
+    # (e.g. the deployed Pi), this test must not silently load the real 1.5B model instead.
+    monkeypatch.setattr(deuter, "MODEL_PATH", "/nonexistent/path/model.gguf")
     conn = _fresh()
     chat_id, answer = telegram_bot.handle_update(
         conn, _msg(1, 42, "voellig unverstaendliche anfrage"), allowed={42}, sessions={},
