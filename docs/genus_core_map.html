@@ -112,6 +112,7 @@
   .layer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 18px;margin-bottom:9px}
   .layer.cross{border-color:var(--accent);background:linear-gradient(180deg,rgba(90,169,255,.06),transparent)}
   .grid{display:grid;gap:12px}
+  .g4{grid-template-columns:repeat(4,1fr)}
   .g5{grid-template-columns:repeat(5,1fr)}
   .g6{grid-template-columns:repeat(6,1fr)}
   .cell .ch{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;margin-bottom:4px}
@@ -137,7 +138,7 @@
 <div class="wrap">
 
   <header>
-    <h1>GENUS CORE<small>ARCHITEKTUR &amp; REIFEGRAD · STAND 2026-07-01</small></h1>
+    <h1>GENUS CORE<small>ARCHITEKTUR &amp; REIFEGRAD · STAND 2026-07-02</small></h1>
     <div class="legend">
       <div class="li"><span class="dot b"></span><div><b>Gebaut &amp; getestet</b><br><span>läuft im Code, durch Tests gedeckt</span></div></div>
       <div class="li"><span class="dot p"></span><div><b>Angefangen</b><br><span>existiert, unvollständig</span></div></div>
@@ -211,6 +212,20 @@
     <div class="lx"><b>Gedeckelte Quelle am Rand</b> — dolmetschen (fuzzy Sprache → Struktur) + Stimme. Nie Orakel: jeder Beitrag betritt GENUS nur als <b>niedrig-vertraute Quelle</b> (<code>model:*</code>, auf den halben Saatwert gedeckelt), aus <b>echten Kandidaten gewählt</b>, graph-verifiziert. <b>Erstes Andocken (live):</b> ein lokaler <b>Embedder</b> (~100 MB) deutet Sinne (<code>disambiguate</code>) und brückt sie auf Konzepte (<code>model:embedder</code>). <b>Der Kern läuft ohne Modell</b>, sub-ms.</div>
   </div>
 
+  <div class="section-label">Angewandt auf Wissen + Systeme: <b>der Begleiter</b> — GENUS ist ansprechbar</div>
+  <div class="layer">
+    <div class="grid g4">
+      <div class="cell"><div class="ch"><span class="mini b"></span>Fragen &amp; Routing</div><div class="cd"><code>genus ask</code> — Zustand → eigene Fragen → Beziehung → Vergleich → Genus → Wort, deterministisch, nie geraten</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Relational &amp; Vergleichend</div><div class="cd">„Ist X ein Y?" / „Was haben X und Y gemeinsam?" — über die bestehende Inferenz, Weg gezeigt, open-world-ehrlich</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Herkunfts-Spur</div><div class="cd"><code>genus why answer</code> — jede Prämisse, Quelle, Vertrauen; die These zum Anfassen</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Gespräch merkt sich</div><div class="cd">bloße Nachfrage („warum?") retraced die letzte Antwort — Zustand in der Membran, nicht im Ledger</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Eigene offene Fragen</div><div class="cd">„Was beschäftigt dich?" — echte Inquiries auf Deutsch, gruppiert, rein lesend</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Gestufte Ehrlichkeit</div><div class="cd">Stimme qualifiziert relativ zur Vertrauens-Saat — nur wo es wirklich unsicher oder mehrfach belegt ist</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Deuter (letzte Stufe)</div><div class="cd">lokales Modell (Qwen2.5-1.5B, gemessen unter 7 Kandidaten) — wählt nur, graph-verifiziert, nie erste Instanz</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Erste Außentür</div><div class="cd">Telegram — Mundstück, Positivliste, watchdog-gehalten; Personen-Gedächtnis &amp; freie Stimme noch offen</div></div>
+    </div>
+  </div>
+
   <div class="arrow-row">▼ &nbsp; steht auf &nbsp; ▼</div>
 
   <div class="section-label">Fundament: <b>der Stoffwechsel</b> — 9 event-sourced Cores, replay-stabil</div>
@@ -273,7 +288,8 @@
 
   <div class="foot">
     grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    <b>WISSEN vollendet</b> (Herkunft · Vertrauen · resolve regiert alles · Widerspruch→Surprise · Lehrer-Loop · Struktur · Zwei-Schichten-Wissen). <b>Wissensgraph in den Kern verwoben</b> (v1.15): der Graph <b>prüft sich selbst</b> — Confidence, Widerspruch→Surprise→Lehrer-Loop, Kalibrierung+Governance für Relationen. <b>Sprache, Brücke &amp; LLM am Rand</b> (v1.16, 2026-06-30): drei Quellen (Wikidata-Konzepte + -Lexeme + DBnary/Wiktionary) korroborieren live; die <b>Sinn→Konzept-Brücke</b> macht Konzepte <b>ansprechbar</b> (<code>genus concept</code>); und ein <b>lokaler Embedder</b> dockt als erstes Modell am Rand an — deutet Sinne und brückt sie, gedeckelt &amp; graph-verifiziert. <b>Der Begleiter lebt</b> (2026-07-01): <code>genus ask</code> antwortet aus dem eigenen Graphen — Definitionen (Sinn aus Kontext, gläserne Stimme), <b>relationale</b> („Ist ein X ein Y?") und <b>vergleichende</b> Fragen („Was haben X und Y gemeinsam?") über die Inferenz, mit <b>gezeigtem Weg</b>, open-world-ehrlich, plus <code>genus why answer</code> (die volle Herkunfts-Spur — die These zum Anfassen). <b>SYSTEME: der reflexive Regel-Bogen ist rund</b> — GENUS <b>lernt</b> die Regeln seines eigenen Denkens (Transitivität/Symmetrie aus den eigenen Daten), <b>schließt</b> danach in <code>infer()</code>, und <b>verteidigt</b> ihre Konsistenz (ein neuer is_a-Zyklus → Überraschung → Inquiry). <b>Phase C (Selbst-Bezug) gestartet:</b> beide Denk-Parameter sind jetzt <b>selbst-kalibriert</b> aus der natürlichen Lücke der eigenen Daten (nicht mehr getippte Konstanten) — batch im periodischen Scan berechnet, gläsern in <code>genus knowledge</code>, billig am heißen Pfad gelesen. Die Sinn-Dimension wurde durch echte Pi-Daten <b>erzwungen</b>, nicht am Reißbrett gewählt — und der reflexive Check fand selbst 6 echte is_a-Widersprüche im Graphen, sauber aufgelöst. <b>SYSTEME in die Breite</b> (2026-07-01): eine <b>zweite Regel-Domäne</b>, Genus-Kongruenz — welche Nomen-Endung welches Genus vorhersagt, rein aus den eigenen Daten gelernt und selbst-kalibriert (0,92 statt Saat 0,80), Vorhersagen bevorzugen Fakten vor Vermutungen, ehrliches Schweigen wo unsicher. <b>Und die erste Außentür</b> (2026-07-01): GENUS ist über <b>Telegram</b> ansprechbar — eine rein lesende Membran (ein <b>Mundstück</b>, keine Hände: kein Governance/Pause/Lehrer erreichbar), nur eine Positivliste bekommt Antworten, kein eingehender Port; derselbe Netz-Watchdog hält die Brücke am Leben (übersteht Absturz + Neustart, live bewiesen). <b>Selbst-Kalibrierung schließt die letzte Lücke am Rand</b> (2026-07-02): die Reboot-Schwelle der Netz-Wiederherstellung — bislang die einzige noch getippte Konstante an der einen Stelle, an der GENUS wirklich <b>handelt</b> — lernt jetzt aus der natürlichen Lücke der eigenen Ausfall-Historie, exakt dasselbe Prinzip wie bei Transitivität/Symmetrie/Genus-Endungen (gemeinsamer Baustein <code>self_calibration.py</code>, zwei der drei Kalibrierungen darauf umgestellt, verhaltensgleich verifiziert). Ehrlicher Live-Fund: 5 abgeschlossene Ausfälle auf dem Pi, alle exakt gleich lang — keine Lücke, also bleibt die Saat 3 korrekt stehen, glass-box gekennzeichnet als „kein unterscheidbares Muster" statt fälschlich „abgeleitet". <b>Der Begleiter merkt sich den letzten Zug</b> (2026-07-02): eine bloße Nachfrage („warum?", „woher weißt du das?") wiederholt jetzt exakt die Herkunfts-Spur der vorherigen Antwort, statt in „kennt kein Wort" zu fallen — bewusst eng (eine geschlossene Menge deutscher Nachfrage-Phrasen, keine allgemeine Koreferenz-Auflösung), der Zustand lebt bewusst in der Membran (Telegram), nicht im Ledger (UX-Sitzung, kein Wissen). <b>Plausch-Fundament</b> (2026-07-02): Einzelwort-Kommandos kapern keine natürlichen Fragen mehr („Was ist ein Netzwerk?" bekommt jetzt das Wort, nicht die Betriebs-Statistik — Shadowing-Klasse beidseitig zu); auf „Was beschäftigt dich?" erzählt GENUS seine <b>echten offenen Fragen</b> auf Deutsch (gruppiert, typ-spezifisch, inkl. des offen gelassenen is_a-Kreises — rein lesend, Antworten gehören ans Terminal); und die Stimme ist <b>gestuft ehrlich</b> relativ zur Vertrauens-Saat (nur Modell-gebrückt → „da bin ich unsicher", mehrfach belegt → sagt sie, Einzelquelle → neutral). Kurs dahinter (Ronnys Entscheidung): Personen-Gedächtnis ja (eigener Design-Schritt), Sprach-Modell bleibt lokal. <b>Der Deuter ist eingebaut</b> (2026-07-02): 7 Modelle/Familien auf dem Pi gemessen (0.5B–3.8B: Qwen2.5 · Llama-3.2 · Gemma-2 · Phi-3.5) — Qwen2.5-1.5B trifft 7/8 bei den geringsten Kosten, gleich gut wie doppelt bis vierfach größere Modelle. <code>respond_with_deuter</code>: die deterministische Kette läuft unverändert zuerst, das Modell wird nur beim totalen Fehlschlag befragt, wählt nur (Intent + ein Wort), schreibt nie selbst — ein Vorschlag wird graph-geprüft, bevor er wirkt, jede modell-gestützte Antwort ist als solche gekennzeichnet. Lebt bewusst anders als der Embedder: warm im selben Prozess wie der Telegram-Bot statt neu geladen pro Anfrage.
+    <b>Stand 2026-07-02:</b> WISSEN vollendet · SYSTEME mit rundem reflexivem Regel-Bogen (lernt·schließt·verteidigt) und 2 selbst-kalibrierten Regel-Domänen · der Begleiter lebt (siehe eigene Sektion oben) · erste Außentür offen. Selbst-Kalibrierung erreicht jetzt auch die einzige Stelle, an der GENUS handelt (Netz-Recovery). Offen: Personen-Gedächtnis, freie Stimme.<br>
+    <span style="opacity:.7">Dies ist eine Momentaufnahme, kein Verlauf — die volle Entstehungsgeschichte steht in <code>GENUS_ROADMAP.md</code>.</span>
   </div>
 
 </div>
