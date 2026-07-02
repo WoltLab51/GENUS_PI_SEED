@@ -72,6 +72,7 @@ _QUESTION_STARTERS = {
     "ist", "sind", "hat", "haben", "kannst", "kennst", "weißt", "weisst",
 }
 _FIRST_WORD = re.compile(r"^\s*([^\s?!.,]+)", re.UNICODE)
+_JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 _model = None   # lazy singleton -- loaded once per process (~2-3s), then warm
 
@@ -115,7 +116,12 @@ def interpret(question: str) -> dict | None:
             temperature=0.0,
         )
         text = result["choices"][0]["message"]["content"].strip()
-        parsed = json.loads(text)
+        # lenient on purpose: a small model occasionally wraps the JSON in prose or a markdown
+        # fence despite the instruction not to (seen live, and in the model-comparison
+        # benchmark) -- pulling out the {...} substring rescues an otherwise-valid guess
+        # without weakening the outer safety net (still fails to None on genuinely broken output)
+        match = _JSON_OBJECT.search(text)
+        parsed = json.loads(match.group(0) if match else text)
     except Exception:
         return None
     if not isinstance(parsed, dict) or parsed.get("intent") not in _VALID_INTENTS:
