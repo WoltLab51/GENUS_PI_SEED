@@ -10,6 +10,18 @@ from genus.db import init_schema
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "deploy"))
 import telegram_bot  # noqa: E402  (deploy/ script, imported directly for its pure logic)
+import deuter  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_real_deuter_model(monkeypatch):
+    """Every test here must behave the same regardless of whether a Deuter model happens to be
+    installed on the machine running them (the deployed Pi has one; a fresh dev/CI box doesn't)
+    -- force "not installed" by default, so a session-based test can't silently start loading
+    the real 1.5B model just because a chat_id's message falls through to the fallback sentinel.
+    Tests that specifically exercise the wiring monkeypatch ``deuter.interpret`` itself, which
+    overrides this."""
+    monkeypatch.setattr(deuter, "MODEL_PATH", "/nonexistent/path/model.gguf")
 
 
 def _fresh():
@@ -98,7 +110,6 @@ def test_without_sessions_behaves_exactly_as_before():
 
 
 def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
-    import deuter
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
@@ -111,11 +122,8 @@ def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
     assert "Wolf" in answer and "Sprachmodell gedeutet" in answer
 
 
-def test_bot_stays_honest_when_the_deuter_is_not_installed(monkeypatch):
-    import deuter
-    # force the "not installed" case explicitly -- on a machine where the model IS installed
-    # (e.g. the deployed Pi), this test must not silently load the real 1.5B model instead.
-    monkeypatch.setattr(deuter, "MODEL_PATH", "/nonexistent/path/model.gguf")
+def test_bot_stays_honest_when_the_deuter_is_not_installed():
+    # the autouse fixture above already forces "not installed" for every test in this file
     conn = _fresh()
     chat_id, answer = telegram_bot.handle_update(
         conn, _msg(1, 42, "voellig unverstaendliche anfrage"), allowed={42}, sessions={},
