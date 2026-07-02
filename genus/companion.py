@@ -200,24 +200,34 @@ def _collapse(path: list[str]) -> list[str]:
     return out
 
 
+def _relate_terms(conn, x_tok: str, y_tok: str) -> dict:
+    """The core of a yes/no is_a question once the two terms are already known -- shared by the
+    regex-triggered :func:`relate` and the Deuter's free-form ``relation`` guess (see
+    :func:`respond_with_deuter`). ``{relational: False}`` if either term doesn't resolve."""
+    x_form = _concept_form(conn, x_tok)
+    y_concepts, y_form = _concepts_of(conn, y_tok)
+    if x_form is None or not y_concepts:
+        return {"relational": False}
+    ancestors = inference.infer_lexeme(conn, x_form, "is_a", "de")
+    hits = [a for a in ancestors if a["object"] in y_concepts]
+    if hits:
+        best = min(hits, key=lambda a: len(a["chain"]))
+        return {"relational": True, "verdict": "yes", "subject": x_form, "object": y_form,
+                "target": best["object"], "trust": best["trust"], "chain": best["chain"]}
+    return {"relational": True, "verdict": "no_path", "subject": x_form, "object": y_form}
+
+
 def relate(conn, question: str) -> dict:
-    """Answer a yes/no is_a question from the graph; ``{relational: False}`` if it isn't one
-    (or names something GENUS can't resolve, so a plain word-lookup should try instead)."""
+    """Answer a yes/no is_a question from the graph via a fixed German phrasing;
+    ``{relational: False}`` if the text doesn't match one (or names something GENUS can't
+    resolve, so a plain word-lookup should try instead)."""
     for pattern in _REL_PATTERNS:
         m = pattern.search(question)
         if not m:
             continue
-        x_form = _concept_form(conn, m.group(1))
-        y_concepts, y_form = _concepts_of(conn, m.group(2))
-        if x_form is None or not y_concepts:
-            continue  # not a relation GENUS can own -- fall through to the word companion
-        ancestors = inference.infer_lexeme(conn, x_form, "is_a", "de")
-        hits = [a for a in ancestors if a["object"] in y_concepts]
-        if hits:
-            best = min(hits, key=lambda a: len(a["chain"]))
-            return {"relational": True, "verdict": "yes", "subject": x_form, "object": y_form,
-                    "target": best["object"], "trust": best["trust"], "chain": best["chain"]}
-        return {"relational": True, "verdict": "no_path", "subject": x_form, "object": y_form}
+        r = _relate_terms(conn, m.group(1), m.group(2))
+        if r["relational"]:
+            return r
     return {"relational": False}
 
 
@@ -262,19 +272,28 @@ def _ancestor_depths(conn, form: str) -> dict[str, int]:
     return depths
 
 
+def _common_terms(conn, x_tok: str, y_tok: str) -> dict:
+    """The core of a comparative question once the two terms are already known -- shared by the
+    regex-triggered :func:`common` and the Deuter's free-form ``comparative`` guess.
+    ``{common: False}`` if either term doesn't resolve to a concept."""
+    x, y = _concept_form(conn, x_tok), _concept_form(conn, y_tok)
+    if x is None or y is None:
+        return {"common": False}
+    dx, dy = _ancestor_depths(conn, x), _ancestor_depths(conn, y)
+    ordered = sorted(set(dx) & set(dy), key=lambda c: dx[c] + dy[c])
+    shared = [c for c in ordered if _label(conn, c) != c]   # only human-nameable categories
+    return {"common": True, "found": bool(shared), "x": x, "y": y, "shared": shared}
+
+
 def common(conn, question: str) -> dict:
     """The shared is_a ancestors of two words, closest first; ``{common: False}`` if not asked."""
     for pattern in _COMMON_PATTERNS:
         m = pattern.search(question)
         if not m:
             continue
-        x, y = _concept_form(conn, m.group(1)), _concept_form(conn, m.group(2))
-        if x is None or y is None:
-            continue
-        dx, dy = _ancestor_depths(conn, x), _ancestor_depths(conn, y)
-        ordered = sorted(set(dx) & set(dy), key=lambda c: dx[c] + dy[c])
-        shared = [c for c in ordered if _label(conn, c) != c]   # only human-nameable categories
-        return {"common": True, "found": bool(shared), "x": x, "y": y, "shared": shared}
+        r = _common_terms(conn, m.group(1), m.group(2))
+        if r["common"]:
+            return r
     return {"common": False}
 
 
@@ -303,24 +322,31 @@ _GENDER_PATTERNS = [
 ]
 
 
+def _gender_term(conn, tok: str) -> dict:
+    """The core of a gender question once the noun is already known -- shared by the
+    regex-triggered :func:`gender_question` and the Deuter's free-form ``gender`` guess. Always
+    returns a narratable dict (even ``prediction: None``) once a term is actually asked about --
+    "GENUS doesn't know" is itself an honest answer to a genuine gender question."""
+    for form in _forms(tok):
+        known = sorted({r["object"] for r in sources.relations(
+            conn, subject=f"{form}@de", predicate="grammatical_gender")})
+        if known:
+            return {"gender_q": True, "noun": form, "known": known}
+    from genus import gender_rule
+    for form in _forms(tok):
+        r = gender_rule.predict_gender(conn, f"{form}@de")
+        if r["found"]:
+            return {"gender_q": True, "noun": form, "known": [], "prediction": r}
+    return {"gender_q": True, "noun": tok, "known": [], "prediction": None}
+
+
 def gender_question(conn, question: str) -> dict:
     """A grammatical-gender question about a German noun; ``{gender_q: False}`` if not one."""
     for pattern in _GENDER_PATTERNS:
         m = pattern.search(question)
         if not m:
             continue
-        tok = m.group(1)
-        for form in _forms(tok):
-            known = sorted({r["object"] for r in sources.relations(
-                conn, subject=f"{form}@de", predicate="grammatical_gender")})
-            if known:
-                return {"gender_q": True, "noun": form, "known": known}
-        from genus import gender_rule
-        for form in _forms(tok):
-            r = gender_rule.predict_gender(conn, f"{form}@de")
-            if r["found"]:
-                return {"gender_q": True, "noun": form, "known": [], "prediction": r}
-        return {"gender_q": True, "noun": tok, "known": [], "prediction": None}
+        return _gender_term(conn, m.group(1))
     return {"gender_q": False}
 
 
@@ -619,55 +645,85 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
     return {"text": respond(conn, question), "question": question}
 
 
-# --- the DEUTER: a capped, last-resort edge model, called only when nothing else answers ------
+# --- the DEUTER: a capped edge model that parses free phrasing INTO the deterministic core -----
 #
 # Benchmarked (not guessed) across 7 models/families on the Pi before choosing: Qwen2.5-1.5B-
 # Instruct hit the same accuracy (7/8 on a hand-scored German routing test) as models twice to
 # four times its size, at the lowest latency/RAM of the reliable tier -- see the roadmap entry
 # for the full comparison. The model lives at the edge (deploy/deuter.py); genus/ stays
 # model-free -- ``deuter`` here is a plain callable a caller supplies (dependency injection),
-# never imported by this module. It WAEHLT only (an intent from a fixed list, a subject word
-# from the question) -- it never writes the answer; the deterministic pipeline still supplies
-# the actual, sourced content. Any subject it names is GRAPH-VERIFIED before anything happens.
+# never imported by this module.
+#
+# Only called as a last resort (the fixed regex patterns above are cheap and, when they match,
+# already fully reliable -- no reason to spend a model call once a pattern already nailed it),
+# but no longer a narrow one: EVERY intent the deterministic core can act on (definition,
+# relation, comparative, gender, statement, followup) is reachable through the Deuter now, not
+# just three of them. Ronny's framing: "mit klaren Vorgaben, was GENUS braucht" -- the model
+# WAEHLT only (an intent from a fixed list, one or two words from the question); it never
+# writes the answer or invents a fact. Every subject/object it names is GRAPH-VERIFIED against
+# the SAME resolution helpers the regex path uses (_relate_terms/_common_terms/_gender_term/
+# _last_known_word) before anything happens -- a wrong guess just leaves the honest fallback in
+# place, it can never fabricate an answer.
 
 _UNKNOWN_FALLBACK = (   # query.ask's stable "nothing recognized" sentinel -- keep in sync
     "Das kann GENUS nicht einordnen — kein bekannter Befehl, kein gelerntes Wort."
 )
+_DEUTED = " (Frage vom Sprachmodell gedeutet.)"
 
 
 def respond_with_deuter(conn, question: str, last_question: str | None = None, deuter=None) -> dict:
-    """Like ``respond_in_conversation``, but with an optional last-resort DEUTER for when the
-    deterministic pipeline finds NOTHING at all: an edge model may guess
-    ``{"intent": ..., "subject": ...}`` (``deuter(question) -> dict | None``, e.g.
-    ``deploy.deuter.interpret``). Three guesses are ever acted on, none answered directly:
+    """Like ``respond_in_conversation``, but with an optional DEUTER for when the deterministic
+    pipeline finds NOTHING at all: an edge model may guess ``{"intent", "subject", "object"}``
+    (``deuter(question) -> dict | None``, e.g. ``deploy.deuter.interpret``). Every guess is
+    resolved through the SAME deterministic machinery the regex path uses, never answered
+    directly by the model:
     - ``followup`` (with a known ``last_question``) retraces it exactly like a recognized bare
       follow-up -- this is what lets a phrasing OUTSIDE the small fixed cue-phrase set
       (:data:`_WHY_FOLLOWUP`) still reach the trace.
     - ``definition`` with a subject GENUS actually has something recorded about (checked via
       :func:`_last_known_word`, never trusted blindly) re-asks a clean synthesized question.
+    - ``relation``/``comparative`` with BOTH terms present are resolved via
+      :func:`_relate_terms`/:func:`_common_terms` -- the same graph-derived answer a matching
+      regex would have produced, just reached from free phrasing instead.
+    - ``gender`` with a subject that resolves (known fact or induced rule) is resolved via
+      :func:`_gender_term`.
     - ``statement`` (an unprompted personal statement, e.g. "ich habe zwei Hunde" with no
       "merke dir" at all) is recorded VERBATIM as a capped, unconfirmed note
       (:data:`STATEMENT_SOURCE`) -- GENUS noticing something worth remembering without being
       told to, honestly marked as a guess, never silently promoted to full trust.
-    Anything else (chitchat/relation/unclear, an unknown subject, or no ``deuter``/no guess at
-    all) leaves the honest fallback untouched. The answer is marked as model-assisted, glass-box
-    -- never silently. ``deuter=None`` (the default) reproduces ``respond_in_conversation``
-    exactly, so every existing caller stays safe without wiring one in."""
+    Anything that doesn't resolve (chitchat/unclear, missing terms, an unknown subject, or no
+    ``deuter``/no guess at all) leaves the honest fallback untouched -- a wrong guess can only
+    ever fail safe. Every model-assisted answer is marked as such, glass-box, never silently.
+    ``deuter=None`` (the default) reproduces ``respond_in_conversation`` exactly, so every
+    existing caller stays safe without wiring one in."""
     result = respond_in_conversation(conn, question, last_question)
     if deuter is None or result["text"] != _UNKNOWN_FALLBACK:
         return result
     guess = deuter(question)
     if not guess:
         return result
-    if guess.get("intent") == "followup" and last_question:
+    intent, subject, obj = guess.get("intent"), guess.get("subject"), guess.get("object")
+    if intent == "followup" and last_question:
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
-        return {"text": text + " (Frage vom Sprachmodell gedeutet.)", "question": last_question}
-    if guess.get("intent") == "definition" and guess.get("subject"):
-        found = _last_known_word(conn, guess["subject"])
+        return {"text": text + _DEUTED, "question": last_question}
+    if intent == "definition" and subject:
+        found = _last_known_word(conn, subject)
         if found is not None:
             text = respond(conn, f"Was ist {found}?")
-            return {"text": text + " (Frage vom Sprachmodell gedeutet.)", "question": question}
-    if guess.get("intent") == "statement":
+            return {"text": text + _DEUTED, "question": question}
+    if intent == "relation" and subject and obj:
+        r = _relate_terms(conn, subject, obj)
+        if r["relational"]:
+            return {"text": narrate_relation(conn, r) + _DEUTED, "question": question}
+    if intent == "comparative" and subject and obj:
+        r = _common_terms(conn, subject, obj)
+        if r["common"]:
+            return {"text": narrate_common(conn, r) + _DEUTED, "question": question}
+    if intent == "gender" and subject:
+        r = _gender_term(conn, subject)
+        if r["known"] or r.get("prediction"):
+            return {"text": narrate_gender(r) + _DEUTED, "question": question}
+    if intent == "statement":
         remember(conn, question, source=STATEMENT_SOURCE)
         text = (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
                 f"(sag „merke dir: {question}“, wenn's wichtig ist, dann bin ich mir sicher).")

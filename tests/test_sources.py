@@ -1046,6 +1046,46 @@ def test_deuter_chitchat_and_relation_guesses_are_not_actionable():
         assert result == baseline
 
 
+def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
+    # the Deuter now runs on free phrasing the fixed _REL_PATTERNS regex can't parse -- the
+    # extracted subject/object still go through the exact same graph reasoning (_relate_terms)
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"intent": "relation", "subject": "Hund", "object": "Säugetier"}
+    result = companion.respond_with_deuter(conn, "zaehlt sowas wie ein wuffwuff eigentlich dazu", deuter=deuter)
+    assert result["text"].startswith("Ja.") and "Säugetier" in result["text"]
+    assert "Sprachmodell gedeutet" in result["text"]
+
+
+def test_deuter_comparative_guess_with_both_terms_resolves_via_the_graph():
+    from genus import companion
+    conn = _kinship_graph()
+    deuter = lambda q: {"intent": "comparative", "subject": "Hund", "object": "Katze"}
+    result = companion.respond_with_deuter(conn, "was ist da eigentlich aehnlich bei den beiden", deuter=deuter)
+    assert "Säugetier" in result["text"] and "Sprachmodell gedeutet" in result["text"]
+
+
+def test_deuter_gender_guess_resolves_when_the_noun_is_known():
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "grammatical_gender", "maskulin", "wikidata-lexemes")
+    deuter = lambda q: {"intent": "gender", "subject": "Hund"}
+    result = companion.respond_with_deuter(conn, "was fuer ein wort ist das denn grammatikalisch", deuter=deuter)
+    assert "maskulin" in result["text"] and "Sprachmodell gedeutet" in result["text"]
+
+
+def test_deuter_gender_guess_with_unresolvable_noun_stays_honest():
+    # unlike the regex-triggered gender_question (an unambiguous pattern match commits to the
+    # "I don't know" answer), an unresolvable MODEL guess just leaves the honest fallback in
+    # place -- a wrong guess can never manufacture an answer, it can only fail safe
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"intent": "gender", "subject": "Erfundenwort"}
+    baseline = companion.respond_in_conversation(conn, "was fuer ein wort ist das denn grammatikalisch")
+    result = companion.respond_with_deuter(conn, "was fuer ein wort ist das denn grammatikalisch", deuter=deuter)
+    assert result == baseline
+
+
 def test_remember_command_recognizes_the_cue_phrases_and_extracts_the_fact():
     from genus import companion
     for question, expected in [

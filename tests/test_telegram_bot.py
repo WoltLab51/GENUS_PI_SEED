@@ -132,6 +132,18 @@ def test_bot_stays_honest_when_the_deuter_is_not_installed():
     assert "schiefgelaufen" not in answer   # no crash, just the ordinary honest fallback
 
 
+def test_deuter_never_calls_a_real_question_a_statement():
+    # live-caught 2026-07-02: "was ist ein Hund" (an unambiguous question) came back from the
+    # real model as {"intent": "statement", ...} -- a structural, deterministic veto, not a
+    # prompt tweak: ANY "statement" verdict for text that looks like a question is retried as
+    # "definition" instead, regardless of what the model said.
+    assert deuter._looks_like_question("was ist ein Hund")
+    assert deuter._looks_like_question("Ist das so?")
+    assert deuter._looks_like_question("kannst du mir das erklären")
+    assert not deuter._looks_like_question("ich habe zwei Hunde")
+    assert not deuter._looks_like_question("mein Geburtstag ist im Mai")
+
+
 def test_allowed_ids_parses_comma_separated_list(monkeypatch):
     monkeypatch.setenv("GENUS_TELEGRAM_ALLOWED_IDS", "111, 222 ,333")
     assert telegram_bot._allowed_ids() == {111, 222, 333}
