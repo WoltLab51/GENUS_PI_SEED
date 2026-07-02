@@ -32,16 +32,19 @@ _SYSTEM = (
     "Du bist ein Deuter fuer einen deutschen Sprach-Assistenten. Gib NUR ein kompaktes JSON "
     "zurueck: {\"intent\": ..., \"subject\": ...}. intent ist genau eines von: "
     "definition (was ist X), relation (ist X ein Y), followup (bezieht sich auf die letzte "
-    "Antwort, z.B. \"warum\", \"und er?\"), chitchat (Small Talk, keine Wissensfrage), "
-    "unclear (nicht zuordenbar). subject ist das Hauptwort der Frage (Grundform, ohne Artikel) "
-    "oder null. Kein Fliesstext, kein Kommentar -- nur das JSON, IMMER GENAU diese zwei Felder.\n"
+    "Antwort, z.B. \"warum\", \"und er?\"), statement (eine persoenliche Aussage/Tatsachen-"
+    "Behauptung, KEINE Frage, z.B. \"ich habe zwei Hunde\", \"du heisst GENUS\"), "
+    "chitchat (Small Talk, keine Wissensfrage), unclear (nicht zuordenbar). subject ist das "
+    "Hauptwort der Frage (Grundform, ohne Artikel) oder null. Kein Fliesstext, kein Kommentar "
+    "-- nur das JSON, IMMER GENAU diese zwei Felder.\n"
     "Beispiele:\n"
     "Was ist eine Katze? -> {\"intent\": \"definition\", \"subject\": \"Katze\"}\n"
     "ist ein hund ein saeugetier -> {\"intent\": \"relation\", \"subject\": \"Hund\"}\n"
     "warum -> {\"intent\": \"followup\", \"subject\": null}\n"
+    "ich habe zwei Hunde -> {\"intent\": \"statement\", \"subject\": \"Hund\"}\n"
     "na wie laeufts -> {\"intent\": \"chitchat\", \"subject\": null}"
 )
-_VALID_INTENTS = {"definition", "relation", "followup", "chitchat", "unclear"}
+_VALID_INTENTS = {"definition", "relation", "followup", "statement", "chitchat", "unclear"}
 
 _model = None   # lazy singleton -- loaded once per process (~2-3s), then warm
 

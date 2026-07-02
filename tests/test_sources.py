@@ -1062,29 +1062,47 @@ def test_remember_command_recognizes_the_cue_phrases_and_extracts_the_fact():
 def test_remember_and_recall_round_trip():
     from genus import companion
     conn = _isa_graph()
-    assert companion.personal_facts(conn) == []
+    assert companion.confirmed_notes(conn) == []
     # "Zebra" sorts AFTER "Apfel" alphabetically but was told FIRST -- pins insertion order,
     # not sources.relations()'s alphabetical-by-object order (a real bug caught locally)
     companion.remember(conn, "Zebra mag ich am liebsten im Zoo")
     companion.remember(conn, "Apfelsaft trinke ich jeden Morgen")
-    assert companion.personal_facts(conn) == [
+    assert companion.confirmed_notes(conn) == [
         "Zebra mag ich am liebsten im Zoo", "Apfelsaft trinke ich jeden Morgen",
     ]
 
 
-def test_recall_question_is_recognized():
+def test_remembering_is_not_hardcoded_to_be_about_ronny():
+    # regression, caught live on the Pi (Ronny's own reaction was a 😂): "Merk dir dass du
+    # GENUS heisst" is a fact about GENUS, not about Ronny -- slice 1 filed EVERYTHING as "a
+    # fact about Ronny" regardless of content, so recalling it read back nonsensically. The
+    # notebook is now general -- it just knows WHO TOLD it, never WHAT/WHOM a note is about.
     from genus import companion
-    for q in ("Was weißt du über mich?", "was weisst du von mir", "Kennst du mich?"):
+    conn = _isa_graph()
+    companion.remember(conn, "dass du GENUS heißt und Ronny dich erschaffen hat")
+    assert companion.confirmed_notes(conn) == ["dass du GENUS heißt und Ronny dich erschaffen hat"]
+
+
+def test_recall_question_is_recognized_by_exact_match_not_substring():
+    from genus import companion
+    for q in ("Was weißt du über mich?", "was weisst du von mir", "Kennst du mich?",
+              "Was weißt du?", "was hast du dir gemerkt"):
         assert companion.is_recall_question(q)
     assert not companion.is_recall_question("Was ist ein Hund?")
+    # regression: a substring check on the bare "was weißt du" cue would have hijacked this
+    # ordinary word question (real risk once "was weißt du" itself became a valid cue)
+    assert not companion.is_recall_question("Was weißt du über Hunde?")
 
 
-def test_narrate_personal_facts_handles_zero_one_many():
+def test_narrate_notes_shows_confirmed_and_suggested_tiers_separately():
     from genus import companion
-    assert "noch nichts" in companion.narrate_personal_facts([])
-    assert "Einzige" in companion.narrate_personal_facts(["ich mag Kaffee"])
-    many = companion.narrate_personal_facts(["A", "B"])
-    assert "A" in many and "B" in many and "Das weiß ich über dich" in many
+    assert "noch nichts" in companion.narrate_notes([], [])
+    assert "Einzige" in companion.narrate_notes(["ich mag Kaffee"], [])
+    many = companion.narrate_notes(["A", "B"], [])
+    assert "A" in many and "B" in many and "Das weiß ich sicher" in many
+    mixed = companion.narrate_notes(["A"], ["B"])
+    assert "A" in mixed and "B" in mixed
+    assert "noch nicht bestätigt" in mixed   # a suggestion is never presented as a fact
 
 
 def test_remembering_is_a_human_source_with_full_trust_not_capped():
@@ -1092,6 +1110,17 @@ def test_remembering_is_a_human_source_with_full_trust_not_capped():
     conn = _isa_graph()
     companion.remember(conn, "ich mag Kaffee")
     assert sources.source_trust(conn, "ronny") >= sources.SOURCE_TRUST_SEED  # never model-capped
+
+
+def test_a_deuter_suggested_statement_is_capped_and_marked_unconfirmed():
+    from genus import companion, sources
+    conn = _isa_graph()
+    deuter = lambda q: {"intent": "statement", "subject": "Hund"}
+    result = companion.respond_with_deuter(conn, "ich habe zwei Hunde", deuter=deuter)
+    assert "notiert" in result["text"] and "unsicher" in result["text"]
+    assert companion.suggested_notes(conn) == ["ich habe zwei Hunde"]
+    assert companion.confirmed_notes(conn) == []   # never conflated with a real "Merke dir"
+    assert sources.source_trust(conn, companion.STATEMENT_SOURCE) <= sources.MODEL_TRUST_SEED
 
 
 def test_respond_remembers_and_recalls_end_to_end():

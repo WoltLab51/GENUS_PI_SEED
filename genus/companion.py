@@ -335,32 +335,59 @@ def narrate_gender(r: dict) -> str:
     return f"GENUS kennt »{r['noun']}« nicht gut genug, um auch nur zu vermuten — es rät nicht."
 
 
-# --- personal memory ("Merke dir: ...") --------------------------------------------------
+# --- memory ("Merke dir: ...") -----------------------------------------------------------
 #
-# The first slice of Personen-Gedächtnis: Ronny told the companion once and for all it should
-# actually remember him ("auf jeden Fall!"). Deliberately EXPLICIT, not automatic extraction
-# from ordinary conversation -- inferring facts from freeform chat is a much harder, far more
-# error-prone problem (a whole separate model role); this is the honest, controllable first
-# step, matching the same discipline as the Deuter (small, capped, real). A remembered fact is
-# an ORDINARY relation (person:ronny -personal_fact-> "<what Ronny said>"), reusing the exact
-# same provenanced machinery as every other fact GENUS holds -- no new event type, no new
-# schema. Source "ronny" is a HUMAN source (uncapped, like the teacher-loop), not a model:*
-# source. "person:ronny" is a namespaced subject key (like a Wikidata Q-id or a model: source
-# prefix) -- this Kern belongs to exactly one person, per the Föderation principle (one core
-# per person, never multi-tenant within one), so there is deliberately no per-user parameter.
+# Slice 1 of Personen-Gedächtnis, corrected the same day it shipped: it was named
+# "person:ronny", but Ronny immediately used it to teach GENUS a fact about GENUS ITSELF
+# ("Merk dir dass du GENUS heißt") -- filed under "facts about Ronny", read back nonsensically
+# under "Was weißt du über mich?" (his own 😂 in the live log said it all). The fix isn't a
+# patch, it's a correct generalization: this is a general NOTEBOOK, not a "things about one
+# person" store -- GENUS doesn't (and, honestly, mostly can't) know WHO or WHAT a free-text
+# note is about; it only knows WHO TOLD it. A note is an ordinary relation
+# (genus:notizen -notiz-> "<text>"), reusing the exact same provenanced machinery as every
+# other fact GENUS holds -- no new event type, no new schema.
+#
+# Storage form (Ronny asked directly: "dicht aber schnell?"): the triple store already IS both
+# -- normalized (no duplication), indexed (subject+predicate lookup, sub-ms) -- for the volume
+# that exists and will exist for a good while. A semantic (embedding) index over notes, so
+# "was weißt du über Hunde" could find a note by MEANING and not just literal recall, is a
+# real, named future step -- deliberately NOT built now (self-calibration-no-presets: build
+# capacity when the need is real, not speculatively for a notebook with a handful of entries).
+#
+# Two trust tiers, not a formal Proposal/Review cycle -- reusing a mechanism that's already
+# fully built and trusted, not inventing a new one:
+#   - source="ronny" (explicit "Merke dir: ..."): a HUMAN source, full/uncapped trust, exactly
+#     like the teacher-loop. Ronny SAID to remember it -- that IS "enorm wichtig".
+#   - source="model:deuter" (an unprompted personal STATEMENT the Deuter noticed in ordinary
+#     conversation, e.g. "ich habe zwei Hunde" with no "merke dir" at all): capped at half the
+#     trust seed, automatically, by the SAME model-source cap that already governs every other
+#     model contribution (sources.MODEL_SOURCE_PREFIX) -- "GENUS schlägt vor" IS exactly what a
+#     capped, unconfirmed source means elsewhere in this graph. Never silently promoted to full
+#     trust; saying "Merke dir" for real about the same thing later adds a full-trust entry
+#     alongside it (corroboration raises confidence, same as anywhere else in the graph).
+#
+# "Über Nacht Erinnerungen bilden" (Ronny's idea, sleep-like consolidation): deliberately NOT
+# built here. It needs conversation TURNS to exist as ledger material to consolidate FROM --
+# today only explicit/suggested notes are recorded, not raw conversation (Ledger ≠ Memory holds
+# for ordinary chat). That is a separate, real architectural fork (do we start logging
+# conversation turns, and in what form) -- worth revisiting once there is enough note/
+# suggestion volume that consolidation would have real material to work with, not before.
 
-PERSON_SUBJECT = "person:ronny"
-PERSONAL_FACT = "personal_fact"
+NOTE_SUBJECT = "genus:notizen"
+NOTE_PREDICATE = "notiz"
+STATEMENT_SOURCE = "model:deuter"
 _REMEMBER_CUE = re.compile(
     r"^\s*(?:merke?\s+dir|denk\s+dran|notier(?:e)?\s+dir)\s*[:,]?\s*(.+?)\s*[.!]?\s*$",
     re.IGNORECASE,
 )
-_RECALL_CUES = (
+_RECALL_CUES = {
+    "was weißt du", "was weisst du",
     "was weißt du über mich", "was weisst du über mich",
     "was weißt du von mir", "was weisst du von mir",
+    "was hast du dir gemerkt", "was hast du gemerkt",
     "erzähl mir was du über mich weißt", "erzähl mir was du über mich weisst",
     "kennst du mich",
-)
+}
 
 
 def remember_command(question: str) -> str | None:
@@ -372,45 +399,66 @@ def remember_command(question: str) -> str | None:
     return fact or None
 
 
-def remember(conn, fact: str) -> int:
-    """Records a fact Ronny explicitly asked GENUS to remember -- an ordinary, provenanced
-    relation, source="ronny" (a human source, full trust, like the teacher-loop)."""
+def remember(conn, fact: str, source: str = "ronny") -> int:
+    """Records a note -- an ordinary, provenanced relation. ``source="ronny"`` (the default) is
+    an explicit, human-trusted command; ``source="model:deuter"`` is the Deuter noticing an
+    unprompted personal statement, automatically capped (a suggestion, not a confirmed fact)."""
     from genus import reactors  # local: keeps companion's import-time surface a leaf otherwise
-    result = reactors.observe_relation(conn, PERSON_SUBJECT, PERSONAL_FACT, fact, "ronny")
+    result = reactors.observe_relation(conn, NOTE_SUBJECT, NOTE_PREDICATE, fact, source)
     return result["event_id"]
 
 
-def personal_facts(conn) -> list[str]:
-    """Everything GENUS has been explicitly asked to remember about Ronny, oldest first.
+def _notes(conn, source_filter) -> list[str]:
+    """Notes matching ``source_filter(source) -> bool``, oldest first.
 
     A dedicated query, not ``sources.relations()`` -- that orders alphabetically by object
-    (right for graph traversal, wrong here: two facts would sort by their TEXT, not by when
-    they were told to GENUS, which looked like silent shuffling). Ordered by the projection's
-    own ``id`` (insertion order), the simplest faithful proxy for "when was this remembered".
-    """
+    (right for graph traversal, wrong here: notes would sort by their TEXT, not by when they
+    were told to GENUS, which looked like silent shuffling). Ordered by the projection's own
+    ``id`` (insertion order), the simplest faithful proxy for "when was this remembered"."""
     rows = conn.execute(
-        "SELECT object FROM relation_projection WHERE subject = ? AND predicate = ? ORDER BY id",
-        (PERSON_SUBJECT, PERSONAL_FACT),
+        "SELECT object, source FROM relation_projection WHERE subject = ? AND predicate = ? ORDER BY id",
+        (NOTE_SUBJECT, NOTE_PREDICATE),
     ).fetchall()
-    return [row["object"] for row in rows]
+    return [row["object"] for row in rows if source_filter(row["source"])]
+
+
+def confirmed_notes(conn) -> list[str]:
+    """Notes a human explicitly asked GENUS to remember -- full trust."""
+    return _notes(conn, lambda s: not s.startswith(sources.MODEL_SOURCE_PREFIX))
+
+
+def suggested_notes(conn) -> list[str]:
+    """Notes the Deuter noticed unprompted in ordinary conversation -- capped, unconfirmed."""
+    return _notes(conn, lambda s: s.startswith(sources.MODEL_SOURCE_PREFIX))
 
 
 def is_recall_question(question: str) -> bool:
-    """True for a bare "was weißt du über mich?"-style question. Uses ``.lower()``, not
-    ``.casefold()`` (matching ``is_why_followup``'s convention) -- casefold would turn German
-    "ß" into "ss" and silently break a cue phrase spelled with the real letter (caught live:
-    the "ß" cue never matched its own casefolded question)."""
+    """True for a "was weißt du (über mich)?"-style question. EXACT match after normalizing
+    (not a substring check) -- a substring cue like "was weißt du" would otherwise also fire
+    inside a real question like "was weißt du über Hunde?", hijacking an ordinary word lookup.
+    Uses ``.lower()``, not ``.casefold()`` (matching ``is_why_followup``'s convention) --
+    casefold would turn German "ß" into "ss" and silently break a "ß"-spelled cue phrase
+    (caught live: the "ß" cue never matched its own casefolded question)."""
     q = question.strip().strip("?!.").lower()
-    return any(cue in q for cue in _RECALL_CUES)
+    return q in _RECALL_CUES
 
 
-def narrate_personal_facts(facts: list[str]) -> str:
-    if not facts:
+def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
+    """Tiered honesty, same principle as everywhere else in the companion (known fact > induced
+    rule > silence): confirmed notes are stated plainly; suggested (model-noticed, unconfirmed)
+    ones are named separately and marked as a guess -- never silently blended together."""
+    if not confirmed and not suggested:
         return "Bisher weiß ich noch nichts über dich — sag mir „merke dir: …“, und ich behalte es."
-    if len(facts) == 1:
-        return f"Das Einzige, was ich über dich weiß: {facts[0]}"
-    lines = ["Das weiß ich über dich:"]
-    lines += [f"• {f}" for f in facts]
+    lines = []
+    if confirmed:
+        if len(confirmed) == 1:
+            lines.append(f"Das Einzige, was ich sicher weiß: {confirmed[0]}")
+        else:
+            lines.append("Das weiß ich sicher:")
+            lines += [f"• {f}" for f in confirmed]
+    if suggested:
+        lines.append("Das vermute ich außerdem (noch nicht bestätigt):")
+        lines += [f"• {f}" for f in suggested]
     return "\n".join(lines)
 
 
@@ -434,7 +482,7 @@ def respond(conn, question: str) -> str:
         remember(conn, fact)
         return f"Gemerkt: „{fact}“"
     if is_recall_question(question):
-        return narrate_personal_facts(personal_facts(conn))
+        return narrate_notes(confirmed_notes(conn), suggested_notes(conn))
     state = query.ask(conn, question)
     if state.get("kind") != "unknown":
         return state["answer"]
@@ -591,13 +639,16 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None, d
     """Like ``respond_in_conversation``, but with an optional last-resort DEUTER for when the
     deterministic pipeline finds NOTHING at all: an edge model may guess
     ``{"intent": ..., "subject": ...}`` (``deuter(question) -> dict | None``, e.g.
-    ``deploy.deuter.interpret``). Only two guesses are ever acted on, both re-run through the
-    existing deterministic machinery rather than answered directly:
+    ``deploy.deuter.interpret``). Three guesses are ever acted on, none answered directly:
     - ``followup`` (with a known ``last_question``) retraces it exactly like a recognized bare
       follow-up -- this is what lets a phrasing OUTSIDE the small fixed cue-phrase set
       (:data:`_WHY_FOLLOWUP`) still reach the trace.
     - ``definition`` with a subject GENUS actually has something recorded about (checked via
       :func:`_last_known_word`, never trusted blindly) re-asks a clean synthesized question.
+    - ``statement`` (an unprompted personal statement, e.g. "ich habe zwei Hunde" with no
+      "merke dir" at all) is recorded VERBATIM as a capped, unconfirmed note
+      (:data:`STATEMENT_SOURCE`) -- GENUS noticing something worth remembering without being
+      told to, honestly marked as a guess, never silently promoted to full trust.
     Anything else (chitchat/relation/unclear, an unknown subject, or no ``deuter``/no guess at
     all) leaves the honest fallback untouched. The answer is marked as model-assisted, glass-box
     -- never silently. ``deuter=None`` (the default) reproduces ``respond_in_conversation``
@@ -616,6 +667,11 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None, d
         if found is not None:
             text = respond(conn, f"Was ist {found}?")
             return {"text": text + " (Frage vom Sprachmodell gedeutet.)", "question": question}
+    if guess.get("intent") == "statement":
+        remember(conn, question, source=STATEMENT_SOURCE)
+        text = (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
+                f"(sag „merke dir: {question}“, wenn's wichtig ist, dann bin ich mir sicher).")
+        return {"text": text, "question": question}
     return result
 
 
