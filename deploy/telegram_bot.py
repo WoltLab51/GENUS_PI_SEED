@@ -2,14 +2,16 @@
 """Telegram bridge — a conversational membrane at the edge, nothing more.
 
 Long-polls Telegram's Bot API (outbound HTTPS only; no inbound port, no public server needed)
-and answers each allowed message with `genus.companion.respond_in_conversation` -- the same
+and answers each allowed message with `genus.companion.respond_with_deuter` -- the same
 read-only routing `genus ask` uses (state -> relational -> comparative -> gender -> word ->
 help), aware of the PREVIOUS message in the same chat so a bare "warum?"/"woher weißt du das?"
 retraces it instead of failing (per-chat state lives here in the membrane, in-process only --
-the ledger stays the source of epistemic truth, this is UX plumbing, not knowledge). The core is
-untouched: this is a new DOOR, not a new ROOM. Strictly answer-only -- no proposal, governance,
-pause/resume, or any state-changing command is reachable here, on purpose (Hände stay parked;
-this is a Mundstück).
+the ledger stays the source of epistemic truth, this is UX plumbing, not knowledge). As the
+LAST resort, when nothing deterministic answers at all, a local edge model (deuter.py, kept
+warm in this process) may guess an intent + subject -- never trusted blindly, graph-verified
+by the core before it acts, never writing the answer itself. The core is untouched: this is a
+new DOOR, not a new ROOM. Strictly answer-only -- no proposal, governance, pause/resume, or any
+state-changing command is reachable here, on purpose (Hände stay parked; this is a Mundstück).
 
 Security: a message is answered ONLY if its sender's Telegram user id is on the allow-list
 (GENUS_TELEGRAM_ALLOWED_IDS). Everyone else is silently ignored (logged, not replied to, so a
@@ -112,6 +114,7 @@ def handle_update(
     not knowledge, so it deliberately doesn't touch the ledger (Ledger != Memory). Omit
     ``sessions`` for the plain, stateless behaviour (unchanged)."""
     from genus import companion
+    import deuter
 
     message = update.get("message") or update.get("edited_message")
     if not message or "text" not in message:
@@ -129,7 +132,9 @@ def handle_update(
         if sessions is None:
             answer = companion.respond(conn, question)
         else:
-            result = companion.respond_in_conversation(conn, question, sessions.get(chat_id))
+            result = companion.respond_with_deuter(
+                conn, question, sessions.get(chat_id), deuter=deuter.interpret,
+            )
             answer = result["text"]
             sessions[chat_id] = result["question"]
     except Exception as exc:  # a bug in answering must never take the bridge down

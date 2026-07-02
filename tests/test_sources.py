@@ -984,3 +984,63 @@ def test_a_real_question_is_never_mistaken_for_a_followup():
     result = companion.respond_in_conversation(conn, "Was ist ein Hund?", last_question="Ist ein Hund ein Säugetier?")
     assert "Herleitung" not in result["text"]          # routed through respond(), not the why-trace
     assert result["question"] == "Was ist ein Hund?"   # a real question always overrides, never a stale one
+
+
+def test_deuter_none_reproduces_the_conversation_default():
+    from genus import companion
+    conn = _isa_graph()
+    a = companion.respond_with_deuter(conn, "Quuxikon?")
+    b = companion.respond_in_conversation(conn, "Quuxikon?")
+    assert a == b   # deuter=None must be a byte-for-byte no-op, safe for every existing caller
+
+
+def test_deuter_is_never_consulted_when_the_deterministic_chain_already_answered():
+    from genus import companion
+    conn = _isa_graph()
+    calls = []
+    deuter = lambda q: (calls.append(q) or {"intent": "definition", "subject": "Hund"})
+    companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", deuter=deuter)
+    assert calls == []   # the relational answer already succeeded -- the model must stay idle
+
+
+def test_deuter_resolves_a_freeform_question_the_deterministic_chain_missed():
+    from genus import companion
+    conn = _isa_graph()   # already has Hund@de -expresses-> Q144
+    deuter = lambda q: {"intent": "definition", "subject": "Hund"}
+    # a phrasing the rigid extractor can't parse a subject out of on its own
+    result = companion.respond_with_deuter(conn, "so ne allgemeine frage zu dem thema wuffwuff", deuter=deuter)
+    assert "Hund" in result["text"]
+    assert "Sprachmodell gedeutet" in result["text"]   # glass-box: never silently model-assisted
+
+
+def test_deuter_guess_is_graph_verified_not_trusted_blindly():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"intent": "definition", "subject": "Erfundenwort"}   # GENUS knows no such word
+    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
+    result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=deuter)
+    assert result == baseline   # the model's guess is not a real word -- stays honest, unchanged
+
+
+def test_deuter_followup_reaches_the_trace_outside_the_fixed_cue_phrases():
+    from genus import companion
+    conn = _isa_graph()
+    first = companion.respond_in_conversation(conn, "Ist ein Hund ein Säugetier?")
+    deuter = lambda q: {"intent": "followup", "subject": None}
+    # a phrasing NOT in the small fixed _WHY_FOLLOWUP set -- deterministic is_why_followup misses it
+    followup = companion.respond_with_deuter(
+        conn, "kannst du mir das nochmal genauer herleiten", last_question=first["question"], deuter=deuter,
+    )
+    assert "Herleitung" in followup["text"] and "Sprachmodell gedeutet" in followup["text"]
+
+
+def test_deuter_chitchat_and_relation_guesses_are_not_actionable():
+    from genus import companion
+    conn = _isa_graph()
+    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
+    for guess in ({"intent": "chitchat", "subject": None},
+                  {"intent": "relation", "subject": "Hund"},   # no object -> can't be safely re-asked
+                  {"intent": "unclear", "subject": None},
+                  None):
+        result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=lambda q, g=guess: g)
+        assert result == baseline

@@ -97,6 +97,30 @@ def test_without_sessions_behaves_exactly_as_before():
     assert result is not None and "Wolf" in result[1]
 
 
+def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
+    import deuter
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    monkeypatch.setattr(deuter, "interpret", lambda q: {"intent": "definition", "subject": "Hund"})
+
+    chat_id, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "so ne frage zu dem wuffwuff thema"), allowed={42}, sessions={},
+    )
+    assert chat_id == 42
+    assert "Wolf" in answer and "Sprachmodell gedeutet" in answer
+
+
+def test_bot_stays_honest_when_the_deuter_is_not_installed():
+    # the real deuter.interpret() returns None when the model file isn't present (e.g. in CI/dev)
+    conn = _fresh()
+    chat_id, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "voellig unverstaendliche anfrage"), allowed={42}, sessions={},
+    )
+    assert chat_id == 42
+    assert "schiefgelaufen" not in answer   # no crash, just the ordinary honest fallback
+
+
 def test_allowed_ids_parses_comma_separated_list(monkeypatch):
     monkeypatch.setenv("GENUS_TELEGRAM_ALLOWED_IDS", "111, 222 ,333")
     assert telegram_bot._allowed_ids() == {111, 222, 333}

@@ -483,6 +483,52 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
     return {"text": respond(conn, question), "question": question}
 
 
+# --- the DEUTER: a capped, last-resort edge model, called only when nothing else answers ------
+#
+# Benchmarked (not guessed) across 7 models/families on the Pi before choosing: Qwen2.5-1.5B-
+# Instruct hit the same accuracy (7/8 on a hand-scored German routing test) as models twice to
+# four times its size, at the lowest latency/RAM of the reliable tier -- see the roadmap entry
+# for the full comparison. The model lives at the edge (deploy/deuter.py); genus/ stays
+# model-free -- ``deuter`` here is a plain callable a caller supplies (dependency injection),
+# never imported by this module. It WAEHLT only (an intent from a fixed list, a subject word
+# from the question) -- it never writes the answer; the deterministic pipeline still supplies
+# the actual, sourced content. Any subject it names is GRAPH-VERIFIED before anything happens.
+
+_UNKNOWN_FALLBACK = "unknown fixed query pattern"  # query.ask's stable "nothing recognized" sentinel
+
+
+def respond_with_deuter(conn, question: str, last_question: str | None = None, deuter=None) -> dict:
+    """Like ``respond_in_conversation``, but with an optional last-resort DEUTER for when the
+    deterministic pipeline finds NOTHING at all: an edge model may guess
+    ``{"intent": ..., "subject": ...}`` (``deuter(question) -> dict | None``, e.g.
+    ``deploy.deuter.interpret``). Only two guesses are ever acted on, both re-run through the
+    existing deterministic machinery rather than answered directly:
+    - ``followup`` (with a known ``last_question``) retraces it exactly like a recognized bare
+      follow-up -- this is what lets a phrasing OUTSIDE the small fixed cue-phrase set
+      (:data:`_WHY_FOLLOWUP`) still reach the trace.
+    - ``definition`` with a subject GENUS actually has something recorded about (checked via
+      :func:`_last_known_word`, never trusted blindly) re-asks a clean synthesized question.
+    Anything else (chitchat/relation/unclear, an unknown subject, or no ``deuter``/no guess at
+    all) leaves the honest fallback untouched. The answer is marked as model-assisted, glass-box
+    -- never silently. ``deuter=None`` (the default) reproduces ``respond_in_conversation``
+    exactly, so every existing caller stays safe without wiring one in."""
+    result = respond_in_conversation(conn, question, last_question)
+    if deuter is None or result["text"] != _UNKNOWN_FALLBACK:
+        return result
+    guess = deuter(question)
+    if not guess:
+        return result
+    if guess.get("intent") == "followup" and last_question:
+        text = "\n".join(render_trace(conn, trace(conn, last_question)))
+        return {"text": text + " (Frage vom Sprachmodell gedeutet.)", "question": last_question}
+    if guess.get("intent") == "definition" and guess.get("subject"):
+        found = _last_known_word(conn, guess["subject"])
+        if found is not None:
+            text = respond(conn, f"Was ist {found}?")
+            return {"text": text + " (Frage vom Sprachmodell gedeutet.)", "question": question}
+    return result
+
+
 # --- the provenance trace ("genus why") ------------------------------------------------
 #
 # The thesis made tangible: every answer is rückführbar auf seine Herkunft. `trace` runs the

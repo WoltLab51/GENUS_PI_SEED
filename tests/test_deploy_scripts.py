@@ -213,6 +213,25 @@ def test_learner_installer_is_a_continuous_idle_priority_service():
     assert "genus pause" in script                   # documents how to stop it
 
 
+def test_deuter_installer_puts_llama_cpp_in_the_shared_venv_not_a_new_one():
+    script = (ROOT / "deploy" / "pi_install_deuter.sh").read_text(encoding="utf-8")
+    # unlike the embedder, this model must stay warm inside the bot's own process -- no new venv
+    assert "llama-cpp-python" in script
+    assert ".venv" in script
+    assert "embed-venv" not in script
+    assert "qwen2.5-1.5b-instruct-q4_k_m.gguf" in script
+    assert "models" in script                        # a permanent home under ~/.genus/
+
+
+def test_deuter_module_is_a_capped_last_resort_that_never_writes():
+    script = (ROOT / "deploy" / "deuter.py").read_text(encoding="utf-8")
+    # never invents -- picks an intent from a fixed list and copies a word out of the question
+    assert "_VALID_INTENTS" in script
+    assert "except Exception" in script and "return None" in script   # never raises
+    for forbidden in ("import governance", "import proposals", "control.pause", "teach_relation"):
+        assert forbidden not in script
+
+
 def test_learner_wordlist_is_words_only():
     import re as _re
     lines = (ROOT / "deploy" / "wortschatz_de.txt").read_text(encoding="utf-8").splitlines()
