@@ -91,7 +91,7 @@ def _get_model():
     global _model
     if _model is None:
         from llama_cpp import Llama   # local import: this module stays importable without the dep
-        _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=512, verbose=False)
+        _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=1024, verbose=False)
     return _model
 
 
