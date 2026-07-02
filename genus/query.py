@@ -169,7 +169,7 @@ def ask(conn, question: str) -> dict:
     return {
         "kind": "unknown",
         "question": question,
-        "answer": "unknown fixed query pattern",
+        "answer": "Das kann GENUS nicht einordnen — kein bekannter Befehl, kein gelerntes Wort.",
         "supported": list(SUPPORTED_PATTERNS),
     }
 

@@ -34,6 +34,14 @@ def test_unknown_ask_returns_supported_patterns(conn):
     assert response["supported"]
 
 
+def test_unknown_ask_answer_is_honest_german_never_a_raw_placeholder(conn):
+    # regression: this "answer" reaches real conversations verbatim (companion.respond, the
+    # Telegram bridge) -- caught live when Ronny got the literal internal sentinel text back
+    response = query.ask(conn, "sing mir ein lied")
+    assert response["answer"] == "Das kann GENUS nicht einordnen — kein bekannter Befehl, kein gelerntes Wort."
+    assert "pattern" not in response["answer"].lower()
+
+
 def test_single_word_patterns_do_not_hijack_natural_questions(conn):
     # single-word patterns are terse commands -- inside a natural sentence they must NOT fire,
     # so the question can flow on to the companion (the "Was ist ein Netzwerk?" shadowing bug)

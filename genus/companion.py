@@ -367,7 +367,7 @@ def respond(conn, question: str) -> str:
         if a.get("concept"):
             text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
         return text
-    return state["answer"]  # the "unknown fixed query pattern" help, same fallback as the CLI
+    return state["answer"]  # the honest "nothing recognized" help, same fallback as the CLI
 
 
 # --- GENUS's own open questions ("Was beschäftigt dich?") --------------------------------
@@ -494,7 +494,9 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
 # from the question) -- it never writes the answer; the deterministic pipeline still supplies
 # the actual, sourced content. Any subject it names is GRAPH-VERIFIED before anything happens.
 
-_UNKNOWN_FALLBACK = "unknown fixed query pattern"  # query.ask's stable "nothing recognized" sentinel
+_UNKNOWN_FALLBACK = (   # query.ask's stable "nothing recognized" sentinel -- keep in sync
+    "Das kann GENUS nicht einordnen — kein bekannter Befehl, kein gelerntes Wort."
+)
 
 
 def respond_with_deuter(conn, question: str, last_question: str | None = None, deuter=None) -> dict:

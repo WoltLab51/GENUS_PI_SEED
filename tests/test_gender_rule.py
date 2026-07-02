@@ -214,4 +214,5 @@ def test_respond_falls_back_to_help_when_nothing_matches():
     from genus import companion
     conn = _fresh()
     s = companion.respond(conn, "Quuxikon Blarg?")
-    assert "unknown fixed query pattern" in s or "kennt kein Wort" not in s  # the query.ask help text
+    assert "GENUS nicht einordnen" in s  # the query.ask help text, honest German -- never a raw
+                                          # internal placeholder leaking to a real conversation
