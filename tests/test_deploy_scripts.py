@@ -1,5 +1,10 @@
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,6 +157,49 @@ def test_background_learner_runs_continuously_and_is_pausable():
     assert "CURSOR" in script and "cursor" in script  # resumes where it left off
     assert "DELAY" in script                 # paced between words (politeness to the source)
     assert "loadavg" in script               # yields when the box is busy
+
+
+def test_learner_gap_climb_remembers_attempts_and_has_a_retry_ttl():
+    script = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
+    # the fix for the pinned-on-one-gap loop: a bounded attempts memory with a retry TTL
+    assert "GAP_ATTEMPTS" in script and "GAP_RETRY_TTL" in script
+    assert "grep -vxF" in script          # rotate past gaps already tried within the TTL
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash to run the learner script")
+def test_learner_gap_climb_rotates_past_an_unclosable_gap(tmp_path):
+    # Regression (found live: 20k+ repeats of one Q-id in 24h). A gap whose source cannot close
+    # it (no P279 -> never becomes an is_a subject) must NOT pin the learner; it must rotate on.
+    repo = tmp_path
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    shutil.copy(ROOT / "deploy" / "pi_learn.sh", repo / "pi_learn.sh")
+    (repo / "observe_konzept.sh").write_text('#!/usr/bin/env bash\necho "$1" >> "$OBSERVE_LOG"\n')
+    (repo / "observe_lexem.sh").write_text("#!/usr/bin/env bash\ntrue\n")
+    (repo / "observe_dbnary.sh").write_text("#!/usr/bin/env bash\ntrue\n")
+    # gaps returns a STABLE list whose first entry is the unclosable one (stays a gap forever)
+    (repo / ".venv" / "bin" / "genus").write_text(
+        '#!/usr/bin/env bash\nif [ "$1" = "gaps" ]; then printf "Q_STUCK\\nQ_A\\nQ_B\\n"; fi\n')
+    (repo / "empty.txt").write_text("")           # exhausted word list -> straight to gap climbing
+    for f in ("pi_learn.sh", "observe_konzept.sh", "observe_lexem.sh", "observe_dbnary.sh"):
+        os.chmod(repo / f, 0o755)
+    os.chmod(repo / ".venv" / "bin" / "genus", 0o755)
+    observed = repo / "observed.txt"
+    observed.write_text("")
+    env = {
+        **os.environ,
+        "GENUS_REPO_DIR": str(repo), "GENUS_DB_PATH": str(repo / "db.sqlite3"),
+        "GENUS_LOG_DIR": str(repo / "logs"), "GENUS_LEARN_WORDLIST": str(repo / "empty.txt"),
+        "GENUS_LEARN_ONCE": "1", "GENUS_EMBED_PYTHON": "/nonexistent", "OBSERVE_LOG": str(observed),
+    }
+    for _ in range(3):
+        subprocess.run(["bash", str(repo / "pi_learn.sh")], env=env, check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    climbed = observed.read_text().split()
+    assert climbed == ["Q_STUCK", "Q_A", "Q_B"]   # rotated -- NOT ["Q_STUCK", "Q_STUCK", "Q_STUCK"]
+    # the unclosable gap is remembered so it won't be retried until the TTL elapses
+    attempts = (repo / "learn.gap_attempts").read_text()
+    assert "Q_STUCK" in attempts
 
 
 def test_learner_installer_is_a_continuous_idle_priority_service():

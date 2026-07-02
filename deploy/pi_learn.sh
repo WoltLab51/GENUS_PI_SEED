@@ -33,6 +33,9 @@ MAX_LOAD="${GENUS_LEARN_MAX_LOAD:-2.0}"    # step aside while the box is busy
 IDLE_SLEEP="${GENUS_LEARN_IDLE_SLEEP:-60}" # nap length while paused / busy / exhausted
 PAUSED="$(dirname "$DB_PATH")/paused"
 EMBED_PY="${GENUS_EMBED_PYTHON:-$GENUS_HOME/.genus/embed-venv/bin/python}"  # edge embedder (optional)
+GAP_ATTEMPTS="${GENUS_LEARN_GAP_ATTEMPTS:-$(dirname "$DB_PATH")/learn.gap_attempts}"  # tried gaps + when
+GAP_RETRY_TTL="${GENUS_LEARN_GAP_RETRY_TTL:-21600}"   # 6h: retry an unclosable gap at most this often
+GAP_FETCH="${GENUS_LEARN_GAP_FETCH:-100}"             # how many open gaps to consider each round
 
 mkdir -p "$LOG_DIR"
 log() { printf '[LRN] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -81,15 +84,37 @@ learn_next() {
     return 1
 }
 
-# "Die Kette": when the word list is exhausted, GENUS grows from its OWN graph -- it learns a
-# concept it references as an is_a parent but has not climbed yet (gaps). So the hierarchy grows
-# itself, connected, with no external list. observe_konzept accepts a Q-id directly.
+# "Die Kette": when the word list is exhausted, GENUS grows from its OWN graph -- it climbs a
+# concept it references as an is_a parent but has not learned yet (a gap). observe_konzept takes
+# a Q-id directly, so the hierarchy grows itself, connected, with no external list.
+#
+# NOT every gap is closable: a concept whose Wikidata item has no subclass_of (P279) -- e.g. a
+# taxon leaf that carries "parent taxon" instead -- can never gain an is_a subject edge from this
+# source, so it stays a gap forever. `gaps` returns them in a STABLE order, so naively taking the
+# first one PINS the learner on the first unclosable gap (observed live: 20k+ repeats of the same
+# Q-id in ~24h, learning nothing, hammering Wikidata for no gain). Fix the class, not the
+# instance: remember each attempted gap with a timestamp and skip it for GAP_RETRY_TTL, so the
+# learner rotates through the OTHER gaps. A closable gap vanishes from `gaps` after its first
+# climb (it becomes a subject); an unclosable one is retried at most once per TTL, in case the
+# source later grows a P279. Membrane-local -- which gaps a source *can* close is edge knowledge.
 learn_gap() {
-    local qid
-    qid="$(GENUS_DB_PATH="$DB_PATH" "$REPO_DIR/.venv/bin/genus" gaps --predicate is_a --limit 1 \
-           2>/dev/null | head -1)"
-    [ -n "$qid" ] || return 1
+    local now qid
+    now="$(date +%s)"
+    [ -f "$GAP_ATTEMPTS" ] || : > "$GAP_ATTEMPTS"
+    # prune attempts older than the TTL (keeps the file bounded and re-opens old gaps for retry)
+    if awk -v now="$now" -v ttl="$GAP_RETRY_TTL" '($2 + ttl) > now' "$GAP_ATTEMPTS" > "$GAP_ATTEMPTS.tmp" 2>/dev/null; then
+        mv "$GAP_ATTEMPTS.tmp" "$GAP_ATTEMPTS"
+    else
+        rm -f "$GAP_ATTEMPTS.tmp"
+    fi
+    # the first open is_a gap not attempted within the TTL (rotate past the unclosable ones).
+    # grep -f against the tried-qids column: an empty attempts file matches nothing, so every gap
+    # is fresh -- unlike an awk NR==FNR trick, which mis-handles a zero-line first file.
+    qid="$(GENUS_DB_PATH="$DB_PATH" "$REPO_DIR/.venv/bin/genus" gaps --predicate is_a --limit "$GAP_FETCH" 2>/dev/null \
+           | grep -vxF -f <(cut -d' ' -f1 "$GAP_ATTEMPTS") 2>/dev/null | head -1)"
+    [ -n "$qid" ] || return 1        # nothing fresh to climb -> idle (every open gap tried recently)
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$qid" >/dev/null 2>&1 || true
+    printf '%s %s\n' "$qid" "$now" >> "$GAP_ATTEMPTS"
     log "climbed gap concept $qid (die Kette)"
     return 0
 }
@@ -97,10 +122,11 @@ learn_gap() {
 _have_list=0; for wl in "${WORDLISTS[@]}"; do [ -f "$wl" ] && _have_list=1; done
 if [ "$_have_list" = 0 ]; then log "no word lists found — nothing to learn"; exit 0; fi
 
-# Single step (for testing): GENUS_LEARN_ONCE=1
+# Single step (for testing): GENUS_LEARN_ONCE=1 -- one full learn step, a word OR a gap climb,
+# the same choice the continuous loop makes.
 if [ "${GENUS_LEARN_ONCE:-0}" = "1" ]; then
     if [ -f "$PAUSED" ]; then log "paused — skipping"; exit 0; fi
-    learn_next || log "word list exhausted"
+    learn_next || learn_gap || log "nothing to learn (list exhausted, no fresh gaps)"
     exit 0
 fi
 
