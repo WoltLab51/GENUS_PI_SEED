@@ -112,6 +112,7 @@
   .layer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 18px;margin-bottom:9px}
   .layer.cross{border-color:var(--accent);background:linear-gradient(180deg,rgba(90,169,255,.06),transparent)}
   .grid{display:grid;gap:12px}
+  .g3{grid-template-columns:repeat(3,1fr)}
   .g4{grid-template-columns:repeat(4,1fr)}
   .g5{grid-template-columns:repeat(5,1fr)}
   .g6{grid-template-columns:repeat(6,1fr)}
@@ -214,7 +215,7 @@
 
   <div class="section-label">Angewandt auf Wissen + Systeme: <b>der Begleiter</b> — GENUS ist ansprechbar</div>
   <div class="layer">
-    <div class="grid g4">
+    <div class="grid g3">
       <div class="cell"><div class="ch"><span class="mini b"></span>Fragen &amp; Routing</div><div class="cd"><code>genus ask</code> — Zustand → eigene Fragen → Beziehung → Vergleich → Genus → Wort, deterministisch, nie geraten</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Relational &amp; Vergleichend</div><div class="cd">„Ist X ein Y?" / „Was haben X und Y gemeinsam?" — über die bestehende Inferenz, Weg gezeigt, open-world-ehrlich</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Herkunfts-Spur</div><div class="cd"><code>genus why answer</code> — jede Prämisse, Quelle, Vertrauen; die These zum Anfassen</div></div>
@@ -222,7 +223,8 @@
       <div class="cell"><div class="ch"><span class="mini b"></span>Eigene offene Fragen</div><div class="cd">„Was beschäftigt dich?" — echte Inquiries auf Deutsch, gruppiert, rein lesend</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Gestufte Ehrlichkeit</div><div class="cd">Stimme qualifiziert relativ zur Vertrauens-Saat — nur wo es wirklich unsicher oder mehrfach belegt ist</div></div>
       <div class="cell"><div class="ch"><span class="mini b"></span>Deuter (letzte Stufe)</div><div class="cd">lokales Modell (Qwen2.5-1.5B, gemessen unter 7 Kandidaten) — wählt nur, graph-verifiziert, nie erste Instanz</div></div>
-      <div class="cell"><div class="ch"><span class="mini p"></span>Erste Außentür</div><div class="cd">Telegram — Mundstück, Positivliste, watchdog-gehalten; Personen-Gedächtnis &amp; freie Stimme noch offen</div></div>
+      <div class="cell"><div class="ch"><span class="mini p"></span>Erste Außentür</div><div class="cd">Telegram — Mundstück, Positivliste, watchdog-gehalten</div></div>
+      <div class="cell"><div class="ch"><span class="mini b"></span>Personen-Gedächtnis</div><div class="cd">„Merke dir: …" — explizit, eine ganz normale Relation (<code>person:ronny</code>, Quelle „ronny", voll vertraut); freie Extraktion noch offen</div></div>
     </div>
   </div>
 
@@ -288,7 +290,7 @@
 
   <div class="foot">
     grün = im Code bewiesen &nbsp;·&nbsp; gelb = begonnen &nbsp;·&nbsp; rot = Vision ohne Code<br>
-    <b>Stand 2026-07-02:</b> WISSEN vollendet · SYSTEME mit rundem reflexivem Regel-Bogen (lernt·schließt·verteidigt) und 2 selbst-kalibrierten Regel-Domänen · der Begleiter lebt (siehe eigene Sektion oben) · erste Außentür offen. Selbst-Kalibrierung erreicht jetzt auch die einzige Stelle, an der GENUS handelt (Netz-Recovery). Offen: Personen-Gedächtnis, freie Stimme.<br>
+    <b>Stand 2026-07-02:</b> WISSEN vollendet · SYSTEME mit rundem reflexivem Regel-Bogen (lernt·schließt·verteidigt) und 2 selbst-kalibrierten Regel-Domänen · der Begleiter lebt, inkl. Deuter + Personen-Gedächtnis, Scheibe 1 (siehe eigene Sektion oben) · erste Außentür offen. Selbst-Kalibrierung erreicht jetzt auch die einzige Stelle, an der GENUS handelt (Netz-Recovery). Offen: freie Stimme.<br>
     <span style="opacity:.7">Dies ist eine Momentaufnahme, kein Verlauf — die volle Entstehungsgeschichte steht in <code>GENUS_ROADMAP.md</code>.</span>
   </div>
 
