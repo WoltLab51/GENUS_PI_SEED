@@ -422,6 +422,45 @@ def narrate_ableitung(r: dict) -> str:
             f"(exakt berechnet, für f({r['variable']}) = {r['term']}).")
 
 
+_EXTREMSTELLEN_PATTERNS = [
+    re.compile(
+        r"\b(?:bestimme|berechne|wie\s+lautet)\s+" + _FILL + r"die\s+extremstellen\s+von\s+"
+        r"f\(?(\w)\)?\s*=\s*" + _MATHTERM + r"[.!?]?\s*$", re.I),
+]
+
+
+def _extremstellen_frage(text: str) -> dict | None:
+    m = _EXTREMSTELLEN_PATTERNS[0].search(text)
+    if m is None:
+        return None
+    return {"term": m.group(2).strip(), "variable": m.group(1)}
+
+
+def extremstellen_frage(text: str) -> dict:
+    """Die Extremstellen-Aufgabe in ``text``, exakt gerechnet; ``{"berechnung_q": False}``,
+    wenn keine erkennbare Aufgabenstellung vorliegt. Baut auf :func:`mathematik.extremstellen`
+    auf -- dieselbe Rand/Kern-Trennung wie :func:`ableitung_frage`."""
+    from genus import mathematik
+
+    gefunden = _extremstellen_frage(text)
+    if gefunden is None:
+        return {"berechnung_q": False}
+    r = mathematik.extremstellen(gefunden["term"], gefunden["variable"])
+    r["berechnung_q"] = True
+    return r
+
+
+def narrate_extremstellen(r: dict) -> str:
+    if not r["ok"]:
+        return f"Das kann ich nicht ausrechnen: {r['fehler']}"
+    if not r["punkte"]:
+        return f"f({r['variable']}) = {r['term']} hat keine Extremstellen (exakt berechnet)."
+    zeilen = [f"{p['art']} bei {r['variable']} = {p['x']} (f({r['variable']}) = {p['y']})"
+              for p in r["punkte"]]
+    return (f"Extremstellen von f({r['variable']}) = {r['term']}: " + "; ".join(zeilen)
+            + " (exakt berechnet).")
+
+
 # --- memory ("Merke dir: ...") -----------------------------------------------------------
 #
 # Slice 1 of Personen-Gedächtnis was named "person:ronny", but Ronny immediately used it to
@@ -574,6 +613,9 @@ def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
     ab = ableitung_frage(question)
     if ab.get("berechnung_q"):
         return narrate_ableitung(ab), "berechnen"
+    ex = extremstellen_frage(question)
+    if ex.get("berechnung_q"):
+        return narrate_extremstellen(ex), "berechnen"
     return None
 
 

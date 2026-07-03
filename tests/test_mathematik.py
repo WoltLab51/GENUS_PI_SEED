@@ -63,3 +63,35 @@ def test_a_second_undeclared_variable_is_rejected_not_silently_partial():
 def test_ableitung_result_is_json_serializable():
     import json
     assert json.dumps(mathematik.ableitung("x^2")) is not None
+
+
+def test_extremstellen_of_a_cubic_finds_both_and_classifies_correctly():
+    r = mathematik.extremstellen("x^3 - 3x")
+    assert r["ok"]
+    assert r["punkte"] == [
+        {"x": "-1", "y": "2", "art": "Maximum"},
+        {"x": "1", "y": "-2", "art": "Minimum"},
+    ]
+
+
+def test_extremstellen_of_a_parabola_has_one_minimum():
+    r = mathematik.extremstellen("x^2")
+    assert r["ok"] and r["punkte"] == [{"x": "0", "y": "0", "art": "Minimum"}]
+
+
+def test_extremstellen_honestly_admits_when_the_second_derivative_test_is_inconclusive():
+    # x^3 hat bei 0 einen Sattelpunkt, x^4 ein Minimum -- in BEIDEN Fällen ist f''(0)=0, der
+    # Test selbst kann nicht entscheiden. GENUS darf hier NICHT raten, welcher Fall vorliegt.
+    for term in ("x^3", "x^4"):
+        r = mathematik.extremstellen(term)
+        assert r["ok"] and r["punkte"][0]["art"].startswith("unklar")
+
+
+def test_extremstellen_of_a_function_without_any_is_an_empty_list_not_an_error():
+    r = mathematik.extremstellen("7")
+    assert r["ok"] and r["punkte"] == []
+
+
+def test_extremstellen_rejects_unreadable_input_same_as_ableitung():
+    r = mathematik.extremstellen("das ist kein term")
+    assert not r["ok"] and "kein bekanntes Symbol" in r["fehler"]

@@ -1248,6 +1248,44 @@ def test_ableitung_answer_is_never_offered_to_the_stimme():
     assert calls == [] and "6*x + 2" in result["text"] and "VERFÄLSCHT" not in result["text"]
 
 
+def test_extremstellen_frage_recognizes_the_fixed_formulation():
+    from genus import companion
+    r = companion.extremstellen_frage("Bestimme die Extremstellen von f(x) = x^3 - 3x")
+    assert r["berechnung_q"] and r["ok"]
+    assert r["punkte"] == [
+        {"x": "-1", "y": "2", "art": "Maximum"}, {"x": "1", "y": "-2", "art": "Minimum"},
+    ]
+
+
+def test_extremstellen_frage_is_false_for_an_unrelated_question():
+    from genus import companion
+    assert companion.extremstellen_frage("Was ist ein Fahrrad?") == {"berechnung_q": False}
+
+
+def test_narrate_extremstellen_names_both_points_with_their_kind():
+    from genus import companion
+    r = companion.extremstellen_frage("Bestimme die Extremstellen von f(x) = x^3 - 3x")
+    text = companion.narrate_extremstellen(r)
+    assert "Maximum bei x = -1" in text and "Minimum bei x = 1" in text
+
+
+def test_narrate_extremstellen_is_honest_when_there_are_none():
+    from genus import companion
+    r = companion.extremstellen_frage("Bestimme die Extremstellen von f(x) = 7")
+    text = companion.narrate_extremstellen(r)
+    assert "keine Extremstellen" in text
+
+
+def test_extremstellen_is_reached_through_the_muster_dispatch_and_never_offered_to_the_stimme():
+    from genus import companion
+    conn = _fresh()
+    calls = []
+    stimme = lambda satz: (calls.append(satz) or "VERFÄLSCHT")
+    result = companion.respond_with_deuter(
+        conn, "Bestimme die Extremstellen von f(x) = x^3 - 3x", deuter=lambda q: None, stimme=stimme)
+    assert calls == [] and "Maximum bei x = -1" in result["text"] and "VERFÄLSCHT" not in result["text"]
+
+
 def test_zaehlt_zu_is_a_deterministic_relation_pattern():
     # "Zählt X zu den Y?" -- one of the live misfires -- is now a fixed pattern (ms, no model)
     from genus import companion

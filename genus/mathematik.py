@@ -15,10 +15,11 @@ Rand/Kern-Aufteilung wie überall sonst in diesem Begleiter: das PARSEN einer Au
 ("Bestimme die Ableitung von f(x) = ...") ist ein deterministisches Muster (wie relate/common/
 gender_question in companion.py) -- kein Deuter nötig für diese feste Formulierung. Das RECHNEN
 ist der exakte Kern (dieses Modul). Die AUSGABE folgt der gewohnten deutschen Schulnotation
-(f'(x) = ...). Erste Aufgabenart: Ableitungen (die häufigste, grundlegendste Analysis-Aufgabe --
-Extremstellen/Kurvendiskussion bauen später direkt darauf auf). Weitere Aufgabenarten
-(Integrale, Nullstellen, Vektorrechnung, Wahrscheinlichkeit) sind benannte, nicht gebaute
-nächste Schritte -- siehe die Roadmap, nicht hier vorweggenommen.
+(f'(x) = ...). Aufgabenarten bisher: Ableitungen (die häufigste, grundlegendste Analysis-
+Aufgabe) und Extremstellen (baut direkt auf der Ableitung auf -- kritische Punkte über f'=0,
+klassifiziert über f'', ehrlich "unklar", wenn der Test selbst nichts hergibt, z.B. bei x³/x⁴
+in 0). Weitere Aufgabenarten (Integrale, Kurvendiskussion als Komposition, Vektorrechnung,
+Wahrscheinlichkeit) sind benannte, nicht gebaute nächste Schritte -- siehe docs/GENUS_ABITUR.md.
 """
 from __future__ import annotations
 
@@ -85,4 +86,43 @@ def ableitung(term: str, variable: str = "x", ordnung: int = 1) -> dict:
             "ableitung": str(ergebnis),
         }
     except (sympy.SympifyError, TypeError, ValueError, SyntaxError) as exc:
+        return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
+
+
+def extremstellen(term: str, variable: str = "x") -> dict:
+    """Die Extremstellen von ``term`` -- kritische Punkte (f'=0), klassifiziert über die zweite
+    Ableitung (f''>0 Minimum, f''<0 Maximum). Baut direkt auf :func:`ableitung` auf (dieselbe
+    Vorprüfung, dieselbe Ehrlichkeitsdisziplin: nie geraten).
+
+    Gibt ``{"ok": True, "term": ..., "variable": ..., "punkte": [{"x", "y", "art"}, ...]}``
+    zurück (reelle Extremstellen, aufsteigend sortiert; ``punkte`` ist leer, wenn es
+    nachweislich keine gibt). Ein Punkt, an dem auch f''=0 ist, bekommt ehrlich
+    ``"art": "unklar (weitere Untersuchung nötig)"`` statt einer geratenen Klassifikation."""
+    unbekannt = _unbekanntes_wort(term, variable)
+    if unbekannt is not None:
+        return {"ok": False, "fehler": f"«{unbekannt}» in «{term}» ist kein bekanntes Symbol."}
+    try:
+        var = sympy.symbols(variable)
+        ausdruck = _zu_ausdruck(term, variable)
+        f1 = sympy.diff(ausdruck, var)
+        f2 = sympy.diff(ausdruck, var, 2)
+        kandidaten = sympy.solve(sympy.Eq(f1, 0), var)
+        punkte = []
+        for x0 in kandidaten:
+            if not x0.is_real:
+                continue   # komplexe Nullstellen von f' sind im Schulkontext nicht gemeint
+            f2_wert = sympy.simplify(f2.subs(var, x0))
+            if not f2_wert.is_number:
+                art = "unklar (f'' nicht auswertbar)"
+            elif f2_wert > 0:
+                art = "Minimum"
+            elif f2_wert < 0:
+                art = "Maximum"
+            else:
+                art = "unklar (weitere Untersuchung nötig)"
+            y0 = sympy.simplify(ausdruck.subs(var, x0))
+            punkte.append({"x": str(x0), "y": str(y0), "art": art})
+        punkte.sort(key=lambda p: sympy.sympify(p["x"]))
+        return {"ok": True, "term": str(ausdruck), "variable": variable, "punkte": punkte}
+    except (sympy.SympifyError, TypeError, ValueError, SyntaxError, NotImplementedError) as exc:
         return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
