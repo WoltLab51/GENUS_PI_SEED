@@ -76,8 +76,13 @@ def test_unklar_runs_count_as_their_own_blind_spot():
         verstehen.record_reading(conn, "unklar", "model:deuter")
     ergebnisse = _luecken_scan(conn)
     assert [r["pattern"]["kind"] for r in ergebnisse] == ["unklar"]
-    assert "gar nicht deuten" in [p for p in _proposals(conn)
-                                  if p.get("claim_value") == "verstehens_luecke"][0]["payload"]["description"]
+    beschreibung = [p for p in _proposals(conn)
+                    if p.get("claim_value") == "verstehens_luecke"][0]["payload"]["description"]
+    assert "gar nicht deuten" in beschreibung
+    # Gesamtprüfungs-Fund: "unklar" ist kein Blatt -- sein Plan muss "besser deuten" sein,
+    # nicht "dieses Blatt soll eine Fähigkeit bekommen" (das kann es nie)
+    assert "Deuten selbst muss besser werden" in beschreibung
+    assert "dieses Blatt" not in beschreibung
 
 
 def test_threshold_is_self_calibrated_from_the_own_population_not_a_preset():

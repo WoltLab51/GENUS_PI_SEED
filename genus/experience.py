@@ -658,8 +658,17 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
             continue
         if _active_experience(conn, f"verstehens_luecke:{kind}") is not None:
             continue
-        was = ("Nachrichten, die ich gar nicht deuten konnte" if kind == "unklar"
-               else f"das Blatt „{kind}“, das ich lese, aber nicht beantworten kann")
+        # "unklar" ist kein Blatt und kann keinen Handler bekommen -- der ehrliche Plan dort
+        # ist ein besseres DEUTEN (Beispiele/Modell), nicht eine neue Fähigkeit (Gesamtprüfungs-
+        # Fund 2026-07-03: der erste Live-Proposal-Kandidat hätte sonst einen unsinnigen Plan
+        # getragen, denn "unklar" ist auf dem Pi die häufigste Lücke)
+        if kind == "unklar":
+            was = "Nachrichten, die ich gar nicht deuten konnte"
+            plan = ("mein Deuten selbst muss besser werden — schärfere Anker-Beispiele "
+                    "oder ein stärkeres Deuter-Modell")
+        else:
+            was = f"das Blatt „{kind}“, das ich lese, aber nicht beantworten kann"
+            plan = "dieses Blatt soll eine Fähigkeit bekommen"
         candidates.append({
             "experience_key": f"verstehens_luecke:{kind}",
             "experience_type": VERSTEHENS_LUECKE_TYPE,
@@ -675,8 +684,8 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
                 "action_required": True,
                 "description": (
                     f"Ich spüre eine Lücke: {was} — {total}-mal in echten Gesprächen "
-                    f"(selbst-kalibrierte Schwelle: {schwelle}). Mein Plan: dieses Blatt soll "
-                    f"eine Fähigkeit bekommen. Darf ich das priorisieren? "
+                    f"(selbst-kalibrierte Schwelle: {schwelle}). Mein Plan: {plan}. "
+                    f"Darf ich das priorisieren? "
                     f"(Freigabe über genus governance; die Umsetzung bleibt gegated.)"
                 ),
             },
