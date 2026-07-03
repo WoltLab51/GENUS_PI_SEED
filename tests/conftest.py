@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from genus import reactors
+from genus import reactors, werkzeug
 from genus.db import init_schema
 from genus.sensor import (
     mock_activity,
@@ -12,6 +12,15 @@ from genus.sensor import (
     mock_temperature,
     mock_weather,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_werkzeug_registry():
+    # genus.werkzeug.REGISTRY ist Prozess-global (wie RULES/DETECTORS) -- ohne Reset könnten
+    # Tests sich über die Ausführungsreihenfolge hinweg gegenseitig beeinflussen
+    werkzeug.REGISTRY.clear()
+    yield
+    werkzeug.REGISTRY.clear()
 
 
 @pytest.fixture(autouse=True)

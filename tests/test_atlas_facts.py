@@ -32,3 +32,4 @@ def test_atlas_facts_derives_goal_and_dispatch_state_not_hand_typed():
     assert "Ziele:" in text and "Fähigkeiten" in text and "fehlt" in text
     assert "Verstehens-Raster:" in text and "Feinblätter" in text
     assert "Companion-Dispatch:" in text and "handelbare Zellen" in text
+    assert "Werkzeugbauer:" in text and "registrierte Werkzeuge" in text

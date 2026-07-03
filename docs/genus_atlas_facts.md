@@ -11,3 +11,4 @@
 - **Ziele:** 6 Ziele, 8 Fähigkeiten (0 live, 3 teilweise, 5 fehlt), 12 braucht-Kanten
 - **Verstehens-Raster:** 33 Feinblätter, 11 Zwicky-Zellen
 - **Companion-Dispatch:** 7 Muster-Listen (16 Muster gesamt), 23 handelbare Zellen
+- **Werkzeugbauer:** 4 registrierte Werkzeuge (4 wortlautfest)

@@ -32,6 +32,8 @@ from genus import (
     sensor,
     sources,
     state,
+    werkzeug,
+    werkzeuge_seed,
 )
 from genus.cli_format import (
     _print_active_belief_summary,
@@ -295,7 +297,7 @@ def _atlas_facts() -> str:
     can be regenerated and a test can enforce currency.
     """
     import genus
-    from genus import companion, constants, experience, rules, verstehen, ziele
+    from genus import companion, constants, experience, rules, verstehen, werkzeug, werkzeuge_seed, ziele
 
     metric_keys = sorted({getattr(rules, n) for n in dir(rules) if n.endswith("_METRIC_KEY")})
     reactors = [reactor.__name__ for reactor in rules.REACTORS]
@@ -312,6 +314,9 @@ def _atlas_facts() -> str:
         status_zaehlung[status] = status_zaehlung.get(status, 0) + 1
     pattern_listen = [n for n in dir(companion) if n.isupper() and n.endswith("_PATTERNS")]
     muster_gesamt = sum(len(getattr(companion, n)) for n in pattern_listen)
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    werkzeuge = werkzeug.alle()
+    wortlautfest_n = sum(1 for w in werkzeuge if w.wortlautfest)
 
     return "\n".join(
         [
@@ -332,6 +337,8 @@ def _atlas_facts() -> str:
             f"{len(verstehen.ZELLEN)} Zwicky-Zellen",
             f"- **Companion-Dispatch:** {len(pattern_listen)} Muster-Listen "
             f"({muster_gesamt} Muster gesamt), {len(companion._HANDELBAR)} handelbare Zellen",
+            f"- **Werkzeugbauer:** {len(werkzeuge)} registrierte Werkzeuge "
+            f"({wortlautfest_n} wortlautfest)",
             "",
         ]
     )
@@ -682,6 +689,26 @@ def integral_command(term: str, untere_grenze: str, obere_grenze: str, variable:
         f"[MATH] Integral von f({variable}) = {r['term']} von {r['untere_grenze']} bis "
         f"{r['obere_grenze']} = {r['integral']}"
     )
+
+
+@main.command("werkzeuge")
+def werkzeuge_command() -> None:
+    """Alle beim Werkzeugbauer registrierten Werkzeuge -- das, was ein Planer sehen würde
+    (Ronnys Frage: "woraus besteht ein Werkzeug eigentlich genau?", docs/GENUS_AUDIT_2026_07.md)."""
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    for w in werkzeug.alle():
+        parameter = ", ".join(
+            f"{name}" + ("" if p.pflicht else f"={p.standard!r}")
+            for name, p in w.parameter.items()
+        )
+        flags = []
+        if w.schreibt:
+            flags.append("schreibt")
+        if w.wortlautfest:
+            flags.append("wortlautfest")
+        flags.append(f"prüfbar_als={w.pruefbar_als}")
+        click.echo(f"[WERKZEUG] {w.name}({parameter}) — {w.beschreibung}")
+        click.echo(f"[WERKZEUG]   {', '.join(flags)}")
 
 
 @main.command("concept")

@@ -868,6 +868,13 @@ def test_why_cli_traces_a_relation(monkeypatch):
     assert "[WHY]" in result.output and "Säugetier" in result.output and "Vertrauen" in result.output
 
 
+def test_werkzeuge_cli_lists_all_registered_werkzeuge_with_flags():
+    result = CliRunner().invoke(cli.main, ["werkzeuge"])
+    assert result.exit_code == 0, result.output
+    assert "ableitung(" in result.output and "wortlautfest" in result.output
+    assert "prüfbar_als=sympy" in result.output
+
+
 def test_ableitung_cli_computes_exactly():
     result = CliRunner().invoke(cli.main, ["ableitung", "3x^2 + 2x"])
     assert result.exit_code == 0, result.output
