@@ -246,10 +246,11 @@ ein Gebiet ansetzen) und ist von diesen Scheiben unabhängig startbar — aber e
 macht es im Gespräch ERLEBBAR. Empfehlung daher: ① und ② zuerst, dann Fachwissen einfüllen,
 dann ③–⑤.
 
-**Offene Entscheidungen (Ronnys):**
-- **(A) Tagespuffer:** darf Roh-Gesprächstext bis zur Nacht in einer lokalen, verfallenden
-  Membran-Datei liegen? (Ohne ihn gibt es keine Konsolidierung — nur Sofort-Merken.)
-- **(B) Konsolidierungs-Stil:** nachts still gedeckelt merken und morgens berichten — oder
-  grundsätzlich erst nachfragen, bevor etwas aus der Nacht in den Ledger geht?
-- **(C) Morgen-Push:** darf GENUS von sich aus die erste Nachricht des Tages schicken
-  (eine, mit dem Nacht-Ergebnis), oder bleibt die Membran strikt reaktiv?
+**Entschieden (Ronny, 2026-07-03):**
+- **(A) Tagespuffer: JA** — Roh-Gesprächstext darf bis zur Nacht in der lokalen,
+  selbstlöschenden Membran-Datei liegen; der Ledger sieht nie Rohtext.
+- **(B) Konsolidierungs-Stil: still merken, morgens berichten** — nächtliche Funde werden
+  gedeckelt gespeichert (wie tatsache-Notizen); GENUS erzählt morgens, was hängengeblieben
+  ist, und Ronny korrigiert bei Bedarf (Rücknahme = bestehende retract-Maschinerie).
+- **(C) Morgen-Push: JA, genau eine Nachricht** — der erste bewusste Push-Anlass für die
+  bisher rein reaktive Membran; nur wenn die Nacht tatsächlich etwas ergab.
