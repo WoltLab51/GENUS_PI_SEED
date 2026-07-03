@@ -371,45 +371,30 @@ def narrate_gender(r: dict) -> str:
 
 # --- memory ("Merke dir: ...") -----------------------------------------------------------
 #
-# Slice 1 of Personen-Gedächtnis, corrected the same day it shipped: it was named
-# "person:ronny", but Ronny immediately used it to teach GENUS a fact about GENUS ITSELF
-# ("Merk dir dass du GENUS heißt") -- filed under "facts about Ronny", read back nonsensically
-# under "Was weißt du über mich?" (his own 😂 in the live log said it all). The fix isn't a
-# patch, it's a correct generalization: this is a general NOTEBOOK, not a "things about one
-# person" store -- GENUS doesn't (and, honestly, mostly can't) know WHO or WHAT a free-text
-# note is about; it only knows WHO TOLD it. A note is an ordinary relation
-# (genus:notizen -notiz-> "<text>"), reusing the exact same provenanced machinery as every
-# other fact GENUS holds -- no new event type, no new schema.
+# Slice 1 of Personen-Gedächtnis was named "person:ronny", but Ronny immediately used it to
+# teach GENUS a fact about GENUS ITSELF ("Merk dir dass du GENUS heißt") -- filed under "facts
+# about Ronny", read back nonsensically under "Was weißt du über mich?" (his own 😂 in the live
+# log said it all). The fix wasn't a patch, it was a correct generalization: this is a general
+# NOTEBOOK, not a "things about one person" store -- GENUS doesn't (and, honestly, mostly
+# can't) know WHO or WHAT a free-text note is about; it only knows WHO TOLD it.
 #
-# Storage form (Ronny asked directly: "dicht aber schnell?"): the triple store already IS both
-# -- normalized (no duplication), indexed (subject+predicate lookup, sub-ms) -- for the volume
-# that exists and will exist for a good while. A semantic (embedding) index over notes, so
-# "was weißt du über Hunde" could find a note by MEANING and not just literal recall, is a
-# real, named future step -- deliberately NOT built now (self-calibration-no-presets: build
-# capacity when the need is real, not speculatively for a notebook with a handful of entries).
+# Storage moved on from a flat, unnetworked relation (Punkt 1 von docs/GENUS_GEDAECHTNIS.md,
+# 2026-07-03: Tulving 1972 -- episodic memory is dated and networked THROUGH shared knowledge,
+# not a pile of disconnected strings) to real episodes in :mod:`genus.erinnerung` -- this module
+# only does dispatch and phrasing now, the storage/retrieval contract lives there.
 #
 # Two trust tiers, not a formal Proposal/Review cycle -- reusing a mechanism that's already
 # fully built and trusted, not inventing a new one:
-#   - source="ronny" (explicit "Merke dir: ..."): a HUMAN source, full/uncapped trust, exactly
+#   - quelle="ronny" (explicit "Merke dir: ..."): a HUMAN source, full/uncapped trust, exactly
 #     like the teacher-loop. Ronny SAID to remember it -- that IS "enorm wichtig".
-#   - source="model:deuter" (an unprompted personal STATEMENT the Deuter noticed in ordinary
-#     conversation, e.g. "ich habe zwei Hunde" with no "merke dir" at all): capped at half the
-#     trust seed, automatically, by the SAME model-source cap that already governs every other
-#     model contribution (sources.MODEL_SOURCE_PREFIX) -- "GENUS schlägt vor" IS exactly what a
+#   - quelle="model:deuter" (an unprompted personal STATEMENT the Deuter noticed in ordinary
+#     conversation, e.g. an offhand remark with no "merke dir" at all): capped at half the trust
+#     seed, automatically, by the SAME model-source cap that already governs every other model
+#     contribution (sources.MODEL_SOURCE_PREFIX) -- "GENUS schlägt vor" IS exactly what a
 #     capped, unconfirmed source means elsewhere in this graph. Never silently promoted to full
 #     trust; saying "Merke dir" for real about the same thing later adds a full-trust entry
 #     alongside it (corroboration raises confidence, same as anywhere else in the graph).
-#
-# "Über Nacht Erinnerungen bilden" (Ronny's idea, sleep-like consolidation): deliberately NOT
-# built here. It needs conversation TURNS to exist as ledger material to consolidate FROM --
-# today only explicit/suggested notes are recorded, not raw conversation (Ledger ≠ Memory holds
-# for ordinary chat). That is a separate, real architectural fork (do we start logging
-# conversation turns, and in what form) -- worth revisiting once there is enough note/
-# suggestion volume that consolidation would have real material to work with, not before.
 
-NOTE_SUBJECT = "genus:notizen"
-NOTE_PREDICATE = "notiz"
-STATEMENT_SOURCE = "model:deuter"
 _REMEMBER_CUE = re.compile(
     r"^\s*(?:merke?\s+dir|denk\s+dran|notier(?:e)?\s+dir)\s*[:,]?\s*(.+?)\s*[.!]?\s*$",
     re.IGNORECASE,
@@ -431,39 +416,6 @@ def remember_command(question: str) -> str | None:
     m = _REMEMBER_CUE.match(question)
     fact = m.group(1).strip() if m else ""
     return fact or None
-
-
-def remember(conn, fact: str, source: str = "ronny") -> int:
-    """Records a note -- an ordinary, provenanced relation. ``source="ronny"`` (the default) is
-    an explicit, human-trusted command; ``source="model:deuter"`` is the Deuter noticing an
-    unprompted personal statement, automatically capped (a suggestion, not a confirmed fact)."""
-    from genus import reactors  # local: keeps companion's import-time surface a leaf otherwise
-    result = reactors.observe_relation(conn, NOTE_SUBJECT, NOTE_PREDICATE, fact, source)
-    return result["event_id"]
-
-
-def _notes(conn, source_filter) -> list[str]:
-    """Notes matching ``source_filter(source) -> bool``, oldest first.
-
-    A dedicated query, not ``sources.relations()`` -- that orders alphabetically by object
-    (right for graph traversal, wrong here: notes would sort by their TEXT, not by when they
-    were told to GENUS, which looked like silent shuffling). Ordered by the projection's own
-    ``id`` (insertion order), the simplest faithful proxy for "when was this remembered"."""
-    rows = conn.execute(
-        "SELECT object, source FROM relation_projection WHERE subject = ? AND predicate = ? ORDER BY id",
-        (NOTE_SUBJECT, NOTE_PREDICATE),
-    ).fetchall()
-    return [row["object"] for row in rows if source_filter(row["source"])]
-
-
-def confirmed_notes(conn) -> list[str]:
-    """Notes a human explicitly asked GENUS to remember -- full trust."""
-    return _notes(conn, lambda s: not s.startswith(sources.MODEL_SOURCE_PREFIX))
-
-
-def suggested_notes(conn) -> list[str]:
-    """Notes the Deuter noticed unprompted in ordinary conversation -- capped, unconfirmed."""
-    return _notes(conn, lambda s: s.startswith(sources.MODEL_SOURCE_PREFIX))
 
 
 def is_recall_question(question: str) -> bool:
@@ -496,32 +448,30 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
     return "\n".join(lines)
 
 
-# --- Personen-Gedächtnis, Scheibe 2: Notizen beiläufig in Antworten einweben -------------
+# --- Personen-Gedächtnis, Scheibe 2: Episoden beiläufig in Antworten einweben -------------
 #
 # Scheibe 1 machte das Gedächtnis nur auf explizite Rückfrage sichtbar ("Was weißt du über
 # mich?"). Der reale nächste Schritt (Ronny) ist NICHT die automatische Extraktion aus
 # gewöhnlichem Gespräch -- die gibt es faktisch schon: die "tatsache"-Zelle des Verstehens-
 # Würfels notiert unaufgefordert erwähnte Aussagen längst (gedeckelt, unbestätigt). Was fehlt,
-# ist das WEBEN: eine Notiz taucht bisher nie beiläufig in einer anderen Antwort auf, selbst
-# wenn das Thema überschneidet. Bewusst einfach gehalten (kein Embedding-Index, self-
-# calibration-no-presets: das Volumen rechtfertigt noch keine semantische Suche) -- ein reiner
-# Substring-Treffer auf Wörtern ab 4 Zeichen (kürzere sind zu generisch, "und"/"der"/"was"
-# würden sonst ständig falsch anschlagen). Nur EIN Treffer, um nicht aufdringlich zu werden;
-# bestätigt/vermutet bleibt sichtbar unterschieden, wie überall sonst in diesem Speicher.
+# ist das WEBEN: eine Erinnerung taucht bisher nie beiläufig in einer anderen Antwort auf, selbst
+# wenn das Thema überschneidet. Der Abruf (Punkt 2 von docs/GENUS_GEDAECHTNIS.md, 2026-07-03)
+# läuft jetzt über den echten Graphen (``erinnerung.erwaehnter_bezug`` -- Konzept-Anker, nicht
+# roher Substring-Abgleich), nicht mehr über einen reinen Wort-in-Wort-Vergleich. Nur EIN
+# Treffer, um nicht aufdringlich zu werden; bestätigt/vermutet bleibt sichtbar unterschieden,
+# wie überall sonst in diesem Speicher.
 
 def _notiz_bezug(conn, question: str) -> str | None:
-    """Ein kurzer, ehrlicher Nebenbei-Hinweis, falls ein Wort aus ``question`` auch in einer
-    gemerkten Notiz vorkommt -- ``None`` sonst. Nie erfunden: die Notiz wird wörtlich zitiert."""
-    worte = {w.lower() for w in _WORD.findall(question) if len(w) > 3}
-    if not worte:
+    """Ein kurzer, ehrlicher Nebenbei-Hinweis, falls ``question`` denselben Begriff berührt wie
+    eine gemerkte Episode -- ``None`` sonst. Nie erfunden: die Episode wird wörtlich zitiert."""
+    from genus import erinnerung  # local: keeps companion's import-time surface a leaf otherwise
+
+    treffer = erinnerung.erwaehnter_bezug(conn, question)
+    if treffer is None:
         return None
-    for note in confirmed_notes(conn):
-        if any(w in note.lower() for w in worte):
-            return f" (Nebenbei: du hast mir erzählt „{note}“.)"
-    for note in suggested_notes(conn):
-        if any(w in note.lower() for w in worte):
-            return f" (Nebenbei, noch unbestätigt: du hattest erwähnt „{note}“.)"
-    return None
+    if treffer["bestaetigt"]:
+        return f" (Nebenbei: du hast mir erzählt „{treffer['inhalt']}“.)"
+    return f" (Nebenbei, noch unbestätigt: du hattest erwähnt „{treffer['inhalt']}“.)"
 
 
 # --- a single shared answer, for any conversational channel -----------------------------
@@ -538,14 +488,14 @@ def _ritual_antwort(conn, question: str) -> str | None:
     """The unambiguous rituals -- explicit memory, recall, fixed state queries, GENUS's own
     open questions. Exact/cue matches, deterministic, never model-deuted (a clear command
     needs no interpretation). ``None`` when no ritual claims the question."""
-    from genus import query  # local: keeps companion's import-time surface a leaf otherwise
+    from genus import erinnerung, query  # local: keeps companion's import-time surface a leaf otherwise
 
     fact = remember_command(question)
     if fact is not None:
-        remember(conn, fact)
+        erinnerung.merke(conn, fact, quelle="ronny")
         return f"Gemerkt: „{fact}“"
     if is_recall_question(question):
-        return narrate_notes(confirmed_notes(conn), suggested_notes(conn))
+        return narrate_notes(erinnerung.bestaetigte_episoden(conn), erinnerung.vermutete_episoden(conn))
     state = query.ask(conn, question)
     if state.get("kind") != "unknown":
         return state["answer"]
@@ -819,9 +769,11 @@ def _zelle_nachfrage(conn, guess, question, last_question, last_answer, stimme=N
 
 def _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme=None):
     # die eigene Klausel des Segments merken, nicht die ganze Nachricht -- sonst würde
-    # "Hallo! Ich hab zwei Hunde. Danke!" den Gruß und den Dank mit in die Notiz aufnehmen
+    # "Hallo! Ich war auf einem Konzert. Danke!" den Gruß und den Dank mit in die Episode aufnehmen
+    from genus import erinnerung  # local: keeps companion's import-time surface a leaf otherwise
+
     text = guess.get("text") or question
-    remember(conn, text, source=STATEMENT_SOURCE)
+    erinnerung.merke(conn, text, quelle=erinnerung.STATEMENT_SOURCE)
     return (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
             f"(sag „merke dir: {text}“, wenn's wichtig ist, dann bin ich mir sicher).")
 
@@ -833,7 +785,9 @@ def _zelle_merken(conn, guess, question, last_question, last_answer, stimme=None
 
 
 def _zelle_erinnerung(conn, guess, question, last_question, last_answer, stimme=None):
-    return narrate_notes(confirmed_notes(conn), suggested_notes(conn))
+    from genus import erinnerung  # local: keeps companion's import-time surface a leaf otherwise
+
+    return narrate_notes(erinnerung.bestaetigte_episoden(conn), erinnerung.vermutete_episoden(conn))
 
 
 def _zelle_zustand(conn, guess, question, last_question, last_answer, stimme=None):

@@ -230,12 +230,16 @@ bestehende Maschinen, kein neues Organ.
 
 Jede Scheibe klein, einzeln testbar, einzeln live nachweisbar:
 
-1. **Episoden statt flacher Notizen** — neue Form (vier Kanten), Migration der bestehenden
-   `genus:notizen` (sie bekommen `am` = Migrationsdatum und `erwähnt`-Kanten, soweit
-   Begriffe auflösbar), `merke dir` + `tatsache`-Zelle schreiben ab sofort Episoden.
-2. **Abruf über den Graphen** — ersetzt die Wort-Überschneidung; Episoden UND Nachbarwissen
-   fließen in die Antwort ein. *Ab hier fühlt sich das Gespräch zum ersten Mal „wissend" an,
-   und ab hier lohnt sich das Fachwissen-Einfüllen richtig.*
+1. **Episoden statt flacher Notizen — ✅ geliefert (2026-07-03, `genus/erinnerung.py`).** Vier
+   Kanten (`inhalt`/`von`/`am`/`erwähnt`), Migration der bestehenden `genus:notizen` per
+   `deploy/migriere_notizen.sh` (übernimmt den echten historischen Zeitstempel, idempotent),
+   `merke dir` + `tatsache`-Zelle schreiben jetzt Episoden statt der flachen Relation.
+2. **Abruf über den Graphen — ✅ geliefert (2026-07-03).** Ersetzt die reine Wort-Überschneidung:
+   `erwähnt`-Kanten verankern bevorzugt am KONZEPT (nicht an der Wortform), mit einer
+   Endungs-Toleranz für deutsche Flexion als Rückfall — zwei Erwähnungen desselben Begriffs
+   treffen sich jetzt auch über Singular/Plural oder Synonyme hinweg, nicht nur bei exakt
+   gleicher Schreibung. *Ab hier fühlt sich das Gespräch zum ersten Mal „wissend" an, und ab
+   hier lohnt sich das Fachwissen-Einfüllen richtig.*
 3. **Arbeitsgedächtnis über mehrere Züge** — Session-Liste statt Ein-Zug-Paar; „das Tier von
    vorhin" wird auflösbar.
 4. **Tagespuffer + Nacht-Konsolidierung** — inkl. Vergessen und der Treffer-Quote-Kennzahl.

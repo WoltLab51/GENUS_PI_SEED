@@ -242,6 +242,13 @@ def test_verstehen_seed_script_is_one_clean_idempotent_apply():
     assert "idempotent" in script.lower()      # re-running must never duplicate the raster
 
 
+def test_migriere_notizen_script_is_one_clean_idempotent_apply():
+    script = (ROOT / "deploy" / "migriere_notizen.sh").read_text(encoding="utf-8")
+    assert "erinnerung.migriere_notizen" in script
+    assert "conn.commit()" in script
+    assert "idempotent" in script.lower()      # re-running must find nothing left to migrate
+
+
 def test_stimme_module_only_rephrases_never_invents():
     script = (ROOT / "deploy" / "stimme.py").read_text(encoding="utf-8")
     # the faithfulness leash: every quoted word/number must survive, or it fails to None

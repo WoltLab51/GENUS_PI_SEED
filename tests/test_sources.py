@@ -1045,36 +1045,42 @@ def test_stimme_is_not_consulted_for_rituals_or_the_honest_fallback():
     assert calls == []
 
 
+def _fahrrad_graph():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q_fahrrad", "wikidata")
+    return conn
+
+
 def test_notiz_bezug_finds_a_confirmed_note_sharing_a_word_with_the_question():
-    from genus import companion
-    conn = _isa_graph()
-    companion.remember(conn, "ich habe zwei Hunde")
-    aside = companion._notiz_bezug(conn, "Was ist ein Hund?")
-    assert aside is not None and "zwei Hunde" in aside and "Nebenbei" in aside
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle="ronny")
+    aside = companion._notiz_bezug(conn, "Was ist ein Fahrrad?")
+    assert aside is not None and "Platten" in aside and "Nebenbei" in aside
 
 
 def test_notiz_bezug_marks_a_suggested_note_as_unconfirmed():
-    from genus import companion
-    conn = _isa_graph()
-    companion.remember(conn, "ich habe zwei Hunde", source=companion.STATEMENT_SOURCE)
-    aside = companion._notiz_bezug(conn, "Was ist ein Hund?")
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle=erinnerung.STATEMENT_SOURCE)
+    aside = companion._notiz_bezug(conn, "Was ist ein Fahrrad?")
     assert aside is not None and "noch unbestätigt" in aside
 
 
 def test_notiz_bezug_prefers_a_confirmed_note_over_a_suggested_one():
-    from genus import companion
-    conn = _isa_graph()
-    companion.remember(conn, "ich hatte mal einen Hund", source=companion.STATEMENT_SOURCE)
-    companion.remember(conn, "ich habe zwei Hunde")   # explicit, told later -- confirmed wins
-    aside = companion._notiz_bezug(conn, "Was ist ein Hund?")
-    assert "zwei Hunde" in aside and "noch unbestätigt" not in aside
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    erinnerung.merke(conn, "ich hatte mal ein altes Fahrrad", quelle=erinnerung.STATEMENT_SOURCE)
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle="ronny")   # told later -- confirmed wins
+    aside = companion._notiz_bezug(conn, "Was ist ein Fahrrad?")
+    assert "Platten" in aside and "noch unbestätigt" not in aside
 
 
 def test_notiz_bezug_ignores_short_words_and_unrelated_notes():
-    from genus import companion
-    conn = _isa_graph()
-    companion.remember(conn, "ich mag Kaffee")
-    assert companion._notiz_bezug(conn, "Was ist ein Hund?") is None   # no shared word ≥4 chars
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    erinnerung.merke(conn, "ich mag Kaffee", quelle="ronny")
+    assert companion._notiz_bezug(conn, "Was ist ein Fahrrad?") is None   # no shared concept
     assert companion._notiz_bezug(conn, "Wie ist das Wetter?") is None
 
 
@@ -1085,32 +1091,32 @@ def test_notiz_bezug_returns_none_without_any_notes():
 
 
 def test_respond_with_deuter_weaves_a_note_into_a_word_answer_on_the_bot_path():
-    from genus import companion
-    conn = _isa_graph()
-    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
-    companion.remember(conn, "ich habe zwei Hunde")
-    result = companion.respond_with_deuter(conn, "Was ist ein Hund?", deuter=lambda q: None)
-    assert "Wolf" in result["text"] and "Nebenbei" in result["text"] and "zwei Hunde" in result["text"]
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad zum Fahren", "dbnary")
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle="ronny")
+    result = companion.respond_with_deuter(conn, "Was ist ein Fahrrad?", deuter=lambda q: None)
+    assert "Zweirad" in result["text"] and "Nebenbei" in result["text"] and "Platten" in result["text"]
 
 
 def test_note_weaving_is_off_for_the_cli_path_deuter_none():
     # respond_with_deuter(deuter=None) must exactly reproduce respond_in_conversation --
     # the CLI never gets a beiläufig-personalised answer, only the explicit recall command does
-    from genus import companion
-    conn = _isa_graph()
-    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
-    companion.remember(conn, "ich habe zwei Hunde")
-    result = companion.respond_with_deuter(conn, "Was ist ein Hund?")
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad zum Fahren", "dbnary")
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle="ronny")
+    result = companion.respond_with_deuter(conn, "Was ist ein Fahrrad?")
     assert "Nebenbei" not in result["text"]
-    assert result == companion.respond_in_conversation(conn, "Was ist ein Hund?")
+    assert result == companion.respond_in_conversation(conn, "Was ist ein Fahrrad?")
 
 
 def test_note_weaving_is_not_applied_to_remember_or_recall_or_the_honest_fallback():
     # weaving a note right next to recording/recalling notes would be circular/confusing
-    from genus import companion
-    conn = _isa_graph()
-    companion.remember(conn, "ich habe zwei Hunde")
-    gemerkt = companion.respond_with_deuter(conn, "Merke dir: ich mag auch Katzen", deuter=lambda q: None)
+    from genus import companion, erinnerung
+    conn = _fahrrad_graph()
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle="ronny")
+    gemerkt = companion.respond_with_deuter(conn, "Merke dir: ich mag auch Zugfahren", deuter=lambda q: None)
     assert "Nebenbei" not in gemerkt["text"]
     abgerufen = companion.respond_with_deuter(conn, "Was weißt du über mich?", deuter=lambda q: None)
     assert "Nebenbei" not in abgerufen["text"]
@@ -1471,12 +1477,12 @@ def test_sozialgeste_word_limit_judges_the_segments_own_text_not_the_whole_messa
 
 def test_tatsache_remembers_only_its_own_segment_not_the_whole_message():
     # dieselbe Klasse: eine Notiz soll die KLAUSEL enthalten, nicht Gruß+Frage+Dank mit
-    from genus import companion
+    from genus import companion, erinnerung
     conn = _isa_graph()
-    deuter = lambda q: [{"text": "ich habe zwei Hunde", "absicht": "tatsache"}]
+    deuter = lambda q: [{"text": "ich war auf einem Konzert", "absicht": "tatsache"}]
     companion.respond_with_deuter(
-        conn, "Übrigens, ich habe zwei Hunde, das nur nebenbei", deuter=deuter)
-    assert companion.suggested_notes(conn) == ["ich habe zwei Hunde"]
+        conn, "Übrigens, ich war auf einem Konzert, das nur nebenbei", deuter=deuter)
+    assert erinnerung.vermutete_episoden(conn) == ["ich war auf einem Konzert"]
 
 
 def test_deuter_a_segment_that_fails_does_not_block_the_others():
@@ -1603,14 +1609,14 @@ def test_remember_command_recognizes_the_cue_phrases_and_extracts_the_fact():
 
 
 def test_remember_and_recall_round_trip():
-    from genus import companion
+    from genus import erinnerung
     conn = _isa_graph()
-    assert companion.confirmed_notes(conn) == []
+    assert erinnerung.bestaetigte_episoden(conn) == []
     # "Zebra" sorts AFTER "Apfel" alphabetically but was told FIRST -- pins insertion order,
     # not sources.relations()'s alphabetical-by-object order (a real bug caught locally)
-    companion.remember(conn, "Zebra mag ich am liebsten im Zoo")
-    companion.remember(conn, "Apfelsaft trinke ich jeden Morgen")
-    assert companion.confirmed_notes(conn) == [
+    erinnerung.merke(conn, "Zebra mag ich am liebsten im Zoo", quelle="ronny")
+    erinnerung.merke(conn, "Apfelsaft trinke ich jeden Morgen", quelle="ronny")
+    assert erinnerung.bestaetigte_episoden(conn) == [
         "Zebra mag ich am liebsten im Zoo", "Apfelsaft trinke ich jeden Morgen",
     ]
 
@@ -1620,10 +1626,10 @@ def test_remembering_is_not_hardcoded_to_be_about_ronny():
     # GENUS heisst" is a fact about GENUS, not about Ronny -- slice 1 filed EVERYTHING as "a
     # fact about Ronny" regardless of content, so recalling it read back nonsensically. The
     # notebook is now general -- it just knows WHO TOLD it, never WHAT/WHOM a note is about.
-    from genus import companion
+    from genus import erinnerung
     conn = _isa_graph()
-    companion.remember(conn, "dass du GENUS heißt und Ronny dich erschaffen hat")
-    assert companion.confirmed_notes(conn) == ["dass du GENUS heißt und Ronny dich erschaffen hat"]
+    erinnerung.merke(conn, "dass du GENUS heißt und Ronny dich erschaffen hat", quelle="ronny")
+    assert erinnerung.bestaetigte_episoden(conn) == ["dass du GENUS heißt und Ronny dich erschaffen hat"]
 
 
 def test_recall_question_is_recognized_by_exact_match_not_substring():
@@ -1649,21 +1655,21 @@ def test_narrate_notes_shows_confirmed_and_suggested_tiers_separately():
 
 
 def test_remembering_is_a_human_source_with_full_trust_not_capped():
-    from genus import companion, sources
+    from genus import erinnerung, sources
     conn = _isa_graph()
-    companion.remember(conn, "ich mag Kaffee")
+    erinnerung.merke(conn, "ich mag Kaffee", quelle="ronny")
     assert sources.source_trust(conn, "ronny") >= sources.SOURCE_TRUST_SEED  # never model-capped
 
 
 def test_a_deuter_suggested_statement_is_capped_and_marked_unconfirmed():
-    from genus import companion, sources
+    from genus import companion, erinnerung
     conn = _isa_graph()
-    deuter = lambda q: {"absicht": "tatsache", "subject": "Hund"}
-    result = companion.respond_with_deuter(conn, "ich habe zwei Hunde", deuter=deuter)
+    deuter = lambda q: {"absicht": "tatsache", "subject": "Konzert"}
+    result = companion.respond_with_deuter(conn, "ich war gestern auf einem Konzert", deuter=deuter)
     assert "notiert" in result["text"] and "unsicher" in result["text"]
-    assert companion.suggested_notes(conn) == ["ich habe zwei Hunde"]
-    assert companion.confirmed_notes(conn) == []   # never conflated with a real "Merke dir"
-    assert sources.source_trust(conn, companion.STATEMENT_SOURCE) <= sources.MODEL_TRUST_SEED
+    assert erinnerung.vermutete_episoden(conn) == ["ich war gestern auf einem Konzert"]
+    assert erinnerung.bestaetigte_episoden(conn) == []   # never conflated with a real "Merke dir"
+    assert sources.source_trust(conn, erinnerung.STATEMENT_SOURCE) <= sources.MODEL_TRUST_SEED
 
 
 def test_respond_remembers_and_recalls_end_to_end():
