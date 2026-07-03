@@ -1015,6 +1015,21 @@ def test_stimme_none_or_failed_rephrase_keeps_the_original_template():
         assert "geglättet" not in result["text"]
 
 
+def test_stimme_also_reaches_the_deuter_driven_definition_cell():
+    # live fund (2026-07-03): "Was ist ein Hund?" runs through the DEUTER path now (it sits
+    # before the plain word reading), not through _wort_antwort directly -- Stimme must reach
+    # it there too, or the single most common conversational pattern never gets rephrased
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    deuter = lambda q: {"absicht": "definition", "subject": "Hund"}
+    stimme = lambda satz: "»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt."
+    result = companion.respond_with_deuter(conn, "was ist eigentlich ein wuffwuff", deuter=deuter, stimme=stimme)
+    assert result["text"].startswith("»Hund« ist laut GENUS")
+    assert "Sprachlich vom Modell geglättet" in result["text"]
+    assert "Sprachmodell gedeutet" in result["text"]   # both disclosures survive, never silent
+
+
 def test_stimme_is_not_consulted_for_rituals_or_the_honest_fallback():
     # the first slice is deliberately scoped to Muster/Wort cells -- memory, recall, and the
     # honest "nichts erkannt" fallback are left exactly as they are (no value in rephrasing a
