@@ -652,6 +652,36 @@ def is_why_followup(question: str) -> bool:
     return question.strip().strip("?!.").strip().lower() in _WHY_FOLLOWUP
 
 
+# --- Mehr-Zug-Arbeitsgedächtnis (Punkt 4 von docs/GENUS_GEDAECHTNIS.md, Scheibe "das Tier von
+# vorhin wird auflösbar") -- dieselbe Disziplin wie beim "warum?"-Nachfrage-Fix: ein kleiner,
+# geschlossener Signalsatz statt allgemeiner Koreferenz-Auflösung (ein echt schwereres Problem).
+# GENUS erfindet keine Wort-Ersetzung ("das Tier" -> "der Igel") -- es beantwortet ehrlich die
+# FRÜHERE, konkrete Frage noch einmal, sichtbar als solche benannt, statt so zu tun, als hätte
+# es die neue Formulierung wirklich verstanden. ``verlauf`` sind Züge VOR dem unmittelbar
+# letzten (der schon über last_question/last_answer erreichbar ist) -- reines UX-Zustand in der
+# Membran (Ledger != Memory), wie last_question/last_answer selbst.
+
+_BACKREF_CUES = ("von vorhin", "von eben")
+_BACKREF_TAG = " (Bezogen auf deine frühere Frage „{}“.)"
+
+
+def is_backreference(question: str) -> bool:
+    """True for a question that explicitly points back beyond the immediately previous turn
+    ("... von vorhin", "... von eben") -- deliberately narrow, not general pronoun resolution."""
+    q = question.lower()
+    return any(cue in q for cue in _BACKREF_CUES)
+
+
+def _fruehere_frage_mit_bekanntem_begriff(conn, verlauf: list[dict]) -> str | None:
+    """The most recent EARLIER question (newest first) that GENUS could actually answer again
+    (contains a word it knows) -- ``None`` if no turn in ``verlauf`` qualifies."""
+    for zug in reversed(verlauf):
+        frage = zug.get("question")
+        if frage and _last_known_word(conn, frage) is not None:
+            return frage
+    return None
+
+
 def respond_in_conversation(conn, question: str, last_question: str | None = None) -> dict:
     """Like ``respond``, but aware of the PREVIOUS turn's question. A bare "warum?"/"woher weißt
     du das?" reruns the exact same routing ``why`` would use for ``last_question`` -- correctly
@@ -1060,7 +1090,8 @@ def _komponiere(teile: list[str]) -> str:
 
 
 def respond_with_deuter(conn, question: str, last_question: str | None = None,
-                         deuter=None, stimme=None, last_answer: str | None = None) -> dict:
+                         deuter=None, stimme=None, last_answer: str | None = None,
+                         verlauf: list[dict] | None = None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
     offene Deuter-SEGMENTIERUNG (eine Nachricht kann mehrere Sprechhandlungen enthalten, ISO
     24617-2 -- jedes Segment aufs Raster abgebildet, is_a-Fallback GENAU einen Schritt,
@@ -1090,12 +1121,23 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     forward as the next call's ``last_question``.
 
     ``deuter=None``/``stimme=None`` degrades to the deterministic Würfel half and behaves
-    exactly like ``respond_in_conversation``."""
+    exactly like ``respond_in_conversation`` (as long as ``verlauf`` is also omitted).
+
+    ``verlauf`` (optional, Mehr-Zug-Arbeitsgedächtnis): turns BEFORE the immediately previous
+    one (that one stays reachable via ``last_question``/``last_answer`` as always). A question
+    containing „von vorhin"/„von eben" (:func:`is_backreference`) re-answers the most recent
+    earlier question GENUS can still answer, named honestly as a retrace -- never a guessed
+    word-substitution."""
     from genus import verstehen
 
     if last_question and is_why_followup(question):
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
         return {"text": text, "question": last_question}
+    if verlauf and is_backreference(question):
+        frueher = _fruehere_frage_mit_bekanntem_begriff(conn, verlauf)
+        if frueher is not None:
+            text = respond(conn, frueher) + _BACKREF_TAG.format(frueher)
+            return {"text": text, "question": frueher}
     text = _ritual_antwort(conn, question)
     if text is not None:
         return {"text": text, "question": question}

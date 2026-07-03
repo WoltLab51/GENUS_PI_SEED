@@ -240,8 +240,12 @@ Jede Scheibe klein, einzeln testbar, einzeln live nachweisbar:
    treffen sich jetzt auch über Singular/Plural oder Synonyme hinweg, nicht nur bei exakt
    gleicher Schreibung. *Ab hier fühlt sich das Gespräch zum ersten Mal „wissend" an, und ab
    hier lohnt sich das Fachwissen-Einfüllen richtig.*
-3. **Arbeitsgedächtnis über mehrere Züge** — Session-Liste statt Ein-Zug-Paar; „das Tier von
-   vorhin" wird auflösbar.
+3. **Arbeitsgedächtnis über mehrere Züge — ✅ geliefert (2026-07-03).** Session-Liste
+   (gekappt, `_VERLAUF_MAX` Züge) statt Ein-Zug-Paar in `deploy/telegram_bot.py`; ein „…von
+   vorhin"/„…von eben" (`companion.is_backreference`) beantwortet ehrlich die konkrete
+   FRÜHERE Frage noch einmal (sichtbar als Retrace benannt, „Bezogen auf deine frühere Frage
+   „…"") — bewusst kein Wort-Ersatz/keine allgemeine Koreferenz, dieselbe Enge wie beim
+   „warum?"-Nachfrage-Fix.
 4. **Tagespuffer + Nacht-Konsolidierung** — inkl. Vergessen und der Treffer-Quote-Kennzahl.
 5. **Semantisierung** — wiederkehrende Episoden → Wissens-Kandidaten → Korroboration/Inquiry.
 

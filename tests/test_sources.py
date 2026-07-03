@@ -877,6 +877,50 @@ def test_why_followup_recognizes_the_closed_set_of_cue_phrases():
         assert not companion.is_why_followup(phrase), phrase
 
 
+def test_is_backreference_recognizes_von_vorhin_and_von_eben():
+    from genus import companion
+    for phrase in ("was frisst das Tier von vorhin", "und was meintest du von eben",
+                   "VON VORHIN nochmal"):
+        assert companion.is_backreference(phrase), phrase
+    for phrase in ("Was ist ein Fahrrad?", "warum?", "ich habe Angst davor", ""):
+        assert not companion.is_backreference(phrase), phrase
+
+
+def test_backreference_reanswers_the_earlier_question_not_the_last_one():
+    # Mehr-Zug-Arbeitsgedächtnis (Punkt 4): "von vorhin" reicht über die letzte Runde hinaus --
+    # last_question/last_answer sind ein Gruss (kein bekanntes Wort), verlauf[0] trägt Fahrrad
+    from genus import companion
+    conn = _fahrrad_graph()
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad zum Fahren", "dbnary")
+    verlauf = [{"question": "Was ist ein Fahrrad?", "answer": "ein Zweirad zum Fahren."}]
+    result = companion.respond_with_deuter(
+        conn, "was war das nochmal von vorhin?", last_question="Hallo!", last_answer="Hallo!",
+        verlauf=verlauf,
+    )
+    assert "Zweirad" in result["text"]
+    assert "frühere Frage" in result["text"] and "Was ist ein Fahrrad?" in result["text"]
+    assert result["question"] == "Was ist ein Fahrrad?"   # anchor moves to the retraced topic
+
+
+def test_backreference_without_any_resolvable_earlier_turn_falls_through():
+    from genus import companion
+    conn = _fahrrad_graph()
+    verlauf = [{"question": "Hallo!", "answer": "Hallo, was kann ich für dich tun?"}]
+    result = companion.respond_with_deuter(
+        conn, "und das von vorhin?", last_question="Danke!", last_answer="Gern!", verlauf=verlauf,
+    )
+    assert "frühere Frage" not in result["text"]   # nothing in verlauf had a known word -- honest fallthrough
+
+
+def test_backreference_is_a_noop_without_verlauf_or_without_the_cue():
+    from genus import companion
+    conn = _fahrrad_graph()
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad zum Fahren", "dbnary")
+    baseline = companion.respond_with_deuter(conn, "Was ist ein Fahrrad?")
+    with_empty_verlauf = companion.respond_with_deuter(conn, "Was ist ein Fahrrad?", verlauf=[])
+    assert baseline == with_empty_verlauf
+
+
 def test_conversation_retraces_the_previous_relational_answer():
     from genus import companion
     conn = _isa_graph()

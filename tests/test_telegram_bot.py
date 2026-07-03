@@ -134,6 +134,33 @@ def test_sessions_are_kept_separate_per_chat():
     assert "Herleitung" not in answer   # chat 99 has no prior turn -> ordinary routing, not a stale trace
 
 
+def test_sessions_resolve_a_von_vorhin_backreference_across_two_turns():
+    # Mehr-Zug-Arbeitsgedächtnis: Runde 3 fragt "von vorhin" -- muss Runde 1 (Fahrrad) treffen,
+    # nicht die dazwischenliegende Runde 2 (ein Gruss ohne bekanntes Wort)
+    conn = _fresh()
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q_fahrrad", "wikidata")
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad zum Fahren", "dbnary")
+    sessions: dict = {}
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Fahrrad?"), allowed={42}, sessions=sessions)
+    telegram_bot.handle_update(conn, _msg(2, 42, "Hallo!"), allowed={42}, sessions=sessions)
+    chat_id, answer = telegram_bot.handle_update(
+        conn, _msg(3, 42, "was war das von vorhin?"), allowed={42}, sessions=sessions)
+
+    assert chat_id == 42
+    assert "Zweirad" in answer and "Was ist ein Fahrrad?" in answer
+
+
+def test_session_turn_history_is_capped_not_unbounded():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q_fahrrad", "wikidata")
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad zum Fahren", "dbnary")
+    sessions: dict = {}
+    for i in range(telegram_bot._VERLAUF_MAX + 4):
+        telegram_bot.handle_update(conn, _msg(i, 42, f"Runde {i}"), allowed={42}, sessions=sessions)
+    assert len(sessions[42]) == telegram_bot._VERLAUF_MAX
+
+
 def test_without_sessions_behaves_exactly_as_before():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")

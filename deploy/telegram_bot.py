@@ -4,9 +4,11 @@
 Long-polls Telegram's Bot API (outbound HTTPS only; no inbound port, no public server needed)
 and answers each allowed message with `genus.companion.respond_with_deuter` -- the
 Verstehens-Würfel (Rituale -> Muster-Zellen -> offene Deuter-Lesart aufs Absichts-Raster ->
-Wort-Lesart), aware of the PREVIOUS message in the same chat so a bare "warum?"/"woher weißt du
-das?" retraces it instead of failing (per-chat state lives here in the membrane, in-process
-only -- the ledger stays the source of epistemic truth, this is UX plumbing, not knowledge).
+Wort-Lesart), aware of a bounded WINDOW of previous turns in the same chat (Mehr-Zug-
+Arbeitsgedächtnis, docs/GENUS_GEDAECHTNIS.md Punkt 4) -- a bare "warum?"/"woher weißt du das?"
+retraces the last turn, and "... von vorhin"/"... von eben" can reach further back, instead of
+failing (per-chat state lives here in the membrane, in-process only -- the ledger stays the
+source of epistemic truth, this is UX plumbing, not knowledge).
 Two capped edge models, both dependency-injected, never trusted blindly: `deuter.py` reads
 free phrasing INTO the deterministic core (an intent/subject/object GUESS, graph-verified
 before anything acts); `stimme.py` reads an ALREADY-verified answer back OUT more naturally
@@ -46,6 +48,7 @@ TOKEN_FILE = os.environ.get(
 OFFSET_FILE = os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.offset")
 UA = "GENUS-PI/0.1 (personal companion bridge)"
 _CTX = ssl.create_default_context()
+_VERLAUF_MAX = 6   # Mehr-Zug-Arbeitsgedächtnis: wie viele Züge pro Chat im Blick bleiben
 
 
 def _log(msg: str) -> None:
@@ -109,18 +112,20 @@ def _save_offset(offset: int) -> None:
 
 
 def handle_update(
-    conn, update: dict, allowed: set[int], sessions: dict[int, str] | None = None
+    conn, update: dict, allowed: set[int], sessions: dict[int, list[dict]] | None = None
 ) -> tuple[int, str] | None:
     """Pure logic, no network: given one Telegram update + the allow-list, decide whether to
     answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer.
 
-    ``sessions`` (optional), keyed by chat_id, holds each conversation's last question AND last
-    answer (``{"question": ..., "answer": ...}``) so a bare follow-up ("warum?", "kürzer",
-    "nochmal", ...) can be read against them (``companion.respond_with_deuter``) instead of
-    falling through to "kein Wort bekannt". In-process only, forgotten on a restart -- an
-    honest, small limitation: this is UX-session plumbing, not knowledge, so it deliberately
-    doesn't touch the ledger (Ledger != Memory). Omit ``sessions`` for the plain, stateless
-    behaviour (unchanged)."""
+    ``sessions`` (optional), keyed by chat_id, holds a bounded LIST of that conversation's last
+    turns (``[{"question": ..., "answer": ...}, ...]``, oldest first, capped at
+    :data:`_VERLAUF_MAX`) -- Mehr-Zug-Arbeitsgedächtnis (docs/GENUS_GEDAECHTNIS.md, Punkt 4):
+    a bare follow-up ("warum?", "kürzer", "nochmal", ...) reads against the LAST turn as before;
+    a "... von vorhin"/"... von eben" question can additionally reach further back
+    (``companion.is_backreference``). In-process only, forgotten on a restart -- an honest,
+    small limitation: this is UX-session plumbing, not knowledge, so it deliberately doesn't
+    touch the ledger (Ledger != Memory). Omit ``sessions`` for the plain, stateless behaviour
+    (unchanged)."""
     from genus import companion, verstehen
     import deuter
     import stimme
@@ -150,15 +155,18 @@ def handle_update(
             # ~1300-Token-Prompt neu verarbeiten musste -- 26s statt 3s. Kostet dauerhaft ein
             # zweites 1.5B-Modell im RAM (~1-1.5 GB, auf dem Pi reichlich frei), aber macht die
             # Latenz durchgehend vorhersagbar statt vom Zufall der Aufrufreihenfolge abzuhängen.
-            vorher = sessions.get(chat_id) or {}
+            zuege = sessions.get(chat_id) or []
+            vorher = zuege[-1] if zuege else {}
             result = companion.respond_with_deuter(
                 conn, question, vorher.get("question"),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot),
                 stimme=stimme.formuliere,
                 last_answer=vorher.get("answer"),
+                verlauf=zuege[:-1],
             )
             answer = result["text"]
-            sessions[chat_id] = {"question": result["question"], "answer": answer}
+            neuer_zug = {"question": result["question"], "answer": answer}
+            sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering {question!r}: {exc}")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."
@@ -182,7 +190,7 @@ def main() -> int:
     conn.row_factory = sqlite3.Row
 
     offset = _load_offset()
-    sessions: dict[int, str] = {}   # chat_id -> last question; in-process only, see handle_update
+    sessions: dict[int, list[dict]] = {}   # chat_id -> turn list; in-process only, see handle_update
     while True:
         try:
             updates = _get_updates(token, offset)
