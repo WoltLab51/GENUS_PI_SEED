@@ -148,11 +148,13 @@ def narrate(a: dict) -> str:
 # weakest premise. No model, nothing invented; the reasoning is the answer.
 
 _ART = r"(?:einen|einer|eine|ein|der|die|das|den|dem)"
+_FILL = r"(?:(?:eigentlich|denn|jetzt|nochmal|noch|so|überhaupt|gerade|wirklich)\s+)*"
 _TERM = r"([A-Za-zäöüÄÖÜß]+)"
 _REL_PATTERNS = [
-    re.compile(r"\bist\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _ART + r"?\s*art(?:\s+von)?\s+" + _TERM, re.I),
-    re.compile(r"\bist\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _ART + r"\s+" + _TERM, re.I),
-    re.compile(r"\bsind\s+" + _TERM + r"\s+" + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bist\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"?\s*art(?:\s+von)?\s+" + _TERM, re.I),
+    re.compile(r"\bist\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"\s+" + _TERM, re.I),
+    re.compile(r"\bsind\s+" + _FILL + _TERM + r"\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bz[äa]hlt\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"zu\s+(?:den|der|die|das)?\s*" + _TERM, re.I),
 ]
 _LABEL_IN = re.compile(r"^Q\d+\s*\((.*)\)$")
 
@@ -252,8 +254,8 @@ def narrate_relation(conn, r: dict) -> str:
 # construction, glass-box (the shared category is a real graph node).
 
 _COMMON_PATTERNS = [
-    re.compile(r"\bwas\s+haben\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+gemeinsam", re.I),
-    re.compile(r"\bwas\s+ist\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+gemeinsam", re.I),
+    re.compile(r"\bwas\s+haben\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"gemeinsam", re.I),
+    re.compile(r"\bwas\s+ist\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"gemeinsam", re.I),
     re.compile(r"\bgemeinsam(?:keit(?:en)?)?\s+(?:von|zwischen)\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM, re.I),
     re.compile(r"\bwas\s+verbindet\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM, re.I),
 ]
@@ -316,8 +318,8 @@ def narrate_common(conn, r: dict) -> str:
 # carry more than one recorded gender (homonymous lexemes, e.g. "Messer") -- both are shown.
 
 _GENDER_PATTERNS = [
-    re.compile(r"\bwelches\s+geschlecht\s+hat\s+" + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bwelchen\s+artikel\s+(?:hat|braucht)\s+" + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwelches\s+geschlecht\s+hat\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwelchen\s+artikel\s+(?:hat|braucht)\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
     re.compile(r"\bder,?\s*die\s+oder\s+das\s+" + _TERM, re.I),
 ]
 
@@ -495,12 +497,13 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
 # text for a channel where that log-tag style would look odd (e.g. a chat bridge like Telegram).
 # Read-only except for one deliberate, explicit exception: "merke dir: ..." (personal memory) --
 # every other branch is a pure read, identical data functions, a different voice for a room.
+# The stages are factored so the Verstehens-Würfel (respond_with_deuter, below) can reuse them
+# in a different order without duplicating their logic.
 
-def respond(conn, question: str) -> str:
-    """The full conversational answer to ``question``: remember -> recall -> state ->
-    relational -> comparative -> gender -> word -> help, in that order (the personal-memory
-    checks run first so they can never be shadowed by a fixed pattern or a known word; the rest
-    matches ``cli.ask_command``). Plain text, no CLI tags."""
+def _ritual_antwort(conn, question: str) -> str | None:
+    """The unambiguous rituals -- explicit memory, recall, fixed state queries, GENUS's own
+    open questions. Exact/cue matches, deterministic, never model-deuted (a clear command
+    needs no interpretation). ``None`` when no ritual claims the question."""
     from genus import query  # local: keeps companion's import-time surface a leaf otherwise
 
     fact = remember_command(question)
@@ -514,22 +517,55 @@ def respond(conn, question: str) -> str:
         return state["answer"]
     if inquiries_question(question):
         return narrate_inquiries(conn, open_questions(conn))
+    return None
+
+
+def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
+    """The fixed-pattern cells (relation/comparative/gender) -- self-verifying: a pattern only
+    claims the question when its terms actually resolve in the graph. Returns
+    ``(text, zelle)`` so a caller can record WHICH cell answered; ``None`` otherwise."""
     rel = relate(conn, question)
     if rel.get("relational"):
-        return narrate_relation(conn, rel)
+        return narrate_relation(conn, rel), "beziehung"
     com = common(conn, question)
     if com.get("common"):
-        return narrate_common(conn, com)
+        return narrate_common(conn, com), "vergleich"
     gen = gender_question(conn, question)
     if gen.get("gender_q"):
-        return narrate_gender(gen)
+        return narrate_gender(gen), "grammatik"
+    return None
+
+
+def _wort_antwort(conn, question: str) -> str | None:
+    """The bare word reading -- any known word in the question, answered from its grounding.
+    Deliberately the LAST reading in the Würfel order (it is greedy by nature and used to
+    shadow better readings when it ran early -- the live bug class of 2026-07-02)."""
     a = answer(conn, question)
-    if a["found"]:
-        text = narrate(a)
-        if a.get("concept"):
-            text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
+    if not a["found"]:
+        return None
+    text = narrate(a)
+    if a.get("concept"):
+        text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
+    return text
+
+
+def respond(conn, question: str) -> str:
+    """The full conversational answer to ``question``: remember -> recall -> state ->
+    relational -> comparative -> gender -> word -> help, in that order (the personal-memory
+    checks run first so they can never be shadowed by a fixed pattern or a known word; the rest
+    matches ``cli.ask_command``). Plain text, no CLI tags. Pure deterministic half -- no model,
+    and (except the explicit "merke dir") no writes: the Würfel's reading-records happen only
+    in ``respond_with_deuter``, the conversational channel."""
+    text = _ritual_antwort(conn, question)
+    if text is not None:
         return text
-    return state["answer"]  # the honest "nothing recognized" help, same fallback as the CLI
+    muster = _muster_antwort(conn, question)
+    if muster is not None:
+        return muster[0]
+    text = _wort_antwort(conn, question)
+    if text is not None:
+        return text
+    return _UNKNOWN_FALLBACK  # the honest "nothing recognized" help, same fallback as the CLI
 
 
 # --- GENUS's own open questions ("Was beschäftigt dich?") --------------------------------
@@ -645,90 +681,236 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
     return {"text": respond(conn, question), "question": question}
 
 
-# --- the DEUTER: a capped edge model that parses free phrasing INTO the deterministic core -----
+# --- der VERSTEHENS-WÜRFEL: erst einordnen, dann lösen -----------------------------------
 #
-# Benchmarked (not guessed) across 7 models/families on the Pi before choosing: Qwen2.5-1.5B-
-# Instruct hit the same accuracy (7/8 on a hand-scored German routing test) as models twice to
-# four times its size, at the lowest latency/RAM of the reliable tier -- see the roadmap entry
-# for the full comparison. The model lives at the edge (deploy/deuter.py); genus/ stays
-# model-free -- ``deuter`` here is a plain callable a caller supplies (dependency injection),
-# never imported by this module.
+# The dispatch bug CLASS, seen live three times in one test (2026-07-02): routing was a
+# first-match-wins chain of fused recognizer+resolvers ending in a greedy word lookup, so
+# "zählt ein Apfel zu den Pflanzen?" got a botany lecture about the word "Pflanzen" before a
+# better reading was ever consulted. Ronny's fix is structural (a morphological grid, Zwicky):
+# EINORDNEN is separated from LÖSEN. Fixed patterns classify first (ms, self-verifying); only
+# when NO pattern claims the question does the Deuter read it -- openly ("komplett offen. da
+# kann alles kommen"): the model answers clear questions about the utterance and may describe
+# an intent in its OWN words instead of being forced into a list (the Ankreuzzwang behind the
+# live "was ist ein Hund"->statement misfire). GENUS then makes the actual choice: the reading
+# is mapped onto the Absichts-Raster -- a sub-GRAPH in the ledger (genus.verstehen), not a
+# Python list. Acting happens only from known cells; a known cell without a handler is named
+# honestly ("das kann ich noch nicht"); a cell whose handler can't resolve falls SOFT up the
+# is_a chain to the nearest actionable ancestor (like inference climbs concept is_a); an
+# off-grid reading is collected as differentiation material for new Ausprägungen. Open when
+# OBSERVING, closed when ACTING -- and the difference between the two is the learning signal.
 #
-# Only called as a last resort (the fixed regex patterns above are cheap and, when they match,
-# already fully reliable -- no reason to spend a model call once a pattern already nailed it),
-# but no longer a narrow one: EVERY intent the deterministic core can act on (definition,
-# relation, comparative, gender, statement, followup) is reachable through the Deuter now, not
-# just three of them. Ronny's framing: "mit klaren Vorgaben, was GENUS braucht" -- the model
-# WAEHLT only (an intent from a fixed list, one or two words from the question); it never
-# writes the answer or invents a fact. Every subject/object it names is GRAPH-VERIFIED against
-# the SAME resolution helpers the regex path uses (_relate_terms/_common_terms/_gender_term/
-# _last_known_word) before anything happens -- a wrong guess just leaves the honest fallback in
-# place, it can never fabricate an answer.
+# The model at the edge stays on the same leash as ever: deploy/deuter.py, injected as a plain
+# callable, WAEHLT/liest only -- every subject/object it names is graph-verified by the same
+# resolution cores the regex path uses, every model-assisted answer is visibly marked, a wrong
+# reading can only fail safe. Benchmarked choice (7 models/4 families on the Pi):
+# Qwen2.5-1.5B-Instruct -- small models handle SMALL tasks well, and the Würfel keeps every
+# model task small.
 
 _UNKNOWN_FALLBACK = (   # query.ask's stable "nothing recognized" sentinel -- keep in sync
     "Das kann GENUS nicht einordnen — kein bekannter Befehl, kein gelerntes Wort."
 )
 _DEUTED = " (Frage vom Sprachmodell gedeutet.)"
 
+# German voice for cells GENUS can read but not yet act on -- honest capability naming.
+_ZELLEN_LABELS = {
+    "eigenschaft": "eine Frage nach einer Eigenschaft",
+    "ursache": "eine Warum-Frage über die Welt",
+    "menge": "eine Frage nach einer Anzahl",
+    "faehigkeiten": "eine Frage danach, was ich kann",
+    "lernen": "eine Aufforderung, etwas zu lernen",
+    "tun": "eine Aufforderung, etwas zu tun",
+    "meinung": "eine Meinungsäußerung",
+    "korrektur": "eine Korrektur",
+    "empfehlungsfrage": "eine Bitte um Empfehlung",
+    "sozialgeste": "eine soziale Geste",
+    "gruss": "einen Gruß", "dank": "ein Dankeschön", "lob": "ein Lob",
+    "kritik": "eine Kritik", "abschied": "einen Abschied",
+    "meta": "einen Wunsch zum Gespräch selbst",
+    "kuerzer": "den Wunsch nach einer kürzeren Antwort",
+    "ausfuehrlicher": "den Wunsch nach einer ausführlicheren Antwort",
+    "anders-erklaeren": "den Wunsch nach einer anderen Erklärung",
+    "wiederholen": "den Wunsch nach einer Wiederholung",
+    "mitteilung": "eine Mitteilung", "aufforderung": "eine Aufforderung",
+    "vertiefung": "eine vertiefende Nachfrage", "bezug": "eine Bezug-Nachfrage",
+    "nachfrage": "eine Nachfrage", "wissensfrage": "eine Wissensfrage",
+    "genus-auskunft": "eine Frage über mich",
+}
+
+
+def _zelle_definition(conn, guess, question, last_question):
+    subject = guess.get("subject")
+    if not subject:
+        return None
+    found = _last_known_word(conn, subject)
+    if found is None:
+        return None
+    return respond(conn, f"Was ist {found}?")
+
+
+def _zelle_beziehung(conn, guess, question, last_question):
+    if not (guess.get("subject") and guess.get("object")):
+        return None
+    r = _relate_terms(conn, guess["subject"], guess["object"])
+    return narrate_relation(conn, r) if r["relational"] else None
+
+
+def _zelle_vergleich(conn, guess, question, last_question):
+    if not (guess.get("subject") and guess.get("object")):
+        return None
+    r = _common_terms(conn, guess["subject"], guess["object"])
+    return narrate_common(conn, r) if r["common"] else None
+
+
+def _zelle_grammatik(conn, guess, question, last_question):
+    if not guess.get("subject"):
+        return None
+    r = _gender_term(conn, guess["subject"])
+    return narrate_gender(r) if (r["known"] or r.get("prediction")) else None
+
+
+def _zelle_nachfrage(conn, guess, question, last_question):
+    if not last_question:
+        return None
+    return "\n".join(render_trace(conn, trace(conn, last_question)))
+
+
+def _zelle_tatsache(conn, guess, question, last_question):
+    remember(conn, question, source=STATEMENT_SOURCE)
+    return (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
+            f"(sag „merke dir: {question}“, wenn's wichtig ist, dann bin ich mir sicher).")
+
+
+def _zelle_merken(conn, guess, question, last_question):
+    # a MODEL-read "please remember" (the explicit ritual "merke dir: ..." never reaches the
+    # Deuter) -- never granted human trust off a model reading: capped note + the honest hint
+    return _zelle_tatsache(conn, guess, question, last_question)
+
+
+def _zelle_erinnerung(conn, guess, question, last_question):
+    return narrate_notes(confirmed_notes(conn), suggested_notes(conn))
+
+
+def _zelle_zustand(conn, guess, question, last_question):
+    from genus import query
+    return query.ask(conn, "zustand")["answer"]
+
+
+def _zelle_offene_fragen(conn, guess, question, last_question):
+    return narrate_inquiries(conn, open_questions(conn))
+
+
+def _zelle_wissensfrage(conn, guess, question, last_question):
+    # the soft landing for fine knowledge questions GENUS can't answer specifically yet
+    # (eigenschaft/ursache/menge climb here): say what IS known about the subject, honestly
+    text = _zelle_definition(conn, guess, question, last_question)
+    if text is None:
+        return None
+    return text + " Genauer (das, wonach du eigentlich fragst) kann ich noch nicht antworten."
+
+
+# Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;
+# which cells exist and how they relate lives in the ledger (genus.verstehen.RASTER_SEED).
+_HANDELBAR = {
+    "definition": _zelle_definition,
+    "beziehung": _zelle_beziehung,
+    "vergleich": _zelle_vergleich,
+    "grammatik": _zelle_grammatik,
+    "nachfrage": _zelle_nachfrage,
+    "warum-herkunft": _zelle_nachfrage,
+    "vertiefung": _zelle_nachfrage,
+    "bezug": _zelle_nachfrage,
+    "tatsache": _zelle_tatsache,
+    "merken": _zelle_merken,
+    "erinnerungs-abruf": _zelle_erinnerung,
+    "zustand": _zelle_zustand,
+    "offene-fragen": _zelle_offene_fragen,
+    "wissensfrage": _zelle_wissensfrage,
+}
+
+
+def _record_still(fn, *args) -> None:
+    """Reading-records are Kennzahl bookkeeping -- they must never cost an answer (the bridge
+    stays up even if a write fails, e.g. a read-only replica)."""
+    try:
+        fn(*args)
+    except Exception:
+        pass
+
+
+def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None) -> dict | None:
+    """Map an OPEN model reading onto the Absichts-Raster and act from the known cell -- or
+    climb the is_a chain to the nearest actionable ancestor -- or name honestly what GENUS
+    read but cannot do yet. ``None`` only when the reading is off-grid or empty (then the
+    caller falls through to the last word reading and the honest fallback)."""
+    from genus import verstehen
+
+    kind = (guess.get("absicht") or "").strip().lower()
+    if not kind:
+        return None
+    # the graph is authoritative once sown; before the one clean seed-apply, the code-side
+    # seed table keeps the mapping sane (same content, Quelle folgt mit der Saat)
+    known = verstehen.kinds(conn) or {k for k, _ in verstehen.RASTER_SEED} | {"aeusserung"}
+    if kind not in known:
+        # off-grid: the model described the intent in its own words -- collected as
+        # differentiation material (model words only, never the user's), then fail safe
+        _record_still(verstehen.record_free_reading, conn, kind)
+        return None
+    if kind == "unklar":
+        return None   # an honest "I can't place it" from the model changes nothing
+    attempted = [kind] + verstehen.parents(conn, kind)
+    hatte_handler = False
+    for step in attempted:
+        handler = _HANDELBAR.get(step)
+        if handler is None:
+            continue
+        hatte_handler = True
+        text = handler(conn, guess, question, last_question)
+        if text is not None:
+            _record_still(verstehen.record_reading, conn, kind, "model:deuter")
+            marker = "" if step in ("tatsache", "merken") else _DEUTED
+            anchor = last_question if step in ("nachfrage", "warum-herkunft", "vertiefung", "bezug") else question
+            return {"text": text + marker, "question": anchor}
+    if hatte_handler:
+        return None   # capability exists but nothing resolved here -- fail safe, never claim inability
+    # known cell, no capability anywhere up the chain: say so, honestly -- and count it,
+    # because exactly these counts prioritise what gets built next
+    _record_still(verstehen.record_reading, conn, kind, "model:deuter")
+    label = _ZELLEN_LABELS.get(kind, f"„{kind}“")
+    return {"text": f"Ich lese das als {label} — das kann ich noch nicht. Ich habe es mir "
+                    f"als Lücke gemerkt.", "question": question}
+
 
 def respond_with_deuter(conn, question: str, last_question: str | None = None, deuter=None) -> dict:
-    """Like ``respond_in_conversation``, but with an optional DEUTER for when the deterministic
-    pipeline finds NOTHING at all: an edge model may guess ``{"intent", "subject", "object"}``
-    (``deuter(question) -> dict | None``, e.g. ``deploy.deuter.interpret``). Every guess is
-    resolved through the SAME deterministic machinery the regex path uses, never answered
-    directly by the model:
-    - ``followup`` (with a known ``last_question``) retraces it exactly like a recognized bare
-      follow-up -- this is what lets a phrasing OUTSIDE the small fixed cue-phrase set
-      (:data:`_WHY_FOLLOWUP`) still reach the trace.
-    - ``definition`` with a subject GENUS actually has something recorded about (checked via
-      :func:`_last_known_word`, never trusted blindly) re-asks a clean synthesized question.
-    - ``relation``/``comparative`` with BOTH terms present are resolved via
-      :func:`_relate_terms`/:func:`_common_terms` -- the same graph-derived answer a matching
-      regex would have produced, just reached from free phrasing instead.
-    - ``gender`` with a subject that resolves (known fact or induced rule) is resolved via
-      :func:`_gender_term`.
-    - ``statement`` (an unprompted personal statement, e.g. "ich habe zwei Hunde" with no
-      "merke dir" at all) is recorded VERBATIM as a capped, unconfirmed note
-      (:data:`STATEMENT_SOURCE`) -- GENUS noticing something worth remembering without being
-      told to, honestly marked as a guess, never silently promoted to full trust.
-    Anything that doesn't resolve (chitchat/unclear, missing terms, an unknown subject, or no
-    ``deuter``/no guess at all) leaves the honest fallback untouched -- a wrong guess can only
-    ever fail safe. Every model-assisted answer is marked as such, glass-box, never silently.
-    ``deuter=None`` (the default) reproduces ``respond_in_conversation`` exactly, so every
-    existing caller stays safe without wiring one in."""
-    result = respond_in_conversation(conn, question, last_question)
-    if deuter is None or result["text"] != _UNKNOWN_FALLBACK:
-        return result
-    guess = deuter(question)
-    if not guess:
-        return result
-    intent, subject, obj = guess.get("intent"), guess.get("subject"), guess.get("object")
-    if intent == "followup" and last_question:
+    """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
+    offene Deuter-Lesart (aufs Raster abgebildet, is_a-Fallback, ehrliche Benennung) -> letzte
+    Wort-Lesart -> ehrlicher Rest. The Deuter now runs BEFORE the greedy word reading (the
+    2026-07-02 bug class); the word reading remains as the final reading when the model is
+    absent or reads nothing actionable. Known-cell readings are recorded as pure structure
+    (Belegungs-Kennzahl); the user's words are never stored. ``deuter=None`` degrades to the
+    deterministic Würfel half and behaves exactly like ``respond_in_conversation``."""
+    from genus import verstehen
+
+    if last_question and is_why_followup(question):
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
-        return {"text": text + _DEUTED, "question": last_question}
-    if intent == "definition" and subject:
-        found = _last_known_word(conn, subject)
-        if found is not None:
-            text = respond(conn, f"Was ist {found}?")
-            return {"text": text + _DEUTED, "question": question}
-    if intent == "relation" and subject and obj:
-        r = _relate_terms(conn, subject, obj)
-        if r["relational"]:
-            return {"text": narrate_relation(conn, r) + _DEUTED, "question": question}
-    if intent == "comparative" and subject and obj:
-        r = _common_terms(conn, subject, obj)
-        if r["common"]:
-            return {"text": narrate_common(conn, r) + _DEUTED, "question": question}
-    if intent == "gender" and subject:
-        r = _gender_term(conn, subject)
-        if r["known"] or r.get("prediction"):
-            return {"text": narrate_gender(r) + _DEUTED, "question": question}
-    if intent == "statement":
-        remember(conn, question, source=STATEMENT_SOURCE)
-        text = (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
-                f"(sag „merke dir: {question}“, wenn's wichtig ist, dann bin ich mir sicher).")
+        return {"text": text, "question": last_question}
+    text = _ritual_antwort(conn, question)
+    if text is not None:
         return {"text": text, "question": question}
-    return result
+    muster = _muster_antwort(conn, question)
+    if muster is not None:
+        if deuter is not None:   # record only on the conversational (bot) path, not for CLI
+            _record_still(verstehen.record_reading, conn, muster[1], "muster")
+        return {"text": muster[0], "question": question}
+    if deuter is not None:
+        guess = deuter(question)
+        if guess:
+            gedeutet = _deuter_antwort(conn, guess, question, last_question)
+            if gedeutet is not None:
+                return gedeutet
+    text = _wort_antwort(conn, question)
+    if text is not None:
+        return {"text": text, "question": question}
+    return {"text": _UNKNOWN_FALLBACK, "question": question}
 
 
 # --- the provenance trace ("genus why") ------------------------------------------------

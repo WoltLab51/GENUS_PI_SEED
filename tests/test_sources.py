@@ -986,6 +986,34 @@ def test_a_real_question_is_never_mistaken_for_a_followup():
     assert result["question"] == "Was ist ein Hund?"   # a real question always overrides, never a stale one
 
 
+def test_gender_pattern_skips_filler_words_instead_of_grabbing_them():
+    # live (2026-07-02): "welchen Artikel hat eigentlich Tisch?" grabbed "eigentlich" as the
+    # noun and answered from the "-ich" suffix rule -- fillers are now skipped in the patterns
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Tisch@de", "grammatical_gender", "maskulin", "wikidata-lexemes")
+    r = companion.gender_question(conn, "Welchen Artikel hat eigentlich Tisch?")
+    assert r["gender_q"] and r["noun"] == "Tisch" and r["known"] == ["maskulin"]
+
+
+def test_zaehlt_zu_is_a_deterministic_relation_pattern():
+    # "Zählt X zu den Y?" -- one of the live misfires -- is now a fixed pattern (ms, no model)
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Apfel@de", "expresses", "Q_apfel", "wikidata")
+    reactors.observe_relation(conn, "Pflanzen@de", "expresses", "Q_pflanze", "wikidata")
+    reactors.observe_relation(conn, "Q_apfel", "is_a", "Q_pflanze", "wikidata")
+    r = companion.relate(conn, "Zählt ein Apfel eigentlich zu den Pflanzen?")
+    assert r["relational"] and r["verdict"] == "yes"
+
+
+def test_common_pattern_skips_filler_words():
+    from genus import companion
+    conn = _kinship_graph()
+    r = companion.common(conn, "Was haben Hund und Katze eigentlich gemeinsam?")
+    assert r["common"] and r["found"]
+
+
 def test_deuter_none_reproduces_the_conversation_default():
     from genus import companion
     conn = _isa_graph()
@@ -998,7 +1026,7 @@ def test_deuter_is_never_consulted_when_the_deterministic_chain_already_answered
     from genus import companion
     conn = _isa_graph()
     calls = []
-    deuter = lambda q: (calls.append(q) or {"intent": "definition", "subject": "Hund"})
+    deuter = lambda q: (calls.append(q) or {"absicht": "definition", "subject": "Hund"})
     companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", deuter=deuter)
     assert calls == []   # the relational answer already succeeded -- the model must stay idle
 
@@ -1006,7 +1034,7 @@ def test_deuter_is_never_consulted_when_the_deterministic_chain_already_answered
 def test_deuter_resolves_a_freeform_question_the_deterministic_chain_missed():
     from genus import companion
     conn = _isa_graph()   # already has Hund@de -expresses-> Q144
-    deuter = lambda q: {"intent": "definition", "subject": "Hund"}
+    deuter = lambda q: {"absicht": "definition", "subject": "Hund"}
     # a phrasing the rigid extractor can't parse a subject out of on its own
     result = companion.respond_with_deuter(conn, "so ne allgemeine frage zu dem thema wuffwuff", deuter=deuter)
     assert "Hund" in result["text"]
@@ -1016,7 +1044,7 @@ def test_deuter_resolves_a_freeform_question_the_deterministic_chain_missed():
 def test_deuter_guess_is_graph_verified_not_trusted_blindly():
     from genus import companion
     conn = _isa_graph()
-    deuter = lambda q: {"intent": "definition", "subject": "Erfundenwort"}   # GENUS knows no such word
+    deuter = lambda q: {"absicht": "definition", "subject": "Erfundenwort"}   # GENUS knows no such word
     baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
     result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=deuter)
     assert result == baseline   # the model's guess is not a real word -- stays honest, unchanged
@@ -1026,7 +1054,7 @@ def test_deuter_followup_reaches_the_trace_outside_the_fixed_cue_phrases():
     from genus import companion
     conn = _isa_graph()
     first = companion.respond_in_conversation(conn, "Ist ein Hund ein Säugetier?")
-    deuter = lambda q: {"intent": "followup", "subject": None}
+    deuter = lambda q: {"absicht": "warum-herkunft", "subject": None}
     # a phrasing NOT in the small fixed _WHY_FOLLOWUP set -- deterministic is_why_followup misses it
     followup = companion.respond_with_deuter(
         conn, "kannst du mir das nochmal genauer herleiten", last_question=first["question"], deuter=deuter,
@@ -1034,16 +1062,58 @@ def test_deuter_followup_reaches_the_trace_outside_the_fixed_cue_phrases():
     assert "Herleitung" in followup["text"] and "Sprachmodell gedeutet" in followup["text"]
 
 
-def test_deuter_chitchat_and_relation_guesses_are_not_actionable():
+def test_deuter_unactionable_readings_fail_safe_to_the_baseline():
     from genus import companion
     conn = _isa_graph()
     baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
-    for guess in ({"intent": "chitchat", "subject": None},
-                  {"intent": "relation", "subject": "Hund"},   # no object -> can't be safely re-asked
-                  {"intent": "unclear", "subject": None},
+    for guess in ({"absicht": "beziehung", "subject": "Hund"},   # no object -> can't be safely re-asked
+                  {"absicht": "unklar", "subject": None},        # model honestly can't place it
+                  {"absicht": "", "subject": None},
                   None):
         result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=lambda q, g=guess: g)
         assert result == baseline
+
+
+def test_deuter_known_but_unhandled_cell_is_named_honestly_and_counted():
+    # the big-raster principle: open when OBSERVING, closed when ACTING. A cell GENUS can read
+    # but not act on is named honestly (not "kein Wort bekannt") and its Belegung is counted --
+    # these counts prioritise what gets built next, from lived conversations
+    from genus import companion, verstehen
+    conn = _isa_graph()
+    verstehen.seed_raster(conn)
+    deuter = lambda q: {"absicht": "empfehlungsfrage", "subject": "Haustier"}
+    result = companion.respond_with_deuter(conn, "kannst du mir ein Haustier empfehlen", deuter=deuter)
+    assert "Bitte um Empfehlung" in result["text"] and "noch nicht" in result["text"]
+    assert verstehen.belegung(conn, "empfehlungsfrage")["gesamt"] == 1
+
+
+def test_deuter_offgrid_reading_is_collected_as_differentiation_material():
+    # "da kann alles kommen": a reading OUTSIDE the raster changes no answer (fail safe), but
+    # the model's OWN words are collected under absicht:unklar -- the material from which the
+    # scan will later recognize missing Ausprägungen. The user's words are never stored.
+    from genus import companion, verstehen
+    conn = _isa_graph()
+    verstehen.seed_raster(conn)
+    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
+    deuter = lambda q: {"absicht": "bitte um ein gedicht", "subject": None}
+    result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=deuter)
+    assert result == baseline
+    assert verstehen.free_readings(conn) == ["bitte um ein gedicht"]
+
+
+def test_deuter_reading_climbs_the_is_a_chain_to_the_nearest_actionable_cell():
+    # the soft landing: "eigenschaft" has no handler of its own, but is_a wissensfrage does --
+    # a too-fine reading falls SOFT onto the ancestor instead of hard onto the fallback,
+    # exactly like inference climbs concept is_a
+    from genus import companion, verstehen
+    conn = _isa_graph()
+    verstehen.seed_raster(conn)
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    deuter = lambda q: {"absicht": "eigenschaft", "subject": "Hund"}
+    result = companion.respond_with_deuter(conn, "wie schnell rennt so ein wuffwuff", deuter=deuter)
+    assert "Wolf" in result["text"]                        # what IS known about the subject
+    assert "kann ich noch nicht" in result["text"]         # the honest limit, named
+    assert verstehen.belegung(conn, "eigenschaft")["gesamt"] == 1   # counted as the FINE cell
 
 
 def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
@@ -1051,16 +1121,32 @@ def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
     # extracted subject/object still go through the exact same graph reasoning (_relate_terms)
     from genus import companion
     conn = _isa_graph()
-    deuter = lambda q: {"intent": "relation", "subject": "Hund", "object": "Säugetier"}
-    result = companion.respond_with_deuter(conn, "zaehlt sowas wie ein wuffwuff eigentlich dazu", deuter=deuter)
+    deuter = lambda q: {"absicht": "beziehung", "subject": "Hund", "object": "Säugetier"}
+    result = companion.respond_with_deuter(conn, "gehoert sowas wie ein wuffwuff eigentlich dahin", deuter=deuter)
     assert result["text"].startswith("Ja.") and "Säugetier" in result["text"]
+    assert "Sprachmodell gedeutet" in result["text"]
+
+
+def test_deuter_reading_outranks_the_greedy_word_lookup():
+    # the live bug class (2026-07-02): "zählt ein Apfel zu den Pflanzen?" got a botany lecture
+    # about the word "Pflanzen" because the greedy word lookup ran before the Deuter was ever
+    # consulted. In the Würfel order the Deuter reads first; the word reading is the LAST resort.
+    from genus import companion
+    conn = _fresh()
+    reactors.observe_relation(conn, "Apfel@de", "expresses", "Q_apfel", "wikidata")
+    reactors.observe_relation(conn, "Pflanzen@de", "expresses", "Q_pflanze", "wikidata")
+    reactors.observe_relation(conn, "Q_apfel", "is_a", "Q_pflanze", "wikidata")
+    deuter = lambda q: {"absicht": "beziehung", "subject": "Apfel", "object": "Pflanzen"}
+    result = companion.respond_with_deuter(
+        conn, "gehört der Apfel nicht irgendwie zu den Pflanzen", deuter=deuter)
+    assert result["text"].startswith("Ja.")            # the relation -- NOT a lecture on "Pflanzen"
     assert "Sprachmodell gedeutet" in result["text"]
 
 
 def test_deuter_comparative_guess_with_both_terms_resolves_via_the_graph():
     from genus import companion
     conn = _kinship_graph()
-    deuter = lambda q: {"intent": "comparative", "subject": "Hund", "object": "Katze"}
+    deuter = lambda q: {"absicht": "vergleich", "subject": "Hund", "object": "Katze"}
     result = companion.respond_with_deuter(conn, "was ist da eigentlich aehnlich bei den beiden", deuter=deuter)
     assert "Säugetier" in result["text"] and "Sprachmodell gedeutet" in result["text"]
 
@@ -1069,7 +1155,7 @@ def test_deuter_gender_guess_resolves_when_the_noun_is_known():
     from genus import companion
     conn = _isa_graph()
     reactors.observe_relation(conn, "Hund@de", "grammatical_gender", "maskulin", "wikidata-lexemes")
-    deuter = lambda q: {"intent": "gender", "subject": "Hund"}
+    deuter = lambda q: {"absicht": "grammatik", "subject": "Hund"}
     result = companion.respond_with_deuter(conn, "was fuer ein wort ist das denn grammatikalisch", deuter=deuter)
     assert "maskulin" in result["text"] and "Sprachmodell gedeutet" in result["text"]
 
@@ -1080,7 +1166,7 @@ def test_deuter_gender_guess_with_unresolvable_noun_stays_honest():
     # place -- a wrong guess can never manufacture an answer, it can only fail safe
     from genus import companion
     conn = _isa_graph()
-    deuter = lambda q: {"intent": "gender", "subject": "Erfundenwort"}
+    deuter = lambda q: {"absicht": "grammatik", "subject": "Erfundenwort"}
     baseline = companion.respond_in_conversation(conn, "was fuer ein wort ist das denn grammatikalisch")
     result = companion.respond_with_deuter(conn, "was fuer ein wort ist das denn grammatikalisch", deuter=deuter)
     assert result == baseline
@@ -1155,7 +1241,7 @@ def test_remembering_is_a_human_source_with_full_trust_not_capped():
 def test_a_deuter_suggested_statement_is_capped_and_marked_unconfirmed():
     from genus import companion, sources
     conn = _isa_graph()
-    deuter = lambda q: {"intent": "statement", "subject": "Hund"}
+    deuter = lambda q: {"absicht": "tatsache", "subject": "Hund"}
     result = companion.respond_with_deuter(conn, "ich habe zwei Hunde", deuter=deuter)
     assert "notiert" in result["text"] and "unsicher" in result["text"]
     assert companion.suggested_notes(conn) == ["ich habe zwei Hunde"]

@@ -113,7 +113,8 @@ def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
-    monkeypatch.setattr(deuter, "interpret", lambda q: {"intent": "definition", "subject": "Hund"})
+    monkeypatch.setattr(deuter, "interpret",
+                        lambda q, absichten=None: {"absicht": "definition", "subject": "Hund"})
 
     chat_id, answer = telegram_bot.handle_update(
         conn, _msg(1, 42, "so ne frage zu dem wuffwuff thema"), allowed={42}, sessions={},

@@ -223,13 +223,23 @@ def test_deuter_installer_puts_llama_cpp_in_the_shared_venv_not_a_new_one():
     assert "models" in script                        # a permanent home under ~/.genus/
 
 
-def test_deuter_module_is_a_capped_last_resort_that_never_writes():
+def test_deuter_module_is_a_capped_open_reader_that_never_writes():
     script = (ROOT / "deploy" / "deuter.py").read_text(encoding="utf-8")
-    # never invents -- picks an intent from a fixed list and copies a word out of the question
-    assert "_VALID_INTENTS" in script
+    # reads OPENLY (known Absichten are an offer, free words allowed -- no Ankreuzzwang), but
+    # never invents facts and never touches the core's write paths
+    assert "DEFAULT_ABSICHTEN" in script
+    assert "frei" in script                    # the open escape is part of the contract
+    assert "_looks_like_question" in script    # the deterministic statement-veto stays
     assert "except Exception" in script and "return None" in script   # never raises
     for forbidden in ("import governance", "import proposals", "control.pause", "teach_relation"):
         assert forbidden not in script
+
+
+def test_verstehen_seed_script_is_one_clean_idempotent_apply():
+    script = (ROOT / "deploy" / "seed_verstehen.sh").read_text(encoding="utf-8")
+    assert "verstehen.seed_raster" in script
+    assert "conn.commit()" in script
+    assert "idempotent" in script.lower()      # re-running must never duplicate the raster
 
 
 def test_learner_wordlist_is_words_only():

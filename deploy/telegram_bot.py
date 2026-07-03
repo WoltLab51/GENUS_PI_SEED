@@ -113,7 +113,7 @@ def handle_update(
     only, forgotten on a restart -- an honest, small limitation: this is UX-session plumbing,
     not knowledge, so it deliberately doesn't touch the ledger (Ledger != Memory). Omit
     ``sessions`` for the plain, stateless behaviour (unchanged)."""
-    from genus import companion
+    from genus import companion, verstehen
     import deuter
 
     message = update.get("message") or update.get("edited_message")
@@ -132,8 +132,12 @@ def handle_update(
         if sessions is None:
             answer = companion.respond(conn, question)
         else:
+            # the OFFER of known Absichten comes from GENUS's own sown raster (the graph is
+            # authoritative); before the one clean seed-apply, the module default steps in
+            angebot = verstehen.leaf_kinds(conn) or None
             result = companion.respond_with_deuter(
-                conn, question, sessions.get(chat_id), deuter=deuter.interpret,
+                conn, question, sessions.get(chat_id),
+                deuter=lambda q: deuter.interpret(q, absichten=angebot),
             )
             answer = result["text"]
             sessions[chat_id] = result["question"]

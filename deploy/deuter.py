@@ -1,31 +1,31 @@
-"""Deuter (edge): frei formulierte deutsche Fragen in eine kleine, gedeckelte Routing-Struktur
-uebersetzen -- {"intent": ..., "subject": ..., "object": ...}. Der Deuter WAEHLT nur (ein Intent
-aus einer festen Liste, ein bis zwei Woerter aus der Frage), er formuliert NIE eine Antwort
-selbst -- die kommt weiterhin aus dem gläsernen Graphen (genus.companion). Der Deuter laeuft
-JETZT VOR der deterministischen Kette (nicht mehr nur als letzter Ausweg): freie Formulierung
-soll eine normale Unterhaltung tragen, nicht nur ein starres Muster-Set. Die deterministische
-Kette bleibt trotzdem die einzige Stelle, die tatsaechlich antwortet -- der Deuter liefert nur
-die Struktur, jeder Vorschlag wird graph-verifiziert, bevor er wirkt (genus.companion.
-respond_with_deuter). Ein fest zugesagtes Ritual ("merke dir: ...", "was weißt du") bleibt eine
-reine Mustererkennung ohne Modell -- eindeutige Befehle brauchen keine Deutung.
+"""Deuter (edge): eine frei formulierte deutsche Nachricht OFFEN lesen -- klare Fragestellungen,
+keine Ankreuzliste. Das Modell beantwortet drei Fragen über die Nachricht ({"absicht": ...,
+"subject": ..., "object": ...}); die bekannten Absichten werden ihm ANGEBOTEN (sie kommen aus
+GENUS' eigenem Absichts-Raster, einem Teilgraphen im Ledger -- genus.verstehen), aber wenn
+keine wirklich passt, darf es die Absicht mit eigenen Worten beschreiben. Der alte
+Ankreuzzwang war die Wurzel eines echten Live-Fehlgriffs ("was ist ein Hund" -> "statement"):
+ein Modell, das IRGENDWAS wählen muss, wählt bei Unsicherheit falsch. Offen beim Beobachten,
+geschlossen beim Handeln: die eigentliche AUSWAHL trifft GENUS (genus.companion bildet die
+Lesart aufs Raster ab, handelt nur aus bekannten Zellen, klettert die is_a-Kette für weiche
+Landungen, und sammelt raster-fremde Lesarten als Lernmaterial für neue Ausprägungen).
 
-Modell-Wahl gemessen, nicht geraten: 7 Modelle/Familien auf dem Pi verglichen (0.5B-3.8B,
-Qwen/Llama/Gemma/Phi). Qwen2.5-1.5B-Instruct traf 7/8 bei den geringsten Kosten (Ladezeit,
-Latenz, RAM) der zuverlässigen Gruppe -- groessere Modelle trafen nicht besser, nur langsamer.
+Der Deuter WAEHLT/liest nur -- er formuliert NIE eine Antwort selbst; die kommt weiterhin aus
+dem gläsernen Graphen. Jede Nennung wird graph-verifiziert, bevor irgendetwas wirkt.
 
-Anders als der Embedder (fastembed, eigene venv, pro Wort neu geladen im Lerner) lebt dieses
-Modell WARM im selben Prozess wie der Telegram-Bot -- ein Neuladen pro Nachricht waere ~2-3s
-Extra-Kosten pro Frage. Deshalb: kein eigenes venv, sondern llama-cpp-python direkt in der
-bestehenden .venv (der Kern importiert diese Datei nie -- Membran-Reinheit bleibt gewahrt,
-das ist eine Frage von WAS genus/ importiert, nicht von WO eine deploy/-Abhaengigkeit installiert
-ist), und ein lazy geladenes Modul-Singleton.
+Modell-Wahl gemessen, nicht geraten: 7 Modelle/4 Familien auf dem Pi verglichen (0.5B-3.8B,
+Qwen/Llama/Gemma/Phi). Qwen2.5-1.5B-Instruct traf 7/8 bei den geringsten Kosten der
+zuverlässigen Gruppe. Kleine Modelle können kleine Aufgaben -- und der Würfel hält jede
+Modell-Aufgabe klein.
 
-Ein echter Live-Fund (2026-07-02): "was ist ein Hund" -- eine eindeutige Frage -- wurde vom
-Modell als "statement" gedeutet, nicht als "definition" (vermutlich Wortassoziation mit dem
-"statement"-Beispiel im Prompt, das zufaellig denselben Nomen-Typ nutzte). Klare Vorgaben statt
-blindem Vertrauen: eine strukturelle, deterministische Gegenprobe (`_looks_like_question`)
-verwirft eine "statement"-Deutung IMMER, wenn der Text wie eine Frage aussieht (Fragezeichen
-oder Fragewort am Anfang) -- unabhaengig davon, ob das Modell das im Einzelfall richtig trifft.
+Anders als der Embedder (eigene venv, pro Wort neu geladen) lebt dieses Modell WARM im selben
+Prozess wie der Telegram-Bot (lazy Modul-Singleton, llama-cpp-python in der bestehenden .venv;
+der Kern importiert diese Datei nie -- Membran-Reinheit bleibt gewahrt).
+
+Zwei deterministische Leitplanken, unabhängig vom Modell:
+- `_looks_like_question`: eine "tatsache"-Lesart wird NIE geglaubt, wenn der Text strukturell
+  eine Frage ist (Fragezeichen oder Fragewort am Anfang) -- der Live-Fund vom 2026-07-02.
+- lenient JSON: das {...}-Objekt wird aus der Antwort gezogen, auch wenn das Modell Prosa
+  oder einen Markdown-Zaun drumherum setzt (ebenfalls live gesehen).
 """
 from __future__ import annotations
 
@@ -39,33 +39,47 @@ MODEL_PATH = os.environ.get(
 )
 N_THREADS = int(os.environ.get("GENUS_DEUTER_THREADS", "4"))
 
-_SYSTEM = (
-    "Du bist ein Deuter fuer einen deutschen Sprach-Assistenten. Gib NUR ein kompaktes JSON "
-    "zurueck: {\"intent\": ..., \"subject\": ..., \"object\": ...}. intent ist genau eines von: "
-    "definition (was ist X), relation (ist X ein Y / zaehlt X zu Y), comparative (was haben X "
-    "und Y gemeinsam), gender (welches Geschlecht/welchen Artikel hat X), followup (bezieht sich "
-    "auf die letzte Antwort, z.B. \"warum\", \"und er?\"), statement (eine persoenliche Aussage "
-    "oder Tatsachen-Behauptung -- NIEMALS eine Frage: jeder Satz mit Fragezeichen am Ende oder "
-    "einem Fragewort am Anfang wie was/wer/wie/wo/warum/wieso/welche/ist/hat/kannst ist KEIN "
-    "statement, ganz gleich worum es inhaltlich geht), chitchat (Small Talk, keine Wissensfrage), "
-    "unclear (nicht zuordenbar). subject/object sind die Hauptwoerter (Grundform, ohne Artikel, "
-    "korrekt geschrieben inkl. Umlaute) oder null, wenn nicht vorhanden. Kein Fliesstext, kein "
-    "Kommentar -- nur das JSON, IMMER GENAU diese drei Felder.\n"
-    "Beispiele:\n"
-    "Was ist eine Katze? -> {\"intent\": \"definition\", \"subject\": \"Katze\", \"object\": null}\n"
-    "was ist eigentlich ein Hund? -> {\"intent\": \"definition\", \"subject\": \"Hund\", \"object\": null}\n"
-    "ist ein hund ein saeugetier -> {\"intent\": \"relation\", \"subject\": \"Hund\", \"object\": \"Säugetier\"}\n"
-    "was haben Hund und Katze gemeinsam -> {\"intent\": \"comparative\", \"subject\": \"Hund\", \"object\": \"Katze\"}\n"
-    "welchen Artikel hat Tisch -> {\"intent\": \"gender\", \"subject\": \"Tisch\", \"object\": null}\n"
-    "warum -> {\"intent\": \"followup\", \"subject\": null, \"object\": null}\n"
-    "ich hab mir gerade einen Wellensittich gekauft -> {\"intent\": \"statement\", "
-    "\"subject\": \"Wellensittich\", \"object\": null}\n"
-    "mein Geburtstag ist im Mai -> {\"intent\": \"statement\", \"subject\": \"Geburtstag\", \"object\": null}\n"
-    "na wie laeufts -> {\"intent\": \"chitchat\", \"subject\": null, \"object\": null}"
+# Mirror of the sown leaf cells (genus.verstehen.RASTER_SEED) -- the OFFER, not a cage. The
+# bot passes the live list from the graph; this default keeps the module usable standalone.
+DEFAULT_ABSICHTEN = (
+    "definition", "beziehung", "vergleich", "eigenschaft", "ursache", "menge", "grammatik",
+    "zustand", "offene-fragen", "faehigkeiten", "erinnerungs-abruf",
+    "merken", "lernen", "tun",
+    "tatsache", "meinung", "korrektur", "empfehlungsfrage",
+    "gruss", "dank", "lob", "kritik", "abschied",
+    "kuerzer", "ausfuehrlicher", "anders-erklaeren", "wiederholen",
+    "warum-herkunft", "vertiefung", "bezug", "unklar",
 )
-_VALID_INTENTS = {
-    "definition", "relation", "comparative", "gender", "followup", "statement", "chitchat", "unclear",
+
+_ERKLAERUNGEN = {
+    "definition": "was ist X",
+    "beziehung": "ist/zaehlt X (zu) ein(em) Y",
+    "vergleich": "was haben X und Y gemeinsam",
+    "eigenschaft": "welche Eigenschaft hat X",
+    "ursache": "warum ist etwas in der Welt so",
+    "menge": "wie viele",
+    "grammatik": "Artikel/Geschlecht eines Wortes",
+    "zustand": "wie geht es dir / dein Zustand",
+    "offene-fragen": "was beschaeftigt dich",
+    "faehigkeiten": "was kannst du",
+    "erinnerungs-abruf": "was weisst du ueber mich / hast du dir gemerkt",
+    "merken": "merk dir etwas",
+    "lernen": "lern etwas Neues",
+    "tun": "tu etwas",
+    "tatsache": "persoenliche Aussage, KEINE Frage (z.B. ich habe zwei Hunde)",
+    "meinung": "Meinung/Gefuehl der Person",
+    "korrektur": "das stimmt nicht / Korrektur",
+    "empfehlungsfrage": "was empfiehlst du / was ist besser",
+    "gruss": "Begruessung", "dank": "Dank", "lob": "Lob", "kritik": "Kritik",
+    "abschied": "Verabschiedung",
+    "kuerzer": "bitte kuerzer", "ausfuehrlicher": "bitte ausfuehrlicher",
+    "anders-erklaeren": "bitte anders erklaeren", "wiederholen": "bitte nochmal",
+    "warum-herkunft": "warum / woher weisst du das (zur letzten Antwort)",
+    "vertiefung": "mehr dazu (zur letzten Antwort)",
+    "bezug": "bezieht sich auf die letzte Antwort (z.B. und er?)",
+    "unklar": "nicht zuordenbar",
 }
+
 _QUESTION_STARTERS = {
     "was", "wer", "wie", "wo", "warum", "wieso", "weshalb",
     "welche", "welcher", "welches", "welchen", "welchem",
@@ -79,7 +93,7 @@ _model = None   # lazy singleton -- loaded once per process (~2-3s), then warm
 
 def _looks_like_question(text: str) -> bool:
     """A cheap, deterministic structural check -- not a model guess. Used as a hard veto: a
-    "statement" verdict is never trusted for text that is structurally a question, regardless
+    "tatsache" reading is never trusted for text that is structurally a question, regardless
     of what the model says (see the module docstring for the live misfire this guards against)."""
     t = text.strip()
     if t.endswith("?"):
@@ -88,51 +102,78 @@ def _looks_like_question(text: str) -> bool:
     return bool(m and m.group(1).lower() in _QUESTION_STARTERS)
 
 
+def _system_prompt(absichten) -> str:
+    angebot = "\n".join(
+        f"- {a}: {_ERKLAERUNGEN[a]}" if a in _ERKLAERUNGEN else f"- {a}"
+        for a in absichten
+    )
+    return (
+        "Du bist ein Deuter fuer einen deutschen Sprach-Assistenten. Beantworte fuer die "
+        "Nachricht drei klare Fragen und gib NUR ein kompaktes JSON zurueck: "
+        "{\"absicht\": ..., \"subject\": ..., \"object\": ...}.\n"
+        "1. absicht -- was will die Person? Waehle die passende aus dieser Liste:\n"
+        + angebot + "\n"
+        "Wenn KEINE davon wirklich passt, beschreibe die Absicht frei in 2-4 deutschen "
+        "Woertern (kein Zwang zur Liste).\n"
+        "2. subject -- das Hauptwort, um das es geht (Grundform, ohne Artikel, korrekt "
+        "geschrieben inkl. Umlaute) oder null.\n"
+        "3. object -- das zweite Bezugswort, falls vorhanden, sonst null.\n"
+        "Kein Fliesstext, kein Kommentar -- nur das JSON mit GENAU diesen drei Feldern.\n"
+        "Beispiele:\n"
+        "was ist eigentlich ein Hund? -> {\"absicht\": \"definition\", \"subject\": \"Hund\", \"object\": null}\n"
+        "zaehlt ein Apfel zu den Pflanzen -> {\"absicht\": \"beziehung\", \"subject\": \"Apfel\", \"object\": \"Pflanze\"}\n"
+        "was haben Hund und Katze gemeinsam -> {\"absicht\": \"vergleich\", \"subject\": \"Hund\", \"object\": \"Katze\"}\n"
+        "ich hab mir einen Wellensittich gekauft -> {\"absicht\": \"tatsache\", \"subject\": \"Wellensittich\", \"object\": null}\n"
+        "warum -> {\"absicht\": \"warum-herkunft\", \"subject\": null, \"object\": null}\n"
+        "kannst du mir ein Haustier empfehlen -> {\"absicht\": \"empfehlungsfrage\", \"subject\": \"Haustier\", \"object\": null}\n"
+        "na wie laeufts -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}"
+    )
+
+
 def _get_model():
     global _model
     if _model is None:
         from llama_cpp import Llama   # local import: this module stays importable without the dep
-        _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=1024, verbose=False)
+        _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=2048, verbose=False)
     return _model
 
 
-def interpret(question: str) -> dict | None:
-    """A capped, best-effort routing guess for ``question`` -- ``{"intent", "subject", "object"}``
-    or ``None`` on ANY problem (model not installed, inference error, malformed output). Never
-    raises: genus.companion.respond_with_deuter treats a ``None`` exactly like "nothing to add".
-    Never invents facts -- only picks an intent label and copies up to two words out of the
-    question; the caller graph-verifies subject/object and supplies the actual answer content
-    itself."""
+def interpret(question: str, absichten=None) -> dict | None:
+    """An OPEN, capped reading of ``question`` -- ``{"absicht", "subject", "object"}`` or
+    ``None`` on ANY problem (model not installed, inference error, malformed output). Never
+    raises. ``absicht`` is one of the offered kinds OR the model's own free words -- the
+    caller (genus.companion) maps it onto the Absichts-Raster, acts only from known cells,
+    and collects off-grid readings as learning material. Never invents facts: it only names
+    an intent and copies words out of the question; every named term is graph-verified by
+    the caller before anything happens."""
     if not os.path.exists(MODEL_PATH):
         return None
     try:
         model = _get_model()
         result = model.create_chat_completion(
             messages=[
-                {"role": "system", "content": _SYSTEM},
+                {"role": "system", "content": _system_prompt(absichten or DEFAULT_ABSICHTEN)},
                 {"role": "user", "content": question},
             ],
             max_tokens=60,
             temperature=0.0,
         )
         text = result["choices"][0]["message"]["content"].strip()
-        # lenient on purpose: a small model occasionally wraps the JSON in prose or a markdown
-        # fence despite the instruction not to (seen live, and in the model-comparison
-        # benchmark) -- pulling out the {...} substring rescues an otherwise-valid guess
-        # without weakening the outer safety net (still fails to None on genuinely broken output)
         match = _JSON_OBJECT.search(text)
         parsed = json.loads(match.group(0) if match else text)
     except Exception:
         return None
-    if not isinstance(parsed, dict) or parsed.get("intent") not in _VALID_INTENTS:
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("absicht"), str):
         return None
-    intent = parsed["intent"]
-    if intent == "statement" and _looks_like_question(question):
-        intent = "definition"   # a question is never a statement -- retry it as a lookup instead
+    absicht = parsed["absicht"].strip()
+    if not absicht:
+        return None
+    if absicht == "tatsache" and _looks_like_question(question):
+        absicht = "definition"   # a question is never a statement -- retry it as a lookup
     subject = parsed.get("subject")
     obj = parsed.get("object")
     return {
-        "intent": intent,
+        "absicht": absicht,
         "subject": subject if isinstance(subject, str) else None,
         "object": obj if isinstance(obj, str) else None,
     }
