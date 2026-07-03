@@ -202,14 +202,6 @@ def _get_model():
     return _model
 
 
-def get_model():
-    """Das warme Llama-Singleton, oeffentlich gemacht, damit ``stimme.py`` es TEILT (ein
-    geladenes 1.5B-Modell im Bot-Prozess, nicht zwei). ``None`` wenn nicht installiert."""
-    if not os.path.exists(MODEL_PATH):
-        return None
-    return _get_model()
-
-
 def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     """Ein rohes geparstes Segment in ein sauberes ``{"text","absicht","subject","object"}`` --
     ``None`` wenn kein gueltiges Blatt genannt wurde. ``text`` (die eigene Klausel des Segments)
@@ -237,10 +229,16 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
 
 def interpret(nachricht: str, absichten=None) -> list[dict] | None:
     """Liest ``nachricht`` als eine LISTE von Sprechhandlungs-Segmenten -- ``[{"absicht",
-    "subject", "object"}, ...]`` oder ``None`` bei jedem Problem (Modell fehlt, Fehler, kaputtes
-    JSON, keine gueltigen Segmente). Nie eine Ausnahme. Erfindet nie Fakten -- waehlt pro
-    Segment nur ein Blatt und kopiert Woerter aus dem Text; der Aufrufer graph-verifiziert
-    subject/object und liefert den eigentlichen Antwort-Inhalt selbst."""
+    "subject", "object"}, ...]``. Zwei verschiedene "nichts"-Fälle, bewusst unterschieden:
+    eine LEERE Liste ``[]`` heisst "das Modell lief und sagt ehrlich: keine Segmente passen"
+    (das Modell gibt das selbst so zurueck, live gesehen); ``None`` heisst "das Modell konnte
+    gar nicht erst gefragt werden oder ist gescheitert" (Modell fehlt, Ausnahme, kaputtes JSON).
+    Der Aufrufer (companion.respond_with_deuter) behandelt beides unterschiedlich: eine leere
+    Liste ist ein ehrliches Nichtverstehen (kein Rueckfall auf den Wort-Lookup mehr noetig),
+    ``None`` bleibt ein legitimer Grund, es trotzdem mit dem Wort-Lookup zu versuchen. Nie eine
+    Ausnahme. Erfindet nie Fakten -- waehlt pro Segment nur ein Blatt und kopiert Woerter aus
+    dem Text; der Aufrufer graph-verifiziert subject/object und liefert den eigentlichen
+    Antwort-Inhalt selbst."""
     if not os.path.exists(MODEL_PATH):
         return None
     try:
@@ -267,8 +265,7 @@ def interpret(nachricht: str, absichten=None) -> list[dict] | None:
         parsed = [parsed]
     if not isinstance(parsed, list):
         return None
-    segmente = [s for s in (_segment(e, nachricht) for e in parsed) if s is not None]
-    return segmente or None
+    return [s for s in (_segment(e, nachricht) for e in parsed) if s is not None]
 
 
 if __name__ == "__main__":

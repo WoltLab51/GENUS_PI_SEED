@@ -253,10 +253,15 @@ def test_stimme_module_only_rephrases_never_invents():
         assert forbidden not in script
 
 
-def test_stimme_shares_the_deuter_model_not_a_second_one():
+def test_deuter_and_stimme_each_get_their_own_model_not_shared():
+    # live gemessen (2026-07-03): ein geteiltes Modell verwarf bei jedem Stimme-Aufruf den
+    # Deuter-Prompt-Cache (26s statt 3s beim naechsten Deuter-Aufruf) -- jede Rolle hat jetzt
+    # ihr eigenes warmes Modell
     bot = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
-    assert "deuter.get_model()" in bot
-    assert "stimme.formuliere(satz, model=" in bot   # the shared model is threaded through
+    assert "deuter.get_model" not in bot
+    assert "stimme=stimme.formuliere" in bot
+    deuter_script = (ROOT / "deploy" / "deuter.py").read_text(encoding="utf-8")
+    assert "def get_model" not in deuter_script
 
 
 def test_learner_wordlist_is_words_only():

@@ -108,7 +108,9 @@ def test_session_threads_last_answer_into_the_meta_zellen(monkeypatch):
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
-    monkeypatch.setattr(deuter, "interpret", lambda q, absichten=None: {"absicht": "wiederholen"})
+    lesarten = {"Was ist ein Hund?": {"absicht": "definition", "subject": "Hund"},
+                "nochmal bitte": {"absicht": "wiederholen"}}
+    monkeypatch.setattr(deuter, "interpret", lambda q, absichten=None: lesarten[q])
     sessions: dict = {}
 
     telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions)
@@ -176,6 +178,17 @@ def test_deuter_never_calls_a_real_question_a_statement():
     assert not deuter._looks_like_question("mein Geburtstag ist im Mai")
 
 
+def test_deuter_interpret_distinguishes_explicit_empty_from_hard_failure(monkeypatch):
+    # live gefunden: "OK prima" bekam wortwörtlich "[]" vom echten Modell zurück -- eine
+    # erfolgreich geparste, aber LEERE Liste ist ein anderes Signal als "Modell/JSON kaputt"
+    monkeypatch.setattr(deuter, "MODEL_PATH", __file__)   # eine echt existierende Datei genügt
+    monkeypatch.setattr(deuter, "_get_model", lambda: _FakeModel("[]"))
+    assert deuter.interpret("OK prima") == []
+
+    monkeypatch.setattr(deuter, "_get_model", lambda: _FakeModel("das ist kein JSON"))
+    assert deuter.interpret("kaputte antwort") is None
+
+
 def test_stimme_anchors_extracts_every_quoted_word_and_number():
     satz = "Unter »Hund« versteht GENUS: Haustier. (Vertrauen 0.50 — hergeleitet.)"
     assert stimme._anchors(satz) == ["Hund", "0.50"]
@@ -218,24 +231,27 @@ def test_stimme_formuliere_returns_none_without_a_model_and_none_installed():
     assert stimme.formuliere("Unter »Hund« versteht GENUS: Haustier.") is None
 
 
-def test_bot_shares_one_warm_model_between_deuter_and_stimme(monkeypatch):
+def test_bot_gives_deuter_and_stimme_each_their_own_model(monkeypatch):
+    # live gemessen (2026-07-03): ein geteiltes Modell verwarf bei jedem Stimme-Aufruf den
+    # Prompt-Cache des Deuter (anderer System-Prompt) -- der NÄCHSTE Deuter-Aufruf brauchte dann
+    # 26s statt 3s. Jetzt bekommt jede Rolle ihr eigenes warmes Modell; der Bot ruft
+    # stimme.formuliere direkt auf (ohne ein model= von deuter.get_model() durchzureichen --
+    # die Funktion existiert seit diesem Fix gar nicht mehr).
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
-    shared = _FakeModel("»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt.")
-    monkeypatch.setattr(deuter, "get_model", lambda: shared)
+    assert not hasattr(deuter, "get_model")
     seen_models = []
-    real_formuliere = stimme.formuliere
 
     def spy(satz, model=None):
         seen_models.append(model)
-        return real_formuliere(satz, model=model)
+        return "»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt."
     monkeypatch.setattr(stimme, "formuliere", spy)
 
     chat_id, answer = telegram_bot.handle_update(
         conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions={},
     )
-    assert seen_models == [shared]           # stimme got the SAME object deuter.get_model() gave
+    assert seen_models == [None]   # kein geteiltes Modell durchgereicht -- stimme lädt ihr eigenes
     assert "Sprachlich vom Modell geglättet" in answer
 
 

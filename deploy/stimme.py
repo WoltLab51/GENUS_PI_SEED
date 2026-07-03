@@ -11,9 +11,12 @@ weggelassen oder ersetzt) -- die Funktion gibt dann `None` zurück, und der Aufr
 den ORIGINALEN, bewährten Satz zurück. Nie stillschweigend: eine geglättete Antwort trägt einen
 sichtbaren Hinweis (companion._STIMME_TAG).
 
-Teilt sich bewusst das WARME Deuter-Modell (get_model()) statt ein zweites 1.5B-Modell zu laden
--- auf dem Pi zählt jedes GB RAM. Ein eigenes lazy Singleton bleibt als Fallback für den
-Standalone-Gebrauch (Tests, `python -m deploy.stimme`).
+Eigenes warmes Modell, bewusst NICHT mit dem Deuter geteilt -- live gemessen (2026-07-03): ein
+geteiltes Modell verwarf bei jedem Stimme-Aufruf den Prompt-Cache des Deuter (ein komplett
+anderer System-Prompt), sodass der NÄCHSTE Deuter-Aufruf seinen ganzen ~1300-Token-Prompt neu
+verarbeiten musste -- 26s statt 3s, ein Zufalls-Faktor abhängig von der Aufrufreihenfolge.
+Kostet dauerhaft ein zweites 1.5B-Modell im RAM (~1-1.5 GB, auf dem Pi reichlich frei), macht
+die Latenz dafür durchgehend vorhersagbar.
 """
 from __future__ import annotations
 

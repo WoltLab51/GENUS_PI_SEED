@@ -11,7 +11,11 @@ Two capped edge models, both dependency-injected, never trusted blindly: `deuter
 free phrasing INTO the deterministic core (an intent/subject/object GUESS, graph-verified
 before anything acts); `stimme.py` reads an ALREADY-verified answer back OUT more naturally
 (a faithfulness-checked rephrase -- every quoted word/number must survive, or the original
-template stands). They share ONE warm 1.5B model (`deuter.get_model()`), not two. Neither ever
+template stands). Each keeps its OWN warm 1.5B model, deliberately NOT shared -- live measured
+(2026-07-03): sharing one model meant every Stimme call evicted the Deuter's llama.cpp prompt
+cache (a different system prompt), so the NEXT Deuter call had to reprocess its whole ~1300-
+token prompt from scratch (26s instead of 3s). Two models cost ~1-1.5 GB more RAM (the Pi has
+plenty free) but keep latency predictable instead of depending on call order. Neither ever
 writes the answer itself. The core is untouched: this is a new DOOR, not a new ROOM. Strictly
 answer-only -- no proposal, governance, pause/resume, or any state-changing command is
 reachable here, on purpose (Hände stay parked; this is a Mundstück).
@@ -140,18 +144,17 @@ def handle_update(
             # the OFFER of known Absichten comes from GENUS's own sown raster (the graph is
             # authoritative); before the one clean seed-apply, the module default steps in
             angebot = verstehen.leaf_kinds(conn) or None
-            # die Stimme teilt sich das warme Deuter-Modell (ein 1.5B-Modell im Prozess, nicht
-            # zwei) -- None, solange kein Deuter-Modell installiert ist, dann bleibt es aus
-            geteiltes_modell = deuter.get_model()
-            stimme_fn = (
-                (lambda satz: stimme.formuliere(satz, model=geteiltes_modell))
-                if geteiltes_modell is not None else None
-            )
+            # Deuter und Stimme haben JEWEILS ihr eigenes warmes Modell -- live gemessen
+            # (2026-07-03): geteilt verwarf jeder Stimme-Aufruf den Prompt-Cache des Deuter
+            # (ein anderer System-Prompt), sodass der NÄCHSTE Deuter-Aufruf seinen ganzen
+            # ~1300-Token-Prompt neu verarbeiten musste -- 26s statt 3s. Kostet dauerhaft ein
+            # zweites 1.5B-Modell im RAM (~1-1.5 GB, auf dem Pi reichlich frei), aber macht die
+            # Latenz durchgehend vorhersagbar statt vom Zufall der Aufrufreihenfolge abzuhängen.
             vorher = sessions.get(chat_id) or {}
             result = companion.respond_with_deuter(
                 conn, question, vorher.get("question"),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot),
-                stimme=stimme_fn,
+                stimme=stimme.formuliere,
                 last_answer=vorher.get("answer"),
             )
             answer = result["text"]

@@ -753,6 +753,15 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
 _UNKNOWN_FALLBACK = (   # query.ask's stable "nothing recognized" sentinel -- keep in sync
     "Das kann GENUS nicht einordnen — kein bekannter Befehl, kein gelerntes Wort."
 )
+# Live gefunden (2026-07-03): wenn der Deuter LIEF und ehrlich nichts fand (leere Liste --
+# "OK prima" bekam wortwörtlich `[]` vom Modell zurück), fiel GENUS bisher auf den gierigen
+# Wort-Lookup zurück -- der griff sich irgendein bekanntes Wort aus dem Satz ("prima" -> eine
+# Schulstufe, "glaube ich" -> Theologie) und erklärte es, komplett am Thema vorbei. Das ist
+# SCHLIMMER als ehrliches Nichtverstehen: es sieht wie eine Antwort aus, ist aber keine. Ein
+# Deuter-Lauf, der explizit nichts findet, ist ein stärkeres Signal als "kein Deuter da" --
+# nur DANN (deuter(question) gibt None, nicht bloß eine leere Liste) bleibt der Wort-Lookup
+# ein legitimer letzter Versuch.
+_NICHT_VERSTANDEN = "Das habe ich nicht verstanden — magst du es anders sagen?"
 _DEUTED = " (Frage vom Sprachmodell gedeutet.)"
 
 # German voice for cells GENUS can read but not yet act on -- honest capability naming. Nur
@@ -1149,7 +1158,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         segmente = deuter(question)
         if isinstance(segmente, dict):
             segmente = [segmente]
-        if segmente:
+        if segmente is not None:   # der Deuter LIEF -- auch eine leere Liste zählt als Lauf
             teile: list[str] = []
             anchor = question
             for segment in segmente:
@@ -1160,6 +1169,9 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                     anchor = gedeutet["question"]
             if teile:
                 return {"text": _komponiere(teile), "question": anchor}
+            # der Deuter lief und fand ehrlich nichts -- kein Rückfall auf den gierigen
+            # Wort-Lookup mehr (siehe _NICHT_VERSTANDEN-Kommentar oben)
+            return {"text": _NICHT_VERSTANDEN, "question": question}
     text = _wort_antwort(conn, question)
     if text is not None:
         text = _stimme_versucht(text, stimme)

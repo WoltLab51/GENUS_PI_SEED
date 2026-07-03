@@ -1178,12 +1178,14 @@ def test_deuter_resolves_a_freeform_question_the_deterministic_chain_missed():
 
 
 def test_deuter_guess_is_graph_verified_not_trusted_blindly():
+    # das Modell nennt ein Wort, das GENUS nicht kennt -- kein Rückfall auf den gierigen
+    # Wort-Lookup mehr (Ronnys Entscheidung 2026-07-03): der Deuter LIEF und die Lesart löste
+    # sich nicht auf, also ein ehrliches "nicht verstanden" statt einer erfundenen Antwort
     from genus import companion
     conn = _isa_graph()
     deuter = lambda q: {"absicht": "definition", "subject": "Erfundenwort"}   # GENUS knows no such word
-    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
     result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=deuter)
-    assert result == baseline   # the model's guess is not a real word -- stays honest, unchanged
+    assert result["text"] == companion._NICHT_VERSTANDEN
 
 
 def test_deuter_followup_reaches_the_trace_outside_the_fixed_cue_phrases():
@@ -1198,16 +1200,41 @@ def test_deuter_followup_reaches_the_trace_outside_the_fixed_cue_phrases():
     assert "Herleitung" in followup["text"] and "Sprachmodell gedeutet" in followup["text"]
 
 
-def test_deuter_unactionable_readings_fail_safe_to_the_baseline():
+def test_deuter_explicit_empty_list_is_honest_not_understood():
+    # live gefunden: "OK prima" bekam vom echten Modell wortwörtlich "[]" zurück -- das Modell
+    # LIEF und sagte ehrlich "keine Segmente passen". Das ist ein staerkeres Signal als
+    # "kein Deuter da" und darf nicht beim gierigen Wort-Lookup landen.
     from genus import companion
     conn = _isa_graph()
-    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
+    result = companion.respond_with_deuter(conn, "OK prima", deuter=lambda q: [])
+    assert result["text"] == companion._NICHT_VERSTANDEN
+
+
+def test_deuter_none_still_falls_back_to_word_lookup():
+    # der Unterschied zur leeren Liste: deuter(question) selbst gibt None (Modell fehlt,
+    # Ausnahme, kaputtes JSON) -- dann bleibt der Wort-Lookup ein legitimer letzter Versuch
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    baseline = companion.respond_in_conversation(conn, "Was ist ein Hund?")
+    result = companion.respond_with_deuter(conn, "Was ist ein Hund?", deuter=lambda q: None)
+    assert result == baseline
+
+
+def test_deuter_unactionable_readings_fail_safe_honestly():
+    # ein Deuter-LAUF (auch eine Liste mit nur unklaren/nicht auflösbaren Lesarten) endet jetzt
+    # ehrlich bei "nicht verstanden", nicht beim gierigen Wort-Lookup -- außer der Deuter selbst
+    # lief GAR NICHT (gibt None zurück), dann bleibt der Wort-Lookup der legitime letzte Versuch
+    from genus import companion
+    conn = _isa_graph()
     for guess in ({"absicht": "beziehung", "subject": "Hund"},   # no object -> can't be safely re-asked
                   {"absicht": "unklar", "subject": None},        # model honestly can't place it
-                  {"absicht": "", "subject": None},
-                  None):
+                  {"absicht": "", "subject": None}):
         result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=lambda q, g=guess: g)
-        assert result == baseline
+        assert result["text"] == companion._NICHT_VERSTANDEN
+    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
+    kein_lauf = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=lambda q: None)
+    assert kein_lauf == baseline   # der Deuter lief gar nicht -- Wort-Lookup bleibt der Ausweg
 
 
 def test_deuter_known_but_unhandled_cell_is_named_honestly_and_counted():
@@ -1226,14 +1253,14 @@ def test_deuter_known_but_unhandled_cell_is_named_honestly_and_counted():
 def test_deuter_unknown_leaf_changes_nothing_no_freetext_escape_anymore():
     # Zwickys Kategorien sollen erschöpfend sein -- kein Freitext-Ausweg mehr (der hatte selbst
     # Nebenwirkungen, live gefunden: "Danke" wich auf "erleben" aus). Ein Blatt außerhalb der
-    # gesäten Liste (Modell-Fehler oder Halluzination) ändert ehrlich nichts, fail safe.
+    # gesäten Liste (Modell-Fehler oder Halluzination) ändert ehrlich nichts, fail safe --
+    # honestly "nicht verstanden", nie der gierige Wort-Lookup (der Deuter LIEF ja).
     from genus import companion, verstehen
     conn = _isa_graph()
     verstehen.seed_raster(conn)
-    baseline = companion.respond_in_conversation(conn, "asdf ganz unklare frage")
     deuter = lambda q: {"absicht": "bitte um ein gedicht", "subject": None}
     result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=deuter)
-    assert result == baseline
+    assert result["text"] == companion._NICHT_VERSTANDEN
 
 
 def test_deuter_reading_climbs_the_is_a_chain_to_the_nearest_actionable_cell():
@@ -1263,13 +1290,15 @@ def test_kuerzer_truncates_to_the_first_sentence():
     assert "Heimtier" not in result["text"] and "Vertrauen" not in result["text"]
 
 
-def test_kuerzer_without_a_prior_answer_fails_safe_to_the_honest_fallback():
+def test_kuerzer_without_a_prior_answer_fails_safe_honestly():
+    # kein last_answer -- die Zelle kann nichts kürzen, und weil der Deuter aktiv LIEF und
+    # ehrlich nichts fand, zeigt GENUS jetzt ein "nicht verstanden" statt eines gierigen
+    # Wort-Lookups (Ronnys Entscheidung nach der zweiten enttäuschenden Session)
     from genus import companion
     conn = _isa_graph()
     deuter = lambda q: {"absicht": "kuerzer"}
-    baseline = companion.respond_in_conversation(conn, "kürzer bitte")
     result = companion.respond_with_deuter(conn, "kürzer bitte", deuter=deuter)   # no last_answer
-    assert result["text"] == baseline["text"]   # never fabricates a shortened answer from nothing
+    assert result["text"] == companion._NICHT_VERSTANDEN   # never fabricates a shortened answer
 
 
 def test_ausfuehrlicher_appends_the_provenance_trace():
@@ -1386,10 +1415,9 @@ def test_sozialgesten_refuse_a_long_sentence_even_if_the_model_reads_one():
     conn = _isa_graph()
     lang = "Ich möchte einen Familienausflug planen. Kannst du mir helfen?"
     deuter = lambda q: {"absicht": "abschied", "subject": None}
-    baseline = companion.respond_in_conversation(conn, lang)
     result = companion.respond_with_deuter(conn, lang, deuter=deuter)
     assert "Bis bald" not in result["text"]
-    assert result["text"] == baseline["text"]   # fällt ehrlich durch, statt falsch zu antworten
+    assert result["text"] == companion._NICHT_VERSTANDEN   # fällt ehrlich durch, nicht falsch
 
 
 # --- Segmentierung (ISO 24617-2): eine Nachricht kann mehrere Sprechhandlungen enthalten ----
@@ -1552,14 +1580,13 @@ def test_deuter_gender_guess_resolves_when_the_noun_is_known():
 
 def test_deuter_gender_guess_with_unresolvable_noun_stays_honest():
     # unlike the regex-triggered gender_question (an unambiguous pattern match commits to the
-    # "I don't know" answer), an unresolvable MODEL guess just leaves the honest fallback in
-    # place -- a wrong guess can never manufacture an answer, it can only fail safe
+    # "I don't know" answer), an unresolvable MODEL guess never manufactures an answer -- it
+    # fails safe to an honest "nicht verstanden" (the Deuter DID run, just found nothing usable)
     from genus import companion
     conn = _isa_graph()
     deuter = lambda q: {"absicht": "grammatik", "subject": "Erfundenwort"}
-    baseline = companion.respond_in_conversation(conn, "was fuer ein wort ist das denn grammatikalisch")
     result = companion.respond_with_deuter(conn, "was fuer ein wort ist das denn grammatikalisch", deuter=deuter)
-    assert result == baseline
+    assert result["text"] == companion._NICHT_VERSTANDEN
 
 
 def test_remember_command_recognizes_the_cue_phrases_and_extracts_the_fact():
