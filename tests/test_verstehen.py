@@ -80,6 +80,23 @@ def test_belegung_counts_per_herkunft_from_the_event_log():
     assert verstehen.belegung(conn, "vergleich")["gesamt"] == 0
 
 
+def test_belegung_is_retraction_aware_so_a_miscount_can_be_corrected():
+    # a reading is an ordinary relation -- a stray mark (e.g. a verification run that wrote
+    # into the live ledger) is taken back the ordinary way, and the Kennzahl nets it out
+    from genus import reactors
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    verstehen.record_reading(conn, "empfehlungsfrage", "model:deuter")
+    verstehen.record_reading(conn, "empfehlungsfrage", "model:deuter")
+    assert verstehen.belegung(conn, "empfehlungsfrage")["gesamt"] == 2
+    reactors.retract_relation(conn, verstehen.node("empfehlungsfrage"),
+                              verstehen.READING_PREDICATE, "model:deuter", source="model:deuter")
+    reactors.retract_relation(conn, verstehen.node("empfehlungsfrage"),
+                              verstehen.READING_PREDICATE, "model:deuter", source="model:deuter")
+    b = verstehen.belegung(conn, "empfehlungsfrage")
+    assert b["gesamt"] == 0 and b["je_quelle"] == {}   # netted back to clean
+
+
 def test_free_readings_are_collected_under_unklar_with_a_capped_model_source():
     from genus import sources
     conn = _fresh()

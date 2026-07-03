@@ -174,17 +174,27 @@ def free_readings(conn) -> list[str]:
 def belegung(conn, kind: str) -> dict:
     """Kennzahl 1 (QM am Verstehen): how often this cell was read, per Herkunft -- counted
     read-time from the event log (every recorded reading is one relation_asserted event),
-    nothing new stored."""
-    rows = conn.execute(
-        """
-        SELECT json_extract(payload, '$.object') AS quelle, COUNT(*) AS n
-        FROM event_log
-        WHERE event_type = 'relation_asserted'
-          AND json_extract(payload, '$.subject') = ?
-          AND json_extract(payload, '$.predicate') = ?
-        GROUP BY quelle
-        """,
-        (node(kind), READING_PREDICATE),
-    ).fetchall()
-    je_quelle = {row["quelle"]: row["n"] for row in rows}
+    nothing new stored.
+
+    Retraction-aware: a reading is an ordinary relation, so a mis-count (e.g. a verification
+    run that wrote into the live ledger) is corrected the ordinary way -- ``reactors.
+    retract_relation(node(kind), READING_PREDICATE, quelle, source=quelle)`` -- and the count
+    nets asserted minus retracted per Herkunft. Reading the raw event_log (not the projection,
+    which collapses the UNIQUE (s,p,o,source) tuple to one row and would lose the tally) is
+    what makes a real COUNT possible; netting the retractions is what keeps it CORRECTABLE."""
+    counts: dict[str, int] = {}
+    for event_type, delta in (("relation_asserted", 1), ("relation_retracted", -1)):
+        for row in conn.execute(
+            """
+            SELECT json_extract(payload, '$.object') AS quelle, COUNT(*) AS n
+            FROM event_log
+            WHERE event_type = ?
+              AND json_extract(payload, '$.subject') = ?
+              AND json_extract(payload, '$.predicate') = ?
+            GROUP BY quelle
+            """,
+            (event_type, node(kind), READING_PREDICATE),
+        ).fetchall():
+            counts[row["quelle"]] = counts.get(row["quelle"], 0) + delta * row["n"]
+    je_quelle = {q: n for q, n in counts.items() if n > 0}
     return {"kind": kind, "gesamt": sum(je_quelle.values()), "je_quelle": je_quelle}
