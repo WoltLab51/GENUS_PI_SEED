@@ -884,6 +884,33 @@ def _zelle_wiederholen(conn, guess, question, last_question, last_answer, stimme
     return f"Nochmal: {last_answer}"
 
 
+# --- Sozialgesten: feste, höfliche Antworten -- kein Wissen behauptet, nichts erfunden --------
+#
+# Live gefunden (2026-07-03): ein bloßes "Hallo" landete beim ehrlichen "das kann ich noch
+# nicht" -- korrekt im Sinne von "keine Zelle hat gehandelt", aber absurd für den simpelsten
+# aller Gesprächseinstiege. Diese fünf sind reine Höflichkeitsfloskeln, kein Wissen -- ein
+# fester Satz ist hier keine Einschränkung, sondern die richtige Antwort.
+
+def _zelle_gruss(conn, guess, question, last_question, last_answer, stimme=None):
+    return "Hallo! Frag mich etwas, oder sag „was weißt du?“, um zu hören, was ich mir gemerkt habe."
+
+
+def _zelle_dank(conn, guess, question, last_question, last_answer, stimme=None):
+    return "Gern geschehen."
+
+
+def _zelle_lob(conn, guess, question, last_question, last_answer, stimme=None):
+    return "Danke."
+
+
+def _zelle_kritik(conn, guess, question, last_question, last_answer, stimme=None):
+    return "Danke für die Rückmeldung — sag mir gern genauer, was nicht gepasst hat."
+
+
+def _zelle_abschied(conn, guess, question, last_question, last_answer, stimme=None):
+    return "Bis bald!"
+
+
 # Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;
 # which cells exist and how they relate lives in the ledger (genus.verstehen.RASTER_SEED).
 _HANDELBAR = {
@@ -905,6 +932,11 @@ _HANDELBAR = {
     "ausfuehrlicher": _zelle_ausfuehrlicher,
     "anders-erklaeren": _zelle_anders_erklaeren,
     "wiederholen": _zelle_wiederholen,
+    "gruss": _zelle_gruss,
+    "dank": _zelle_dank,
+    "lob": _zelle_lob,
+    "kritik": _zelle_kritik,
+    "abschied": _zelle_abschied,
 }
 
 

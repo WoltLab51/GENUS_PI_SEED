@@ -1343,6 +1343,40 @@ def test_meta_zellen_keep_the_session_anchored_on_the_original_topic():
     assert result["question"] == "Ist ein Hund ein Säugetier?"
 
 
+# --- Sozialgesten -- live gefunden: "Hallo" landete beim generischen "kann ich nicht" ------
+
+def test_gruss_gets_a_friendly_reply_not_the_honest_gap_message():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "gruss"}
+    result = companion.respond_with_deuter(conn, "Hallo", deuter=deuter)
+    assert "kann ich noch nicht" not in result["text"]
+    assert "Hallo" in result["text"]
+
+
+def test_dank_lob_kritik_abschied_get_deterministic_replies():
+    from genus import companion
+    conn = _isa_graph()
+    for absicht, erwartet in [("dank", "Gern geschehen"), ("lob", "Danke"),
+                               ("kritik", "Rückmeldung"), ("abschied", "Bis bald")]:
+        deuter = lambda q, a=absicht: {"absicht": a}
+        result = companion.respond_with_deuter(conn, "irgendein Text", deuter=deuter)
+        assert erwartet in result["text"], (absicht, result["text"])
+
+
+def test_sozialgesten_are_counted_as_belegung_but_never_store_the_message_text():
+    # eine Lese-Zelle wird wie jede andere gezählt (Belegung/QM), aber der Nutzertext selbst
+    # ("Hallo, wie schön dich zu treffen") landet nie im Ledger -- nur die Struktur (Absicht+Quelle)
+    from genus import companion, verstehen
+    conn = _isa_graph()
+    verstehen.seed_raster(conn)
+    deuter = lambda q: {"absicht": "gruss"}
+    companion.respond_with_deuter(conn, "Hallo, wie schön dich zu treffen!", deuter=deuter)
+    assert verstehen.belegung(conn, "gruss")["gesamt"] == 1
+    for row in conn.execute("SELECT payload FROM event_log").fetchall():
+        assert "wie schön dich zu treffen" not in row["payload"]
+
+
 def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
     # the Deuter now runs on free phrasing the fixed _REL_PATTERNS regex can't parse -- the
     # extracted subject/object still go through the exact same graph reasoning (_relate_terms)

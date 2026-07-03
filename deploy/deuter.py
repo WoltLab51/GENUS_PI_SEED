@@ -127,7 +127,11 @@ def _system_prompt(absichten) -> str:
         "warum -> {\"absicht\": \"warum-herkunft\", \"subject\": null, \"object\": null}\n"
         "kannst du mir ein Haustier empfehlen -> {\"absicht\": \"empfehlungsfrage\", \"subject\": \"Haustier\", \"object\": null}\n"
         "kannst du das nochmal sagen -> {\"absicht\": \"wiederholen\", \"subject\": null, \"object\": null}\n"
-        "na wie laeufts -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}"
+        "hallo -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}\n"
+        "na wie laeufts -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}\n"
+        "Wenn du DIR SELBST unsicher bist, welche Absicht wirklich passt (auch nicht "
+        "annaehernd), beschreibe sie lieber frei in eigenen Worten -- rate NIEMALS eine "
+        "Absicht aus der Liste nur, weil irgendein Wort oberflaechlich aehnlich klingt."
     )
 
 
