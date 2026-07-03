@@ -129,9 +129,13 @@ def _system_prompt(absichten) -> str:
         "kannst du das nochmal sagen -> {\"absicht\": \"wiederholen\", \"subject\": null, \"object\": null}\n"
         "hallo -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}\n"
         "na wie laeufts -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}\n"
+        "danke dir -> {\"absicht\": \"dank\", \"subject\": null, \"object\": null}\n"
+        "tschuess -> {\"absicht\": \"abschied\", \"subject\": null, \"object\": null}\n"
         "Wenn du DIR SELBST unsicher bist, welche Absicht wirklich passt (auch nicht "
         "annaehernd), beschreibe sie lieber frei in eigenen Worten -- rate NIEMALS eine "
-        "Absicht aus der Liste nur, weil irgendein Wort oberflaechlich aehnlich klingt."
+        "Absicht aus der Liste nur, weil irgendein Wort oberflaechlich aehnlich klingt. Aber "
+        "fuer eindeutige, ALLTAEGLICHE Hoeflichkeitsfloskeln (Gruss, Dank, Abschied) gilt das "
+        "NICHT -- die sind klar in der Liste, dort wird nicht frei formuliert."
     )
 
 
