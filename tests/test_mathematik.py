@@ -60,6 +60,14 @@ def test_a_second_undeclared_variable_is_rejected_not_silently_partial():
     assert not r["ok"] and "y" in r["fehler"]
 
 
+def test_ableitung_stays_in_expanded_school_normal_form_not_factored():
+    # live gefunden: sympy.simplify() faktorisiert manche Polynome um (4x^3+12x^2+8x wurde zu
+    # 4x(x^2+3x+2)) -- mathematisch gleich, aber nicht die erwartete Schul-Normalform. Muss
+    # in der ausmultiplizierten Form bleiben.
+    r = mathematik.ableitung("x^4 + 4x^3 + 4x^2")
+    assert r["ok"] and r["ableitung"] == "4*x**3 + 12*x**2 + 8*x"
+
+
 def test_ableitung_result_is_json_serializable():
     import json
     assert json.dumps(mathematik.ableitung("x^2")) is not None
@@ -95,3 +103,38 @@ def test_extremstellen_of_a_function_without_any_is_an_empty_list_not_an_error()
 def test_extremstellen_rejects_unreadable_input_same_as_ableitung():
     r = mathematik.extremstellen("das ist kein term")
     assert not r["ok"] and "kein bekanntes Symbol" in r["fehler"]
+
+
+def test_stammfunktion_includes_the_integration_constant():
+    r = mathematik.stammfunktion("x^2")
+    assert r["ok"] and r["stammfunktion"] == "x**3/3 + C"
+
+
+def test_stammfunktion_stays_expanded_not_factored():
+    r = mathematik.stammfunktion("3x^2 + 2x")
+    assert r["ok"] and r["stammfunktion"] == "x**3 + x**2 + C"
+
+
+def test_stammfunktion_of_a_trig_function():
+    r = mathematik.stammfunktion("sin(x)")
+    assert r["ok"] and r["stammfunktion"] == "-cos(x) + C"
+
+
+def test_stammfunktion_rejects_unreadable_input():
+    r = mathematik.stammfunktion("das ist kein term")
+    assert not r["ok"] and "kein bekanntes Symbol" in r["fehler"]
+
+
+def test_integral_of_a_polynomial_between_bounds_is_exact():
+    r = mathematik.integral("x^2", "0", "3")
+    assert r["ok"] and r["integral"] == "9"
+
+
+def test_integral_accepts_symbolic_bounds_like_pi():
+    r = mathematik.integral("sin(x)", "0", "pi")
+    assert r["ok"] and r["integral"] == "2"
+
+
+def test_integral_rejects_an_unreadable_bound_not_just_an_unreadable_term():
+    r = mathematik.integral("x^2", "0", "quatsch")
+    assert not r["ok"] and "quatsch" in r["fehler"]

@@ -77,7 +77,11 @@ def ableitung(term: str, variable: str = "x", ordnung: int = 1) -> dict:
     try:
         ausdruck = _zu_ausdruck(term, variable)
         var = sympy.symbols(variable)
-        ergebnis = sympy.simplify(sympy.diff(ausdruck, var, ordnung))
+        # expand(), nicht simplify(): simplify() faktorisiert ein Polynom manchmal um
+        # (z.B. 4x^3+12x^2+8x -> 4x(x^2+3x+2)) -- mathematisch gleich, aber nicht die
+        # erwartete Schul-Normalform. expand() liefert live geprüft immer die ausmultiplizierte
+        # Form, ohne je ein falsches Ergebnis zu produzieren.
+        ergebnis = sympy.expand(sympy.diff(ausdruck, var, ordnung))
         return {
             "ok": True,
             "term": str(ausdruck),
@@ -124,5 +128,48 @@ def extremstellen(term: str, variable: str = "x") -> dict:
             punkte.append({"x": str(x0), "y": str(y0), "art": art})
         punkte.sort(key=lambda p: sympy.sympify(p["x"]))
         return {"ok": True, "term": str(ausdruck), "variable": variable, "punkte": punkte}
+    except (sympy.SympifyError, TypeError, ValueError, SyntaxError, NotImplementedError) as exc:
+        return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
+
+
+def stammfunktion(term: str, variable: str = "x") -> dict:
+    """Eine Stammfunktion (unbestimmtes Integral) von ``term`` -- exakt über sympy, mit der
+    Integrationskonstante "+ C" (Teil der korrekten Schulantwort; sympy liefert sie nicht von
+    sich aus, da C beliebig ist)."""
+    unbekannt = _unbekanntes_wort(term, variable)
+    if unbekannt is not None:
+        return {"ok": False, "fehler": f"«{unbekannt}» in «{term}» ist kein bekanntes Symbol."}
+    try:
+        ausdruck = _zu_ausdruck(term, variable)
+        var = sympy.symbols(variable)
+        ergebnis = sympy.expand(sympy.integrate(ausdruck, var))   # siehe ableitung(): Normalform
+        return {
+            "ok": True, "term": str(ausdruck), "variable": variable,
+            "stammfunktion": f"{ergebnis} + C",
+        }
+    except (sympy.SympifyError, TypeError, ValueError, SyntaxError, NotImplementedError) as exc:
+        return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
+
+
+def integral(term: str, untere_grenze: str, obere_grenze: str, variable: str = "x") -> dict:
+    """Das bestimmte Integral von ``term`` über [``untere_grenze``, ``obere_grenze``] -- der
+    Flächeninhalt unter dem Graphen MIT Vorzeichen (Fläche unterhalb der x-Achse zählt negativ,
+    wie in der Schulrechnung üblich; der reine Betrags-Flächeninhalt bräuchte vorher die
+    Nullstellen im Intervall -- eine eigene, hier noch nicht gebaute Aufgabenart, siehe
+    docs/GENUS_ABITUR.md). Grenzen dürfen Zahlen oder Konstanten wie "pi" sein, keine Variablen."""
+    for stueck in (term, untere_grenze, obere_grenze):
+        unbekannt = _unbekanntes_wort(stueck, variable)
+        if unbekannt is not None:
+            return {"ok": False, "fehler": f"«{unbekannt}» in «{stueck}» ist kein bekanntes Symbol."}
+    try:
+        ausdruck = _zu_ausdruck(term, variable)
+        var = sympy.symbols(variable)
+        a = _zu_ausdruck(untere_grenze, variable)
+        b = _zu_ausdruck(obere_grenze, variable)
+        ergebnis = sympy.simplify(sympy.integrate(ausdruck, (var, a, b)))
+        return {
+            "ok": True, "term": str(ausdruck), "variable": variable,
+            "untere_grenze": str(a), "obere_grenze": str(b), "integral": str(ergebnis),
+        }
     except (sympy.SympifyError, TypeError, ValueError, SyntaxError, NotImplementedError) as exc:
         return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}

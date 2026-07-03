@@ -886,6 +886,30 @@ def test_ableitung_cli_respects_variable_and_ordnung_options():
     assert "f''(x)" in result.output and "6*x" in result.output
 
 
+def test_extremstellen_cli_reports_both_points():
+    result = CliRunner().invoke(cli.main, ["extremstellen", "x^3 - 3x"])
+    assert result.exit_code == 0, result.output
+    assert "Maximum bei x = -1" in result.output and "Minimum bei x = 1" in result.output
+
+
+def test_stammfunktion_cli_shows_the_integration_constant():
+    result = CliRunner().invoke(cli.main, ["stammfunktion", "3x^2 + 2x"])
+    assert result.exit_code == 0, result.output
+    assert "x**3 + x**2 + C" in result.output
+
+
+def test_integral_cli_computes_between_bounds():
+    result = CliRunner().invoke(cli.main, ["integral", "x^2", "0", "3"])
+    assert result.exit_code == 0, result.output
+    assert "= 9" in result.output
+
+
+def test_integral_cli_honestly_fails_on_an_unreadable_bound():
+    result = CliRunner().invoke(cli.main, ["integral", "x^2", "0", "quatsch"])
+    assert result.exit_code == 1
+    assert "kein bekanntes Symbol" in result.output
+
+
 def test_why_followup_recognizes_the_closed_set_of_cue_phrases():
     from genus import companion
     for phrase in ("warum?", "Warum", "wieso??", "  weshalb ", "Woher weißt du das?",
@@ -1284,6 +1308,60 @@ def test_extremstellen_is_reached_through_the_muster_dispatch_and_never_offered_
     result = companion.respond_with_deuter(
         conn, "Bestimme die Extremstellen von f(x) = x^3 - 3x", deuter=lambda q: None, stimme=stimme)
     assert calls == [] and "Maximum bei x = -1" in result["text"] and "VERFÄLSCHT" not in result["text"]
+
+
+def test_stammfunktion_frage_recognizes_the_fixed_formulation():
+    from genus import companion
+    r = companion.stammfunktion_frage("Bestimme eine Stammfunktion von f(x) = 3x^2 + 2x")
+    assert r["berechnung_q"] and r["ok"] and r["stammfunktion"] == "x**3 + x**2 + C"
+
+
+def test_stammfunktion_frage_is_false_for_an_unrelated_question():
+    from genus import companion
+    assert companion.stammfunktion_frage("Was ist ein Fahrrad?") == {"berechnung_q": False}
+
+
+def test_narrate_stammfunktion_shows_the_integration_constant():
+    from genus import companion
+    r = companion.stammfunktion_frage("Bestimme eine Stammfunktion von f(x) = x^2")
+    assert "F(x) = x**3/3 + C" in companion.narrate_stammfunktion(r)
+
+
+def test_integral_frage_recognizes_in_den_grenzen_von_and_zwischen():
+    from genus import companion
+    for text, erwartet in [
+        ("Berechne das Integral von f(x) = x^2 in den Grenzen von 0 bis 3", "9"),
+        ("Berechne das Integral von f(x) = sin(x) zwischen 0 und pi", "2"),
+    ]:
+        r = companion.integral_frage(text)
+        assert r["berechnung_q"] and r["ok"] and r["integral"] == erwartet, text
+
+
+def test_integral_frage_is_false_for_an_unrelated_question():
+    from genus import companion
+    assert companion.integral_frage("Was ist ein Fahrrad?") == {"berechnung_q": False}
+
+
+def test_narrate_integral_shows_both_bounds_and_the_result():
+    from genus import companion
+    r = companion.integral_frage("Berechne das Integral von f(x) = x^2 in den Grenzen von 0 bis 3")
+    text = companion.narrate_integral(r)
+    assert "0 bis 3" in text and "ist 9" in text
+
+
+def test_integral_and_stammfunktion_are_reached_through_muster_and_never_offered_to_stimme():
+    from genus import companion
+    conn = _fresh()
+    calls = []
+    stimme = lambda satz: (calls.append(satz) or "VERFÄLSCHT")
+    r1 = companion.respond_with_deuter(
+        conn, "Bestimme eine Stammfunktion von f(x) = x^2", deuter=lambda q: None, stimme=stimme)
+    r2 = companion.respond_with_deuter(
+        conn, "Berechne das Integral von f(x) = x^2 in den Grenzen von 0 bis 3",
+        deuter=lambda q: None, stimme=stimme)
+    assert calls == []
+    assert "x**3/3 + C" in r1["text"] and "ist 9" in r2["text"]
+    assert "VERFÄLSCHT" not in r1["text"] and "VERFÄLSCHT" not in r2["text"]
 
 
 def test_zaehlt_zu_is_a_deterministic_relation_pattern():

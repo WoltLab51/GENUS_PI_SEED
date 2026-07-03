@@ -461,6 +461,61 @@ def narrate_extremstellen(r: dict) -> str:
             + " (exakt berechnet).")
 
 
+_BOUND = r"([A-Za-z0-9\.\-]+)"
+_STAMMFUNKTION_PATTERNS = [
+    re.compile(
+        r"\b(?:bestimme|berechne|wie\s+lautet)\s+" + _FILL + r"(?:eine|die)\s+stammfunktion\s+"
+        r"von\s+f\(?(\w)\)?\s*=\s*" + _MATHTERM + r"[.!?]?\s*$", re.I),
+]
+_INTEGRAL_PATTERNS = [
+    re.compile(
+        r"\b(?:bestimme|berechne)\s+" + _FILL + r"das\s+integral\s+von\s+f\(?(\w)\)?\)?\s*=\s*"
+        + _MATHTERM + r"\s+(?:in\s+den\s+grenzen\s+von|zwischen)\s+" + _BOUND
+        + r"\s+(?:bis|und)\s+" + _BOUND + r"[.!?]?\s*$", re.I),
+]
+
+
+def stammfunktion_frage(text: str) -> dict:
+    """Die Stammfunktions-Aufgabe in ``text``, exakt gerechnet (inkl. "+ C"); ``{"berechnung_q":
+    False}``, wenn keine erkennbare Aufgabenstellung vorliegt."""
+    from genus import mathematik
+
+    m = _STAMMFUNKTION_PATTERNS[0].search(text)
+    if m is None:
+        return {"berechnung_q": False}
+    r = mathematik.stammfunktion(m.group(2).strip(), m.group(1))
+    r["berechnung_q"] = True
+    return r
+
+
+def narrate_stammfunktion(r: dict) -> str:
+    if not r["ok"]:
+        return f"Das kann ich nicht ausrechnen: {r['fehler']}"
+    return (f"F({r['variable']}) = {r['stammfunktion']} "
+            f"(exakt berechnet, für f({r['variable']}) = {r['term']}).")
+
+
+def integral_frage(text: str) -> dict:
+    """Die Aufgabe eines bestimmten Integrals in ``text``, exakt gerechnet; ``{"berechnung_q":
+    False}``, wenn keine erkennbare Aufgabenstellung ("...in den Grenzen von a bis b" /
+    "...zwischen a und b") vorliegt."""
+    from genus import mathematik
+
+    m = _INTEGRAL_PATTERNS[0].search(text)
+    if m is None:
+        return {"berechnung_q": False}
+    r = mathematik.integral(m.group(2).strip(), m.group(3), m.group(4), m.group(1))
+    r["berechnung_q"] = True
+    return r
+
+
+def narrate_integral(r: dict) -> str:
+    if not r["ok"]:
+        return f"Das kann ich nicht ausrechnen: {r['fehler']}"
+    return (f"Das bestimmte Integral von f({r['variable']}) = {r['term']} in den Grenzen von "
+            f"{r['untere_grenze']} bis {r['obere_grenze']} ist {r['integral']} (exakt berechnet).")
+
+
 # --- memory ("Merke dir: ...") -----------------------------------------------------------
 #
 # Slice 1 of Personen-Gedächtnis was named "person:ronny", but Ronny immediately used it to
@@ -616,6 +671,12 @@ def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
     ex = extremstellen_frage(question)
     if ex.get("berechnung_q"):
         return narrate_extremstellen(ex), "berechnen"
+    integ = integral_frage(question)
+    if integ.get("berechnung_q"):
+        return narrate_integral(integ), "berechnen"
+    stamm = stammfunktion_frage(question)
+    if stamm.get("berechnung_q"):
+        return narrate_stammfunktion(stamm), "berechnen"
     return None
 
 

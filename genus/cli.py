@@ -618,6 +618,54 @@ def ableitung_command(term: str, variable: str, ordnung: int) -> None:
     click.echo(f"[MATH] f({variable}) = {r['term']}  ->  f{strich}({variable}) = {r['ableitung']}")
 
 
+@main.command("extremstellen")
+@click.argument("term")
+@click.option("--variable", default="x", show_default=True)
+def extremstellen_command(term: str, variable: str) -> None:
+    """Die Extremstellen eines Funktionsterms -- exakt über sympy (f'=0, klassifiziert über
+    f''). Beispiel: genus extremstellen "x^3 - 3x" """
+    r = mathematik.extremstellen(term, variable)
+    if not r["ok"]:
+        click.echo(f"[MATH] {r['fehler']}")
+        raise SystemExit(1)
+    if not r["punkte"]:
+        click.echo(f"[MATH] f({variable}) = {r['term']} hat keine Extremstellen.")
+        return
+    for p in r["punkte"]:
+        click.echo(f"[MATH] {p['art']} bei {variable} = {p['x']} (f({variable}) = {p['y']})")
+
+
+@main.command("stammfunktion")
+@click.argument("term")
+@click.option("--variable", default="x", show_default=True)
+def stammfunktion_command(term: str, variable: str) -> None:
+    """Eine Stammfunktion (unbestimmtes Integral) eines Funktionsterms -- exakt über sympy.
+    Beispiel: genus stammfunktion "3x^2 + 2x" """
+    r = mathematik.stammfunktion(term, variable)
+    if not r["ok"]:
+        click.echo(f"[MATH] {r['fehler']}")
+        raise SystemExit(1)
+    click.echo(f"[MATH] f({variable}) = {r['term']}  ->  F({variable}) = {r['stammfunktion']}")
+
+
+@main.command("integral")
+@click.argument("term")
+@click.argument("untere_grenze")
+@click.argument("obere_grenze")
+@click.option("--variable", default="x", show_default=True)
+def integral_command(term: str, untere_grenze: str, obere_grenze: str, variable: str) -> None:
+    """Das bestimmte Integral eines Funktionsterms zwischen zwei Grenzen -- exakt über sympy.
+    Beispiel: genus integral "x^2" 0 3 """
+    r = mathematik.integral(term, untere_grenze, obere_grenze, variable)
+    if not r["ok"]:
+        click.echo(f"[MATH] {r['fehler']}")
+        raise SystemExit(1)
+    click.echo(
+        f"[MATH] Integral von f({variable}) = {r['term']} von {r['untere_grenze']} bis "
+        f"{r['obere_grenze']} = {r['integral']}"
+    )
+
+
 @main.command("concept")
 @click.argument("qid")
 def concept_command(qid: str) -> None:

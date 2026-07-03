@@ -65,11 +65,18 @@ Menge wie der Deuter-Pfad — ein Fund am Rande, der die neue Rechen-Zelle sofor
 **Geliefert:**
 - `genus/mathematik.py`: `ableitung()` (beliebige Ordnung, Polynome/Exponential-/Winkel-
   funktionen), `extremstellen()` (kritische Punkte über f'=0, klassifiziert über f'', ehrlich
-  "unklar", wenn der Test selbst nichts hergibt — z. B. x³/x⁴ bei 0).
-- `companion.py`: zwei neue, selbst-prüfende Muster-Zellen ("berechnen") für feste
+  "unklar", wenn der Test selbst nichts hergibt — z. B. x³/x⁴ bei 0), `stammfunktion()`
+  (unbestimmtes Integral inkl. "+ C"), `integral()` (bestimmtes Integral zwischen zwei Grenzen,
+  auch symbolische Grenzen wie "pi").
+- `companion.py`: vier neue, selbst-prüfende Muster-Zellen ("berechnen") für feste
   Formulierungen ("Bestimme die Ableitung von f(x) = …", "Leite f(x) = … ab", "Bestimme die
-  Extremstellen von f(x) = …").
-- `genus ableitung "<Term>"` als CLI-Befehl.
+  Extremstellen von f(x) = …", "Bestimme eine Stammfunktion von f(x) = …", "Berechne das
+  Integral von f(x) = … in den Grenzen von a bis b" / "… zwischen a und b").
+- `genus ableitung/extremstellen/stammfunktion/integral` als CLI-Befehle.
+- **Ein dritter Rechenfehler gefangen (nach den zwei aus Abschnitt 3):** `sympy.simplify()`
+  faktorisiert ein Polynom manchmal um (z. B. `4x³+12x²+8x` → `4x(x²+3x+2)`) — mathematisch
+  gleich, aber nicht die erwartete Schul-Normalform. `ableitung()`/`stammfunktion()` nutzen
+  jetzt `sympy.expand()`, das live geprüft immer die ausmultiplizierte Form liefert.
 - `deploy/fachwissen_abitur_mathematik.txt`: ein Fachwortschatz aus der echten Quelle (KMK,
   *Bildungsstandards Mathematik für die Allgemeine Hochschulreife*, 2012) — bleibt als
   ergänzende SPRACHLICHE Schicht bestehen (Ronny: "auch sprachlich"), ist aber nicht mehr der
@@ -81,9 +88,10 @@ Menge wie der Deuter-Pfad — ein Fund am Rande, der die neue Rechen-Zelle sofor
   statt nur behauptet. Reusable: derselbe predict→self-test→score-Mechanismus wie
   `genus/learning.py` beim Wetter, hier gegen bekannte richtige Lösungen statt gegen die
   nächste Beobachtung. Braucht eine echte Quelle für Aufgaben+Lösungen (variiert je Bundesland).
-- **Weitere Aufgabenarten**: Integrale (Stammfunktion, Flächeninhalt), Kurvendiskussion als
-  Komposition der schon vorhandenen Bausteine (Nullstellen + Extremstellen + Wendepunkte +
-  Monotonie), Vektorrechnung/Analytische Geometrie, Stochastik.
+- **Weitere Aufgabenarten**: der reine Flächeninhalt (Betrag, braucht vorher die Nullstellen im
+  Intervall — anders als das VORZEICHENBEHAFTETE bestimmte Integral, das schon gebaut ist),
+  Kurvendiskussion als Komposition der schon vorhandenen Bausteine (Nullstellen + Extremstellen
+  + Wendepunkte + Monotonie), Vektorrechnung/Analytische Geometrie, Stochastik.
 - **Freie Deuter-Lesart** für kreativ formulierte Rechenaufgaben — bisher nur die feste
   Musterformulierung erkannt; math. Ausdrücke sind für die Deuter-Subjekt/Objekt-Extraktion
   (auf einzelne Wörter ausgelegt) riskanter als für Begriffs-Fragen.
