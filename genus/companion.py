@@ -809,9 +809,12 @@ def _zelle_nachfrage(conn, guess, question, last_question, last_answer, stimme=N
 
 
 def _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme=None):
-    remember(conn, question, source=STATEMENT_SOURCE)
+    # die eigene Klausel des Segments merken, nicht die ganze Nachricht -- sonst würde
+    # "Hallo! Ich hab zwei Hunde. Danke!" den Gruß und den Dank mit in die Notiz aufnehmen
+    text = guess.get("text") or question
+    remember(conn, text, source=STATEMENT_SOURCE)
     return (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
-            f"(sag „merke dir: {question}“, wenn's wichtig ist, dann bin ich mir sicher).")
+            f"(sag „merke dir: {text}“, wenn's wichtig ist, dann bin ich mir sicher).")
 
 
 def _zelle_merken(conn, guess, question, last_question, last_answer, stimme=None):
@@ -901,40 +904,45 @@ def _zelle_wiederholen(conn, guess, question, last_question, last_answer, stimme
 # dass etwas schiefging, ein fester Höflichkeitssatz tut das nicht. Eine Wortzahl-Bremse ist
 # hier keine Sprach-Analyse, nur eine harte, erklärbare Grenze -- lieber einmal zu oft ehrlich
 # durchfallen als einem echten Anliegen ein munteres "Bis bald!" hinterherrufen.
+#
+# Live gefunden nach der Segmentierung: die Bremse muss das SEGMENT beurteilen (``guess["text"]``,
+# die eigene Klausel), nicht die ganze Nachricht (``question``) -- sonst reißt eine lange
+# Nachricht ("Hallo! Was ist ein Hund? Danke!") ihr eigenes kurzes "Danke!"-Segment mit in die
+# Bremse und die Antwort verschwindet stillschweigend aus der komponierten Antwort.
 
 _SOZIALGESTE_MAX_WOERTER = 6
 
 
-def _ist_kurze_aeusserung(question: str) -> bool:
-    return len(_WORD.findall(question)) <= _SOZIALGESTE_MAX_WOERTER
+def _ist_kurze_aeusserung(text: str) -> bool:
+    return len(_WORD.findall(text)) <= _SOZIALGESTE_MAX_WOERTER
 
 
 def _zelle_gruss(conn, guess, question, last_question, last_answer, stimme=None):
-    if not _ist_kurze_aeusserung(question):
+    if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
     return "Hallo! Frag mich etwas, oder sag „was weißt du?“, um zu hören, was ich mir gemerkt habe."
 
 
 def _zelle_dank(conn, guess, question, last_question, last_answer, stimme=None):
-    if not _ist_kurze_aeusserung(question):
+    if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
     return "Gern geschehen."
 
 
 def _zelle_lob(conn, guess, question, last_question, last_answer, stimme=None):
-    if not _ist_kurze_aeusserung(question):
+    if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
     return "Danke."
 
 
 def _zelle_kritik(conn, guess, question, last_question, last_answer, stimme=None):
-    if not _ist_kurze_aeusserung(question):
+    if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
     return "Danke für die Rückmeldung — sag mir gern genauer, was nicht gepasst hat."
 
 
 def _zelle_abschied(conn, guess, question, last_question, last_answer, stimme=None):
-    if not _ist_kurze_aeusserung(question):
+    if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
     return "Bis bald!"
 

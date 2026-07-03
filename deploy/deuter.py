@@ -211,8 +211,12 @@ def get_model():
 
 
 def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
-    """Ein rohes geparstes Segment in ein sauberes ``{"absicht","subject","object"}`` --
-    ``None`` wenn kein gueltiges Blatt genannt wurde."""
+    """Ein rohes geparstes Segment in ein sauberes ``{"text","absicht","subject","object"}`` --
+    ``None`` wenn kein gueltiges Blatt genannt wurde. ``text`` (die eigene Klausel des Segments)
+    bleibt im Ergebnis -- ein Handler, der die Laenge/den Wortlaut beurteilen muss (Sozialgesten,
+    tatsache), MUSS das SEGMENT beurteilen, nicht die ganze Nachricht: sonst reisst eine lange
+    Nachricht ("Hallo! Was ist ein Hund? Danke!") ihr eigenes kurzes "Danke!"-Segment mit in
+    die Wortzahl-Bremse, live gefunden."""
     if not isinstance(eintrag, dict) or not isinstance(eintrag.get("absicht"), str):
         return None
     absicht = eintrag["absicht"].strip()
@@ -224,6 +228,7 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     subject = eintrag.get("subject")
     obj = eintrag.get("object")
     return {
+        "text": segment_text,
         "absicht": absicht,
         "subject": subject if isinstance(subject, str) else None,
         "object": obj if isinstance(obj, str) else None,

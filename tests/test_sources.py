@@ -1422,6 +1422,35 @@ def test_deuter_composition_deduplicates_the_repeated_disclosure_tag():
     assert result["text"].count("Frage vom Sprachmodell gedeutet") == 1
 
 
+def test_sozialgeste_word_limit_judges_the_segments_own_text_not_the_whole_message():
+    # live gefunden: "Danke dir!" als eigenes, kurzes Segment innerhalb einer langen Nachricht
+    # ("Hallo! Was ist ein Hund? Danke dir!") verschwand stillschweigend aus der komponierten
+    # Antwort, weil die Wortzahl-Bremse die GANZE Nachricht prüfte statt der eigenen Klausel
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    lange_nachricht = "Hallo! Was ist ein Hund? Danke dir schonmal ganz herzlich dafür!"
+    deuter = lambda q: [
+        {"text": "Hallo!", "absicht": "gruss"},
+        {"text": "Was ist ein Hund?", "absicht": "definition", "subject": "Hund"},
+        {"text": "Danke dir schonmal ganz herzlich dafür!", "absicht": "dank"},
+    ]
+    result = companion.respond_with_deuter(conn, lange_nachricht, deuter=deuter)
+    assert "Hallo!" in result["text"]
+    assert "Wolf" in result["text"]
+    assert "Gern geschehen" in result["text"]   # das kurze Dank-SEGMENT durfte nicht durchfallen
+
+
+def test_tatsache_remembers_only_its_own_segment_not_the_whole_message():
+    # dieselbe Klasse: eine Notiz soll die KLAUSEL enthalten, nicht Gruß+Frage+Dank mit
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: [{"text": "ich habe zwei Hunde", "absicht": "tatsache"}]
+    companion.respond_with_deuter(
+        conn, "Übrigens, ich habe zwei Hunde, das nur nebenbei", deuter=deuter)
+    assert companion.suggested_notes(conn) == ["ich habe zwei Hunde"]
+
+
 def test_deuter_a_segment_that_fails_does_not_block_the_others():
     # ein Segment, das an nichts andockt (unklar/unbekannt), liefert einfach nichts bei -- die
     # anderen Segmente antworten trotzdem
