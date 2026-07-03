@@ -34,6 +34,18 @@ STABILITY_QUESTION_KEY = "stability.unexpected_flip"
 RULE_CALIBRATION_TYPE = "RuleCalibration"
 RULE_CALIBRATION_DERIVATION = "rule:rule_calibration_v1"
 
+# VerstehensLuecke: Selbst-Codieren Stufe 0 (Audit-Inversion ③, Ronnys Ziel ⑥ wörtlich: "spürt
+# hin, wo eine Lücke ist und fragt, ob es seinen Plan umsetzen darf"). GENUS liest die eigene
+# Belegung der ehrlich abgewiesenen Raster-Blätter ("das kann ich noch nicht") plus die
+# gezählten "unklar"-Läufe des Deuters -- gelebter Druck aus echten Gesprächen, nie Nutzer-Text
+# -- und macht aus den drängendsten Lücken PROPOSALS über die bestehende Proposal!=Change-
+# Maschinerie. Der Mensch gated; die Umsetzung bleibt (Stufe 0) beim Menschen. Die Schwelle
+# "wie viel Nachfrage ist Druck statt Rauschen" ist selbst-kalibriert (breiteste Lücke über
+# den eigenen Zählungen), Saat nur als Untergrenze der statistischen Gültigkeit.
+VERSTEHENS_LUECKE_TYPE = "VerstehensLuecke"
+VERSTEHENS_LUECKE_DERIVATION = "rule:verstehens_luecke_v1"
+VERSTEHENS_LUECKE_MIN_DEMAND = 3  # Saat/Gültigkeits-Untergrenze: 1-2 Lesungen sind kein Druck
+
 
 def scan(conn) -> list[dict]:
     # The mind grows by registering detectors, not by rewriting scan. Each is a
@@ -155,16 +167,20 @@ def record_experience_event(conn, candidate: dict) -> int:
 
 
 def record_experience_proposal(conn, candidate: dict, experience_event_id: int) -> int:
+    # Ein Kandidat darf sein Proposal selbst formen (candidate["proposal"]) -- bis zum
+    # VerstehensLuecke-Detector war die Erzeugung auf den Rhythmus-Detector hartkodiert
+    # (claim_value "daily_rhythm", Rhythmus-Beschreibung); der Default bleibt unverändert.
+    eigen = candidate.get("proposal") or {}
     return proposals.record_proposal_created_event(
         conn,
         proposal_id=proposals.next_proposal_id(conn),
         proposal_type=PROPOSAL_TYPE,
         claim_key=candidate["subject_key"],
-        claim_value="daily_rhythm",
+        claim_value=eigen.get("claim_value", "daily_rhythm"),
         source_belief=None,
         source_event=experience_event_id,
         payload={
-            "description": (
+            "description": eigen.get("description") or (
                 f"Recurring experience detected: {candidate['summary']}. "
                 "Review whether this rhythm is expected."
             ),
@@ -172,7 +188,7 @@ def record_experience_proposal(conn, candidate: dict, experience_event_id: int) 
             "experience_id": candidate["experience_id"],
             "experience_key": candidate["experience_key"],
             "experience_type": candidate["experience_type"],
-            "action_required": False,
+            "action_required": eigen.get("action_required", False),
             "review_recommended": True,
         },
     )
@@ -592,4 +608,81 @@ def _rule_calibration_candidates(conn) -> list[dict]:
     return candidates
 
 
-DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates, _rule_calibration_candidates)
+def _verstehens_luecke_candidates(conn) -> list[dict]:
+    # GENUS spürt die blinden Stellen seines eigenen Verstehens: Raster-Blätter, die gelesen,
+    # aber ehrlich abgewiesen werden (kein Handler bis hoch zur Zelle), plus "unklar" (der
+    # Deuter lief und fand nichts). Beides wird im Gespräch längst gezählt (record_reading,
+    # retraktions-bewusst, nur Struktur) -- hier wird die Zählung zum ersten Mal KONSUMIERT.
+    from genus import companion, self_calibration, verstehen  # local: kein Import-Zyklus
+
+    blaetter = verstehen.kinds(conn) or {leaf for leaf, _ in verstehen.RASTER_SEED}
+    # die Lücken-Menge ist die ECHTE Fähigkeits-Karte, nicht eine Kopie: alles, was weder
+    # selbst einen Handler hat noch über seine Zwicky-Zelle einen erreicht -- plus "unklar"
+    luecken = {
+        kind for kind in blaetter
+        if kind not in companion._HANDELBAR
+        and (verstehen.zelle_of(conn, kind) or "") not in companion._HANDELBAR
+    }
+    luecken.add("unklar")
+
+    nachfrage: dict[str, int] = {}
+    for kind in sorted(luecken):
+        total = verstehen.belegung(conn, kind)["gesamt"]
+        if total > 0:
+            nachfrage[kind] = total
+    if not nachfrage:
+        return []
+
+    # Die Breiteste-Lücke-Teilung trennt RAUSCHEN von Signal -- dafür muss eine Rausch-Gruppe
+    # existieren. Besteht die Population nur aus Werten über der Gültigkeits-Saat (z.B. {9, 7}),
+    # würde die Teilung eine Grenze ZWISCHEN zwei Signalen fabrizieren und die zweitheißeste
+    # Lücke dauerhaft ausblenden (beim Bauen am eigenen Test gefunden). Ohne Rausch-Gruppe ist
+    # alles Signal: die Saat regiert -- dieselbe Lehre wie bei der Reboot-Schwelle ("abgeleitet"
+    # verlangt zwei echt unterscheidbare Gruppen, nicht nur genug Werte).
+    if min(nachfrage.values()) >= VERSTEHENS_LUECKE_MIN_DEMAND:
+        schwelle = VERSTEHENS_LUECKE_MIN_DEMAND
+    else:
+        schwelle = max(
+            self_calibration.widest_gap_count_threshold(nachfrage.values(), VERSTEHENS_LUECKE_MIN_DEMAND),
+            VERSTEHENS_LUECKE_MIN_DEMAND,   # die Saat bleibt Untergrenze, nie unterschritten
+        )
+
+    # Höchstens EINE neue Lücke pro Lauf (die drängendste), bereits aufgezeichnete werden hier
+    # schon gefiltert -- sonst würde bei zwei gleichzeitig heißen Lücken die zweite zwar als
+    # Experience aufgezeichnet, ihr Proposal aber durch MAX_PROPOSALS_PER_SCAN verschluckt und
+    # bei künftigen Scans (experience_key existiert) nie mehr nachgeholt. So rückt beim
+    # nächsten Scan ehrlich die nächste Lücke nach.
+    candidates: list[dict] = []
+    for kind, total in sorted(nachfrage.items(), key=lambda kv: -kv[1]):
+        if total < schwelle or candidates:
+            continue
+        if _active_experience(conn, f"verstehens_luecke:{kind}") is not None:
+            continue
+        was = ("Nachrichten, die ich gar nicht deuten konnte" if kind == "unklar"
+               else f"das Blatt „{kind}“, das ich lese, aber nicht beantworten kann")
+        candidates.append({
+            "experience_key": f"verstehens_luecke:{kind}",
+            "experience_type": VERSTEHENS_LUECKE_TYPE,
+            "subject_key": f"verstehen.{kind}",
+            "pattern": {"kind": kind, "demand": total, "threshold": schwelle,
+                        "population": nachfrage},
+            "supporting_events": [],
+            "derivation": VERSTEHENS_LUECKE_DERIVATION,
+            "summary": f"Verstehens-Lücke „{kind}“: {total} Lesungen (Schwelle {schwelle})",
+            "proposable": True,
+            "proposal": {
+                "claim_value": "verstehens_luecke",
+                "action_required": True,
+                "description": (
+                    f"Ich spüre eine Lücke: {was} — {total}-mal in echten Gesprächen "
+                    f"(selbst-kalibrierte Schwelle: {schwelle}). Mein Plan: dieses Blatt soll "
+                    f"eine Fähigkeit bekommen. Darf ich das priorisieren? "
+                    f"(Freigabe über genus governance; die Umsetzung bleibt gegated.)"
+                ),
+            },
+        })
+    return candidates
+
+
+DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates,
+             _rule_calibration_candidates, _verstehens_luecke_candidates)

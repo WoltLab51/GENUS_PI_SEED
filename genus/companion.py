@@ -1254,7 +1254,11 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
     known = verstehen.kinds(conn) or {leaf for leaf, _ in verstehen.RASTER_SEED}
     if kind == "unklar" or kind not in known:
         # kein Freitext-Fallback mehr (Zwickys Kategorien sollen erschöpfend sein) -- ein
-        # unbekanntes/unklares Blatt ändert ehrlich nichts, statt etwas zu erfinden
+        # unbekanntes/unklares Blatt ändert ehrlich nichts, statt etwas zu erfinden. Aber es
+        # wird GEZÄHLT (nur Struktur, nie Nutzer-Text): "unklar" ist ein blinder Fleck des
+        # Rasters, und genau diese Zählung ist das Material für den VerstehensLuecke-Detector
+        # (Selbst-Codieren Stufe 0 -- GENUS spürt selbst, wo sein Verstehen nicht hinreicht)
+        _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
         return None
     zelle = verstehen.zelle_of(conn, kind)
     attempted = [kind] + ([zelle] if zelle else [])
@@ -1382,7 +1386,10 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             if teile:
                 return {"text": _komponiere(teile), "question": anchor}
             # der Deuter lief und fand ehrlich nichts -- kein Rückfall auf den gierigen
-            # Wort-Lookup mehr (siehe _NICHT_VERSTANDEN-Kommentar oben)
+            # Wort-Lookup mehr (siehe _NICHT_VERSTANDEN-Kommentar oben). Gezählt wird der
+            # Fall trotzdem (Struktur, nie Text): auch ein leerer Lauf ist ein blinder Fleck
+            if not segmente:
+                _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
             return {"text": _NICHT_VERSTANDEN, "question": question}
     text = _wort_antwort(conn, question)
     if text is not None:
