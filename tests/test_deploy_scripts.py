@@ -202,6 +202,70 @@ def test_learner_gap_climb_rotates_past_an_unclosable_gap(tmp_path):
     assert "Q_STUCK" in attempts
 
 
+def test_learner_offers_a_targeted_fachliste_ahead_of_general_breadth():
+    # Punkt 3 (Fachwissen gezielt aufbauen): a domain list is a NEW priority tier, tried before
+    # the general breadth lists -- not just one more equally-weighted round-robin entry (that
+    # would dilute "gezielt" into "genauso schnell wie 5000 andere Wörter")
+    script = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
+    assert "FACHLISTEN" in script and "learn_fach" in script
+    assert "learn_fach || learn_next || learn_gap" in script
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash to run the learner script")
+def test_learner_fachliste_is_learned_before_the_general_wordlist(tmp_path):
+    repo = tmp_path
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    shutil.copy(ROOT / "deploy" / "pi_learn.sh", repo / "pi_learn.sh")
+    (repo / "observe_konzept.sh").write_text('#!/usr/bin/env bash\necho "$1" >> "$OBSERVE_LOG"\n')
+    (repo / "observe_lexem.sh").write_text("#!/usr/bin/env bash\ntrue\n")
+    (repo / "observe_dbnary.sh").write_text("#!/usr/bin/env bash\ntrue\n")
+    for f in ("pi_learn.sh", "observe_konzept.sh", "observe_lexem.sh", "observe_dbnary.sh"):
+        os.chmod(repo / f, 0o755)
+    (repo / "allgemein.txt").write_text("Tisch\nStuhl\n")
+    (repo / "fachliste.txt").write_text("Datenbank\nAlgorithmus\n")
+    observed = repo / "observed.txt"
+    observed.write_text("")
+    env = {
+        **os.environ,
+        "GENUS_REPO_DIR": str(repo), "GENUS_DB_PATH": str(repo / "db.sqlite3"),
+        "GENUS_LOG_DIR": str(repo / "logs"), "GENUS_LEARN_WORDLIST": str(repo / "allgemein.txt"),
+        "GENUS_LEARN_FACHLISTEN": str(repo / "fachliste.txt"),
+        "GENUS_LEARN_ONCE": "1", "GENUS_EMBED_PYTHON": "/nonexistent", "OBSERVE_LOG": str(observed),
+    }
+    for _ in range(4):
+        subprocess.run(["bash", str(repo / "pi_learn.sh")], env=env, check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # both Fachliste words learned FIRST, general breadth only once the Fachliste is exhausted
+    assert observed.read_text().split() == ["Datenbank", "Algorithmus", "Tisch", "Stuhl"]
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash to run the learner script")
+def test_learner_without_a_fachliste_behaves_exactly_as_before(tmp_path):
+    repo = tmp_path
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    shutil.copy(ROOT / "deploy" / "pi_learn.sh", repo / "pi_learn.sh")
+    (repo / "observe_konzept.sh").write_text('#!/usr/bin/env bash\necho "$1" >> "$OBSERVE_LOG"\n')
+    (repo / "observe_lexem.sh").write_text("#!/usr/bin/env bash\ntrue\n")
+    (repo / "observe_dbnary.sh").write_text("#!/usr/bin/env bash\ntrue\n")
+    for f in ("pi_learn.sh", "observe_konzept.sh", "observe_lexem.sh", "observe_dbnary.sh"):
+        os.chmod(repo / f, 0o755)
+    (repo / "allgemein.txt").write_text("Tisch\nStuhl\n")
+    observed = repo / "observed.txt"
+    observed.write_text("")
+    env = {
+        **os.environ,
+        "GENUS_REPO_DIR": str(repo), "GENUS_DB_PATH": str(repo / "db.sqlite3"),
+        "GENUS_LOG_DIR": str(repo / "logs"), "GENUS_LEARN_WORDLIST": str(repo / "allgemein.txt"),
+        "GENUS_LEARN_ONCE": "1", "GENUS_EMBED_PYTHON": "/nonexistent", "OBSERVE_LOG": str(observed),
+    }
+    env.pop("GENUS_LEARN_FACHLISTEN", None)
+    for _ in range(2):
+        subprocess.run(["bash", str(repo / "pi_learn.sh")], env=env, check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    assert observed.read_text().split() == ["Tisch", "Stuhl"]
+
+
 def test_learner_installer_is_a_continuous_idle_priority_service():
     script = (ROOT / "deploy" / "pi_install_learner.sh").read_text(encoding="utf-8")
     assert "genus-learner.service" in script

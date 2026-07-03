@@ -249,10 +249,18 @@ Jede Scheibe klein, einzeln testbar, einzeln live nachweisbar:
 4. **Tagespuffer + Nacht-Konsolidierung** — inkl. Vergessen und der Treffer-Quote-Kennzahl.
 5. **Semantisierung** — wiederkehrende Episoden → Wissens-Kandidaten → Korroboration/Inquiry.
 
-Das Fachwissen-Ziel (Ronnys Wahl von heute) dockt am Wissensgraphen an (Lerner gezielt auf
-ein Gebiet ansetzen) und ist von diesen Scheiben unabhängig startbar — aber erst Scheibe 2
-macht es im Gespräch ERLEBBAR. Empfehlung daher: ① und ② zuerst, dann Fachwissen einfüllen,
-dann ③–⑤.
+Das Fachwissen-Ziel dockt am Wissensgraphen an (Lerner gezielt auf ein Gebiet ansetzen) und ist
+von diesen Scheiben unabhängig startbar — aber erst Scheibe 2 macht es im Gespräch ERLEBBAR.
+Empfehlung daher: ① und ② zuerst, dann Fachwissen einfüllen, dann ③–⑤.
+
+**Infrastruktur bereit, Inhalt offen (2026-07-03).** `deploy/pi_learn.sh` hat jetzt eine dritte,
+vorrangige Priorität (`learn_fach`, vor der allgemeinen Breite `learn_next`): eine über
+`GENUS_LEARN_FACHLISTEN` konfigurierte Domänen-Wortliste wird ZUERST gelernt, nicht im
+Gleichschritt-Round-Robin mit 5000+ allgemeinen Wörtern verdünnt. Domänen-agnostisch — noch
+keine Datei, keine gewählte Domäne. Bewusst noch offen: die eigentliche Auswahl (welches
+Fachgebiet, auf welchem Tiefen-Niveau) und, falls es dabei bleibt, eine Quelle für
+Prüfungsordnungen/Rahmenlehrpläne als Tiefe-Maßstab (im Gespräch mit Ronny, noch nicht
+entschieden) — das ist keine Infrastruktur-, sondern eine echte Inhalts-Entscheidung.
 
 **Entschieden (Ronny, 2026-07-03):**
 - **(A) Tagespuffer: JA** — Roh-Gesprächstext darf bis zur Nacht in der lokalen,

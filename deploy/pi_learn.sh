@@ -8,6 +8,9 @@ set -uo pipefail
 # Two sources on a shared edge ignite the self-checking weave (corroboration raises
 # confidence). A cursor file remembers its place, so a restart picks up where it left off.
 #
+# Priority each tick: a gezielte Fachliste (learn_fach, if configured) -> the general breadth
+# lists (learn_next, round-robin) -> die Kette (learn_gap, only once breadth is exhausted).
+#
 # It is the lowest-priority job (the installer gives it idle CPU and IO scheduling), so the
 # kernel only lets it run in true idle time and it yields instantly to the punctual ticks.
 # Between words it waits GENUS_LEARN_DELAY seconds -- not to spare the Pi but to be POLITE to
@@ -26,6 +29,14 @@ LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 # verb, then an adjective, ...) instead of finishing all nouns first. The noun list keeps the
 # legacy cursor; each other list gets its own. Override via a space-separated GENUS_LEARN_WORDLIST.
 WORDLISTS=(${GENUS_LEARN_WORDLIST:-$SCRIPT_DIR/wortschatz_de.txt $SCRIPT_DIR/wortschatz_de_verben.txt $SCRIPT_DIR/wortschatz_de_adjektive.txt})
+# "Gezielt": optional domain word list(s) (Fachwissen, Punkt 3 des Gedächtnis-Konzepts, GENUS_
+# GEDAECHTNIS.md) -- same file format/machinery as WORDLISTS (learn_from's cursor-naming already
+# generalizes to any filename), but tried FIRST every tick, ahead of the general breadth lists.
+# Equal round-robin among a 500-word Fachliste and 5000+ general words would dilute "gezielt"
+# into just another equally-weighted list; trying it first instead means it grows as fast as the
+# source allows while breadth keeps filling the remaining ticks. Empty by default -- zero
+# behaviour change until a real domain list is configured (still waiting on which domain).
+FACHLISTEN=(${GENUS_LEARN_FACHLISTEN:-})
 CURSOR="${GENUS_LEARN_CURSOR:-$(dirname "$DB_PATH")/learn.cursor}"
 RRSTATE="$(dirname "$DB_PATH")/learn.rr"      # which list to draw from next
 DELAY="${GENUS_LEARN_DELAY:-2}"            # seconds between words -- politeness to Wikidata
@@ -67,6 +78,16 @@ learn_from() {
     echo "$((start + 1))" > "$cur"
     log "learned '$word' (#$((start + 1)) of $(basename "$wl")) — concept + lexeme + dbnary + bridge"
     return 0
+}
+
+# Tries each configured Fach-list in order (not round-robin -- a small, prioritized set, not
+# competing classes); 1 if none are configured or all are exhausted for this tick.
+learn_fach() {
+    local wl
+    for wl in "${FACHLISTEN[@]}"; do
+        [ -n "$wl" ] && [ -f "$wl" ] && learn_from "$wl" && return 0
+    done
+    return 1
 }
 
 # Round-robin across the lists so the word classes interleave; 1 only when ALL are exhausted.
@@ -126,7 +147,7 @@ if [ "$_have_list" = 0 ]; then log "no word lists found — nothing to learn"; e
 # the same choice the continuous loop makes.
 if [ "${GENUS_LEARN_ONCE:-0}" = "1" ]; then
     if [ -f "$PAUSED" ]; then log "paused — skipping"; exit 0; fi
-    learn_next || learn_gap || log "nothing to learn (list exhausted, no fresh gaps)"
+    learn_fach || learn_next || learn_gap || log "nothing to learn (list exhausted, no fresh gaps)"
     exit 0
 fi
 
@@ -136,7 +157,9 @@ while true; do
     if [ -f "$PAUSED" ]; then sleep "$IDLE_SLEEP"; continue; fi
     load1="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo 0)"
     if awk "BEGIN{exit !($load1 > $MAX_LOAD)}"; then sleep "$IDLE_SLEEP"; continue; fi
-    if learn_next; then
+    if learn_fach; then
+        sleep "$DELAY"           # gezielte Fachliste geht vor der allgemeinen Breite
+    elif learn_next; then
         sleep "$DELAY"
     elif learn_gap; then
         sleep "$DELAY"           # list done -> climb the graph's own gaps (die Kette)
