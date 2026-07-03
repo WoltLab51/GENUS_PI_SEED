@@ -102,6 +102,22 @@ def test_sessions_let_a_bare_followup_retrace_the_previous_answer():
     assert "Herleitung" in answer and "wikidata" in answer   # retraced, not "kein Wort bekannt"
 
 
+def test_session_threads_last_answer_into_the_meta_zellen(monkeypatch):
+    # Antwort-Würfel Scheibe 1: a follow-up like "kürzer" needs the PREVIOUS answer, not just
+    # the previous question -- the session must carry both across turns
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    monkeypatch.setattr(deuter, "interpret", lambda q, absichten=None: {"absicht": "wiederholen"})
+    sessions: dict = {}
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions)
+    chat_id, answer = telegram_bot.handle_update(conn, _msg(2, 42, "nochmal bitte"), allowed={42}, sessions=sessions)
+
+    assert chat_id == 42
+    assert answer.startswith("Nochmal: ") and "Wolf" in answer
+
+
 def test_sessions_are_kept_separate_per_chat():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")

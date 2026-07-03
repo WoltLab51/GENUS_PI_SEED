@@ -490,6 +490,34 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
     return "\n".join(lines)
 
 
+# --- Personen-Gedächtnis, Scheibe 2: Notizen beiläufig in Antworten einweben -------------
+#
+# Scheibe 1 machte das Gedächtnis nur auf explizite Rückfrage sichtbar ("Was weißt du über
+# mich?"). Der reale nächste Schritt (Ronny) ist NICHT die automatische Extraktion aus
+# gewöhnlichem Gespräch -- die gibt es faktisch schon: die "tatsache"-Zelle des Verstehens-
+# Würfels notiert unaufgefordert erwähnte Aussagen längst (gedeckelt, unbestätigt). Was fehlt,
+# ist das WEBEN: eine Notiz taucht bisher nie beiläufig in einer anderen Antwort auf, selbst
+# wenn das Thema überschneidet. Bewusst einfach gehalten (kein Embedding-Index, self-
+# calibration-no-presets: das Volumen rechtfertigt noch keine semantische Suche) -- ein reiner
+# Substring-Treffer auf Wörtern ab 4 Zeichen (kürzere sind zu generisch, "und"/"der"/"was"
+# würden sonst ständig falsch anschlagen). Nur EIN Treffer, um nicht aufdringlich zu werden;
+# bestätigt/vermutet bleibt sichtbar unterschieden, wie überall sonst in diesem Speicher.
+
+def _notiz_bezug(conn, question: str) -> str | None:
+    """Ein kurzer, ehrlicher Nebenbei-Hinweis, falls ein Wort aus ``question`` auch in einer
+    gemerkten Notiz vorkommt -- ``None`` sonst. Nie erfunden: die Notiz wird wörtlich zitiert."""
+    worte = {w.lower() for w in _WORD.findall(question) if len(w) > 3}
+    if not worte:
+        return None
+    for note in confirmed_notes(conn):
+        if any(w in note.lower() for w in worte):
+            return f" (Nebenbei: du hast mir erzählt „{note}“.)"
+    for note in suggested_notes(conn):
+        if any(w in note.lower() for w in worte):
+            return f" (Nebenbei, noch unbestätigt: du hattest erwähnt „{note}“.)"
+    return None
+
+
 # --- a single shared answer, for any conversational channel -----------------------------
 #
 # `cli.ask_command` has its own routing (terminal-log formatting, [ASK]/[BLF]/... tags -- left
@@ -737,7 +765,7 @@ _ZELLEN_LABELS = {
 }
 
 
-def _zelle_definition(conn, guess, question, last_question):
+def _zelle_definition(conn, guess, question, last_question, last_answer, stimme=None):
     subject = guess.get("subject")
     if not subject:
         return None
@@ -747,65 +775,107 @@ def _zelle_definition(conn, guess, question, last_question):
     return respond(conn, f"Was ist {found}?")
 
 
-def _zelle_beziehung(conn, guess, question, last_question):
+def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=None):
     if not (guess.get("subject") and guess.get("object")):
         return None
     r = _relate_terms(conn, guess["subject"], guess["object"])
     return narrate_relation(conn, r) if r["relational"] else None
 
 
-def _zelle_vergleich(conn, guess, question, last_question):
+def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=None):
     if not (guess.get("subject") and guess.get("object")):
         return None
     r = _common_terms(conn, guess["subject"], guess["object"])
     return narrate_common(conn, r) if r["common"] else None
 
 
-def _zelle_grammatik(conn, guess, question, last_question):
+def _zelle_grammatik(conn, guess, question, last_question, last_answer, stimme=None):
     if not guess.get("subject"):
         return None
     r = _gender_term(conn, guess["subject"])
     return narrate_gender(r) if (r["known"] or r.get("prediction")) else None
 
 
-def _zelle_nachfrage(conn, guess, question, last_question):
+def _zelle_nachfrage(conn, guess, question, last_question, last_answer, stimme=None):
     if not last_question:
         return None
     return "\n".join(render_trace(conn, trace(conn, last_question)))
 
 
-def _zelle_tatsache(conn, guess, question, last_question):
+def _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme=None):
     remember(conn, question, source=STATEMENT_SOURCE)
     return (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
             f"(sag „merke dir: {question}“, wenn's wichtig ist, dann bin ich mir sicher).")
 
 
-def _zelle_merken(conn, guess, question, last_question):
+def _zelle_merken(conn, guess, question, last_question, last_answer, stimme=None):
     # a MODEL-read "please remember" (the explicit ritual "merke dir: ..." never reaches the
     # Deuter) -- never granted human trust off a model reading: capped note + the honest hint
     return _zelle_tatsache(conn, guess, question, last_question)
 
 
-def _zelle_erinnerung(conn, guess, question, last_question):
+def _zelle_erinnerung(conn, guess, question, last_question, last_answer, stimme=None):
     return narrate_notes(confirmed_notes(conn), suggested_notes(conn))
 
 
-def _zelle_zustand(conn, guess, question, last_question):
+def _zelle_zustand(conn, guess, question, last_question, last_answer, stimme=None):
     from genus import query
     return query.ask(conn, "zustand")["answer"]
 
 
-def _zelle_offene_fragen(conn, guess, question, last_question):
+def _zelle_offene_fragen(conn, guess, question, last_question, last_answer, stimme=None):
     return narrate_inquiries(conn, open_questions(conn))
 
 
-def _zelle_wissensfrage(conn, guess, question, last_question):
+def _zelle_wissensfrage(conn, guess, question, last_question, last_answer, stimme=None):
     # the soft landing for fine knowledge questions GENUS can't answer specifically yet
     # (eigenschaft/ursache/menge climb here): say what IS known about the subject, honestly
-    text = _zelle_definition(conn, guess, question, last_question)
+    text = _zelle_definition(conn, guess, question, last_question, last_answer, stimme)
     if text is None:
         return None
     return text + " Genauer (das, wonach du eigentlich fragst) kann ich noch nicht antworten."
+
+
+# --- der ANTWORT-WÜRFEL, erste Scheibe: die Meta-Zellen ----------------------------------
+#
+# Ronnys Weiterdenken vom Verstehens-Würfel aus: auch die ANTWORT wird komponiert, nicht nur
+# die Frage eingeordnet. Erste, bewusst kleine Scheibe: die vier Meta-Ausprägungen
+# (kuerzer/ausfuehrlicher/anders-erklaeren/wiederholen) standen im Raster schon seit der
+# Würfel-Scheibe, hatten aber KEINEN Handler -- "na wie laeufts" wurde live sogar fälschlich
+# als "kuerzer" gelesen und bekam nur "das kann ich noch nicht". Diese vier komponieren die
+# LETZTE Antwort um (``last_answer``, jetzt in der Session neben ``last_question`` geführt),
+# nie den Kern selbst -- deterministisch, wo möglich (Kürzen = erster Satz, Wiederholen =
+# wörtlich), und nur bei "anders erklären" wird die Stimme ein zweites Mal versucht (das ist
+# genau ihre Aufgabe: dieselben Fakten anders formulieren). Ohne ``last_answer`` (kein voriger
+# Zug bekannt) ist ehrliches Nichtwissen die einzig korrekte Antwort -- nichts wird erfunden.
+
+def _zelle_kuerzer(conn, guess, question, last_question, last_answer, stimme=None):
+    if not last_answer:
+        return None
+    erster_satz = last_answer.split(". ", 1)[0].rstrip(".") + "."
+    return erster_satz if erster_satz != last_answer else None   # war schon kurz -- nichts zu tun
+
+
+def _zelle_ausfuehrlicher(conn, guess, question, last_question, last_answer, stimme=None):
+    if not last_answer or not last_question:
+        return None
+    spur = "\n".join(render_trace(conn, trace(conn, last_question)))
+    return last_answer + "\n" + spur
+
+
+def _zelle_anders_erklaeren(conn, guess, question, last_question, last_answer, stimme=None):
+    if not last_answer:
+        return None
+    anders = _stimme_versucht(last_answer, stimme)   # ihre eigentliche Aufgabe: neu formulieren
+    if anders != last_answer:   # ein echter zweiter Versuch ist gelungen (Anker-geprüft)
+        return anders
+    return f"Ich kann es nur so sagen, wie ich es weiß: {last_answer}"   # ehrlich wiederholt, nie erfunden
+
+
+def _zelle_wiederholen(conn, guess, question, last_question, last_answer, stimme=None):
+    if not last_answer:
+        return None
+    return f"Nochmal: {last_answer}"
 
 
 # Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;
@@ -825,6 +895,10 @@ _HANDELBAR = {
     "zustand": _zelle_zustand,
     "offene-fragen": _zelle_offene_fragen,
     "wissensfrage": _zelle_wissensfrage,
+    "kuerzer": _zelle_kuerzer,
+    "ausfuehrlicher": _zelle_ausfuehrlicher,
+    "anders-erklaeren": _zelle_anders_erklaeren,
+    "wiederholen": _zelle_wiederholen,
 }
 
 
@@ -867,7 +941,23 @@ def _stimme_versucht(text: str, stimme) -> str:
     return text if geglaettet is None else geglaettet + _STIMME_TAG
 
 
-def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None, stimme=None) -> dict | None:
+def _personalisiert(conn, question: str, text: str, stimme, marker: str = "") -> str:
+    """Stimme-Versuch, dann ``marker`` (z.B. der Deuter-Hinweis), dann die Notiz-Einwebung
+    (Personen-Gedächtnis Scheibe 2) -- in dieser Reihenfolge: die Notiz ist eine reine,
+    deterministische Ergänzung ganz am Ende und darf die Anker-Prüfung der Stimme (die nur den
+    narrate-Kern beurteilen soll) nicht verwirren."""
+    text = _stimme_versucht(text, stimme)
+    return text + marker + (_notiz_bezug(conn, question) or "")
+
+
+_ANCHOR_BLEIBT = {   # cells that reformat/retrace the EXISTING topic, never introduce a new one
+    "nachfrage", "warum-herkunft", "vertiefung", "bezug",
+    "kuerzer", "ausfuehrlicher", "anders-erklaeren", "wiederholen",
+}
+
+
+def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
+                     last_answer: str | None = None, stimme=None) -> dict | None:
     """Map an OPEN model reading onto the Absichts-Raster and act from the known cell -- or
     climb the is_a chain to the nearest actionable ancestor -- or name honestly what GENUS
     read but cannot do yet. ``None`` only when the reading is off-grid or empty (then the
@@ -894,14 +984,16 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         if handler is None:
             continue
         hatte_handler = True
-        text = handler(conn, guess, question, last_question)
+        text = handler(conn, guess, question, last_question, last_answer, stimme)
         if text is not None:
             _record_still(verstehen.record_reading, conn, kind, "model:deuter")
             marker = "" if step in ("tatsache", "merken") else _DEUTED
+            anchor = last_question if step in _ANCHOR_BLEIBT else question
             if step in _STIMME_GEEIGNET:
-                text = _stimme_versucht(text, stimme)   # tags its own success; composes with marker
-            anchor = last_question if step in ("nachfrage", "warum-herkunft", "vertiefung", "bezug") else question
-            return {"text": text + marker, "question": anchor}
+                text = _personalisiert(conn, question, text, stimme, marker)
+            else:
+                text = text + marker
+            return {"text": text, "question": anchor}
     if hatte_handler:
         return None   # capability exists but nothing resolved here -- fail safe, never claim inability
     # known cell, no capability anywhere up the chain: say so, honestly -- and count it,
@@ -913,7 +1005,7 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
 
 
 def respond_with_deuter(conn, question: str, last_question: str | None = None,
-                         deuter=None, stimme=None) -> dict:
+                         deuter=None, stimme=None, last_answer: str | None = None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
     offene Deuter-Lesart (aufs Raster abgebildet, is_a-Fallback, ehrliche Benennung) -> letzte
     Wort-Lesart -> ehrlicher Rest. The Deuter now runs BEFORE the greedy word reading (the
@@ -924,8 +1016,17 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     :data:`_STIMME_GEEIGNET` (definition/beziehung/vergleich/grammatik/wissensfrage; a plain
     "Was ist ein Hund?" reaches the Deuter now that it runs before the word reading, so it
     must be covered too) -- is offered to it for a more natural rephrase
-    (:func:`_stimme_versucht`), always safe to fall back, never required. Multi-line/structured
-    answers (Nachfrage-Herleitung, Erinnerungen, offene Fragen) are deliberately left alone.
+    (:func:`_stimme_versucht`), always safe to fall back, never required. The SAME answers,
+    on the conversational path only (``deuter is not None``), are also offered a Notiz-Bezug
+    (:func:`_notiz_bezug`, Personen-Gedächtnis Scheibe 2) -- a personal note woven in beiläufig
+    when its text shares a word with the question. Multi-line/structured answers (Nachfrage-
+    Herleitung, Erinnerungen, offene Fragen) are deliberately left alone by both.
+
+    ``last_answer`` (optional, the EXACT text ``respond_with_deuter`` returned last turn) feeds
+    the Antwort-Würfel's Meta-Zellen (kuerzer/ausfuehrlicher/anders-erklaeren/wiederholen) --
+    a caller threads ``result["text"]`` forward the same way it threads ``result["question"]``
+    forward as the next call's ``last_question``.
+
     ``deuter=None``/``stimme=None`` degrades to the deterministic Würfel half and behaves
     exactly like ``respond_in_conversation``."""
     from genus import verstehen
@@ -938,18 +1039,25 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         return {"text": text, "question": question}
     muster = _muster_antwort(conn, question)
     if muster is not None:
-        if deuter is not None:   # record only on the conversational (bot) path, not for CLI
+        if deuter is not None:   # recording/notes only on the conversational (bot) path, not
+            # for the CLI -- Stimme itself stays independent of deuter (always offered when given)
             _record_still(verstehen.record_reading, conn, muster[1], "muster")
-        return {"text": _stimme_versucht(muster[0], stimme), "question": question}
+        text = _stimme_versucht(muster[0], stimme)
+        if deuter is not None:
+            text += _notiz_bezug(conn, question) or ""
+        return {"text": text, "question": question}
     if deuter is not None:
         guess = deuter(question)
         if guess:
-            gedeutet = _deuter_antwort(conn, guess, question, last_question, stimme=stimme)
+            gedeutet = _deuter_antwort(conn, guess, question, last_question, last_answer, stimme=stimme)
             if gedeutet is not None:
                 return gedeutet
     text = _wort_antwort(conn, question)
     if text is not None:
-        return {"text": _stimme_versucht(text, stimme), "question": question}
+        text = _stimme_versucht(text, stimme)
+        if deuter is not None:
+            text += _notiz_bezug(conn, question) or ""
+        return {"text": text, "question": question}
     return {"text": _UNKNOWN_FALLBACK, "question": question}
 
 

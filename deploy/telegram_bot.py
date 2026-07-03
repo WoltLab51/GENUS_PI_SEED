@@ -110,12 +110,13 @@ def handle_update(
     """Pure logic, no network: given one Telegram update + the allow-list, decide whether to
     answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer.
 
-    ``sessions`` (optional), keyed by chat_id, holds each conversation's last question so a bare
-    follow-up ("warum?", "woher weißt du das?") can be read against it (``companion.
-    respond_in_conversation``) instead of falling through to "kein Wort bekannt". In-process
-    only, forgotten on a restart -- an honest, small limitation: this is UX-session plumbing,
-    not knowledge, so it deliberately doesn't touch the ledger (Ledger != Memory). Omit
-    ``sessions`` for the plain, stateless behaviour (unchanged)."""
+    ``sessions`` (optional), keyed by chat_id, holds each conversation's last question AND last
+    answer (``{"question": ..., "answer": ...}``) so a bare follow-up ("warum?", "kürzer",
+    "nochmal", ...) can be read against them (``companion.respond_with_deuter``) instead of
+    falling through to "kein Wort bekannt". In-process only, forgotten on a restart -- an
+    honest, small limitation: this is UX-session plumbing, not knowledge, so it deliberately
+    doesn't touch the ledger (Ledger != Memory). Omit ``sessions`` for the plain, stateless
+    behaviour (unchanged)."""
     from genus import companion, verstehen
     import deuter
     import stimme
@@ -146,13 +147,15 @@ def handle_update(
                 (lambda satz: stimme.formuliere(satz, model=geteiltes_modell))
                 if geteiltes_modell is not None else None
             )
+            vorher = sessions.get(chat_id) or {}
             result = companion.respond_with_deuter(
-                conn, question, sessions.get(chat_id),
+                conn, question, vorher.get("question"),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot),
                 stimme=stimme_fn,
+                last_answer=vorher.get("answer"),
             )
             answer = result["text"]
-            sessions[chat_id] = result["question"]
+            sessions[chat_id] = {"question": result["question"], "answer": answer}
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering {question!r}: {exc}")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."

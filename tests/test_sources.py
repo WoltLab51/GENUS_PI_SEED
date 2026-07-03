@@ -1043,6 +1043,79 @@ def test_stimme_is_not_consulted_for_rituals_or_the_honest_fallback():
     assert calls == []
 
 
+def test_notiz_bezug_finds_a_confirmed_note_sharing_a_word_with_the_question():
+    from genus import companion
+    conn = _isa_graph()
+    companion.remember(conn, "ich habe zwei Hunde")
+    aside = companion._notiz_bezug(conn, "Was ist ein Hund?")
+    assert aside is not None and "zwei Hunde" in aside and "Nebenbei" in aside
+
+
+def test_notiz_bezug_marks_a_suggested_note_as_unconfirmed():
+    from genus import companion
+    conn = _isa_graph()
+    companion.remember(conn, "ich habe zwei Hunde", source=companion.STATEMENT_SOURCE)
+    aside = companion._notiz_bezug(conn, "Was ist ein Hund?")
+    assert aside is not None and "noch unbestätigt" in aside
+
+
+def test_notiz_bezug_prefers_a_confirmed_note_over_a_suggested_one():
+    from genus import companion
+    conn = _isa_graph()
+    companion.remember(conn, "ich hatte mal einen Hund", source=companion.STATEMENT_SOURCE)
+    companion.remember(conn, "ich habe zwei Hunde")   # explicit, told later -- confirmed wins
+    aside = companion._notiz_bezug(conn, "Was ist ein Hund?")
+    assert "zwei Hunde" in aside and "noch unbestätigt" not in aside
+
+
+def test_notiz_bezug_ignores_short_words_and_unrelated_notes():
+    from genus import companion
+    conn = _isa_graph()
+    companion.remember(conn, "ich mag Kaffee")
+    assert companion._notiz_bezug(conn, "Was ist ein Hund?") is None   # no shared word ≥4 chars
+    assert companion._notiz_bezug(conn, "Wie ist das Wetter?") is None
+
+
+def test_notiz_bezug_returns_none_without_any_notes():
+    from genus import companion
+    conn = _isa_graph()
+    assert companion._notiz_bezug(conn, "Was ist ein Hund?") is None
+
+
+def test_respond_with_deuter_weaves_a_note_into_a_word_answer_on_the_bot_path():
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    companion.remember(conn, "ich habe zwei Hunde")
+    result = companion.respond_with_deuter(conn, "Was ist ein Hund?", deuter=lambda q: None)
+    assert "Wolf" in result["text"] and "Nebenbei" in result["text"] and "zwei Hunde" in result["text"]
+
+
+def test_note_weaving_is_off_for_the_cli_path_deuter_none():
+    # respond_with_deuter(deuter=None) must exactly reproduce respond_in_conversation --
+    # the CLI never gets a beiläufig-personalised answer, only the explicit recall command does
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    companion.remember(conn, "ich habe zwei Hunde")
+    result = companion.respond_with_deuter(conn, "Was ist ein Hund?")
+    assert "Nebenbei" not in result["text"]
+    assert result == companion.respond_in_conversation(conn, "Was ist ein Hund?")
+
+
+def test_note_weaving_is_not_applied_to_remember_or_recall_or_the_honest_fallback():
+    # weaving a note right next to recording/recalling notes would be circular/confusing
+    from genus import companion
+    conn = _isa_graph()
+    companion.remember(conn, "ich habe zwei Hunde")
+    gemerkt = companion.respond_with_deuter(conn, "Merke dir: ich mag auch Katzen", deuter=lambda q: None)
+    assert "Nebenbei" not in gemerkt["text"]
+    abgerufen = companion.respond_with_deuter(conn, "Was weißt du über mich?", deuter=lambda q: None)
+    assert "Nebenbei" not in abgerufen["text"]
+    unklar = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=lambda q: None)
+    assert "Nebenbei" not in unklar["text"]
+
+
 def test_gender_pattern_skips_filler_words_instead_of_grabbing_them():
     # live (2026-07-02): "welchen Artikel hat eigentlich Tisch?" grabbed "eigentlich" as the
     # noun and answered from the "-ich" suffix rule -- fillers are now skipped in the patterns
@@ -1175,6 +1248,86 @@ def test_deuter_reading_climbs_the_is_a_chain_to_the_nearest_actionable_cell():
     assert "Wolf" in result["text"]                        # what IS known about the subject
     assert "kann ich noch nicht" in result["text"]         # the honest limit, named
     assert verstehen.belegung(conn, "eigenschaft")["gesamt"] == 1   # counted as the FINE cell
+
+
+# --- Antwort-Würfel, Scheibe 1: die Meta-Zellen (kuerzer/ausfuehrlicher/anders/wiederholen) --
+
+def test_kuerzer_truncates_to_the_first_sentence():
+    from genus import companion
+    conn = _isa_graph()
+    voll = "Unter »Hund« versteht GENUS: Haustier. Es zählt zu Heimtier. (Vertrauen 0.50.)"
+    deuter = lambda q: {"absicht": "kuerzer"}
+    result = companion.respond_with_deuter(conn, "kürzer bitte", last_answer=voll, deuter=deuter)
+    assert result["text"].startswith("Unter »Hund« versteht GENUS: Haustier.")
+    assert "Heimtier" not in result["text"] and "Vertrauen" not in result["text"]
+
+
+def test_kuerzer_without_a_prior_answer_fails_safe_to_the_honest_fallback():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "kuerzer"}
+    baseline = companion.respond_in_conversation(conn, "kürzer bitte")
+    result = companion.respond_with_deuter(conn, "kürzer bitte", deuter=deuter)   # no last_answer
+    assert result["text"] == baseline["text"]   # never fabricates a shortened answer from nothing
+
+
+def test_ausfuehrlicher_appends_the_provenance_trace():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "ausfuehrlicher"}
+    result = companion.respond_with_deuter(
+        conn, "ausführlicher bitte", last_question="Ist ein Hund ein Säugetier?",
+        last_answer="Ja. »Hund« zählt zu »Säugetier«.", deuter=deuter,
+    )
+    assert result["text"].startswith("Ja. »Hund« zählt zu »Säugetier«.")
+    assert "Herleitung" in result["text"] and "wikidata" in result["text"]
+
+
+def test_anders_erklaeren_uses_the_stimme_for_a_genuinely_different_phrasing():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "anders-erklaeren"}
+    stimme = lambda satz: "GENUS meint: »Hund« ist ein Haustier."
+    result = companion.respond_with_deuter(
+        conn, "kannst du das anders sagen", last_answer="Unter »Hund« versteht GENUS: Haustier.",
+        deuter=deuter, stimme=stimme,
+    )
+    assert result["text"].startswith("GENUS meint: »Hund« ist ein Haustier.")
+
+
+def test_anders_erklaeren_without_a_working_stimme_repeats_honestly():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "anders-erklaeren"}
+    result = companion.respond_with_deuter(
+        conn, "kannst du das anders sagen", last_answer="Unter »Hund« versteht GENUS: Haustier.",
+        deuter=deuter,   # kein stimme
+    )
+    assert result["text"].startswith(
+        "Ich kann es nur so sagen, wie ich es weiß: Unter »Hund« versteht GENUS: Haustier.")
+
+
+def test_wiederholen_repeats_the_last_answer_verbatim():
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "wiederholen"}
+    result = companion.respond_with_deuter(
+        conn, "nochmal bitte", last_answer="Unter »Hund« versteht GENUS: Haustier.", deuter=deuter,
+    )
+    assert result["text"].startswith("Nochmal: Unter »Hund« versteht GENUS: Haustier.")
+
+
+def test_meta_zellen_keep_the_session_anchored_on_the_original_topic():
+    # a "kürzer"/"nochmal" turn must not become the new last_question -- a later "warum?" should
+    # still retrace the ORIGINAL topic, not the meta-command
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "wiederholen"}
+    result = companion.respond_with_deuter(
+        conn, "nochmal bitte", last_question="Ist ein Hund ein Säugetier?",
+        last_answer="Ja. »Hund« zählt zu »Säugetier«.", deuter=deuter,
+    )
+    assert result["question"] == "Ist ein Hund ein Säugetier?"
 
 
 def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
