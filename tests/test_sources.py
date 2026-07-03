@@ -1377,6 +1377,22 @@ def test_sozialgesten_are_counted_as_belegung_but_never_store_the_message_text()
         assert "wie schön dich zu treffen" not in row["payload"]
 
 
+def test_sozialgesten_refuse_a_long_sentence_even_if_the_model_reads_one():
+    # live gefunden direkt beim Nachverifizieren: eine Hilfe-Bitte für einen Familienausflug
+    # wurde als "abschied" gelesen -- ein selbstsicheres "Bis bald!" darauf ist SCHLIMMER als
+    # die ehrliche Lücken-Meldung, weil es die Fehldeutung unsichtbar macht. Ein echter Gruß/
+    # Dank/Abschied ist so gut wie immer kurz; ein langer Satz in dieser Zelle ist fast sicher
+    # ein Fehlgriff -- die Wortzahl-Bremse lässt ihn dann ehrlich durchfallen statt zu antworten.
+    from genus import companion
+    conn = _isa_graph()
+    lang = "Ich möchte einen Familienausflug planen. Kannst du mir helfen?"
+    deuter = lambda q: {"absicht": "abschied", "subject": None}
+    baseline = companion.respond_in_conversation(conn, lang)
+    result = companion.respond_with_deuter(conn, lang, deuter=deuter)
+    assert "Bis bald" not in result["text"]
+    assert result["text"] == baseline["text"]   # fällt ehrlich durch, statt falsch zu antworten
+
+
 def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
     # the Deuter now runs on free phrasing the fixed _REL_PATTERNS regex can't parse -- the
     # extracted subject/object still go through the exact same graph reasoning (_relate_terms)

@@ -890,24 +890,50 @@ def _zelle_wiederholen(conn, guess, question, last_question, last_answer, stimme
 # nicht" -- korrekt im Sinne von "keine Zelle hat gehandelt", aber absurd für den simpelsten
 # aller Gesprächseinstiege. Diese fünf sind reine Höflichkeitsfloskeln, kein Wissen -- ein
 # fester Satz ist hier keine Einschränkung, sondern die richtige Antwort.
+#
+# ABER, gleich beim Nachverifizieren gefunden: ein echter Gruß/Dank/Abschied ist so gut wie
+# immer KURZ. Ein langer, mehrteiliger Satz ("Ich möchte einen Familienausflug planen, kannst
+# du mir helfen?"), den der Deuter trotzdem als "abschied" liest, ist mit an Sicherheit
+# grenzender Wahrscheinlichkeit ein Fehlgriff -- und ein selbstsicheres "Bis bald!" darauf ist
+# SCHLIMMER als die ehrliche Lücken-Meldung von vorher: die Lücken-Meldung verrät wenigstens,
+# dass etwas schiefging, ein fester Höflichkeitssatz tut das nicht. Eine Wortzahl-Bremse ist
+# hier keine Sprach-Analyse, nur eine harte, erklärbare Grenze -- lieber einmal zu oft ehrlich
+# durchfallen als einem echten Anliegen ein munteres "Bis bald!" hinterherrufen.
+
+_SOZIALGESTE_MAX_WOERTER = 6
+
+
+def _ist_kurze_aeusserung(question: str) -> bool:
+    return len(_WORD.findall(question)) <= _SOZIALGESTE_MAX_WOERTER
+
 
 def _zelle_gruss(conn, guess, question, last_question, last_answer, stimme=None):
+    if not _ist_kurze_aeusserung(question):
+        return None
     return "Hallo! Frag mich etwas, oder sag „was weißt du?“, um zu hören, was ich mir gemerkt habe."
 
 
 def _zelle_dank(conn, guess, question, last_question, last_answer, stimme=None):
+    if not _ist_kurze_aeusserung(question):
+        return None
     return "Gern geschehen."
 
 
 def _zelle_lob(conn, guess, question, last_question, last_answer, stimme=None):
+    if not _ist_kurze_aeusserung(question):
+        return None
     return "Danke."
 
 
 def _zelle_kritik(conn, guess, question, last_question, last_answer, stimme=None):
+    if not _ist_kurze_aeusserung(question):
+        return None
     return "Danke für die Rückmeldung — sag mir gern genauer, was nicht gepasst hat."
 
 
 def _zelle_abschied(conn, guess, question, last_question, last_answer, stimme=None):
+    if not _ist_kurze_aeusserung(question):
+        return None
     return "Bis bald!"
 
 
