@@ -126,6 +126,7 @@ def _system_prompt(absichten) -> str:
         "ich hab mir einen Wellensittich gekauft -> {\"absicht\": \"tatsache\", \"subject\": \"Wellensittich\", \"object\": null}\n"
         "warum -> {\"absicht\": \"warum-herkunft\", \"subject\": null, \"object\": null}\n"
         "kannst du mir ein Haustier empfehlen -> {\"absicht\": \"empfehlungsfrage\", \"subject\": \"Haustier\", \"object\": null}\n"
+        "kannst du das nochmal sagen -> {\"absicht\": \"wiederholen\", \"subject\": null, \"object\": null}\n"
         "na wie laeufts -> {\"absicht\": \"gruss\", \"subject\": null, \"object\": null}"
     )
 
