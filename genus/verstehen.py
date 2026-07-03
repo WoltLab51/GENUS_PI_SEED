@@ -124,7 +124,7 @@ RASTER_SEED: tuple[tuple[str, str], ...] = (
     ("weltfrage", "frage-welt"),
     ("korrektur", "aussage-begriff"),
     ("tatsache", "aussage-nutzer"), ("merken", "aussage-nutzer"), ("meinung", "aussage-nutzer"),
-    ("lernen", "aufforderung-genus"),
+    ("lernen", "aufforderung-genus"), ("berechnen", "aufforderung-genus"),
     ("kuerzer", "aufforderung-gespraech"), ("ausfuehrlicher", "aufforderung-gespraech"),
     ("anders-erklaeren", "aufforderung-gespraech"), ("wiederholen", "aufforderung-gespraech"),
     ("tun", "aufforderung-welt"),

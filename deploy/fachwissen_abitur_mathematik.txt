@@ -1,0 +1,69 @@
+# Fachwissen Abitur Mathematik -- Kernbegriffe der drei klassischen Sachgebiete.
+# Quelle: KMK, "Bildungsstandards im Fach Mathematik für die Allgemeine Hochschulreife"
+# (Beschluss vom 18.10.2012), https://www.kmk.org/fileadmin/Dateien/veroeffentlichungen_beschluesse/2012/2012_10_18-Bildungsstandards-Mathe-Abi.pdf
+# -- die drei Sachgebiete selbst sind dort explizit benannt (§3.2.1.2: mindestens zwei der drei
+# müssen jede Prüfung abdecken, mindestens ein Drittel Analysis); die Begriffe je Sachgebiet
+# sind aus den Kompetenzbeschreibungen zu den Leitideen (§2.2) extrahiert.
+#
+# -- Analysis --
+Funktion
+Ableitung
+Ableitungsfunktion
+Änderungsrate
+Grenzwert
+Stetigkeit
+Monotonie
+Extremstelle
+Extremum
+Wendepunkt
+Sattelpunkt
+Nullstelle
+Tangente
+Sekante
+Integral
+Stammfunktion
+Flächeninhalt
+Faktorregel
+Summenregel
+Produktregel
+Kettenregel
+Exponentialfunktion
+Logarithmusfunktion
+Kurvendiskussion
+# -- Lineare Algebra / Analytische Geometrie --
+Vektor
+Ortsvektor
+Richtungsvektor
+Skalarprodukt
+Kreuzprodukt
+Kollinearität
+Gerade
+Ebene
+Normalenform
+Parameterform
+Lagebeziehung
+Schnittpunkt
+Schnittwinkel
+Abstand
+Matrix
+Gleichungssystem
+Lösungsmenge
+Determinante
+Tupel
+Winkel
+# -- Stochastik --
+Wahrscheinlichkeit
+Zufallsgröße
+Zufallsexperiment
+Erwartungswert
+Standardabweichung
+Varianz
+Binomialverteilung
+Normalverteilung
+Baumdiagramm
+Vierfeldertafel
+Stichprobe
+Hypothesentest
+Signifikanzniveau
+Simulation
+Verteilung

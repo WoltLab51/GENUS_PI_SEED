@@ -868,6 +868,24 @@ def test_why_cli_traces_a_relation(monkeypatch):
     assert "[WHY]" in result.output and "Säugetier" in result.output and "Vertrauen" in result.output
 
 
+def test_ableitung_cli_computes_exactly():
+    result = CliRunner().invoke(cli.main, ["ableitung", "3x^2 + 2x"])
+    assert result.exit_code == 0, result.output
+    assert "[MATH]" in result.output and "6*x + 2" in result.output
+
+
+def test_ableitung_cli_honestly_fails_on_gibberish():
+    result = CliRunner().invoke(cli.main, ["ableitung", "quatsch mit soße"])
+    assert result.exit_code == 1
+    assert "kein bekanntes Symbol" in result.output
+
+
+def test_ableitung_cli_respects_variable_and_ordnung_options():
+    result = CliRunner().invoke(cli.main, ["ableitung", "x^3 - 3x", "--ordnung", "2"])
+    assert result.exit_code == 0, result.output
+    assert "f''(x)" in result.output and "6*x" in result.output
+
+
 def test_why_followup_recognizes_the_closed_set_of_cue_phrases():
     from genus import companion
     for phrase in ("warum?", "Warum", "wieso??", "  weshalb ", "Woher weißt du das?",
@@ -1176,6 +1194,58 @@ def test_gender_pattern_skips_filler_words_instead_of_grabbing_them():
     reactors.observe_relation(conn, "Tisch@de", "grammatical_gender", "maskulin", "wikidata-lexemes")
     r = companion.gender_question(conn, "Welchen Artikel hat eigentlich Tisch?")
     assert r["gender_q"] and r["noun"] == "Tisch" and r["known"] == ["maskulin"]
+
+
+def test_ableitung_frage_recognizes_bestimme_and_berechne_and_leite_ab():
+    from genus import companion
+    for text, erwartet in [
+        ("Bestimme die Ableitung von f(x) = 3x^2 + 2x", "6*x + 2"),
+        ("Berechne die zweite Ableitung von f(x) = x^3 - 3x", "6*x"),
+        ("Leite f(x) = sin(x) ab", "cos(x)"),
+        ("Wie lautet die Ableitung von f(t) = 2t^2 + 5?", "4*t"),
+    ]:
+        r = companion.ableitung_frage(text)
+        assert r["berechnung_q"] and r["ok"] and r["ableitung"] == erwartet, text
+
+
+def test_ableitung_frage_is_false_for_an_unrelated_question():
+    from genus import companion
+    assert companion.ableitung_frage("Was ist ein Fahrrad?") == {"berechnung_q": False}
+
+
+def test_narrate_ableitung_shows_the_exact_result_with_the_right_number_of_strokes():
+    from genus import companion
+    r = companion.ableitung_frage("Berechne die zweite Ableitung von f(x) = x^3 - 3x")
+    text = companion.narrate_ableitung(r)
+    assert "f''(x) = 6*x" in text and "exakt berechnet" in text
+
+
+def test_narrate_ableitung_is_honest_about_an_unreadable_term():
+    from genus import companion
+    r = companion.ableitung_frage("Bestimme die Ableitung von f(x) = quatsch mit soße")
+    text = companion.narrate_ableitung(r)
+    assert "kann ich nicht ausrechnen" in text
+
+
+def test_ableitung_is_reached_through_the_muster_dispatch():
+    from genus import companion
+    conn = _fresh()
+    result = companion.respond_with_deuter(conn, "Bestimme die Ableitung von f(x) = 3x^2 + 2x")
+    assert "6*x + 2" in result["text"]
+
+
+def test_ableitung_answer_is_never_offered_to_the_stimme():
+    # ein Formel-Ergebnis darf nie umformuliert werden -- viel zu hohes Korruptionsrisiko
+    # (dieselbe Klasse wie "Kernobst" -> "Kernaubere"), deshalb bewusst nicht in
+    # _STIMME_GEEIGNET; hier direkt bewiesen: eine Stimme, die IMMER etwas anderes zurückgibt,
+    # darf trotzdem nie zum Zug kommen
+    from genus import companion
+    conn = _fresh()
+    calls = []
+    stimme = lambda satz: (calls.append(satz) or "VERFÄLSCHT")
+    result = companion.respond_with_deuter(
+        conn, "Bestimme die Ableitung von f(x) = 3x^2 + 2x", deuter=lambda q: None, stimme=stimme)
+    assert calls == [] and "6*x + 2" in result["text"] and "VERFÄLSCHT" not in result["text"]
 
 
 def test_zaehlt_zu_is_a_deterministic_relation_pattern():

@@ -21,6 +21,7 @@ from genus import (
     integrity,
     learning,
     ledger,
+    mathematik,
     maturation,
     operation,
     projection,
@@ -600,6 +601,21 @@ def gender_rule_command() -> None:
                 )
     finally:
         conn.close()
+
+
+@main.command("ableitung")
+@click.argument("term")
+@click.option("--variable", default="x", show_default=True)
+@click.option("--ordnung", default=1, show_default=True, type=int, help="1=erste, 2=zweite, ...")
+def ableitung_command(term: str, variable: str, ordnung: int) -> None:
+    """Die Ableitung eines Funktionsterms -- exakt über sympy, nie geraten (Abitur-Ziel,
+    erste Aufgabenart: docs/GENUS_ROADMAP.md). Beispiel: genus ableitung "3x^2 + 2x" """
+    r = mathematik.ableitung(term, variable, ordnung)
+    if not r["ok"]:
+        click.echo(f"[MATH] {r['fehler']}")
+        raise SystemExit(1)
+    strich = "'" * ordnung
+    click.echo(f"[MATH] f({variable}) = {r['term']}  ->  f{strich}({variable}) = {r['ableitung']}")
 
 
 @main.command("concept")

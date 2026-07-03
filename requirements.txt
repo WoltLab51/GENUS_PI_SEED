@@ -1,3 +1,4 @@
 click>=8.1
 psutil>=5.9
+sympy>=1.12
 pytest>=8.0,<10

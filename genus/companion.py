@@ -369,6 +369,59 @@ def narrate_gender(r: dict) -> str:
     return f"GENUS kennt »{r['noun']}« nicht gut genug, um auch nur zu vermuten — es rät nicht."
 
 
+# --- Rechenfähigkeit: "Bestimme die Ableitung von f(x) = ..." ---------------------------
+#
+# Das Abitur-Ziel (Ronny, 2026-07-03: "GENUS soll die Aufgaben schaffen, nicht nur die Wörter
+# kennen"): eine Ableitungs-Aufgabe ist keine Wissensfrage, sondern eine Rechnung -- exakt über
+# genus.mathematik (sympy), niemals vom Deuter geraten. Diese feste Formulierung ist wie
+# relate/common/gender_question ein deterministisches Muster: es fasst NUR eine erkennbare
+# Aufgabenstellung auf, rechnet über den echten Kern und ist genauso selbst-prüfend (ein
+# unlesbarer Term liefert ehrlich {"ok": False}, nie eine erfundene Ableitung).
+
+_ORDNUNGSWORT = {"erste": 1, "zweite": 2, "dritte": 3}
+_MATHTERM = r"([A-Za-z0-9äöüÄÖÜß\s\^\*\+\-/,\.\(\)]+?)"
+_ABLEITUNG_PATTERNS = [
+    re.compile(
+        r"\b(?:bestimme|berechne|wie\s+lautet)\s+" + _FILL + r"die\s+(?:(erste|zweite|dritte)\s+)?"
+        r"ableitung\s+von\s+f\(?(\w)\)?\s*=\s*" + _MATHTERM + r"[.!?]?\s*$", re.I),
+    re.compile(r"\bleite\s+f\(?(\w)\)?\s*=\s*" + _MATHTERM + r"\s+ab[.!?]?\s*$", re.I),
+]
+
+
+def _ableitung_frage(text: str) -> dict | None:
+    """Erkennt eine feste Ableitungs-Aufgabenformulierung; ``None`` sonst. Gibt
+    ``{"term", "variable", "ordnung"}`` zurück -- reine Extraktion, keine Rechnung."""
+    m = _ABLEITUNG_PATTERNS[0].search(text)
+    if m:
+        ordnung = _ORDNUNGSWORT.get((m.group(1) or "").lower(), 1)
+        return {"term": m.group(3).strip(), "variable": m.group(2), "ordnung": ordnung}
+    m = _ABLEITUNG_PATTERNS[1].search(text)
+    if m:
+        return {"term": m.group(2).strip(), "variable": m.group(1), "ordnung": 1}
+    return None
+
+
+def ableitung_frage(text: str) -> dict:
+    """Die Ableitungs-Aufgabe in ``text``, exakt gerechnet; ``{"berechnung_q": False}``,
+    wenn keine erkennbare Aufgabenstellung vorliegt."""
+    from genus import mathematik
+
+    gefunden = _ableitung_frage(text)
+    if gefunden is None:
+        return {"berechnung_q": False}
+    r = mathematik.ableitung(gefunden["term"], gefunden["variable"], gefunden["ordnung"])
+    r["berechnung_q"] = True
+    return r
+
+
+def narrate_ableitung(r: dict) -> str:
+    if not r["ok"]:
+        return f"Das kann ich nicht ausrechnen: {r['fehler']}"
+    strich = "'" * r["ordnung"]
+    return (f"f{strich}({r['variable']}) = {r['ableitung']} "
+            f"(exakt berechnet, für f({r['variable']}) = {r['term']}).")
+
+
 # --- memory ("Merke dir: ...") -----------------------------------------------------------
 #
 # Slice 1 of Personen-Gedächtnis was named "person:ronny", but Ronny immediately used it to
@@ -505,9 +558,10 @@ def _ritual_antwort(conn, question: str) -> str | None:
 
 
 def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
-    """The fixed-pattern cells (relation/comparative/gender) -- self-verifying: a pattern only
-    claims the question when its terms actually resolve in the graph. Returns
-    ``(text, zelle)`` so a caller can record WHICH cell answered; ``None`` otherwise."""
+    """The fixed-pattern cells (relation/comparative/gender/derivative) -- self-verifying: a
+    pattern only claims the question when its terms actually resolve (in the graph, or -- for
+    the derivative cell -- as a valid computable term). Returns ``(text, zelle)`` so a caller
+    can record WHICH cell answered; ``None`` otherwise."""
     rel = relate(conn, question)
     if rel.get("relational"):
         return narrate_relation(conn, rel), "beziehung"
@@ -517,6 +571,9 @@ def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
     gen = gender_question(conn, question)
     if gen.get("gender_q"):
         return narrate_gender(gen), "grammatik"
+    ab = ableitung_frage(question)
+    if ab.get("berechnung_q"):
+        return narrate_ableitung(ab), "berechnen"
     return None
 
 
@@ -1146,7 +1203,11 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         if deuter is not None:   # recording/notes only on the conversational (bot) path, not
             # for the CLI -- Stimme itself stays independent of deuter (always offered when given)
             _record_still(verstehen.record_reading, conn, muster[1], "muster")
-        text = _stimme_versucht(muster[0], stimme)
+        # dieselbe Eignungs-Prüfung wie beim Deuter-Pfad (_STIMME_GEEIGNET) -- live gefunden
+        # (2026-07-03): bislang lagen alle drei Muster-Zellen zufällig IN der Menge, sodass die
+        # fehlende Prüfung hier nie auffiel; die neue "berechnen"-Zelle (exakte Formel, viel zu
+        # hohes Korruptionsrisiko bei einer Umformulierung) deckte die Lücke sofort auf
+        text = _stimme_versucht(muster[0], stimme) if muster[1] in _STIMME_GEEIGNET else muster[0]
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
         return {"text": text, "question": question}
