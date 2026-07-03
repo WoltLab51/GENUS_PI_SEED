@@ -295,12 +295,23 @@ def _atlas_facts() -> str:
     can be regenerated and a test can enforce currency.
     """
     import genus
-    from genus import constants, experience, rules
+    from genus import companion, constants, experience, rules, verstehen, ziele
 
     metric_keys = sorted({getattr(rules, n) for n in dir(rules) if n.endswith("_METRIC_KEY")})
     reactors = [reactor.__name__ for reactor in rules.REACTORS]
     detectors = [detector.__name__ for detector in experience.DETECTORS]
     budget = sorted(n for n in dir(constants) if n.endswith("_THRESHOLD"))
+
+    # Ronnys Frage (2026-07-03: "kann die Doku nicht völlig abgeleitet sein? dann wäre sie
+    # immer auf Stand") -- der Zustand des Ziel-Graphen und der Dispatch-Umfang sind
+    # CODE-Zustand (keine DB nötig, ziele.py/companion.py/verstehen.py sind die Quelle), also
+    # gehören auch sie hierher statt als von-Hand-getippte Zahl in Commit-Texten und Roadmap.
+    faehigkeiten_status = {f_id: status for f_id, _, status in ziele.FAEHIGKEIT_SEED}
+    status_zaehlung = {"live": 0, "teilweise": 0, "fehlt": 0}
+    for status in faehigkeiten_status.values():
+        status_zaehlung[status] = status_zaehlung.get(status, 0) + 1
+    pattern_listen = [n for n in dir(companion) if n.isupper() and n.endswith("_PATTERNS")]
+    muster_gesamt = sum(len(getattr(companion, n)) for n in pattern_listen)
 
     return "\n".join(
         [
@@ -314,6 +325,13 @@ def _atlas_facts() -> str:
             f"- **Beobachtungs-Reaktoren ({len(reactors)}):** " + ", ".join(reactors),
             f"- **Kognitions-Detektoren ({len(detectors)}):** " + ", ".join(detectors),
             f"- **Preset-Budget ({len(budget)} feste Schwellen):** " + ", ".join(budget),
+            f"- **Ziele:** {len(ziele.ZIEL_SEED) - 1} Ziele, {len(ziele.FAEHIGKEIT_SEED)} "
+            f"Fähigkeiten ({status_zaehlung['live']} live, {status_zaehlung['teilweise']} "
+            f"teilweise, {status_zaehlung['fehlt']} fehlt), {len(ziele.ZIEL_BRAUCHT)} braucht-Kanten",
+            f"- **Verstehens-Raster:** {len(verstehen.RASTER_SEED)} Feinblätter, "
+            f"{len(verstehen.ZELLEN)} Zwicky-Zellen",
+            f"- **Companion-Dispatch:** {len(pattern_listen)} Muster-Listen "
+            f"({muster_gesamt} Muster gesamt), {len(companion._HANDELBAR)} handelbare Zellen",
             "",
         ]
     )

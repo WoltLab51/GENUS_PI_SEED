@@ -22,3 +22,13 @@ def test_atlas_facts_command_runs():
     assert result.exit_code == 0
     assert "Beobachtungs-Reaktoren" in result.output
     assert "Preset-Budget" in result.output
+
+
+def test_atlas_facts_derives_goal_and_dispatch_state_not_hand_typed():
+    # Ronnys Frage (2026-07-03): "kann die Doku nicht völlig abgeleitet sein?" -- Ziel-Graph-
+    # Zustand und Dispatch-Umfang sind Code-Zustand, keine Prosa, die von Hand nachgeführt
+    # werden muss (und deshalb driften kann)
+    text = _atlas_facts()
+    assert "Ziele:" in text and "Fähigkeiten" in text and "fehlt" in text
+    assert "Verstehens-Raster:" in text and "Feinblätter" in text
+    assert "Companion-Dispatch:" in text and "handelbare Zellen" in text

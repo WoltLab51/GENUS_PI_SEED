@@ -1,7 +1,11 @@
 # GENUS ROADMAP
 
-> Vom heutigen Stand (v1.14 — der Geist ist erwacht, GENUS lernt 24/7) bis zum Zielsystem der
-> Architektur-Karte. Ein **Bau-Instrument**, keine Wunschliste.
+> Vom heutigen Stand bis zum Zielsystem der Architektur-Karte. Ein **Bau-Instrument**, keine
+> Wunschliste. Die exakten, driftfreien Zahlen (Version, Ziele/Fähigkeiten, Raster-Größe,
+> Dispatch-Umfang) stehen NICHT hier, sondern in `docs/genus_atlas_facts.md` — generiert aus
+> dem Code via `genus atlas-facts`, ein Test erzwingt die Aktualität. Diese Datei hier ist die
+> HISTORIE (warum, in welcher Reihenfolge, welche Funde) — die kann kein Code ableiten, die
+> wird geschrieben. Aktuellster Kurs-Wendepunkt: `docs/GENUS_AUDIT_2026_07.md`.
 
 ---
 
