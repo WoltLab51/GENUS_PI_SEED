@@ -986,6 +986,48 @@ def test_a_real_question_is_never_mistaken_for_a_followup():
     assert result["question"] == "Was ist ein Hund?"   # a real question always overrides, never a stale one
 
 
+def test_stimme_rephrases_a_deterministic_word_answer():
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    stimme = lambda satz: "»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt."
+    result = companion.respond_with_deuter(conn, "Was ist ein Hund?", stimme=stimme)
+    assert result["text"].startswith("»Hund« ist laut GENUS")
+    assert "Sprachlich vom Modell geglättet" in result["text"]
+
+
+def test_stimme_rephrases_a_deterministic_relation_answer():
+    from genus import companion
+    conn = _isa_graph()
+    stimme = lambda satz: "»Hund« gehört laut GENUS zu »Säugetier«."
+    result = companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", stimme=stimme)
+    assert result["text"].startswith("»Hund« gehört laut GENUS")
+    assert "Sprachlich vom Modell geglättet" in result["text"]
+
+
+def test_stimme_none_or_failed_rephrase_keeps_the_original_template():
+    from genus import companion
+    conn = _isa_graph()
+    baseline = companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?")
+    for stimme in (None, lambda satz: None):
+        result = companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", stimme=stimme)
+        assert result == baseline
+        assert "geglättet" not in result["text"]
+
+
+def test_stimme_is_not_consulted_for_rituals_or_the_honest_fallback():
+    # the first slice is deliberately scoped to Muster/Wort cells -- memory, recall, and the
+    # honest "nichts erkannt" fallback are left exactly as they are (no value in rephrasing a
+    # short, already-clear sentence, and less surface for a faithfulness slip)
+    from genus import companion
+    conn = _isa_graph()
+    calls = []
+    stimme = lambda satz: (calls.append(satz) or None)
+    companion.respond_with_deuter(conn, "Merke dir: ich mag Kaffee", stimme=stimme)
+    companion.respond_with_deuter(conn, "asdf ganz unklare frage", stimme=stimme)
+    assert calls == []
+
+
 def test_gender_pattern_skips_filler_words_instead_of_grabbing_them():
     # live (2026-07-02): "welchen Artikel hat eigentlich Tisch?" grabbed "eigentlich" as the
     # noun and answered from the "-ich" suffix rule -- fillers are now skipped in the patterns

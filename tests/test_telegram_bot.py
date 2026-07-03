@@ -11,6 +11,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "deploy"))
 import telegram_bot  # noqa: E402  (deploy/ script, imported directly for its pure logic)
 import deuter  # noqa: E402
+import stimme  # noqa: E402
+
+
+class _FakeModel:
+    """A minimal stand-in for llama_cpp.Llama's chat-completion surface -- no real model,
+    no GGUF file, just the one method deuter.py/stimme.py actually call."""
+
+    def __init__(self, reply: str):
+        self.reply = reply
+        self.calls: list = []
+
+    def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+        self.calls.append(messages)
+        return {"choices": [{"message": {"content": self.reply}}]}
 
 
 @pytest.fixture(autouse=True)
@@ -19,9 +33,10 @@ def _no_real_deuter_model(monkeypatch):
     installed on the machine running them (the deployed Pi has one; a fresh dev/CI box doesn't)
     -- force "not installed" by default, so a session-based test can't silently start loading
     the real 1.5B model just because a chat_id's message falls through to the fallback sentinel.
-    Tests that specifically exercise the wiring monkeypatch ``deuter.interpret`` itself, which
-    overrides this."""
+    Tests that specifically exercise the wiring monkeypatch ``deuter.interpret``/``get_model``
+    (and ``stimme.formuliere``), which override this."""
     monkeypatch.setattr(deuter, "MODEL_PATH", "/nonexistent/path/model.gguf")
+    monkeypatch.setattr(stimme, "MODEL_PATH", "/nonexistent/path/model.gguf")
 
 
 def _fresh():
@@ -143,6 +158,70 @@ def test_deuter_never_calls_a_real_question_a_statement():
     assert deuter._looks_like_question("kannst du mir das erklären")
     assert not deuter._looks_like_question("ich habe zwei Hunde")
     assert not deuter._looks_like_question("mein Geburtstag ist im Mai")
+
+
+def test_stimme_anchors_extracts_every_quoted_word_and_number():
+    satz = "Unter »Hund« versteht GENUS: Haustier. (Vertrauen 0.50 — hergeleitet.)"
+    assert stimme._anchors(satz) == ["Hund", "0.50"]
+
+
+def test_stimme_formuliere_returns_the_rephrase_when_every_anchor_survives():
+    satz = "Unter »Hund« versteht GENUS: Haustier, dessen Vorfahre der Wolf ist."
+    model = _FakeModel("»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt.")
+    result = stimme.formuliere(satz, model=model)
+    assert result == model.reply
+    assert model.calls and model.calls[0][1]["content"] == satz   # the original, unmodified
+
+
+def test_stimme_formuliere_fails_safe_when_an_anchor_goes_missing():
+    # the model dropped the quoted word entirely -- a faithfulness violation, not a style choice
+    satz = "Unter »Hund« versteht GENUS: Haustier."
+    model = _FakeModel("Ein Tier, das gerne bellt.")
+    assert stimme.formuliere(satz, model=model) is None
+
+
+def test_stimme_formuliere_fails_safe_when_a_number_is_altered():
+    satz = "Ja. »Apfel« zählt zu »Pflanzen«. (Vertrauen 0.50 — hergeleitet.)"
+    model = _FakeModel("»Apfel« gehört laut GENUS zu »Pflanzen«. (Vertrauen 0.95 — hergeleitet.)")
+    assert stimme.formuliere(satz, model=model) is None   # the model must not invent confidence
+
+
+def test_stimme_formuliere_returns_none_without_a_model_and_none_installed():
+    # the autouse fixture forces stimme.MODEL_PATH to a nonexistent path
+    assert stimme.formuliere("Unter »Hund« versteht GENUS: Haustier.") is None
+
+
+def test_bot_shares_one_warm_model_between_deuter_and_stimme(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    shared = _FakeModel("»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt.")
+    monkeypatch.setattr(deuter, "get_model", lambda: shared)
+    seen_models = []
+    real_formuliere = stimme.formuliere
+
+    def spy(satz, model=None):
+        seen_models.append(model)
+        return real_formuliere(satz, model=model)
+    monkeypatch.setattr(stimme, "formuliere", spy)
+
+    chat_id, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions={},
+    )
+    assert seen_models == [shared]           # stimme got the SAME object deuter.get_model() gave
+    assert "Sprachlich vom Modell geglättet" in answer
+
+
+def test_bot_falls_back_to_the_template_when_no_model_is_installed():
+    # the autouse fixture forces "not installed" -- stimme must never be consulted, and the
+    # plain deterministic answer must reach the user unmarked
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    chat_id, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions={},
+    )
+    assert "Wolf" in answer and "geglättet" not in answer
 
 
 def test_allowed_ids_parses_comma_separated_list(monkeypatch):

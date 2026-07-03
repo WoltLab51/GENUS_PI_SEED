@@ -880,14 +880,42 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None)
                     f"als Lücke gemerkt.", "question": question}
 
 
-def respond_with_deuter(conn, question: str, last_question: str | None = None, deuter=None) -> dict:
+# --- die STIMME: einen bereits verifizierten Satz natürlicher formulieren, nie erfinden -------
+#
+# Der letzte offene Plausch-Kurs-Schritt. Sitzt bewusst NACH dem Kern, anders als der Deuter
+# (der VOR jeder Antwort liest): der Satz, den sie bekommt, ist bereits aus dem Graphen gebaut
+# und geprüft (narrate/narrate_relation/…) -- ihre einzige Aufgabe ist FORMULIEREN, nie
+# HINZUFÜGEN. Die Leine ist eine Anker-Prüfung im Modell selbst (deploy.stimme.formuliere prüft
+# jedes zitierte Wort + jede Zahl), nicht Vertrauen -- ein fehlender Anker gibt hier ``None``,
+# und der bewährte Template-Satz bleibt unverändert stehen. Erste Scheibe, bewusst eng: nur die
+# rein deterministischen Zellen (Muster + Wort); Deuter-gedeutete Antworten folgen später.
+
+_STIMME_TAG = " (Sprachlich vom Modell geglättet — Fakten unverändert.)"
+
+
+def _stimme_versucht(text: str, stimme) -> str:
+    """``text``, natürlicher formuliert via ``stimme`` (dependency-injected wie ``deuter``,
+    z.B. ``deploy.stimme.formuliere``) -- unverändert, wenn ``stimme`` fehlt oder sein Versuch
+    die Faktentreue-Prüfung nicht besteht (``None``). Nie stillschweigend: eine geglättete
+    Antwort trägt sichtbar :data:`_STIMME_TAG`."""
+    if stimme is None:
+        return text
+    geglaettet = stimme(text)
+    return text if geglaettet is None else geglaettet + _STIMME_TAG
+
+
+def respond_with_deuter(conn, question: str, last_question: str | None = None,
+                         deuter=None, stimme=None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
     offene Deuter-Lesart (aufs Raster abgebildet, is_a-Fallback, ehrliche Benennung) -> letzte
     Wort-Lesart -> ehrlicher Rest. The Deuter now runs BEFORE the greedy word reading (the
     2026-07-02 bug class); the word reading remains as the final reading when the model is
     absent or reads nothing actionable. Known-cell readings are recorded as pure structure
-    (Belegungs-Kennzahl); the user's words are never stored. ``deuter=None`` degrades to the
-    deterministic Würfel half and behaves exactly like ``respond_in_conversation``."""
+    (Belegungs-Kennzahl); the user's words are never stored. When a ``stimme`` callable is
+    given, the deterministic Muster/Wort answers are offered to it for a more natural
+    rephrase (:func:`_stimme_versucht`) -- always safe to fall back, never required.
+    ``deuter=None``/``stimme=None`` degrades to the deterministic Würfel half and behaves
+    exactly like ``respond_in_conversation``."""
     from genus import verstehen
 
     if last_question and is_why_followup(question):
@@ -900,7 +928,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None, d
     if muster is not None:
         if deuter is not None:   # record only on the conversational (bot) path, not for CLI
             _record_still(verstehen.record_reading, conn, muster[1], "muster")
-        return {"text": muster[0], "question": question}
+        return {"text": _stimme_versucht(muster[0], stimme), "question": question}
     if deuter is not None:
         guess = deuter(question)
         if guess:
@@ -909,7 +937,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None, d
                 return gedeutet
     text = _wort_antwort(conn, question)
     if text is not None:
-        return {"text": text, "question": question}
+        return {"text": _stimme_versucht(text, stimme), "question": question}
     return {"text": _UNKNOWN_FALLBACK, "question": question}
 
 

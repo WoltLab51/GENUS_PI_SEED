@@ -242,6 +242,23 @@ def test_verstehen_seed_script_is_one_clean_idempotent_apply():
     assert "idempotent" in script.lower()      # re-running must never duplicate the raster
 
 
+def test_stimme_module_only_rephrases_never_invents():
+    script = (ROOT / "deploy" / "stimme.py").read_text(encoding="utf-8")
+    # the faithfulness leash: every quoted word/number must survive, or it fails to None
+    assert "_QUOTED" in script and "_NUMBER" in script
+    assert "except Exception" in script and "return None" in script   # never raises
+    # reuses the SAME model file as the Deuter -- no separate install/download needed
+    assert "qwen2.5-1.5b-instruct-q4_k_m.gguf" in script
+    for forbidden in ("import governance", "import proposals", "control.pause", "teach_relation"):
+        assert forbidden not in script
+
+
+def test_stimme_shares_the_deuter_model_not_a_second_one():
+    bot = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
+    assert "deuter.get_model()" in bot
+    assert "stimme.formuliere(satz, model=" in bot   # the shared model is threaded through
+
+
 def test_learner_wordlist_is_words_only():
     import re as _re
     lines = (ROOT / "deploy" / "wortschatz_de.txt").read_text(encoding="utf-8").splitlines()

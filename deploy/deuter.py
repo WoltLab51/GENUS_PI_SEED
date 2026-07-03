@@ -138,6 +138,15 @@ def _get_model():
     return _model
 
 
+def get_model():
+    """The warm Llama singleton, exposed so ``stimme.py`` can SHARE it (one loaded 1.5B model
+    in the bot process, not two -- every GB of RAM counts on the Pi) instead of loading its
+    own. ``None`` if the model isn't installed on this machine."""
+    if not os.path.exists(MODEL_PATH):
+        return None
+    return _get_model()
+
+
 def interpret(question: str, absichten=None) -> dict | None:
     """An OPEN, capped reading of ``question`` -- ``{"absicht", "subject", "object"}`` or
     ``None`` on ANY problem (model not installed, inference error, malformed output). Never

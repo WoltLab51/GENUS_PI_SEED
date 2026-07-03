@@ -2,16 +2,19 @@
 """Telegram bridge — a conversational membrane at the edge, nothing more.
 
 Long-polls Telegram's Bot API (outbound HTTPS only; no inbound port, no public server needed)
-and answers each allowed message with `genus.companion.respond_with_deuter` -- the same
-read-only routing `genus ask` uses (state -> relational -> comparative -> gender -> word ->
-help), aware of the PREVIOUS message in the same chat so a bare "warum?"/"woher weißt du das?"
-retraces it instead of failing (per-chat state lives here in the membrane, in-process only --
-the ledger stays the source of epistemic truth, this is UX plumbing, not knowledge). As the
-LAST resort, when nothing deterministic answers at all, a local edge model (deuter.py, kept
-warm in this process) may guess an intent + subject -- never trusted blindly, graph-verified
-by the core before it acts, never writing the answer itself. The core is untouched: this is a
-new DOOR, not a new ROOM. Strictly answer-only -- no proposal, governance, pause/resume, or any
-state-changing command is reachable here, on purpose (Hände stay parked; this is a Mundstück).
+and answers each allowed message with `genus.companion.respond_with_deuter` -- the
+Verstehens-Würfel (Rituale -> Muster-Zellen -> offene Deuter-Lesart aufs Absichts-Raster ->
+Wort-Lesart), aware of the PREVIOUS message in the same chat so a bare "warum?"/"woher weißt du
+das?" retraces it instead of failing (per-chat state lives here in the membrane, in-process
+only -- the ledger stays the source of epistemic truth, this is UX plumbing, not knowledge).
+Two capped edge models, both dependency-injected, never trusted blindly: `deuter.py` reads
+free phrasing INTO the deterministic core (an intent/subject/object GUESS, graph-verified
+before anything acts); `stimme.py` reads an ALREADY-verified answer back OUT more naturally
+(a faithfulness-checked rephrase -- every quoted word/number must survive, or the original
+template stands). They share ONE warm 1.5B model (`deuter.get_model()`), not two. Neither ever
+writes the answer itself. The core is untouched: this is a new DOOR, not a new ROOM. Strictly
+answer-only -- no proposal, governance, pause/resume, or any state-changing command is
+reachable here, on purpose (Hände stay parked; this is a Mundstück).
 
 Security: a message is answered ONLY if its sender's Telegram user id is on the allow-list
 (GENUS_TELEGRAM_ALLOWED_IDS). Everyone else is silently ignored (logged, not replied to, so a
@@ -115,6 +118,7 @@ def handle_update(
     ``sessions`` for the plain, stateless behaviour (unchanged)."""
     from genus import companion, verstehen
     import deuter
+    import stimme
 
     message = update.get("message") or update.get("edited_message")
     if not message or "text" not in message:
@@ -135,9 +139,17 @@ def handle_update(
             # the OFFER of known Absichten comes from GENUS's own sown raster (the graph is
             # authoritative); before the one clean seed-apply, the module default steps in
             angebot = verstehen.leaf_kinds(conn) or None
+            # die Stimme teilt sich das warme Deuter-Modell (ein 1.5B-Modell im Prozess, nicht
+            # zwei) -- None, solange kein Deuter-Modell installiert ist, dann bleibt es aus
+            geteiltes_modell = deuter.get_model()
+            stimme_fn = (
+                (lambda satz: stimme.formuliere(satz, model=geteiltes_modell))
+                if geteiltes_modell is not None else None
+            )
             result = companion.respond_with_deuter(
                 conn, question, sessions.get(chat_id),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot),
+                stimme=stimme_fn,
             )
             answer = result["text"]
             sessions[chat_id] = result["question"]
