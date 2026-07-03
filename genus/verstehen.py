@@ -1,187 +1,227 @@
-"""Der Verstehens-Würfel als WISSEN: das Absichts-Raster lebt als Teilgraph im Ledger.
+"""Der Verstehens-Würfel als echte Zwicky-Box: drei unabhängige Parameter, kein flaches Raster.
 
-Ronnys Einsicht (2026-07-03): "die Unterscheidungen stehen ja alle im Zusammenhang. das kennen
-wir von den Begriffen." Das Raster der Gesprächs-Absichten ist keine Konfigurationsliste im
-Code -- es ist Wissen, in exakt derselben Form wie alles andere Wissen hier: Ausprägungen sind
-Knoten (``absicht:definition``), ihre Zusammenhänge sind gewöhnliche, herkunfts-tragende
-``is_a``-Relationen, gesät mit Quelle "ronny" (Mensch, voll vertraut -- wie der Lehrer-Loop).
-Damit erbt das Verstehen die komplette vorhandene Maschinerie umsonst: Herkunft und Vertrauen
-je Kante, Read-time-Konfidenz, Widerspruch->Inquiry, und später Governance für vom Scan
-VORGESCHLAGENE neue Unterscheidungen (gedeckelt, bis bestätigt).
+Ronny (2026-07-03, nach einer echten enttäuschenden Session): "wir machen noch grundsätzliche
+Dinge falsch, denke ich! in welche Merkmale zerfällt denn eine Nachricht?" -- und, schärfer:
+"ich habe von Anfang an Zwicky gesagt! mach das so richtig wissenschaftlich!" Die vorige
+Fassung dieses Moduls hatte EIN Raster ("Absicht") mit ~30 Werten und einer is_a-Fallback-
+Leiter -- das ist immer noch eine LISTE, kein morphologischer Kasten. Zwickys General
+Morphological Analysis (1948/1969) hat vier Schritte: (1) unabhängige Parameter finden,
+(2) ihre Werte aufzählen, (3) das Kreuzprodukt bilden, (4) KREUZ-KONSISTENZ prüfen -- welche
+Kombinationen sind überhaupt sinnvoll. Schritt 4 fehlte komplett; die Live-Fehlgriffe von
+heute (Wetterfrage->vergleich, Hilfe-Bitte->abschied) lagen alle auf Zellen, die es als
+eigenständiges Ding in der flachen Liste gar nicht gab.
 
-Zwei Radien, eine Disziplin: fürs LESEN ist das Raster von Anfang an groß (beobachten kostet
-nichts und kann nichts verderben); GEHANDELT wird nur aus Zellen, für die im Companion ein
-deterministischer Kern existiert -- Können ist Code, Wissen über Absichten ist Graph. Eine
-gelesene Zelle ohne Können ist kein Fehler, sondern ein benannter Sammelplatz: GENUS sagt
-ehrlich, WAS es noch nicht kann, und die Belegungszahlen priorisieren den Ausbau aus gelebten
-Gesprächen statt aus Bauchgefühl.
+Drei Parameter, aus etablierter Wissenschaft, nicht ad-hoc erfunden:
+- **Sprechakt** (Searle 1969, Sprechakttheorie): frage, aussage, aufforderung, floskel --
+  WAS für ein sprachlicher Zug ist das.
+- **Gegenstand**: begriff (ein Wort/Konzept im eigenen Graphen), genus (GENUS selbst),
+  nutzer (die Person), gespraech (das laufende Gespräch, rückbezüglich), welt (draußen,
+  ungespeichert) -- WORUM geht es.
+- **Bezug**: eigenständig oder rückbezüglich auf den letzten Zug. Heute strukturell aus dem
+  Gegenstand abgeleitet (gespraech ⇒ rückbezüglich, sonst eigenständig) -- ein echtes,
+  gesätes Merkmal, aber noch nicht unabhängig GEBRAUCHT (erkannt für später, z.B. Ellipsen
+  wie "und die Katze?"; nicht spekulativ vorgebaut, siehe representation-dimensions-as-Merkmale).
 
-Kennzahlen (QM am Verstehen): die erste ist die Belegung -- wie oft eine Zelle gelesen wurde,
-je Herkunft (festes Muster vs. Deuter). Sie wird read-time aus dem Event-Log gezählt, nichts
-Neues gespeichert. Weitere (Treffer-Quote aus Folge-Signalen, Stabilität) folgen, wenn die
-Daten da sind -- selbst-kalibriert, keine Presets.
+Kreuz-Konsistenz (Zwickys Schritt 4, kein Nebenprodukt): von 3×5=15 möglichen (Sprechakt,
+Gegenstand)-Kombinationen plus der gegenstandslosen Floskel sind nur 11 tatsächlich gesät --
+`ZELLEN` unten. Ausgeschlossen, mit Begründung: aussage-genus/aussage-gespraech (eine
+"Behauptung über GENUS/das Gespräch" ist keine natürliche eigene Sprechhandlung -- das wäre
+eher Lob oder eine Meta-Frage), aufforderung-begriff/aufforderung-nutzer (eine Aufforderung
+braucht ein Ziel, das handeln kann -- ein bloßer Begriff kann nicht "aufgefordert" werden,
+und GENUS kann nicht den Nutzer auffordern, die Richtung ist falsch herum), aussage-welt
+(eine reale, aber heute unbelegte Zelle -- kein Blatt/Vokabular existiert dafür, erst säen
+wenn ein echter Fall auftritt).
 
-Ledger != Memory bleibt gewahrt: für eine BEKANNTE Zelle wird nur Struktur festgehalten
-(Zelle + Herkunft der Lesart), nie Gesprächstext. Nur eine raster-FREMDE freie Lesart wird
-mit den eigenen Worten des Modells notiert (Quelle ``model:*``, automatisch gedeckelt) --
-denn genau sie ist das Lernmaterial, aus dem neue Ausprägungen erkannt werden.
+Jede Zelle ist eine echte Kombination, keine Namenskonvention: `zelle:X -kombiniert_aus->
+sprechakt:Y`, `-kombiniert_aus-> gegenstand:Z`, `-kombiniert_aus-> bezug:W` -- drei gewöhnliche,
+herkunftstragende Relationen (Quelle "ronny"), so dass "welche Zellen nutzen gegenstand:welt?"
+eine echte Graph-Abfrage ist, nicht Implementierungsdetail. Die bestehenden Feinblätter
+(definition, beziehung, gruss, kuerzer, ...) bleiben unverändert -- nur ihr is_a-Elternteil ist
+jetzt die echte Kreuzprodukt-Zelle statt eines Ad-hoc-Sammelbegriffs ("wissensfrage",
+"mitteilung", "meta"). Der Dispatch klettert dadurch höchstens EINEN Schritt (Blatt -> Zelle),
+nicht mehr beliebig tief.
+
+Segmentierung (ISO 24617-2, Dialogue Act Markup Language): ein Turn zerfällt in mehrere
+funktionale Segmente, jedes mit eigenem Dialogakt -- "Hallo! Was ist ein Hund? Danke!" sind
+DREI Segmente, nicht eins. Das ist NICHT hier in verstehen.py verankert (die Segmentierung
+selbst passiert im Deuter, deploy/deuter.py gibt eine LISTE von Lesarten zurück) -- dieses
+Modul bleibt, was es war: das Raster als Wissen, jetzt nur mit der richtigen Form.
+
+Zwei Radien, eine Disziplin, unverändert: fürs LESEN ist das Raster von Anfang an vollständig
+(Kreuz-Konsistenz IST die vollständige, geprüfte Form); GEHANDELT wird nur aus Zellen, für die
+im Companion ein deterministischer Kern existiert. Belegung (Kennzahl 1, QM am Verstehen)
+bleibt unverändert: wie oft ein Blatt gelesen wurde, je Herkunft, retraktions-bewusst gezählt.
 """
 from __future__ import annotations
 
 from genus import sources
 
 SEED_SOURCE = "ronny"
-READING_PREDICATE = "gelesen"          # (absicht:X, gelesen, <quelle>) -- Struktur, kein Text
-FREE_READING_PREDICATE = "gelesen_als" # (absicht:unklar, gelesen_als, <Modell-Worte>)
-FREE_READING_SOURCE = "model:deuter"
+READING_PREDICATE = "gelesen"        # (absicht:X, gelesen, <quelle>) -- Struktur, kein Text
+KOMBINIERT_AUS = "kombiniert_aus"    # (zelle:X, kombiniert_aus, sprechakt:Y/gegenstand:Z/bezug:W)
 
-# Ronnys Saat-Tabelle (2026-07-03), Merkmal 1 · Absicht: (Ausprägung, Elternteil).
-# Bewusst ASCII-Schlüssel (das Modell muss sie exakt zurückgeben können); die Wurzel ist
-# "aeusserung". Merkmal 2-4 (Gegenstand, Bezug, Form) bleiben vorerst implizit im Dispatch
-# (subject-Term, last_question) -- eigene Teilgraphen erst, wenn eine Fähigkeit sie braucht.
-RASTER_SEED: tuple[tuple[str, str], ...] = (
-    ("wissensfrage", "aeusserung"),
-    ("definition", "wissensfrage"),
-    ("beziehung", "wissensfrage"),
-    ("vergleich", "wissensfrage"),
-    ("eigenschaft", "wissensfrage"),
-    ("ursache", "wissensfrage"),
-    ("menge", "wissensfrage"),
-    ("grammatik", "wissensfrage"),
-    ("genus-auskunft", "aeusserung"),
-    ("zustand", "genus-auskunft"),
-    ("offene-fragen", "genus-auskunft"),
-    ("faehigkeiten", "genus-auskunft"),
-    ("erinnerungs-abruf", "aeusserung"),
-    ("aufforderung", "aeusserung"),
-    ("merken", "aufforderung"),
-    ("lernen", "aufforderung"),
-    ("tun", "aufforderung"),
-    ("mitteilung", "aeusserung"),
-    ("tatsache", "mitteilung"),
-    ("meinung", "mitteilung"),
-    ("korrektur", "mitteilung"),
-    ("empfehlungsfrage", "aeusserung"),
-    ("sozialgeste", "aeusserung"),
-    ("gruss", "sozialgeste"),
-    ("dank", "sozialgeste"),
-    ("lob", "sozialgeste"),
-    ("kritik", "sozialgeste"),
-    ("abschied", "sozialgeste"),
-    ("meta", "aeusserung"),
-    ("kuerzer", "meta"),
-    ("ausfuehrlicher", "meta"),
-    ("anders-erklaeren", "meta"),
-    ("wiederholen", "meta"),
-    ("nachfrage", "aeusserung"),
-    ("warum-herkunft", "nachfrage"),
-    ("vertiefung", "nachfrage"),
-    ("bezug", "nachfrage"),
-    ("unklar", "aeusserung"),
-)
+SPRECHAKTE: tuple[str, ...] = ("frage", "aussage", "aufforderung", "floskel")
+GEGENSTAENDE: tuple[str, ...] = ("begriff", "genus", "nutzer", "gespraech", "welt")
+BEZUEGE: tuple[str, ...] = ("eigenstaendig", "rueckbezueglich")
+
+# Kreuz-Konsistenz-Tabelle (Zwickys Schritt 4): (Sprechakt, Gegenstand) -> Zellenname.
+# Gegenstand=None für die gegenstandslose Floskel (ein Gruß ist über nichts).
+ZELLEN: dict[tuple[str, str | None], str] = {
+    ("frage", "begriff"): "frage-begriff",
+    ("frage", "genus"): "frage-genus",
+    ("frage", "nutzer"): "frage-nutzer",
+    ("frage", "gespraech"): "frage-gespraech",
+    ("frage", "welt"): "frage-welt",
+    ("aussage", "begriff"): "aussage-begriff",
+    ("aussage", "nutzer"): "aussage-nutzer",
+    ("aufforderung", "genus"): "aufforderung-genus",
+    ("aufforderung", "gespraech"): "aufforderung-gespraech",
+    ("aufforderung", "welt"): "aufforderung-welt",
+    ("floskel", None): "floskel",
+}
+
+# Bezug ist strukturell vom Gegenstand abgeleitet (siehe Moduldoc) -- kein eigenes Deuter-Feld.
+_BEZUG_VON_GEGENSTAND = {"gespraech": "rueckbezueglich"}
+
+
+def _bezug_fuer(gegenstand: str | None) -> str:
+    return _BEZUG_VON_GEGENSTAND.get(gegenstand, "eigenstaendig")
 
 
 def node(kind: str) -> str:
+    """Ein Feinblatt (Ausprägung) -- unverändert seit der vorigen Fassung."""
     return f"absicht:{kind}"
 
 
-def seed_raster(conn) -> int:
-    """Sow the Absichts-Raster into the ledger as ordinary is_a relations, source "ronny".
-    Idempotent: an edge already in the graph is skipped (the ledger is append-only, so a
-    naive re-run would pile up duplicate events). Returns how many NEW edges were sown."""
-    from genus import reactors  # local: keeps this module's import surface a leaf
+def zelle_node(zelle: str) -> str:
+    return f"zelle:{zelle}"
 
-    existing = {
+
+def sprechakt_node(s: str) -> str:
+    return f"sprechakt:{s}"
+
+
+def gegenstand_node(g: str) -> str:
+    return f"gegenstand:{g}"
+
+
+def bezug_node(b: str) -> str:
+    return f"bezug:{b}"
+
+
+# Feinblätter: (Blatt, Zelle) -- dieselben Namen/Handler wie vorher, jetzt unter den echten
+# Kreuzprodukt-Zellen. "bezug" (der alte Blattname für einen Pronomen-Anschluss wie "und er?")
+# wurde in "anschlussfrage" umbenannt -- Kollision mit dem neuen Achsennamen "Bezug" vermieden.
+RASTER_SEED: tuple[tuple[str, str], ...] = (
+    ("definition", "frage-begriff"), ("beziehung", "frage-begriff"), ("vergleich", "frage-begriff"),
+    ("grammatik", "frage-begriff"), ("eigenschaft", "frage-begriff"), ("ursache", "frage-begriff"),
+    ("menge", "frage-begriff"),
+    ("zustand", "frage-genus"), ("offene-fragen", "frage-genus"), ("faehigkeiten", "frage-genus"),
+    ("empfehlungsfrage", "frage-genus"),
+    ("erinnerungs-abruf", "frage-nutzer"),
+    ("warum-herkunft", "frage-gespraech"), ("vertiefung", "frage-gespraech"),
+    ("anschlussfrage", "frage-gespraech"),
+    ("weltfrage", "frage-welt"),
+    ("korrektur", "aussage-begriff"),
+    ("tatsache", "aussage-nutzer"), ("merken", "aussage-nutzer"), ("meinung", "aussage-nutzer"),
+    ("lernen", "aufforderung-genus"),
+    ("kuerzer", "aufforderung-gespraech"), ("ausfuehrlicher", "aufforderung-gespraech"),
+    ("anders-erklaeren", "aufforderung-gespraech"), ("wiederholen", "aufforderung-gespraech"),
+    ("tun", "aufforderung-welt"),
+    ("gruss", "floskel"), ("dank", "floskel"), ("lob", "floskel"), ("kritik", "floskel"),
+    ("abschied", "floskel"),
+)
+
+
+def seed_raster(conn) -> int:
+    """Sät die komplette Zwicky-Box: jede Zelle kombiniert_aus ihrem Sprechakt (+Gegenstand,
+    +Bezug), jedes Feinblatt is_a seiner Zelle. Idempotent (wie vorher): eine schon vorhandene
+    Kante wird übersprungen. Gibt die Zahl neu gesäter Kanten zurück."""
+    from genus import reactors
+
+    existing_komb = {
+        (r["subject"], r["object"]) for r in sources.relations(conn, predicate=KOMBINIERT_AUS)
+    }
+    existing_is_a = {
         (r["subject"], r["object"])
         for r in sources.relations(conn, predicate="is_a")
         if r["subject"].startswith("absicht:")
     }
     sown = 0
-    for kind, parent in RASTER_SEED:
-        edge = (node(kind), node(parent))
-        if edge in existing:
+
+    for (sprechakt, gegenstand), zelle in ZELLEN.items():
+        zn = zelle_node(zelle)
+        kanten = [(zn, sprechakt_node(sprechakt)), (zn, bezug_node(_bezug_fuer(gegenstand)))]
+        if gegenstand is not None:
+            kanten.append((zn, gegenstand_node(gegenstand)))
+        for subj, obj in kanten:
+            if (subj, obj) in existing_komb:
+                continue
+            reactors.observe_relation(conn, subj, KOMBINIERT_AUS, obj, SEED_SOURCE)
+            sown += 1
+
+    for leaf, zelle in RASTER_SEED:
+        edge = (node(leaf), zelle_node(zelle))
+        if edge in existing_is_a:
             continue
         reactors.observe_relation(conn, edge[0], "is_a", edge[1], SEED_SOURCE)
         sown += 1
+
     return sown
 
 
 def kinds(conn) -> set[str]:
-    """Every Ausprägung the graph knows (child OR parent side of a sown edge), bare keys."""
-    result: set[str] = set()
-    for r in sources.relations(conn, predicate="is_a"):
-        for side in (r["subject"], r["object"]):
-            if side.startswith("absicht:"):
-                result.add(side.split(":", 1)[1])
-    return result
+    """Jedes gesäte Feinblatt (Ausprägung) -- was der Deuter pro Segment lesen kann."""
+    return {
+        r["subject"].split(":", 1)[1]
+        for r in sources.relations(conn, predicate="is_a")
+        if r["subject"].startswith("absicht:")
+    }
 
 
 def leaf_kinds(conn) -> list[str]:
-    """The Ausprägungen with no children -- what the Deuter is offered to choose from (a
-    parent like "wissensfrage" is a fallback landing, not a reading the model should pick)."""
-    all_kinds = kinds(conn)
-    parents_of_something = {
-        r["object"].split(":", 1)[1]
-        for r in sources.relations(conn, predicate="is_a")
-        if r["object"].startswith("absicht:") and r["subject"].startswith("absicht:")
-    }
-    return sorted(all_kinds - parents_of_something)
+    """Alle Feinblätter -- in der neuen Struktur ist jedes absicht:*-Blatt schon ein echtes
+    Blatt (die Eltern sind jetzt zelle:*, ein anderer Namensraum), keine weitere Filterung nötig."""
+    return sorted(kinds(conn))
 
 
-def parents(conn, kind: str) -> list[str]:
-    """The is_a ancestors of an Ausprägung, closest first -- the dispatch climbs this chain
-    when the read cell itself has no handler (a too-fine or slightly-off reading falls SOFT
-    onto the nearest actionable ancestor, exactly like inference climbs concept is_a)."""
-    chain: list[str] = []
-    current, seen = node(kind), {node(kind)}
-    while True:
-        ups = [r["object"] for r in sources.relations(conn, subject=current, predicate="is_a")
-               if r["object"].startswith("absicht:") and r["object"] not in seen]
-        if not ups:
-            return chain
-        current = ups[0]
-        seen.add(current)
-        chain.append(current.split(":", 1)[1])
+def zelle_of(conn, kind: str) -> str | None:
+    """Die Kreuzprodukt-Zelle eines Feinblatts (sein is_a-Elternteil) -- der EINE weiche
+    Landeplatz, falls das Blatt selbst keinen Handler hat. Anders als die vorige mehrstufige
+    is_a-Kletterei ist das jetzt genau EIN Schritt: Blatt -> Zelle, nie tiefer (die Zelle IST
+    schon die gröbste sinnvolle Einheit -- "irgendeine Frage" ohne Gegenstand wäre keine
+    handelbare Stufe mehr). ``None`` wenn das Blatt nicht gesät/unbekannt ist."""
+    for r in sources.relations(conn, subject=node(kind), predicate="is_a"):
+        if r["object"].startswith("zelle:"):
+            return r["object"].split(":", 1)[1]
+    return None
+
+
+def zellen_von(conn, sprechakt: str | None = None, gegenstand: str | None = None) -> list[str]:
+    """Alle gesäten Zellen, optional gefiltert nach Sprechakt und/oder Gegenstand -- eine
+    ECHTE Graph-Abfrage über die Kreuz-Konsistenz-Tabelle (z.B. "welche Zellen nutzen
+    gegenstand:welt?"), nicht nur Python-Introspektion von ``ZELLEN``."""
+    kandidaten = {r["subject"] for r in sources.relations(conn, predicate=KOMBINIERT_AUS)}
+    if sprechakt is not None:
+        kandidaten &= {r["subject"] for r in sources.relations(
+            conn, predicate=KOMBINIERT_AUS, object=sprechakt_node(sprechakt))}
+    if gegenstand is not None:
+        kandidaten &= {r["subject"] for r in sources.relations(
+            conn, predicate=KOMBINIERT_AUS, object=gegenstand_node(gegenstand))}
+    return sorted(z.split(":", 1)[1] for z in kandidaten if z.startswith("zelle:"))
 
 
 def record_reading(conn, kind: str, quelle: str) -> None:
-    """One Einordnung, recorded as pure structure: (absicht:X, gelesen, quelle). The event
-    itself is the tally mark; counting happens read-time (:func:`belegung`). ``quelle`` is
-    "muster" (a fixed pattern read it, GENUS's own deterministic observation) or
-    "model:deuter" (the edge model read it -- automatically trust-capped like every model
-    source). Never any conversation text."""
+    """Eine Einordnung, als reine Struktur festgehalten: (absicht:X, gelesen, quelle).
+    Unverändert seit der vorigen Fassung -- ``quelle`` ist "muster" oder "model:deuter"."""
     from genus import reactors
 
     reactors.observe_relation(conn, node(kind), READING_PREDICATE, quelle, quelle)
 
 
-def record_free_reading(conn, reading: str) -> None:
-    """An off-grid reading in the model's OWN words -- the differentiation material for new
-    Ausprägungen, collected under absicht:unklar, capped model source. The user's words are
-    never stored; only what the model said the intent was."""
-    from genus import reactors
-
-    reactors.observe_relation(conn, node("unklar"), FREE_READING_PREDICATE, reading,
-                              FREE_READING_SOURCE)
-
-
-def free_readings(conn) -> list[str]:
-    """The collected off-grid readings -- what the scan (later slice) will differentiate over."""
-    return [r["object"] for r in sources.relations(
-        conn, subject=node("unklar"), predicate=FREE_READING_PREDICATE)]
-
-
 def belegung(conn, kind: str) -> dict:
-    """Kennzahl 1 (QM am Verstehen): how often this cell was read, per Herkunft -- counted
-    read-time from the event log (every recorded reading is one relation_asserted event),
-    nothing new stored.
-
-    Retraction-aware: a reading is an ordinary relation, so a mis-count (e.g. a verification
-    run that wrote into the live ledger) is corrected the ordinary way -- ``reactors.
-    retract_relation(node(kind), READING_PREDICATE, quelle, source=quelle)`` -- and the count
-    nets asserted minus retracted per Herkunft. Reading the raw event_log (not the projection,
-    which collapses the UNIQUE (s,p,o,source) tuple to one row and would lose the tally) is
-    what makes a real COUNT possible; netting the retractions is what keeps it CORRECTABLE."""
+    """Kennzahl 1 (QM am Verstehen), unverändert: wie oft dieses Blatt gelesen wurde, je
+    Herkunft, retraktions-bewusst gezählt (siehe frühere Fassung für die volle Begründung)."""
     counts: dict[str, int] = {}
     for event_type, delta in (("relation_asserted", 1), ("relation_retracted", -1)):
         for row in conn.execute(

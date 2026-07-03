@@ -223,12 +223,12 @@ def test_deuter_installer_puts_llama_cpp_in_the_shared_venv_not_a_new_one():
     assert "models" in script                        # a permanent home under ~/.genus/
 
 
-def test_deuter_module_is_a_capped_open_reader_that_never_writes():
+def test_deuter_module_segments_and_never_writes():
     script = (ROOT / "deploy" / "deuter.py").read_text(encoding="utf-8")
-    # reads OPENLY (known Absichten are an offer, free words allowed -- no Ankreuzzwang), but
-    # never invents facts and never touches the core's write paths
+    # liest eine Nachricht als LISTE von Segmenten (ISO 24617-2), waehlt aus einer Zwicky-
+    # geprueften, erschoepfenden Liste (kein Freitext-Ausweg mehr), erfindet nie Fakten
     assert "DEFAULT_ABSICHTEN" in script
-    assert "frei" in script                    # the open escape is part of the contract
+    assert "_JSON_ARRAY" in script             # liest ein Array, nicht ein einzelnes Objekt
     assert "_looks_like_question" in script    # the deterministic statement-veto stays
     assert "except Exception" in script and "return None" in script   # never raises
     for forbidden in ("import governance", "import proposals", "control.pause", "teach_relation"):

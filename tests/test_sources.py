@@ -1223,10 +1223,10 @@ def test_deuter_known_but_unhandled_cell_is_named_honestly_and_counted():
     assert verstehen.belegung(conn, "empfehlungsfrage")["gesamt"] == 1
 
 
-def test_deuter_offgrid_reading_is_collected_as_differentiation_material():
-    # "da kann alles kommen": a reading OUTSIDE the raster changes no answer (fail safe), but
-    # the model's OWN words are collected under absicht:unklar -- the material from which the
-    # scan will later recognize missing Ausprägungen. The user's words are never stored.
+def test_deuter_unknown_leaf_changes_nothing_no_freetext_escape_anymore():
+    # Zwickys Kategorien sollen erschöpfend sein -- kein Freitext-Ausweg mehr (der hatte selbst
+    # Nebenwirkungen, live gefunden: "Danke" wich auf "erleben" aus). Ein Blatt außerhalb der
+    # gesäten Liste (Modell-Fehler oder Halluzination) ändert ehrlich nichts, fail safe.
     from genus import companion, verstehen
     conn = _isa_graph()
     verstehen.seed_raster(conn)
@@ -1234,13 +1234,12 @@ def test_deuter_offgrid_reading_is_collected_as_differentiation_material():
     deuter = lambda q: {"absicht": "bitte um ein gedicht", "subject": None}
     result = companion.respond_with_deuter(conn, "asdf ganz unklare frage", deuter=deuter)
     assert result == baseline
-    assert verstehen.free_readings(conn) == ["bitte um ein gedicht"]
 
 
 def test_deuter_reading_climbs_the_is_a_chain_to_the_nearest_actionable_cell():
-    # the soft landing: "eigenschaft" has no handler of its own, but is_a wissensfrage does --
-    # a too-fine reading falls SOFT onto the ancestor instead of hard onto the fallback,
-    # exactly like inference climbs concept is_a
+    # the soft landing: "eigenschaft" has no handler of its own, but its Zelle frage-begriff
+    # does -- a too-fine reading falls SOFT onto the cell instead of hard onto the fallback,
+    # exactly like inference climbs concept is_a (now exactly one step: Blatt -> Zelle)
     from genus import companion, verstehen
     conn = _isa_graph()
     verstehen.seed_raster(conn)
@@ -1391,6 +1390,91 @@ def test_sozialgesten_refuse_a_long_sentence_even_if_the_model_reads_one():
     result = companion.respond_with_deuter(conn, lang, deuter=deuter)
     assert "Bis bald" not in result["text"]
     assert result["text"] == baseline["text"]   # fällt ehrlich durch, statt falsch zu antworten
+
+
+# --- Segmentierung (ISO 24617-2): eine Nachricht kann mehrere Sprechhandlungen enthalten ----
+
+def test_deuter_segments_are_resolved_independently_and_composed():
+    # Ronny: "Nachrichten können auch Fragen, Aussagen, Floskeln und Aufforderungen in einer
+    # Nachricht enthalten, sogar mehrfach!" -- eine Liste von Segmenten, jedes einzeln gelöst,
+    # zu EINER Antwort komponiert
+    from genus import companion
+    conn = _isa_graph()
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    deuter = lambda q: [
+        {"absicht": "gruss"},
+        {"absicht": "definition", "subject": "Hund"},
+        {"absicht": "dank"},
+    ]
+    result = companion.respond_with_deuter(conn, "Hallo! Was ist ein Hund? Danke!", deuter=deuter)
+    assert "Hallo!" in result["text"]
+    assert "Wolf" in result["text"]
+    assert "Gern geschehen" in result["text"]
+
+
+def test_deuter_composition_deduplicates_the_repeated_disclosure_tag():
+    # jedes Segment traegt seinen eigenen "(Frage vom Sprachmodell gedeutet.)"-Hinweis --
+    # zusammengesetzt soll er nur EINMAL erscheinen, nicht dreimal hintereinander
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: [{"absicht": "gruss"}, {"absicht": "dank"}, {"absicht": "abschied"}]
+    result = companion.respond_with_deuter(conn, "Hallo, danke, tschüss", deuter=deuter)
+    assert result["text"].count("Frage vom Sprachmodell gedeutet") == 1
+
+
+def test_deuter_a_segment_that_fails_does_not_block_the_others():
+    # ein Segment, das an nichts andockt (unklar/unbekannt), liefert einfach nichts bei -- die
+    # anderen Segmente antworten trotzdem
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: [{"absicht": "gruss"}, {"absicht": "unklar"}, {"absicht": "dank"}]
+    result = companion.respond_with_deuter(conn, "Hallo, ???, danke", deuter=deuter)
+    assert "Hallo" in result["text"] and "Gern geschehen" in result["text"]
+
+
+def test_deuter_bare_dict_still_works_single_segment_backward_compatible():
+    # ein Aufrufer/Test, der noch ein bare dict liefert (statt einer Liste), wird grosszügig
+    # als Ein-Segment-Liste behandelt
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "gruss"}
+    result = companion.respond_with_deuter(conn, "Hallo", deuter=deuter)
+    assert "kann ich noch nicht" not in result["text"]
+
+
+def test_weltfrage_is_an_honest_named_gap_not_a_wrong_guess():
+    # der eigentliche Auslöser der ganzen Zwicky-Box: "Wie wird das Wetter morgen?" wurde
+    # vorher als "vergleich" zwischen Wetter und Morgen fehlgedeutet -- jetzt gibt es eine
+    # eigene, ehrlich benannte Zelle dafür statt eines Fehlgriffs
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: [{"absicht": "weltfrage"}]
+    result = companion.respond_with_deuter(conn, "Wie wird das Wetter morgen?", deuter=deuter)
+    assert "Frage über die Welt draußen" in result["text"]
+    assert "kann ich noch nicht" in result["text"]
+
+
+def test_tun_is_an_honest_named_gap_for_real_world_help_requests():
+    # der zweite Auslöser: eine Hilfe-Bitte für einen Familienausflug wurde als "abschied"
+    # fehlgedeutet ("Bis bald!") -- jetzt eine eigene, ehrliche Zelle für Aufforderungen in
+    # der Welt
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: [{"absicht": "tun", "subject": "Familienausflug"}]
+    result = companion.respond_with_deuter(
+        conn, "Ich möchte einen Familienausflug planen. Kannst du mir helfen?", deuter=deuter)
+    assert "Aufforderung, etwas in der Welt zu tun" in result["text"]
+    assert "Bis bald" not in result["text"]
+
+
+def test_zelle_merken_no_longer_crashes_on_a_deuter_read_remember_request():
+    # ein latenter Bug: _zelle_merken rief _zelle_tatsache mit zu wenigen Argumenten auf
+    # (fehlte last_answer/stimme) -- ein TypeError, der nur nie live ausgelöst wurde
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: [{"absicht": "merken"}]
+    result = companion.respond_with_deuter(conn, "ich hab zwei Hunde, merk dir das", deuter=deuter)
+    assert "notiert" in result["text"]
 
 
 def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():

@@ -715,23 +715,33 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
     return {"text": respond(conn, question), "question": question}
 
 
-# --- der VERSTEHENS-WÜRFEL: erst einordnen, dann lösen -----------------------------------
+# --- der VERSTEHENS-WÜRFEL: erst einordnen, dann lösen -- als echte Zwicky-Box -----------
 #
-# The dispatch bug CLASS, seen live three times in one test (2026-07-02): routing was a
-# first-match-wins chain of fused recognizer+resolvers ending in a greedy word lookup, so
-# "zählt ein Apfel zu den Pflanzen?" got a botany lecture about the word "Pflanzen" before a
-# better reading was ever consulted. Ronny's fix is structural (a morphological grid, Zwicky):
-# EINORDNEN is separated from LÖSEN. Fixed patterns classify first (ms, self-verifying); only
-# when NO pattern claims the question does the Deuter read it -- openly ("komplett offen. da
-# kann alles kommen"): the model answers clear questions about the utterance and may describe
-# an intent in its OWN words instead of being forced into a list (the Ankreuzzwang behind the
-# live "was ist ein Hund"->statement misfire). GENUS then makes the actual choice: the reading
-# is mapped onto the Absichts-Raster -- a sub-GRAPH in the ledger (genus.verstehen), not a
-# Python list. Acting happens only from known cells; a known cell without a handler is named
-# honestly ("das kann ich noch nicht"); a cell whose handler can't resolve falls SOFT up the
-# is_a chain to the nearest actionable ancestor (like inference climbs concept is_a); an
-# off-grid reading is collected as differentiation material for new Ausprägungen. Open when
-# OBSERVING, closed when ACTING -- and the difference between the two is the learning signal.
+# Die Dispatch-Bug-KLASSE, live dreimal in einem Test gesehen (2026-07-02): Routing war eine
+# first-match-wins-Kette verschmolzener Erkenner+Löser bis zu einem gierigen Wort-Lookup, so
+# dass "zählt ein Apfel zu den Pflanzen?" einen Botanik-Vortrag über "Pflanzen" bekam, bevor
+# eine bessere Lesart je gefragt wurde. Ronnys erster Fix (derselbe Tag) trennte EINORDNEN von
+# LÖSEN strukturell. Eine zweite, echte Session ("wir machen noch grundsätzliche Dinge falsch")
+# zeigte: das "Raster" war immer noch eine flache Liste mit is_a-Fallback-Leiter, kein
+# morphologischer Kasten -- "Hallo"->kürzer, eine Wetterfrage->vergleich, eine Hilfe-Bitte->
+# abschied waren alle Fehlgriffe auf Zellen, die als eigenständiges Ding gar nicht existierten.
+#
+# Jetzt: Zwickys General Morphological Analysis (1948/1969), alle vier Schritte. Drei
+# unabhängige Parameter (Sprechakt, Gegenstand, Bezug -- genus.verstehen), ihre Kreuz-
+# Konsistenz geprüft (nur die sinnvollen (Sprechakt,Gegenstand)-Kombinationen sind gesät), und
+# -- Ronnys zweiter, schärferer Punkt -- eine Nachricht ist kein einzelnes Tripel: sie zerfällt
+# in mehrere funktionale SEGMENTE (ISO 24617-2, Dialogue Act Markup Language; "Hallo! Was ist
+# ein Hund? Danke!" sind drei, nicht eins). Der Deuter (deploy/deuter.py) liest jetzt eine
+# LISTE von Segmenten, nicht ein Objekt; ``_deuter_antwort`` löst JEDES Segment einzeln über
+# genau denselben (Blatt -> Zelle)-Mechanismus, und die Teil-Antworten werden komponiert
+# (:func:`_komponiere`) -- der erste, bewusst einfache Auftritt des "Antwort-Würfels".
+#
+# Kein Freitext-Ausweg mehr: die alte "beschreibe frei, wenn unsicher"-Klausel hatte selbst
+# Nebenwirkungen (live: "Danke" wich auf "erleben" aus). Die Kategorien sind jetzt Zwicky-
+# geprüft und sollen erschöpfend sein; bei echter Unsicherheit ist "unklar" die sichere Antwort.
+# Acting happens only from known cells; a known cell without a handler is named honestly
+# ("das kann ich noch nicht"); a leaf whose own handler can't resolve climbs GENAU EINEN
+# Schritt zu seiner Zelle (nie tiefer -- die Zelle ist schon die gröbste sinnvolle Einheit).
 #
 # The model at the edge stays on the same leash as ever: deploy/deuter.py, injected as a plain
 # callable, WAEHLT/liest only -- every subject/object it names is graph-verified by the same
@@ -745,29 +755,19 @@ _UNKNOWN_FALLBACK = (   # query.ask's stable "nothing recognized" sentinel -- ke
 )
 _DEUTED = " (Frage vom Sprachmodell gedeutet.)"
 
-# German voice for cells GENUS can read but not yet act on -- honest capability naming.
+# German voice for cells GENUS can read but not yet act on -- honest capability naming. Nur
+# noch Blätter, die tatsächlich bis zum ehrlichen Lücken-Satz durchfallen können (die anderen
+# lösen sich entweder direkt oder klettern zu einer Zelle mit eigenem Fallback -- z.B.
+# eigenschaft/ursache/menge landen bei frage-begriff und werden dort beantwortet, brauchen also
+# gar keine eigene Lücken-Formulierung mehr).
 _ZELLEN_LABELS = {
-    "eigenschaft": "eine Frage nach einer Eigenschaft",
-    "ursache": "eine Warum-Frage über die Welt",
-    "menge": "eine Frage nach einer Anzahl",
     "faehigkeiten": "eine Frage danach, was ich kann",
-    "lernen": "eine Aufforderung, etwas zu lernen",
-    "tun": "eine Aufforderung, etwas zu tun",
-    "meinung": "eine Meinungsäußerung",
-    "korrektur": "eine Korrektur",
     "empfehlungsfrage": "eine Bitte um Empfehlung",
-    "sozialgeste": "eine soziale Geste",
-    "gruss": "einen Gruß", "dank": "ein Dankeschön", "lob": "ein Lob",
-    "kritik": "eine Kritik", "abschied": "einen Abschied",
-    "meta": "einen Wunsch zum Gespräch selbst",
-    "kuerzer": "den Wunsch nach einer kürzeren Antwort",
-    "ausfuehrlicher": "den Wunsch nach einer ausführlicheren Antwort",
-    "anders-erklaeren": "den Wunsch nach einer anderen Erklärung",
-    "wiederholen": "den Wunsch nach einer Wiederholung",
-    "mitteilung": "eine Mitteilung", "aufforderung": "eine Aufforderung",
-    "vertiefung": "eine vertiefende Nachfrage", "bezug": "eine Bezug-Nachfrage",
-    "nachfrage": "eine Nachfrage", "wissensfrage": "eine Wissensfrage",
-    "genus-auskunft": "eine Frage über mich",
+    "weltfrage": "eine Frage über die Welt draußen",
+    "korrektur": "eine Korrektur an einer Tatsache",
+    "meinung": "eine Meinungsäußerung",
+    "lernen": "eine Aufforderung, etwas zu lernen",
+    "tun": "eine Aufforderung, etwas in der Welt zu tun",
 }
 
 
@@ -817,7 +817,7 @@ def _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme=No
 def _zelle_merken(conn, guess, question, last_question, last_answer, stimme=None):
     # a MODEL-read "please remember" (the explicit ritual "merke dir: ..." never reaches the
     # Deuter) -- never granted human trust off a model reading: capped note + the honest hint
-    return _zelle_tatsache(conn, guess, question, last_question)
+    return _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme)
 
 
 def _zelle_erinnerung(conn, guess, question, last_question, last_answer, stimme=None):
@@ -833,9 +833,11 @@ def _zelle_offene_fragen(conn, guess, question, last_question, last_answer, stim
     return narrate_inquiries(conn, open_questions(conn))
 
 
-def _zelle_wissensfrage(conn, guess, question, last_question, last_answer, stimme=None):
-    # the soft landing for fine knowledge questions GENUS can't answer specifically yet
-    # (eigenschaft/ursache/menge climb here): say what IS known about the subject, honestly
+def _zelle_frage_begriff(conn, guess, question, last_question, last_answer, stimme=None):
+    # der weiche Landeplatz der Zelle "frage-begriff" selbst -- eigenschaft/ursache/menge
+    # haben kein eigenes Blatt-Handler und klettern genau EINEN Schritt hierher (Blatt -> Zelle,
+    # siehe verstehen.zelle_of): sag, was ÜBER DEN BEGRIFF bekannt ist, ehrlich benannt, was
+    # GENAU noch nicht beantwortet werden kann.
     text = _zelle_definition(conn, guess, question, last_question, last_answer, stimme)
     if text is None:
         return None
@@ -938,22 +940,24 @@ def _zelle_abschied(conn, guess, question, last_question, last_answer, stimme=No
 
 
 # Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;
-# which cells exist and how they relate lives in the ledger (genus.verstehen.RASTER_SEED).
+# which cells exist and how they relate lives in the ledger (genus.verstehen.RASTER_SEED +
+# ZELLEN). Die Schlüssel sind jetzt teils Feinblätter (definition, gruss, ...), teils die
+# Kreuzprodukt-Zelle selbst ("frage-begriff") -- der EINE weiche Landeplatz für Blätter ohne
+# eigenen Handler (verstehen.zelle_of macht daraus nie mehr als einen Klettersprung).
 _HANDELBAR = {
+    "frage-begriff": _zelle_frage_begriff,
     "definition": _zelle_definition,
     "beziehung": _zelle_beziehung,
     "vergleich": _zelle_vergleich,
     "grammatik": _zelle_grammatik,
-    "nachfrage": _zelle_nachfrage,
     "warum-herkunft": _zelle_nachfrage,
     "vertiefung": _zelle_nachfrage,
-    "bezug": _zelle_nachfrage,
+    "anschlussfrage": _zelle_nachfrage,
     "tatsache": _zelle_tatsache,
     "merken": _zelle_merken,
     "erinnerungs-abruf": _zelle_erinnerung,
     "zustand": _zelle_zustand,
     "offene-fragen": _zelle_offene_fragen,
-    "wissensfrage": _zelle_wissensfrage,
     "kuerzer": _zelle_kuerzer,
     "ausfuehrlicher": _zelle_ausfuehrlicher,
     "anders-erklaeren": _zelle_anders_erklaeren,
@@ -985,13 +989,13 @@ def _record_still(fn, *args) -> None:
 # und der bewährte Template-Satz bleibt unverändert stehen. Live gefunden (2026-07-03): eine
 # einfache "Was ist ein Hund?"-Frage läuft über den DEUTER-Pfad (er sitzt jetzt vor dem reinen
 # Wort-Lookup), nicht über die reine Wort-Zelle -- die Stimme muss also auch dort greifen, wo
-# eine narrate-artige Zelle antwortet (definition/beziehung/vergleich/grammatik/wissensfrage),
+# eine narrate-artige Zelle antwortet (definition/beziehung/vergleich/grammatik/frage-begriff),
 # nicht nur bei Muster/Wort. Ungeeignet sind mehrzeilige/strukturierte Antworten (Nachfrage-
 # Herleitung, Erinnerungs-Liste, offene Fragen) -- dort bleibt das Risiko einer verlorenen
 # Zeile größer als der Stil-Gewinn.
 
 _STIMME_TAG = " (Sprachlich vom Modell geglättet — Fakten unverändert.)"
-_STIMME_GEEIGNET = {"definition", "beziehung", "vergleich", "grammatik", "wissensfrage"}
+_STIMME_GEEIGNET = {"definition", "beziehung", "vergleich", "grammatik", "frage-begriff"}
 
 
 def _stimme_versucht(text: str, stimme) -> str:
@@ -1015,7 +1019,7 @@ def _personalisiert(conn, question: str, text: str, stimme, marker: str = "") ->
 
 
 _ANCHOR_BLEIBT = {   # cells that reformat/retrace the EXISTING topic, never introduce a new one
-    "nachfrage", "warum-herkunft", "vertiefung", "bezug",
+    "warum-herkunft", "vertiefung", "anschlussfrage",
     "kuerzer", "ausfuehrlicher", "anders-erklaeren", "wiederholen",
 }
 
@@ -1023,9 +1027,10 @@ _ANCHOR_BLEIBT = {   # cells that reformat/retrace the EXISTING topic, never int
 def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                      last_answer: str | None = None, stimme=None) -> dict | None:
     """Map an OPEN model reading onto the Absichts-Raster and act from the known cell -- or
-    climb the is_a chain to the nearest actionable ancestor -- or name honestly what GENUS
-    read but cannot do yet. ``None`` only when the reading is off-grid or empty (then the
-    caller falls through to the last word reading and the honest fallback)."""
+    climb ONE step to its Zwicky-Zelle (Blatt -> Zelle, nie tiefer -- eine Zelle ist schon die
+    gröbste sinnvolle Einheit) -- or name honestly what GENUS read but cannot do yet. ``None``
+    only when the reading is unklar/unbekannt or empty (then the caller falls through to the
+    last word reading and the honest fallback)."""
     from genus import verstehen
 
     kind = (guess.get("absicht") or "").strip().lower()
@@ -1033,15 +1038,13 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         return None
     # the graph is authoritative once sown; before the one clean seed-apply, the code-side
     # seed table keeps the mapping sane (same content, Quelle folgt mit der Saat)
-    known = verstehen.kinds(conn) or {k for k, _ in verstehen.RASTER_SEED} | {"aeusserung"}
-    if kind not in known:
-        # off-grid: the model described the intent in its own words -- collected as
-        # differentiation material (model words only, never the user's), then fail safe
-        _record_still(verstehen.record_free_reading, conn, kind)
+    known = verstehen.kinds(conn) or {leaf for leaf, _ in verstehen.RASTER_SEED}
+    if kind == "unklar" or kind not in known:
+        # kein Freitext-Fallback mehr (Zwickys Kategorien sollen erschöpfend sein) -- ein
+        # unbekanntes/unklares Blatt ändert ehrlich nichts, statt etwas zu erfinden
         return None
-    if kind == "unklar":
-        return None   # an honest "I can't place it" from the model changes nothing
-    attempted = [kind] + verstehen.parents(conn, kind)
+    zelle = verstehen.zelle_of(conn, kind)
+    attempted = [kind] + ([zelle] if zelle else [])
     hatte_handler = False
     for step in attempted:
         handler = _HANDELBAR.get(step)
@@ -1070,23 +1073,45 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                     f"als Lücke gemerkt.", "question": question}
 
 
+def _komponiere(teile: list[str]) -> str:
+    """Mehrere Segment-Antworten zu EINER Antwort -- der erste, bewusst einfache Auftritt des
+    Antwort-Würfels (Ronnys Weiterdenken vom Verstehens-Würfel aus). Heute nur aneinandergereiht,
+    keine stilistische Verschmelzung -- ein kleiner, ehrlicher erster Schritt, kein Anspruch auf
+    das letzte Wort in Sachen Formulierung. Ein Transparenz-Hinweis (Deuter/Stimme), den JEDES
+    Segment einzeln trägt, muss in der zusammengesetzten Antwort nicht mehrfach auftauchen --
+    einmal am Ende genügt, um "nie stillschweigend" einzulösen, ohne redundant zu wirken."""
+    text = " ".join(t for t in teile if t)
+    for marker in (_DEUTED, _STIMME_TAG):
+        n = text.count(marker)
+        if n > 1:
+            text = text.replace(marker, "", n - 1)
+    return text
+
+
 def respond_with_deuter(conn, question: str, last_question: str | None = None,
                          deuter=None, stimme=None, last_answer: str | None = None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
-    offene Deuter-Lesart (aufs Raster abgebildet, is_a-Fallback, ehrliche Benennung) -> letzte
-    Wort-Lesart -> ehrlicher Rest. The Deuter now runs BEFORE the greedy word reading (the
-    2026-07-02 bug class); the word reading remains as the final reading when the model is
-    absent or reads nothing actionable. Known-cell readings are recorded as pure structure
-    (Belegungs-Kennzahl); the user's words are never stored. When a ``stimme`` callable is
-    given, every narrate-style factual answer -- Muster/Wort AND the Deuter-driven cells in
-    :data:`_STIMME_GEEIGNET` (definition/beziehung/vergleich/grammatik/wissensfrage; a plain
-    "Was ist ein Hund?" reaches the Deuter now that it runs before the word reading, so it
-    must be covered too) -- is offered to it for a more natural rephrase
-    (:func:`_stimme_versucht`), always safe to fall back, never required. The SAME answers,
-    on the conversational path only (``deuter is not None``), are also offered a Notiz-Bezug
-    (:func:`_notiz_bezug`, Personen-Gedächtnis Scheibe 2) -- a personal note woven in beiläufig
-    when its text shares a word with the question. Multi-line/structured answers (Nachfrage-
-    Herleitung, Erinnerungen, offene Fragen) are deliberately left alone by both.
+    offene Deuter-SEGMENTIERUNG (eine Nachricht kann mehrere Sprechhandlungen enthalten, ISO
+    24617-2 -- jedes Segment aufs Raster abgebildet, is_a-Fallback GENAU einen Schritt,
+    ehrliche Benennung) -> letzte Wort-Lesart -> ehrlicher Rest. The Deuter now runs BEFORE the
+    greedy word reading (the 2026-07-02 bug class); the word reading remains as the final
+    reading when the model is absent or reads nothing actionable. Known-cell readings are
+    recorded as pure structure (Belegungs-Kennzahl); the user's words are never stored.
+
+    ``deuter(question)`` gibt eine LISTE von Segment-Lesarten zurück (ein bare dict wird
+    grosszügig als Ein-Segment-Liste behandelt, für Aufrufer/Tests, die noch die alte Form
+    nutzen). Jedes Segment wird einzeln über :func:`_deuter_antwort` gelöst; die Teil-Antworten
+    werden über :func:`_komponiere` zu einer zusammengefügt.
+
+    When a ``stimme`` callable is given, every narrate-style factual answer -- Muster/Wort AND
+    the Deuter-driven cells in :data:`_STIMME_GEEIGNET` (definition/beziehung/vergleich/
+    grammatik/frage-begriff; a plain "Was ist ein Hund?" reaches the Deuter now that it runs
+    before the word reading, so it must be covered too) -- is offered to it for a more natural
+    rephrase (:func:`_stimme_versucht`), always safe to fall back, never required. The SAME
+    answers, on the conversational path only (``deuter is not None``), are also offered a
+    Notiz-Bezug (:func:`_notiz_bezug`, Personen-Gedächtnis Scheibe 2) -- a personal note woven
+    in beiläufig when its text shares a word with the question. Multi-line/structured answers
+    (Nachfrage-Herleitung, Erinnerungen, offene Fragen) are deliberately left alone by both.
 
     ``last_answer`` (optional, the EXACT text ``respond_with_deuter`` returned last turn) feeds
     the Antwort-Würfel's Meta-Zellen (kuerzer/ausfuehrlicher/anders-erklaeren/wiederholen) --
@@ -1113,11 +1138,20 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             text += _notiz_bezug(conn, question) or ""
         return {"text": text, "question": question}
     if deuter is not None:
-        guess = deuter(question)
-        if guess:
-            gedeutet = _deuter_antwort(conn, guess, question, last_question, last_answer, stimme=stimme)
-            if gedeutet is not None:
-                return gedeutet
+        segmente = deuter(question)
+        if isinstance(segmente, dict):
+            segmente = [segmente]
+        if segmente:
+            teile: list[str] = []
+            anchor = question
+            for segment in segmente:
+                gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
+                                            stimme=stimme)
+                if gedeutet is not None:
+                    teile.append(gedeutet["text"])
+                    anchor = gedeutet["question"]
+            if teile:
+                return {"text": _komponiere(teile), "question": anchor}
     text = _wort_antwort(conn, question)
     if text is not None:
         text = _stimme_versucht(text, stimme)
