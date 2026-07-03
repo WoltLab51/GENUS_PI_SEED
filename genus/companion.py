@@ -123,7 +123,11 @@ def narrate(a: dict) -> str:
         sentence = f"»{a['word']}«{tag} kennt GENUS, aber eine Bedeutung ist noch nicht erschlossen"
     named = [_LABEL.sub(r"\1", x) for x in a["is_a"] if not _BARE_QID.match(x)]
     if named:   # only human-nameable parents in the voice; a bare Q-id says nothing to a person
-        sentence += f"; es zählt zu {_join_de(named)}"
+        # in Guillemets -- jeder benannte Begriff ist ein ANKER für die Stimme (Anführungs-
+        # zeichen-Wörter müssen wortwörtlich überleben). Live gefunden (2026-07-03): ungeschützt
+        # wurde "Kernobst" beim Umformulieren zu "Kernaubere" -- eine echte, unbemerkte
+        # Faktenverfälschung, weil nur der Kopf-Begriff geschützt war.
+        sentence += f"; es zählt zu {_join_de([f'»{parent}«' for parent in named])}"
     sentence += "."
     # Tiered honesty, relative to the trust seed (no new constant): a meaning carried only by
     # a below-seed witness (e.g. the capped model bridge) is said WITH the doubt; independent
@@ -135,7 +139,7 @@ def narrate(a: dict) -> str:
     elif n >= 2:
         sentence += " Diese Bedeutung ist mehrfach unabhängig belegt."
     if a["languages"]:
-        sentence += f" In anderen Sprachen: {', '.join(a['languages'][:4])}."
+        sentence += f" In anderen Sprachen: {', '.join(f'»{w}«' for w in a['languages'][:4])}."
     return sentence
 
 
@@ -240,7 +244,8 @@ def narrate_relation(conn, r: dict) -> str:
         path = _collapse([x] + [_label(conn, p["object"]) for p in r["chain"]])
         s = f"Ja. »{x}« zählt zu »{y}«."
         if len(path) > 2:
-            s += f" Der Weg: {' → '.join(path)}."
+            # jedes Zwischenglied in Guillemets -- derselbe Stimme-Anker-Schutz wie in narrate()
+            s += f" Der Weg: {' → '.join(f'»{p}«' for p in path)}."
         return s + f" (Vertrauen {r['trust']:.2f} — aus dem Wissensgraphen hergeleitet, nicht behauptet.)"
     return (f"Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von »{x}« zu "
             f"»{y}«. (Das heißt: unbekannt, nicht widerlegt.)")
@@ -303,9 +308,10 @@ def narrate_common(conn, r: dict) -> str:
     if not r["found"]:
         return f"GENUS findet keine gemeinsame Oberkategorie von »{r['x']}« und »{r['y']}«."
     labels = _collapse([_label(conn, c) for c in r["shared"]])[:3]
-    s = f"»{r['x']}« und »{r['y']}« haben gemeinsam: beide zählen zu {labels[0]}"
+    # in Guillemets -- derselbe Stimme-Anker-Schutz wie in narrate()/narrate_relation()
+    s = f"»{r['x']}« und »{r['y']}« haben gemeinsam: beide zählen zu »{labels[0]}«"
     if len(labels) > 1:
-        s += f" (und weiter zu {_join_de(labels[1:])})"
+        s += f" (und weiter zu {_join_de([f'»{lbl}«' for lbl in labels[1:]])})"
     return s + "."
 
 
@@ -991,7 +997,9 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
             anchor = last_question if step in _ANCHOR_BLEIBT else question
             if step in _STIMME_GEEIGNET:
                 text = _personalisiert(conn, question, text, stimme, marker)
-            else:
+            elif marker and marker not in text:
+                # die Meta-Zellen bauen auf last_answer auf, das oft schon einen Hinweis trägt
+                # (Nochmal/Ausführlicher wiederholen ihn wörtlich mit) -- nie doppelt anhängen
                 text = text + marker
             return {"text": text, "question": anchor}
     if hatte_handler:

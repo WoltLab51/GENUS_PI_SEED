@@ -196,6 +196,17 @@ def test_stimme_formuliere_fails_safe_when_an_anchor_goes_missing():
     assert stimme.formuliere(satz, model=model) is None
 
 
+def test_stimme_catches_a_corrupted_category_name_when_it_is_a_quoted_anchor():
+    # live fund (2026-07-03): companion.narrate() left is_a-category names UNQUOTED, so a
+    # rephrase could silently corrupt one ("Kernobst" -> "Kernaubere") without the anchor
+    # check ever noticing -- only the headword was protected. Fixed at the source (companion
+    # now quotes every named category), which this pins from the Stimme's side: once quoted,
+    # a corrupted category name is exactly the kind of anchor loss formuliere() must catch.
+    satz = "Unter »Apfel« versteht GENUS: Frucht; es zählt zu »Kernobst« und »Obst«."
+    model = _FakeModel("»Apfel« ist laut GENUS eine Frucht aus der Familie der Kernaubere.")
+    assert stimme.formuliere(satz, model=model) is None
+
+
 def test_stimme_formuliere_fails_safe_when_a_number_is_altered():
     satz = "Ja. »Apfel« zählt zu »Pflanzen«. (Vertrauen 0.50 — hergeleitet.)"
     model = _FakeModel("»Apfel« gehört laut GENUS zu »Pflanzen«. (Vertrauen 0.95 — hergeleitet.)")

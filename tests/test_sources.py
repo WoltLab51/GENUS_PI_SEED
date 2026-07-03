@@ -687,8 +687,10 @@ def test_companion_narrate_is_fluent_and_glassbox():
          "languages": ["chien", "dog"]}
     s = companion.narrate(a)
     assert s.startswith("Unter »Hund« (Substantiv)") and "Haustier" in s
-    assert "Heimtier und domestiziertes Säugetier" in s and "Q39201" not in s   # labels, no Q-id
-    assert "chien" in s
+    # jeder benannte Begriff in Guillemets -- der Stimme-Anker-Schutz (live gefunden: ohne den
+    # Schutz wurde "Kernobst" beim Umformulieren unbemerkt zu "Kernaubere")
+    assert "»Heimtier« und »domestiziertes Säugetier«" in s and "Q39201" not in s   # labels, no Q-id
+    assert "»chien«" in s
 
 
 def test_companion_narrate_drops_unnameable_parents():
@@ -1315,6 +1317,17 @@ def test_wiederholen_repeats_the_last_answer_verbatim():
         conn, "nochmal bitte", last_answer="Unter »Hund« versteht GENUS: Haustier.", deuter=deuter,
     )
     assert result["text"].startswith("Nochmal: Unter »Hund« versteht GENUS: Haustier.")
+
+
+def test_wiederholen_does_not_duplicate_a_marker_already_in_the_last_answer():
+    # live fund (2026-07-03): "Nochmal" on an already Deuter-tagged last_answer produced the
+    # marker TWICE (once embedded in last_answer, once freshly appended) -- deduped now
+    from genus import companion
+    conn = _isa_graph()
+    deuter = lambda q: {"absicht": "wiederholen"}
+    getaggt = "Unter »Hund« versteht GENUS: Haustier." + companion._DEUTED
+    result = companion.respond_with_deuter(conn, "nochmal bitte", last_answer=getaggt, deuter=deuter)
+    assert result["text"].count("Frage vom Sprachmodell gedeutet") == 1
 
 
 def test_meta_zellen_keep_the_session_anchored_on_the_original_topic():
