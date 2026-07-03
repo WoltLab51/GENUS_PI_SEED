@@ -1005,6 +1005,10 @@ def test_zaehlt_zu_is_a_deterministic_relation_pattern():
     reactors.observe_relation(conn, "Q_apfel", "is_a", "Q_pflanze", "wikidata")
     r = companion.relate(conn, "Zählt ein Apfel eigentlich zu den Pflanzen?")
     assert r["relational"] and r["verdict"] == "yes"
+    # the ae spelling (no umlaut key on the phone) must hit the same fixed pattern -- caught
+    # live: "zaehlt ..." slipped past z[äa]hlt into the model instead of staying deterministic
+    r2 = companion.relate(conn, "zaehlt ein Apfel eigentlich zu den Pflanzen")
+    assert r2["relational"] and r2["verdict"] == "yes"
 
 
 def test_common_pattern_skips_filler_words():

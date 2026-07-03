@@ -154,7 +154,7 @@ _REL_PATTERNS = [
     re.compile(r"\bist\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"?\s*art(?:\s+von)?\s+" + _TERM, re.I),
     re.compile(r"\bist\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"\s+" + _TERM, re.I),
     re.compile(r"\bsind\s+" + _FILL + _TERM + r"\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bz[äa]hlt\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"zu\s+(?:den|der|die|das)?\s*" + _TERM, re.I),
+    re.compile(r"\bz(?:ä|ae|a)hlt\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"zu\s+(?:den|der|die|das)?\s*" + _TERM, re.I),
 ]
 _LABEL_IN = re.compile(r"^Q\d+\s*\((.*)\)$")
 
