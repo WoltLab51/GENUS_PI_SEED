@@ -51,7 +51,7 @@ N_THREADS = int(os.environ.get("GENUS_DEUTER_THREADS", "4"))
 # die Struktur mit, nicht nur eine flache Liste.
 DEFAULT_ABSICHTEN = (
     "definition", "beziehung", "vergleich", "grammatik", "eigenschaft", "ursache", "menge",
-    "zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage",
+    "zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage", "ziele",
     "erinnerungs-abruf",
     "warum-herkunft", "vertiefung", "anschlussfrage",
     "weltfrage",
@@ -70,7 +70,8 @@ DEFAULT_ABSICHTEN = (
 _GRUPPEN = (
     ("FRAGEN über einen Begriff/ein Wort", ("definition", "beziehung", "vergleich", "grammatik",
                                              "eigenschaft", "ursache", "menge")),
-    ("FRAGEN über GENUS selbst", ("zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage")),
+    ("FRAGEN über GENUS selbst", ("zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage",
+                                   "ziele")),
     ("FRAGEN über dich (den Menschen)", ("erinnerungs-abruf",)),
     ("FRAGEN über das laufende GESPRÄCH (rückbezüglich auf die letzte Antwort)",
      ("warum-herkunft", "vertiefung", "anschlussfrage")),
@@ -95,6 +96,7 @@ _ERKLAERUNGEN = {
     "zustand": "wie geht es dir / dein Zustand",
     "offene-fragen": "was beschaeftigt dich",
     "faehigkeiten": "was kannst du",
+    "ziele": "was sind deine Ziele / deine Mission / was willst du werden / was fehlt dir",
     "empfehlungsfrage": "was empfiehlst du / was ist besser / deine Meinung dazu",
     "erinnerungs-abruf": "was weisst du ueber mich / hast du dir gemerkt",
     "warum-herkunft": "warum / woher weisst du das (zur letzten Antwort)",

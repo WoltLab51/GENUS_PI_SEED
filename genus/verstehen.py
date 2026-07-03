@@ -117,7 +117,7 @@ RASTER_SEED: tuple[tuple[str, str], ...] = (
     ("grammatik", "frage-begriff"), ("eigenschaft", "frage-begriff"), ("ursache", "frage-begriff"),
     ("menge", "frage-begriff"),
     ("zustand", "frage-genus"), ("offene-fragen", "frage-genus"), ("faehigkeiten", "frage-genus"),
-    ("empfehlungsfrage", "frage-genus"),
+    ("empfehlungsfrage", "frage-genus"), ("ziele", "frage-genus"),
     ("erinnerungs-abruf", "frage-nutzer"),
     ("warum-herkunft", "frage-gespraech"), ("vertiefung", "frage-gespraech"),
     ("anschlussfrage", "frage-gespraech"),

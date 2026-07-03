@@ -99,7 +99,29 @@ Menge wie der Deuter-Pfad — ein Fund am Rande, der die neue Rechen-Zelle sofor
   abfragbares Wissen) — noch nicht gebaut; heute lebt das Ziel nur in diesem Dokument und in
   Commit-Nachrichten, nicht im Graphen selbst.
 
-## 5 · Verwandte Entscheidungen
+## 5 · Umwidmung (2026-07-03, noch am selben Tag)
+
+Ronnys eigene kritische Nachfrage („ist sowas wie Abi als Benchmark-Gate denn wirklich
+sinnvoll?") hat dieses Ziel neu gefasst — und die Antwort war ehrlich: **nein, als Gate nicht.**
+
+- **Kategorienfehler:** das Abitur misst Menschen-Schwächen (Gedächtnis, Zeitdruck,
+  Flüchtigkeitsfehler). Den Rechenteil besteht sympy heute schon — ein bestandenes Abi würde
+  fast nur unseren Aufgaben-Parser messen.
+- **Goodhart's Law:** eine Messgröße, die zum Ziel wird, hört auf zu messen. „Besteht das Abi"
+  als Gate erzwingt Erkennungs-Shims pro Klausur-Format — exakt die Hand-Aufzählung, die das
+  Audit (docs/GENUS_AUDIT_2026_07.md) als Sackgasse benannt hat.
+- **Begleiter-Wert ≠ Zeugnis:** niemand schätzt seinen Begleiter fürs Abitur; „Berufe/Studium"
+  sind Credentialing-Strukturen für den menschlichen Arbeitsmarkt.
+
+**Was bleibt:** `genus/mathematik.py` voll (wird eines der ersten Werkzeuge im Werkzeugkasten,
+Inversion ②); die KMK-Standards als *Landkarte* eines Gebiets; ein kleiner held-out Korpus
+echter Abi-Textaufgaben als **Thermometer** für die Sprache→Werkzeug→Verifikation-Pipeline —
+abgelesen, nie als Steuergröße optimiert. **Was an seine Stelle trat:** die echten
+Begleiter-Ziele im Ziel-Graphen (`genus/ziele.py`, Ronnys sieben Punkte). Der Maßstab eines
+Begleiters ist nicht „besteht die Klausur", sondern „kann bei Schulmathe wirklich helfen" —
+gemessen an gelebter Nutzung (Belegung, Folge-Signale, Korrekturen).
+
+## 6 · Verwandte Entscheidungen
 
 - Punkt 4 des Gedächtnis-Konzepts (Tagespuffer + Nacht-Konsolidierung + Morgen-Push) wurde
   bewusst zurückgestellt, um sich auf dieses Ziel zu konzentrieren (Ronny, 2026-07-03) — nicht

@@ -648,6 +648,8 @@ def _ritual_antwort(conn, question: str) -> str | None:
         return state["answer"]
     if inquiries_question(question):
         return narrate_inquiries(conn, open_questions(conn))
+    if ziele_question(question):
+        return narrate_ziele(conn)
     return None
 
 
@@ -734,6 +736,51 @@ def inquiries_question(question: str) -> bool:
     """True when the question asks about GENUS's OWN open questions."""
     q = question.casefold()
     return any(cue in q for cue in _INQUIRY_CUES)
+
+
+# --- GENUS' eigene Ziele (Inversion ④ des Audits: Ziele sind Wissen im Graphen) -----------
+#
+# Seit dem Ziel-Graphen (genus/ziele.py, Ronnys sieben Punkte vom 2026-07-03 als provenancte
+# Knoten) WEISS GENUS, was es werden soll -- und kann es erzählen, samt der ehrlichen Lücke
+# ("dafür fehlt mir noch: ..."), direkt aus dem Graphen, deterministisch, kein Modell.
+
+_ZIELE_CUES = (
+    "was sind deine ziele", "welche ziele hast du", "was willst du werden",
+    "was ist deine mission", "was ist dein ziel", "wozu bist du da",
+    "wofür bist du da", "wofuer bist du da", "was fehlt dir",
+)
+
+
+def ziele_question(question: str) -> bool:
+    """True when the question asks about GENUS's OWN goals or what it still lacks for them."""
+    q = question.casefold()
+    return any(cue in q for cue in _ZIELE_CUES)
+
+
+def narrate_ziele(conn) -> str:
+    """Mission, Ziele und die ehrlich benannten fehlenden Fähigkeiten -- aus dem Graphen,
+    mit Herkunft. Ein leerer Graph wird ehrlich benannt (vor dem Seed-Apply auf dem Pi)."""
+    from genus import ziele as ziele_mod
+
+    m = ziele_mod.mission(conn)
+    alle = ziele_mod.ziele(conn)
+    if m is None and not alle:
+        return ("Meine Ziele sind noch nicht in meinem Graphen angekommen — bisher stehen sie "
+                "nur in Dokumenten, und die kann ich nicht lesen.")
+    lines = []
+    if m:
+        lines.append(f"Meine Mission: {m}")
+    if alle:
+        lines.append(f"Dafür verfolge ich {len(alle)} Ziele:")
+        for z in alle:
+            fehlt = [f["id"].removeprefix(ziele_mod.FAEHIGKEIT_PREFIX)
+                     for f in z["braucht"] if f["status"] != "live"]
+            zeile = f"• {z['inhalt']}"
+            if fehlt:
+                zeile += f" (dafür fehlt mir noch: {', '.join(fehlt)})"
+            lines.append(zeile)
+    lines.append("(Quelle: Ronny — meine Ziele sind Wissen mit Herkunft, wie alles andere.)")
+    return "\n".join(lines)
 
 
 def open_questions(conn) -> dict:
@@ -989,6 +1036,10 @@ def _zelle_offene_fragen(conn, guess, question, last_question, last_answer, stim
     return narrate_inquiries(conn, open_questions(conn))
 
 
+def _zelle_ziele(conn, guess, question, last_question, last_answer, stimme=None):
+    return narrate_ziele(conn)
+
+
 def _zelle_frage_begriff(conn, guess, question, last_question, last_answer, stimme=None):
     # der weiche Landeplatz der Zelle "frage-begriff" selbst -- eigenschaft/ursache/menge
     # haben kein eigenes Blatt-Handler und klettern genau EINEN Schritt hierher (Blatt -> Zelle,
@@ -1119,6 +1170,7 @@ _HANDELBAR = {
     "erinnerungs-abruf": _zelle_erinnerung,
     "zustand": _zelle_zustand,
     "offene-fragen": _zelle_offene_fragen,
+    "ziele": _zelle_ziele,
     "kuerzer": _zelle_kuerzer,
     "ausfuehrlicher": _zelle_ausfuehrlicher,
     "anders-erklaeren": _zelle_anders_erklaeren,

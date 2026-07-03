@@ -306,6 +306,14 @@ def test_verstehen_seed_script_is_one_clean_idempotent_apply():
     assert "idempotent" in script.lower()      # re-running must never duplicate the raster
 
 
+def test_ziele_seed_script_is_one_clean_idempotent_apply():
+    script = (ROOT / "deploy" / "seed_ziele.sh").read_text(encoding="utf-8")
+    assert "ziele.seed_ziele" in script
+    assert "conn.commit()" in script
+    assert "idempotent" in script.lower()      # re-running must never duplicate the goal graph
+    assert "fehlende_faehigkeiten" in script   # the apply names the honest gaps out loud
+
+
 def test_migriere_notizen_script_is_one_clean_idempotent_apply():
     script = (ROOT / "deploy" / "migriere_notizen.sh").read_text(encoding="utf-8")
     assert "erinnerung.migriere_notizen" in script

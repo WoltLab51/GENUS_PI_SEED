@@ -364,3 +364,21 @@ Generator wird ein Organ des Organismus, die Autorität bleibt beim gläsernen K
 Behauptung.
 
 *Nicht neu beginnen. Umstülpen.*
+
+---
+
+## Nachtrag (2026-07-03, noch am selben Tag)
+
+Ronny hat die Gabeln aus Abschnitt 10 entschieden — und die Studie in zwei Punkten geschärft:
+
+- **Gabel 1+2 (Richtung + Einstieg): bestätigt.** Erster Schritt = Ziele in den Graphen —
+  geliefert (`genus/ziele.py`, `deploy/seed_ziele.sh`). Als Nächstes: Selbst-Codieren Stufe 0.
+- **Schärfung 1 — das Abitur fiel als Gate** (Ronnys eigene Nachfrage): Kategorienfehler +
+  Goodhart; umgewidmet zum Thermometer. Details in `GENUS_ABITUR.md` §5.
+- **Schärfung 2 — die echten Ziele liegen jetzt vor**: sieben Punkte (Begleiter für
+  Einzelne/Familien · Selbst-Entwicklung mit Erlaubnis-Frage · Trading hinter konservativsten
+  Gates · Unterhaltung/Spiele · private Generierung aus eigenem Modell · sich und die Umwelt
+  verstehen · „Menschen unterstützen. digital. GENUS."). Bemerkenswert: Ronnys Punkte 1+6
+  beschreiben zusammen exakt den Loop aus Abschnitt 5 dieser Studie — Ergebnis (eigenen Code
+  anhängen) und Prozess (Lücke spüren, Plan fassen, um Erlaubnis fragen) desselben Motors.
+- **Gabel 3 (Generator):** offen gehalten; Architektur-Umbau beginnt mit dem 1.5B.
