@@ -934,11 +934,62 @@ Engine" — `meaning_extracted`, immer `derivation: model:*`) und **Stimme** fü
 Ausgabe. *GENUS weiß und erdet; das LLM dolmetscht und spricht* — jede Äußerung gegen
 das eigene Wissen geprüft.
 
-## Noch offen auf der Karte (einzuordnen, nicht linear)
+## Die Etappen bis zur Vollendung (Stand 2026-07-04, von Ronny erfragt: „von jetzt bis Fertigstellung")
 
-- **Transition Core + Worker Interface** — wenn GENUS *handeln* soll (eigener Replay-Vertrag).
-- **Visual Observation Model** — Bild als Sensor-Typ → Behauptung (siehe `GENUS_VISUAL_THINKING.md`).
-- **Föderation / Begleiter** — *wie* GENUS genutzt wird (ein Kern pro Charakter, getrennte DBs).
+„Fertig" heißt ehrlich: alle sieben Ziele haben LEBENDE Fähigkeiten und der Loop trägt
+sich selbst — jede Etappe hat ein messbares „fertig wenn", kein Datum. Die Reihenfolge
+ist die Optimierung: der Begleiter zahlt dreifach (Nutzen + gelebte Lerndaten + spürbar),
+die Selbst-Entwicklung verbilligt alles Spätere, die Markt-Membran wartet auf gelebte
+Gates, das Generator-Organ auf eine bessere Modell-Landschaft (gemessen, nicht gehofft),
+die Föderation auf alles davor plus die gelöste Löschbarkeits-Frage.
+
+**Etappe 1 — Der Begleiter wird alltagstauglich** *(Ziele: begleiter, verstehen)*
+Gedächtnis fertig: Tagespuffer + Nacht-Konsolidierung + Morgen-Push (#19, erste
+PUSH-Fähigkeit, eigener Design-Schritt) · Embedder-Cosine-Nudge (braucht warmen
+Embed-Pfad — kleiner Daemon oder fastembed im Bot-venv) · Raster-Reste (identität-Blatt,
+Segmentier-Qualität, Antwort-Komposition) · Wissens-Breite läuft weiter (Lerner).
+*Fertig wenn:* eine Woche echte Sessions ohne Fehlgriff-Frust; Morgen-Push läuft;
+„Was weißt du über mich?" fühlt sich vollständig an.
+
+**Etappe 2 — Selbst-Entwicklung wird produktiv** *(Ziel: selbst-entwicklung)*
+Plan-Finder: neue lokale Coder-Modelle durchmessen (Geschirr = Einzeiler) ·
+Bauplan-Arten wachsen mit echten Lücken (Registry) · Selbst-Bild vervollständigen
+(GENUS liest den eigenen Code, read-only) · Abitur-Thermometer aufstellen (#20) ·
+erste Gate-Lockerung mit Bilanz, selbst durchs Gate (§8).
+*Fertig wenn:* die erste von GENUS gespürte, freigegebene, vom Schmied gefüllte, von
+Ronny gemergte Zelle LIVE antwortet — der volle Kreis einmal komplett.
+
+**Etappe 3 — Neue Sinne: die Markt-Membran** *(Ziel: trading, Teil 1)*
+Beobachten wie beim Wetter (Membran → provenancte Behauptungen) · Forecast-Skill über
+die bestehende learning-Engine · Papier-Signale mit gemessener Trefferquote · die
+härtesten Gates des Systems (Vorschlag-pro-Trade, menschliche Bestätigung).
+*Fertig (Teil 1) wenn:* Monate Papier-Bilanz mit ehrlicher Trefferquote. Echtes Geld
+ist eine SPÄTERE, eigene Entscheidung — die Leitplanke (nie Auto-Trading auf
+Backtest-Confidence) steht.
+
+**Etappe 4 — Das Generator-Organ** *(Ziele: unterhaltung, private-generierung)*
+Größeres lokales Modell als Organ (freie Stimme mit Anker-Leine) · Spiele zuerst
+regelbasiert (SYSTEME-Schiene: Regel-Domänen sind Kern-Stärke — Schach als Kandidat) ·
+private Generierung über ein eigenes, konfiguriertes Modell-Organ, strukturell isoliert.
+*Fertig wenn:* ein Spiel läuft komplett über Regel-Domänen + Organ; die Generierung
+läuft lokal, isoliert, mit Ronnys Konfiguration.
+
+**Etappe 5 — Föderation: Familie & Gruppen** *(Ziel: begleiter für Gruppen)*
+Ein Kern pro Person, geteilte Räume · Charaktere mit STRUKTURELLER Isolation ·
+Crypto-Shredding (Löschbarkeit vs. append-only) wird VOR dieser Etappe gelöst.
+*Fertig wenn:* zwei Kerne teilen einen Raum, ohne dass einer den anderen lesen kann;
+Löschen ist real.
+
+**Querschnitt, laufend (keine eigene Etappe):** Umbau-Reste (companion-Muster →
+Registry, `query.ask` → Deuten+Register, `integrity`-Schema-Register, deutsche
+Modulnamen #24 als eigene Session) · Ledger-Wachstum auf der SD-Karte NACHMESSEN (nie
+gemessen) · Selbst-Bild aktuell halten (erster fälliger Punkt: `ziele.py` sagt noch
+„vorschlags-loop: fehlt" — er ist seit 2026-07-04 lückenlos live) · Doku bleibt
+abgeleitet und aktuell.
+
+**Einordnung der alten offenen Punkte:** Transition Core + Worker Interface geht in
+Etappe 3 auf (die Markt-Membran ist der erste echte Handlungs-Anlass); Visual
+Observation Model bleibt hinter Etappe 4 (Bild als Sensor-Typ); Föderation IST Etappe 5.
 
 ---
 
@@ -989,12 +1040,21 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
 ── Querschnitt, ANGEDOCKT (erstes Modell am Rand, v1.16) ──
   LLM        Embedder deutet/brückt (model:embedder, gedeckelt) · später Stimme — nie Orakel
 
-── DER UMBAU (2026-07-04: Ziel-Architektur steht · umbauen, nicht neu — jedes Teil NEU gebaut) ──   ← JETZT HIER
-  Phase 0   Boden           → Kopplungen lösen · db.connect · Belief-Maschine teilen
-  Phase 1   Register        → Vertragstest ZUERST · event_router → Registry · CHECKPOINT
-  Phase 2   Deuten härten   → die Grenze (constrained decoding) · Membran-Drift zu
-  Phase 3   Hülle → Ledger  → Registrierung als Event · _HANDELBAR → Registry · Lernkreis
-  Phase 4   Selbst-Codieren → spüren → vorschlagen → BAUEN (Gate-Politik: entwickelt sich)
+── DER UMBAU (2026-07-04: KOMPLETT — alle 5 Phasen geliefert, an einem Tag) ──
+  Phase 0   Boden           → Kopplungen gelöst · db.connect · Belief-Maschine geteilt ✅
+  Phase 1   Register        → Vertragstest + event_router-Registry · Checkpoint bestanden ✅
+  Phase 2   Deuten gehärtet → die Grenze live bewiesen (erfundene Kategorie unmöglich) ✅
+  Phase 3   Hülle → Ledger  → Zellen-Registry · Registrierung als Event · Korrektur-Kanal ✅
+  Phase 4   Selbst-Codieren → Kette LÜCKENLOS: spüren→fragen→Freigabe→bauen→Werkstatt→Merge ✅
+            + Werkstatt/Schmied/Bauplan/Fügewerk/Bauplan-Grenze (Trichter gemessen: 1/3
+            Ende-zu-Ende) · Selbst-Neustart der Membran (kein sudo, je)
+
+── DIE ETAPPEN BIS ZUR VOLLENDUNG (siehe eigener Abschnitt unten) ──   ← JETZT HIER
+  Etappe 1  Begleiter alltagstauglich   → Gedächtnis fertig · Cosine-Lernkreis · Raster-Reste
+  Etappe 2  Selbst-Entwicklung produktiv → Plan-Finder messen · Selbst-Bild · Gate-Lockerung
+  Etappe 3  Markt-Membran               → beobachten · Papier-Bilanz · härteste Gates
+  Etappe 4  Generator-Organ             → freie Stimme · Spiele · private Generierung
+  Etappe 5  Föderation                  → ein Kern pro Person · Löschbarkeit vorher gelöst
 ```
 
 ---
