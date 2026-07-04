@@ -702,8 +702,12 @@ def integral_command(term: str, untere_grenze: str, obere_grenze: str, variable:
 @main.command("werkzeuge")
 def werkzeuge_command() -> None:
     """Alle beim Werkzeugbauer registrierten Werkzeuge -- das, was ein Planer sehen würde
-    (Ronnys Frage: "woraus besteht ein Werkzeug eigentlich genau?", docs/GENUS_AUDIT_2026_07.md)."""
+    (Ronnys Frage: "woraus besteht ein Werkzeug eigentlich genau?", docs/GENUS_AUDIT_2026_07.md).
+    Protokolliert dabei jede noch nicht im Ledger stehende Registrierungs-ENTSCHEIDUNG
+    (Phase 3 Scheibe 2: die Hülle hat Herkunft -- dedupliziert, ein zweiter Aufruf schreibt
+    nichts)."""
     werkzeuge_seed.registriere_mathe_werkzeuge()
+    companion.registriere_zellen()
     for w in werkzeug.alle():
         parameter = ", ".join(
             f"{name}" + ("" if p.pflicht else f"={p.standard!r}")
@@ -717,6 +721,12 @@ def werkzeuge_command() -> None:
         flags.append(f"prüfbar_als={w.pruefbar_als}")
         click.echo(f"[WERKZEUG] {w.name}({parameter}) — {w.beschreibung}")
         click.echo(f"[WERKZEUG]   {', '.join(flags)}")
+    conn = get_conn()
+    try:
+        neu = werkzeug.protokolliere_registrierungen(conn)
+    finally:
+        conn.close()
+    click.echo(f"[WERKZEUG] {neu} neue Registrierungs-Entscheidung(en) im Ledger protokolliert")
 
 
 @main.command("concept")

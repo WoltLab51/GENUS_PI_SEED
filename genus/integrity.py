@@ -167,6 +167,14 @@ REQUIRED_EVENT_KEYS = {
         "prefix_max_id",
         "prefix_count",
     },
+    "werkzeug_registriert": {
+        "name",
+        "parameter",
+        "schreibt",
+        "wortlautfest",
+        "pruefbar_als",
+        "quelle",
+    },
 }
 
 

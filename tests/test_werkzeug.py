@@ -178,3 +178,55 @@ def test_dispatch_ueberlebt_eine_geleerte_registry():
     werkzeug.REGISTRY.clear()
     zellen = companion._handelbare_werkzeuge()
     assert "definition" in zellen and "dank" in zellen
+
+
+# --- Phase 3 Scheibe 2: die Registrierungs-ENTSCHEIDUNG wird Ledger-Geschichte --------
+
+
+def test_registrierung_wird_einmal_protokolliert_nie_gespammt(conn):
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    companion.registriere_zellen()
+    n = len(werkzeug.alle())
+    assert werkzeug.protokolliere_registrierungen(conn) == n   # erste Protokollierung: alle
+    assert werkzeug.protokolliere_registrierungen(conn) == 0   # Prozess-Start spammt nie
+    rows = conn.execute(
+        "SELECT COUNT(*) AS n FROM event_log WHERE event_type = 'werkzeug_registriert'"
+    ).fetchone()
+    assert rows["n"] == n
+
+
+def test_vertragsaenderung_schreibt_eine_neue_entscheidung(conn):
+    werkzeug.verdrahten(_leeres_werkzeug(wortlautfest=True))
+    assert werkzeug.protokolliere_registrierungen(conn) == 1
+    # dieselbe Spec nochmal verdrahtet (Neuladen) -> keine neue Entscheidung
+    werkzeug.verdrahten(_leeres_werkzeug(wortlautfest=True))
+    assert werkzeug.protokolliere_registrierungen(conn) == 0
+    # ein ECHTER Vertragswechsel (wortlautfest kippt) -> neue Entscheidung, Historie bleibt
+    werkzeug.verdrahten(_leeres_werkzeug(wortlautfest=False))
+    assert werkzeug.protokolliere_registrierungen(conn) == 1
+    rows = conn.execute(
+        "SELECT payload FROM event_log WHERE event_type = 'werkzeug_registriert' ORDER BY id"
+    ).fetchall()
+    import json as _json
+    historie = [_json.loads(r["payload"])["wortlautfest"] for r in rows]
+    assert historie == [True, False]
+
+
+def test_beschreibungs_prosa_ist_keine_neue_entscheidung(conn):
+    # Der Fingerabdruck ist der VERTRAG (Parameter, schreibt, wortlautfest, pruefbar_als)
+    # -- Prosa darf sich aendern, ohne die Historie aufzublaehen.
+    werkzeug.verdrahten(_leeres_werkzeug(beschreibung="Erste Prosa."))
+    assert werkzeug.protokolliere_registrierungen(conn) == 1
+    werkzeug.verdrahten(_leeres_werkzeug(beschreibung="Ganz andere Prosa."))
+    assert werkzeug.protokolliere_registrierungen(conn) == 0
+
+
+def test_werkzeug_registriert_ist_bewusst_roh_und_replay_stabil(conn):
+    # Der Phase-1-Vertragstest erzwingt die Entscheidung (projiziert oder roh) ohnehin;
+    # hier zusaetzlich der Beweis, dass ein protokolliertes Event den Replay nicht stoert.
+    from genus import event_router, integrity
+    assert "werkzeug_registriert" in event_router.BEWUSST_ROH
+    werkzeug.verdrahten(_leeres_werkzeug())
+    werkzeug.protokolliere_registrierungen(conn)
+    report = integrity.check(conn)
+    assert report["ok"], report

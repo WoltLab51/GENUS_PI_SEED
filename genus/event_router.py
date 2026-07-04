@@ -85,6 +85,8 @@ BEWUSST_ROH: frozenset[str] = frozenset({
     "forecast_scored",         # dito
     "rule_proposed",           # der Vorschlag läuft als proposal_created; dies ist die Reifungs-Spur
     "ledger_epoch_opened",     # der Siegel-Epochen-Marker (sealing.py) -- Kette, kein Zustand
+    "werkzeug_registriert",    # die Registrierungs-ENTSCHEIDUNG (Phase 3 Scheibe 2); die
+                               # Laufzeit-Registry wird aus Code neu gebaut, nicht projiziert
 })
 
 
