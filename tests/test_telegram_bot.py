@@ -732,3 +732,57 @@ def test_morgen_push_und_nacht_stehen_im_cron_installer():
     text = (ROOT / "deploy" / "pi_install_cron.sh").read_text(encoding="utf-8")
     assert "nacht_konsolidierung.sh" in text
     assert "morgen_push.sh" in text
+
+
+# --- die Morgenzeit-Zelle: Push-Zeit per Chat stellen (Membran-Konfiguration) ----------
+
+
+@pytest.fixture(autouse=True)
+def _morgenzeit_datei_im_tmp(monkeypatch, tmp_path):
+    monkeypatch.setattr(telegram_bot, "MORGENZEIT_DATEI", str(tmp_path / "morgenpush.zeit"))
+
+
+def test_morgenzeit_stellen_schreibt_die_datei_die_der_push_liest():
+    antwort = telegram_bot._morgenzeit_antwort("Stell den Push auf 7")
+    assert "07:00" in antwort
+    inhalt = open(telegram_bot.MORGENZEIT_DATEI, encoding="utf-8").read()
+    assert inhalt == "07:00"   # exakt das Format, das morgen_push.sh string-vergleicht
+
+
+def test_morgenzeit_versteht_minuten_und_uhr_suffix():
+    antwort = telegram_bot._morgenzeit_antwort("stell den Morgen-Push auf 6:30 Uhr!")
+    assert "06:30" in antwort
+    assert open(telegram_bot.MORGENZEIT_DATEI, encoding="utf-8").read() == "06:30"
+
+
+def test_morgenzeit_ausserhalb_des_fensters_wird_gestellt_aber_ehrlich_benannt():
+    antwort = telegram_bot._morgenzeit_antwort("stell den Push auf 12")
+    assert "12:00" in antwort and "Morgen-Fenster" in antwort
+
+
+def test_morgenzeit_weist_eine_unmoegliche_uhrzeit_ab():
+    antwort = telegram_bot._morgenzeit_antwort("stell den Push auf 25")
+    assert "keine gültige Uhrzeit" in antwort
+    import os as _os
+    assert not _os.path.exists(telegram_bot.MORGENZEIT_DATEI)   # nichts geschrieben
+
+
+def test_morgenzeit_frage_nennt_standard_und_gestellten_wert():
+    assert "06:00" in telegram_bot._morgenzeit_antwort("Wann kommt der Push?")
+    telegram_bot._morgenzeit_antwort("stell den Push auf 7:15")
+    assert "07:15" in telegram_bot._morgenzeit_antwort("wann kommt die Morgen-Nachricht?")
+
+
+def test_eine_gewoehnliche_frage_ist_kein_morgenzeit_kommando():
+    assert telegram_bot._morgenzeit_antwort("Was ist ein Hund?") is None
+    assert telegram_bot._morgenzeit_antwort("Wann kommt der Frühling?") is None
+
+
+def test_morgenzeit_kommando_laeuft_als_membran_ritual_vor_dem_kern():
+    # das Kommando erreicht weder Deuter noch Session-Buchführung -- reine Membran-Sache
+    conn = _fresh()
+    sessions: dict = {}
+    result = telegram_bot.handle_update(conn, _msg(1, 42, "stell den Push auf 6:45"),
+                                        allowed={42}, sessions=sessions)
+    assert result is not None and "06:45" in result[1]
+    assert sessions == {}   # kein Zug, kein Verlauf -- Konfiguration ist kein Gespräch

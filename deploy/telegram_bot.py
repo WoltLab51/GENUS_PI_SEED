@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import ssl
 import sys
 import time
@@ -98,6 +99,51 @@ def _neustart_angefordert(start_zeit: float) -> bool:
         return os.path.getmtime(NEUSTART_DATEI) > start_zeit
     except OSError:
         return False
+
+
+# Die MORGENZEIT-Zelle (Ronnys Entscheidung beim Push-Design: „kann ich ja jederzeit
+# ändern über den chat einfach oder?"): die Push-Zeit ist MEMBRAN-Betriebskonfiguration
+# (morgen_push.sh liest genau diese Datei), kein Wissen -- deshalb wohnt das Ritual hier
+# in der Membran, nicht im Kern. Exakte Kommandos wie beim Chat-Regler der Persönlichkeit.
+MORGENZEIT_DATEI = os.environ.get(
+    "GENUS_MORGENPUSH_ZEIT", os.path.join(GENUS_USER_HOME, ".genus", "morgenpush.zeit")
+)
+_MORGENZEIT_STANDARD = "06:00"
+_MORGENZEIT_SETZEN = re.compile(
+    r"^stell den (?:morgen-?push|push|morgengruss|morgengruß) auf (\d{1,2})(?:[:.](\d{2}))?(?: uhr)?$"
+)
+_MORGENZEIT_FRAGE = re.compile(
+    r"^wann kommt (?:der (?:morgen-?push|push)|die morgen-?nachricht)$"
+)
+
+
+def _morgenzeit_antwort(question: str) -> str | None:
+    """Erkennt das Morgenzeit-Kommando (satzzeichen-tolerant) und stellt/nennt die
+    Push-Zeit -- ``None``, wenn die Nachricht etwas anderes ist."""
+    text = question.strip().strip(".!? ").casefold()
+    m = _MORGENZEIT_SETZEN.match(text)
+    if m:
+        stunde, minute = int(m.group(1)), int(m.group(2) or 0)
+        if stunde > 23 or minute > 59:
+            return "Das ist keine gültige Uhrzeit — sag z.B. „stell den Push auf 6:30“."
+        zeit = f"{stunde:02d}:{minute:02d}"
+        os.makedirs(os.path.dirname(MORGENZEIT_DATEI), exist_ok=True)
+        with open(MORGENZEIT_DATEI, "w", encoding="utf-8") as f:
+            f.write(zeit)
+        antwort = f"Gern — die Morgen-Nachricht kommt ab jetzt um {zeit}."
+        if not 5 <= stunde <= 9:
+            # ehrlich: das Cron-Fenster läuft 5-10 Uhr -- außerhalb feuert nichts
+            antwort += (" Beachte: mein Morgen-Fenster läuft 5 bis 10 Uhr — "
+                        "außerhalb davon kommt derzeit keine Nachricht.")
+        return antwort
+    if _MORGENZEIT_FRAGE.match(text):
+        try:
+            with open(MORGENZEIT_DATEI, encoding="utf-8") as f:
+                zeit = f.read().strip() or _MORGENZEIT_STANDARD
+        except FileNotFoundError:
+            zeit = _MORGENZEIT_STANDARD
+        return f"Die Morgen-Nachricht kommt um {zeit}."
+    return None
 _KORREKTUR_MAX = 50       # die Datei bleibt gedeckelt: die jüngsten 50 Korrekturen
 _HINWEIS_BEISPIELE = 3    # wie viele Beispiele der Prompt höchstens trägt (nie wachsend)
 
@@ -245,6 +291,11 @@ def handle_update(
         return None
     question = message["text"]
     _log(f"question from {sender}: {question!r}")
+    # Membran-Ritual VOR dem Kern: die Morgenzeit ist Betriebskonfiguration dieser
+    # Membran (Datei, die morgen_push.sh liest), kein Wissen -- der Kern sieht sie nie.
+    morgen = _morgenzeit_antwort(question)
+    if morgen is not None:
+        return chat_id, morgen
     try:
         if sessions is None:
             answer = companion.respond(conn, question)

@@ -2,9 +2,10 @@
 set -Eeuo pipefail
 
 # Der MORGEN-PUSH (Ronnys Entscheidungen 2026-07-04): genau EINE Nachricht am Morgen,
-# 06:00 (änderbar über ~/.genus/morgenpush.zeit -- eine Chat-Zelle dafür ist der benannte
-# nächste Schritt), nie leer (wenn nichts wartet, erzählt GENUS, was es nachts gelernt
-# hat), warm und nativ formuliert (genus/konsolidierung.morgen_nachricht, deterministisch).
+# 06:00 (änderbar über ~/.genus/morgenpush.zeit -- per Chat: „stell den Push auf 7",
+# telegram_bot._morgenzeit_antwort schreibt genau diese Datei), nie leer (wenn nichts
+# wartet, erzählt GENUS, was es nachts gelernt hat), warm und nativ formuliert
+# (genus/konsolidierung.morgen_nachricht, deterministisch).
 # Läuft alle 10 Minuten im Morgenfenster (Cron) und feuert genau einmal pro Tag
 # (Datums-Marker) -- der erste bewusste PUSH der sonst rein reaktiven Membran.
 
