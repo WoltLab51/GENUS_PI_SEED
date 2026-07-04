@@ -297,11 +297,12 @@ def _atlas_facts() -> str:
     can be regenerated and a test can enforce currency.
     """
     import genus
-    from genus import companion, constants, experience, rules, verstehen, werkzeug, werkzeuge_seed, ziele
+    from genus import companion, constants, experience, maturation, rules, verstehen, werkzeug, werkzeuge_seed, ziele
 
     metric_keys = sorted({getattr(rules, n) for n in dir(rules) if n.endswith("_METRIC_KEY")})
     reactors = [reactor.__name__ for reactor in rules.REACTORS]
     detectors = [detector.__name__ for detector in experience.DETECTORS]
+    kandidaten = [quelle.__name__ for quelle in maturation.KANDIDATEN]
     budget = sorted(n for n in dir(constants) if n.endswith("_THRESHOLD"))
 
     # Ronnys Frage (2026-07-03: "kann die Doku nicht völlig abgeleitet sein? dann wäre sie
@@ -329,6 +330,7 @@ def _atlas_facts() -> str:
             f"- **Sensor-Metriken ({len(metric_keys)}):** " + ", ".join(metric_keys),
             f"- **Beobachtungs-Reaktoren ({len(reactors)}):** " + ", ".join(reactors),
             f"- **Kognitions-Detektoren ({len(detectors)}):** " + ", ".join(detectors),
+            f"- **Reifungs-Kandidaten ({len(kandidaten)}):** " + ", ".join(kandidaten),
             f"- **Preset-Budget ({len(budget)} feste Schwellen):** " + ", ".join(budget),
             f"- **Ziele:** {len(ziele.ZIEL_SEED) - 1} Ziele, {len(ziele.FAEHIGKEIT_SEED)} "
             f"Fähigkeiten ({status_zaehlung['live']} live, {status_zaehlung['teilweise']} "
@@ -339,6 +341,9 @@ def _atlas_facts() -> str:
             f"({muster_gesamt} Muster gesamt), {len(companion._HANDELBAR)} handelbare Zellen",
             f"- **Werkzeugbauer:** {len(werkzeuge)} registrierte Werkzeuge "
             f"({wortlautfest_n} wortlautfest)",
+            f"- **Event-Router:** {len(event_router.PROJEKTOREN)} registrierte Projektoren, "
+            f"{len(event_router.BEWUSST_ROH)} bewusst-rohe Event-Typen "
+            f"(Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)",
             "",
         ]
     )

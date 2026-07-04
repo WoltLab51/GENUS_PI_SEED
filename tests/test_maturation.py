@@ -333,3 +333,25 @@ def insert_activity_evidence(conn, value: float, created_at: str) -> int:
         "_event_id": evidence_id, "_event_created_at": created_at})
     conn.commit()
     return int(evidence_id)
+
+
+def test_kandidaten_registry_ist_die_eine_tuer_fuer_reifungs_arten(conn, monkeypatch):
+    # Phase 1 der Ziel-Architektur: maturation folgt jetzt demselben Registry-Muster wie
+    # rules.REACTORS und experience.DETECTORS -- eine neue Reifungs-Art wird registriert,
+    # nicht in scan() hineingeschrieben. Eine Fake-Quelle in der Registry muss von scan
+    # ohne jede Aenderung an scan() aufgegriffen werden.
+    fake_kandidat = {
+        "rule_key": "test_expectation:test.metrik:07:idle",
+        "rule_type": maturation.RULE_TYPE,
+        "subject_key": "test.metrik",
+        "spec": {"hour_utc": 7, "expected_value": "idle"},
+        "source_experience": 1,
+        "derivation": maturation.DERIVATION,
+        "summary": "Testquelle",
+    }
+    monkeypatch.setattr(maturation, "KANDIDATEN", (lambda c: [fake_kandidat],))
+    proposed = maturation.scan(conn)
+    assert len(proposed) == 1
+    assert proposed[0]["rule_key"] == fake_kandidat["rule_key"]
+    # idempotent wie vorher: ein zweiter Scan schlaegt dieselbe Regel nicht nochmal vor
+    assert maturation.scan(conn) == []

@@ -14,23 +14,24 @@ ACTIVE = "active"
 
 def scan(conn) -> list[dict]:
     proposed: list[dict] = []
-    for candidate in _activity_expectation_candidates(conn):
-        if rule_exists(conn, candidate["rule_key"]):
-            continue
-        rule_event_id = record_rule_proposed_event(conn, candidate)
-        proposal_id, proposal_event_id = record_rule_proposal(
-            conn,
-            candidate,
-            rule_event_id,
-        )
-        proposed.append(
-            {
-                "rule_event_id": rule_event_id,
-                "proposal_event_id": proposal_event_id,
-                "proposal_id": proposal_id,
-                **candidate,
-            }
-        )
+    for kandidaten_quelle in KANDIDATEN:
+        for candidate in kandidaten_quelle(conn):
+            if rule_exists(conn, candidate["rule_key"]):
+                continue
+            rule_event_id = record_rule_proposed_event(conn, candidate)
+            proposal_id, proposal_event_id = record_rule_proposal(
+                conn,
+                candidate,
+                rule_event_id,
+            )
+            proposed.append(
+                {
+                    "rule_event_id": rule_event_id,
+                    "proposal_event_id": proposal_event_id,
+                    "proposal_id": proposal_id,
+                    **candidate,
+                }
+            )
     return proposed
 
 
@@ -240,3 +241,11 @@ def _activity_expectation_candidates(conn) -> list[dict]:
 
 def _json(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+# Kandidaten-Registry: jede Quelle ist eine reine Funktion conn -> list[candidate] --
+# dasselbe Muster wie rules.REACTORS (pro Beobachtung) und experience.DETECTORS (pro
+# Scan), Phase 1 der Ziel-Architektur: eine neue Reifungs-Art wird REGISTRIERT, nicht
+# in scan() hineingeschrieben. Bisher war maturation das eine Geschwister-Modul ohne
+# diese Form (ein hart verdrahteter Aufruf mitten in scan).
+KANDIDATEN = (_activity_expectation_candidates,)
