@@ -271,7 +271,7 @@ Legende: ✅ steht · ◐ teilweise/Prototyp · ✗ fehlt
 | Lernkreis Klassifikation | ✗ | alle Teile live (Embedder auf dem Pi, `record_reading`, teach-Muster) — nicht verdrahtet; Naht 1 ungelöst |
 | Schichtung | ◐ | ~90 % sauber; 2 verkehrte Kopplungen (`erinnerung`/`experience` → `companion`-Private); `telegram_bot` roher `sqlite3.connect` |
 | Gates | ◐ | Governance-Gates real (Proposals, Regel-Aktivierung, Recovery), aber 3× duplizierte `evaluate_*`; Gate-Politik entschieden (§8: startet strengst, entwickelt sich nur durchs Gate), noch nicht als Constraint/Policy kodiert |
-| Selbst-Codieren-Kreis | ◐ | Stufe 0 live (Lücke → Proposal → Frage); „bauen" nach Freigabe fehlt |
+| Selbst-Codieren-Kreis | ◐ | Stufe 0+1 live (Lücke → Proposal → Freigabe → Ziel-Graph-Eintrag, gesprächsnah getaktet); Stufe 2: die WERKSTATT steht (Sandbox-Entwurfs-Pipeline: Entwürfe außerhalb des Kerns, Verbots-Scan im Kern, Probefahrt in der Membran, Merge menschlich) — Generator heute Vorlage, Modell = Konfig-Schalter |
 | Wächter | ◐ | `doctor` prüft LLM-/Netz-Importe; Schicht-Gate ✗; Registry-Vertragstest ✗ (Naht 3) |
 | Membran-Reinheit | ✅ | alle Edge-Skripte: kein `genus`-Import, lesend rohe SQL, schreibend nur via CLI-Subprozess |
 

@@ -180,6 +180,20 @@ REQUIRED_EVENT_KEYS = {
         "art",
         "ergebnis",
     },
+    "code_entwurf_erstellt": {
+        "blatt",
+        "pfad",
+        "fingerabdruck",
+        "quelle",
+    },
+    "code_entwurf_geprueft": {
+        "blatt",
+        "pfad",
+        "fingerabdruck",
+        "verbote",
+        "tests_exit",
+        "bestanden",
+    },
 }
 
 

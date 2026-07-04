@@ -33,6 +33,7 @@ from genus import (
     sources,
     state,
     umsetzung,
+    werkstatt,
     werkzeug,
     werkzeuge_seed,
 )
@@ -701,6 +702,67 @@ def integral_command(term: str, untere_grenze: str, obere_grenze: str, variable:
         f"[MATH] Integral von f({variable}) = {r['term']} von {r['untere_grenze']} bis "
         f"{r['obere_grenze']} = {r['integral']}"
     )
+
+
+@main.group(name="werkstatt")
+def werkstatt_group() -> None:
+    """Die Werkstatt (Selbst-Codieren Stufe 2): Code-Entwürfe entstehen, werden geprüft
+    und warten auf den menschlichen Merge -- nie automatisch Teil der Hülle."""
+
+
+@werkstatt_group.command("entwerfe")
+@click.argument("blatt")
+def werkstatt_entwerfe(blatt: str) -> None:
+    """Erzeugt ein Entwurfs-Paar (Handler + Sandbox-Test) für ein Raster-Blatt."""
+    conn = get_conn()
+    try:
+        ergebnis = werkstatt.entwerfe_zelle(conn, blatt)
+    finally:
+        conn.close()
+    if not ergebnis["erstellt"]:
+        click.echo(f"[WERKSTATT] {ergebnis['grund']}")
+        raise click.exceptions.Exit(1)
+    click.echo(f"[WERKSTATT] Entwurf erstellt ({ergebnis['quelle']}):")
+    click.echo(f"[WERKSTATT]   Handler: {ergebnis['handler']}")
+    click.echo(f"[WERKSTATT]   Test:    {ergebnis['test']}")
+    click.echo("[WERKSTATT] Probefahrt: deploy/werkstatt_probefahrt.sh " + blatt)
+
+
+@werkstatt_group.command("liste")
+def werkstatt_liste() -> None:
+    """Alle Entwürfe in der Werkstatt."""
+    eintraege = werkstatt.liste()
+    if not eintraege:
+        click.echo(f"[WERKSTATT] leer ({werkstatt.verzeichnis()})")
+        return
+    for e in eintraege:
+        click.echo(f"[WERKSTATT] {e['blatt']:<20} {e['fingerabdruck']}  {e['pfad']}")
+
+
+@werkstatt_group.command("pruefe")
+@click.argument("blatt")
+@click.option("--tests-exit", type=int, default=None,
+              help="Ergebnis der Sandbox-Probefahrt (übergibt die Membran)")
+def werkstatt_pruefe(blatt: str, tests_exit: int | None) -> None:
+    """Prüft einen Entwurf und protokolliert die Entscheidung: Verbots-Scan immer (Kern),
+    Probefahrt-Ergebnis, falls die Membran (deploy/werkstatt_probefahrt.sh) eines übergibt."""
+    conn = get_conn()
+    try:
+        ergebnis = werkstatt.protokolliere_pruefung(conn, blatt, tests_exit)
+    finally:
+        conn.close()
+    if not ergebnis["gefunden"]:
+        click.echo(f"[WERKSTATT] {ergebnis['grund']}")
+        raise click.exceptions.Exit(1)
+    if ergebnis["verbote"]:
+        click.echo(f"[WERKSTATT] VERBOTE gefunden: {', '.join(ergebnis['verbote'])}")
+    if ergebnis["tests_exit"] is None:
+        click.echo("[WERKSTATT] nur statisch geprüft — Probefahrt: "
+                   f"deploy/werkstatt_probefahrt.sh {blatt}")
+    else:
+        click.echo(f"[WERKSTATT] Probefahrt tests_exit={ergebnis['tests_exit']}")
+    click.echo(f"[WERKSTATT] bestanden={ergebnis['bestanden']} "
+               "(bestanden = merge-REIF; der Merge bleibt menschlich)")
 
 
 @main.command("kurvendiskussion")

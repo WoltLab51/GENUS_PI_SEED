@@ -89,6 +89,8 @@ BEWUSST_ROH: frozenset[str] = frozenset({
                                # Laufzeit-Registry wird aus Code neu gebaut, nicht projiziert
     "proposal_umgesetzt",      # Ausführungs-Spur von Stufe 1 (genus/umsetzung.py); die
                                # WIRKUNG sind normale, projizierte relation_asserted-Events
+    "code_entwurf_erstellt",   # Werkstatt-Spur (Stufe 2): der Code selbst ist Randmaterial,
+    "code_entwurf_geprueft",   # nur die Entscheidung/Prüfung wird Geschichte
 })
 
 
