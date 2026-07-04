@@ -454,3 +454,29 @@ def test_bot_leitet_die_grenze_aus_dem_lebenden_raster_ab(monkeypatch):
     assert empfangen["grammatik"] is not None and empfangen["grammatik"].startswith("root ::=")
     # die Grenze kommt aus demselben lebenden Angebot wie der Prompt
     assert '"\\"berechnen\\""' in empfangen["grammatik"]
+
+
+def test_fabrizierter_segment_text_wird_nicht_geglaubt(monkeypatch):
+    # Live-Fund (Pi, 2026-07-04): das Modell meldete ein Segment mit dem Text
+    # "f'(x) = 2x + 3" -- selbst ausgerechnet, steht nirgends in der Nachricht. Die
+    # Grammatik erzwingt Struktur, nicht Herkunft; die prueft der deterministische
+    # Segment-Filter: fabrizierter Text -> die ganze Nachricht ist die ehrliche Klausel.
+    fake = _FakeModelMitKwargs(
+        '[{"text": "f\'(x) = 2x + 3", "absicht": "berechnen", "subject": null, '
+        '"object": null}]'
+    )
+    monkeypatch.setattr(deuter, "MODEL_PATH", __file__)
+    monkeypatch.setattr(deuter, "_get_model", lambda: fake)
+
+    nachricht = "Bestimme die Ableitung von f(x) = x^2 + 3x"
+    ergebnis = deuter.interpret(nachricht)
+    assert ergebnis and ergebnis[0]["absicht"] == "berechnen"
+    assert ergebnis[0]["text"] == nachricht   # nicht der fabrizierte Text
+
+    # ein ECHTER Teil-Text der Nachricht bleibt dagegen unangetastet
+    fake2 = _FakeModelMitKwargs(
+        '[{"text": "Danke!", "absicht": "dank", "subject": null, "object": null}]'
+    )
+    monkeypatch.setattr(deuter, "_get_model", lambda: fake2)
+    ergebnis2 = deuter.interpret("Was ist ein Hund? Danke!")
+    assert ergebnis2 and ergebnis2[0]["text"] == "Danke!"

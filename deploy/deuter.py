@@ -252,6 +252,13 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     if not absicht:
         return None
     segment_text = eintrag.get("text") if isinstance(eintrag.get("text"), str) else ganze_nachricht
+    # Herkunfts-Leitplanke (live gefunden, 2026-07-04): das Modell kann einen Segment-Text
+    # FABRIZIEREN, der nirgends in der Nachricht steht (es rechnete selbst "f'(x) = 2x + 3"
+    # aus und meldete das als eigenes Segment). Die Grammatik erzwingt Struktur, nicht
+    # Herkunft -- die prüfen wir deterministisch: ein Text, der nicht in der Nachricht
+    # vorkommt, wird nicht geglaubt; die ganze Nachricht ist dann die ehrliche Klausel.
+    if segment_text.strip() and segment_text.strip() not in ganze_nachricht:
+        segment_text = ganze_nachricht
     if absicht == "tatsache" and _looks_like_question(segment_text):
         absicht = "definition"   # eine Frage ist nie eine Aussage -- pro Segment geprueft
     subject = eintrag.get("subject")
