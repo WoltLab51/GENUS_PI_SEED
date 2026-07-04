@@ -122,9 +122,11 @@ def benchmark(modelle: list[str], modus: str = "code") -> None:
     ``modus="bauplan"``: das Modell füllt nur den morphologischen Bauplan, das
     deterministische Fügewerk (genus/bauplan.py) baut den Code (Ronnys Zerlegung,
     Schmied v2) -- der A/B-Vergleich derselben Aufgaben und Modelle."""
+    grenze = None
     if modus == "bauplan":
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
         from genus import bauplan as fuegewerk
+        grenze = fuegewerk.gbnf_grammatik()   # die Grenze wächst mit der Registry
     for modell in modelle:
         schmied.MODEL_PATH = modell
         schmied._model = None   # frisches, warmes Modell pro Kandidat
@@ -133,7 +135,8 @@ def benchmark(modelle: list[str], modus: str = "code") -> None:
         start = time.time()
         for aufgabe in AUFGABEN:
             if modus == "bauplan":
-                plan = schmied.schmiede_bauplan(aufgabe["blatt"], aufgabe["beschreibung"])
+                plan = schmied.schmiede_bauplan(aufgabe["blatt"], aufgabe["beschreibung"],
+                                                grammatik=grenze)
                 if plan is None:
                     print(f"[BENCH:{modus}] {name}  {aufgabe['blatt']:<20} kein JSON")
                     continue

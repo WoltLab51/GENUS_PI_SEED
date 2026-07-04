@@ -156,12 +156,38 @@ def _bauplan_prompt() -> str:
     )
 
 
-def schmiede_bauplan(blatt: str, beschreibung: str = "") -> dict | None:
+_grammatik_cache: dict[str, object] = {}
+
+
+def _gbnf(text: str):
+    """Kompiliert GBNF zur llama.cpp-Grammatik, einmal pro Text -- laute, ehrliche
+    Degradation wie beim Deuter: scheitert die Kompilierung, läuft der Schmied
+    unbeschränkt weiter, der Verlust der Garantie steht im Log."""
+    if text in _grammatik_cache:
+        return _grammatik_cache[text]
+    try:
+        from llama_cpp import LlamaGrammar
+        grammatik = LlamaGrammar.from_string(text, verbose=False)
+    except Exception as exc:
+        print(f"[SCHMIED] Grammatik unbrauchbar ({exc}) — schmiede UNBESCHRÄNKT weiter",
+              file=sys.stderr)
+        grammatik = None
+    _grammatik_cache[text] = grammatik
+    return grammatik
+
+
+def schmiede_bauplan(blatt: str, beschreibung: str = "",
+                     grammatik: str | None = None) -> dict | None:
     """Schmied v2 (Ronnys morphologische Zerlegung): das Modell liefert nur den BAUPLAN
     (kleines JSON) -- Wortlaut-Template, Wächter, Beschaffung. Den Code fügt das
     deterministische Fügewerk (genus/bauplan.py) im Kern. ``None``, wenn kein Modell da
     ist, kein JSON kam oder der Plan die Kern-Prüfung nicht bestünde (die läuft beim
-    Fügen erneut -- hier nur die Membran-Vorprüfung: parsebares JSON-Objekt)."""
+    Fügen erneut -- hier nur die Membran-Vorprüfung: parsebares JSON-Objekt).
+
+    ``grammatik`` (optional): DIE GRENZE fürs Bauplan-JSON (genus.bauplan.gbnf_grammatik,
+    als Daten über die Membran gereicht) -- Enums, Prädikat-Form und Slot-Alternativen
+    JE Beschaffungs-Art sind dann pro Token erzwungen; eine unregistrierte Art, ein
+    ``guess[...]``-Prädikat oder ein erfundener Slot sind strukturell nicht tippbar."""
     if not os.path.exists(MODEL_PATH):
         return None
     auftrag = f"Fülle den Bauplan für die Gesprächs-Lesart „{blatt}“."
@@ -170,6 +196,11 @@ def schmiede_bauplan(blatt: str, beschreibung: str = "") -> dict | None:
     try:
         import json
         model = _get_model()
+        zusatz: dict = {}
+        if grammatik:
+            uebersetzt = _gbnf(grammatik)
+            if uebersetzt is not None:
+                zusatz["grammar"] = uebersetzt
         result = model.create_chat_completion(
             messages=[
                 {"role": "system", "content": _bauplan_prompt()},
@@ -177,6 +208,7 @@ def schmiede_bauplan(blatt: str, beschreibung: str = "") -> dict | None:
             ],
             max_tokens=300,
             temperature=0.0,
+            **zusatz,
         )
         text = result["choices"][0]["message"]["content"]
         m = _JSON_OBJEKT.search(text)

@@ -269,3 +269,48 @@ def test_glaettung_normalisiert_notation_und_leitet_den_waechter_ab():
     benchmark = importlib.import_module("schmied_benchmark")
     code = bauplan_modul.fuege_zusammen("thema-echo", roh)
     assert benchmark._pruefe(code, benchmark.AUFGABEN[0])
+
+
+def test_bauplan_grenze_wird_aus_der_registry_abgeleitet():
+    g = bauplan_modul.gbnf_grammatik()
+    assert g.startswith("root ::=")
+    # Enums: jede registrierte Art und jeder Waechter-Wert ist einkompiliert
+    for art in bauplan_modul.BESCHAFFUNGEN:
+        assert f'"\\"{art}\\""' in g
+    for w in bauplan_modul.WAECHTER:
+        assert f'"\\"{w}\\""' in g
+    # Kreuz-Konsistenz IN der Grammatik: {anzahl} nur im anzahl_kanten-Template
+    assert '"{anzahl}"' in g and '"{wert}"' in g and '"{subject}"' in g
+    zeile_anzahl = next(z for z in g.splitlines() if z.startswith("template-anzahl-kanten"))
+    zeile_erstes = next(z for z in g.splitlines() if z.startswith("template-erstes-objekt"))
+    zeile_keine = next(z for z in g.splitlines() if z.startswith("template-keine"))
+    assert '"{anzahl}"' in zeile_anzahl and '"{anzahl}"' not in zeile_erstes
+    assert '"{wert}"' in zeile_erstes and '"{wert}"' not in zeile_keine
+    # literale { } sind im Zeichenvorrat ausgeschlossen -- erfundene Slots nicht tippbar
+    assert '[^"{}' in g
+    # praedikat ist formbeschraenkt -- guess[...] nicht tippbar
+    assert "[a-z_]+" in g
+
+
+def test_schmiede_bauplan_reicht_die_grenze_ans_modell(monkeypatch):
+    schmied = _schmied()
+
+    class _FakeModellMitKwargs:
+        def __init__(self):
+            self.kwargs = None
+
+        def create_chat_completion(self, messages, max_tokens=None, temperature=None,
+                                   **kwargs):
+            self.kwargs = kwargs
+            return {"choices": [{"message": {"content":
+                '{"waechter": "subject", "beschaffung": {"art": "keine"}, '
+                '"formulierung": "x {subject}"}'}}]}
+
+    fake = _FakeModellMitKwargs()
+    monkeypatch.setattr(schmied, "MODEL_PATH", __file__)
+    monkeypatch.setattr(schmied, "_get_model", lambda: fake)
+    monkeypatch.setattr(schmied, "_gbnf", lambda text: f"KOMPILIERT:{len(text)}")
+
+    plan = schmied.schmiede_bauplan("thema-echo", grammatik="root ::= x")
+    assert plan is not None and plan["waechter"] == "subject"
+    assert fake.kwargs == {"grammar": f"KOMPILIERT:{len('root ::= x')}"}

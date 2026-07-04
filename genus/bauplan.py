@@ -105,6 +105,50 @@ def pruefe_bauplan(plan: dict) -> list[str]:
     return fehler
 
 
+def gbnf_grammatik() -> str:
+    """Die GRENZE für den Bauplan-Finder (llama.cpp-GBNF) — die Konvergenz von Ronnys
+    zwei Ideen: die Zerlegung schrumpfte den Suchraum auf drei JSON-Felder, die Grenze
+    macht die verbliebenen Fehlerklassen strukturell unmöglich. Aus der
+    ``BESCHAFFUNGEN``-Registry ABGELEITET (wächst die Registry, wächst die Grenze):
+
+    - ``waechter``/``art`` sind Enums — eine unregistrierte Art ist nicht tippbar.
+    - ``praedikat`` ist ``[a-z_]+`` — ``guess['subject']`` ist nicht tippbar.
+    - Das Template erlaubt JE ART nur deren Slots (Zwickys Kreuz-Konsistenz IN der
+      Grammatik: ``{anzahl}`` existiert nur bei anzahl_kanten), und literale ``{``/``}``
+      sind ausgeschlossen — ein erfundener Slot wie ``{n}`` ist nicht tippbar.
+
+    Garantiert wohlgeformt-im-Raum, nicht richtig (Naht 2 gilt weiter): den SINN des
+    Satzes muss das Modell weiterhin treffen."""
+    waechter_alt = " | ".join(f'"\\"{w}\\""' for w in WAECHTER)
+    regeln = [
+        'root ::= "{" ws waechter ws "," ws ('
+        + " | ".join(f"bf-{art.replace('_', '-')}" for art in sorted(BESCHAFFUNGEN))
+        + ') ws "}"',
+        f'waechter ::= "\\"waechter\\"" ws ":" ws ({waechter_alt})',
+        'praedikat ::= "\\"praedikat\\"" ws ":" ws "\\"" [a-z_]+ "\\""',
+    ]
+    for art in sorted(BESCHAFFUNGEN):
+        spec = BESCHAFFUNGEN[art]
+        sicher = art.replace("_", "-")
+        kopf = f'"\\"beschaffung\\"" ws ":" ws "{{" ws "\\"art\\"" ws ":" ws "\\"{art}\\""'
+        if spec["praedikat"] is True:
+            kopf += ' ws "," ws praedikat'
+        elif spec["praedikat"] == "optional":
+            kopf += ' (ws "," ws praedikat)?'
+        kopf += ' ws "}"'
+        regeln.append(
+            f'bf-{sicher} ::= {kopf} ws "," ws "\\"formulierung\\"" ws ":" ws '
+            f"template-{sicher}"
+        )
+        slot_alt = " | ".join(f'"{{{s}}}"' for s in sorted(spec["slots"]))
+        regeln.append(f'template-{sicher} ::= "\\"" (zeichen | {slot_alt})* "\\""')
+    regeln += [
+        'zeichen ::= [^"{}\\\\] | "\\\\" ["\\\\/bfnrt]',
+        'ws ::= [ \\t\\n]*',
+    ]
+    return "\n".join(regeln)
+
+
 def _beschaffungs_baustein(beschaffung: dict) -> tuple[str, str]:
     """Der geprüfte Code-Baustein einer Beschaffungs-Art: (Rumpf-Zeilen, Format-Aufruf).
     Prädikate laufen IMMER als SQL-Parameter -- nie in den Query-Text gefügt."""
