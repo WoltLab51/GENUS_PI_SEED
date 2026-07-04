@@ -127,6 +127,61 @@ def schmiede(blatt: str, beschreibung: str = "") -> str | None:
     return _ast_leitplanke(code, blatt)
 
 
+_JSON_OBJEKT = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _bauplan_prompt() -> str:
+    return (
+        "Du füllst einen kompakten BAUPLAN (JSON) für eine deutsche Antwort-Zelle eines "
+        "Sprach-Assistenten. Du schreibst KEINEN Code — nur den Plan; ein deterministisches "
+        "Fügewerk baut daraus den Code.\n"
+        "Felder (exakt diese, keine weiteren):\n"
+        '- "waechter": "subject" (die Zelle braucht guess[subject]) oder "keiner".\n'
+        '- "beschaffung": {"art": "keine"} ODER {"art": "anzahl_kanten", "praedikat": '
+        'optional} ODER {"art": "erstes_objekt", "praedikat": "<name>"}. anzahl_kanten '
+        "zählt Graph-Kanten des Subjekts (liefert Slot {anzahl}); erstes_objekt liest das "
+        "alphabetisch erste Objekt zum Prädikat (liefert Slot {wert}); keine liest nichts "
+        "(nur Slot {subject}).\n"
+        '- "formulierung": der EXAKTE deutsche Antwortsatz als Template. Übernimm den in '
+        "der Aufgabe geforderten Wortlaut ZEICHENGENAU (inklusive deutscher "
+        "Anführungszeichen „ und “), ersetze nur die variablen Teile durch Slots wie "
+        "{subject}, {anzahl}, {wert}.\n"
+        "Gib NUR das JSON-Objekt zurück, ohne Erklärtext."
+    )
+
+
+def schmiede_bauplan(blatt: str, beschreibung: str = "") -> dict | None:
+    """Schmied v2 (Ronnys morphologische Zerlegung): das Modell liefert nur den BAUPLAN
+    (kleines JSON) -- Wortlaut-Template, Wächter, Beschaffung. Den Code fügt das
+    deterministische Fügewerk (genus/bauplan.py) im Kern. ``None``, wenn kein Modell da
+    ist, kein JSON kam oder der Plan die Kern-Prüfung nicht bestünde (die läuft beim
+    Fügen erneut -- hier nur die Membran-Vorprüfung: parsebares JSON-Objekt)."""
+    if not os.path.exists(MODEL_PATH):
+        return None
+    auftrag = f"Fülle den Bauplan für die Gesprächs-Lesart „{blatt}“."
+    if beschreibung:
+        auftrag += f" Aufgabe: {beschreibung}"
+    try:
+        import json
+        model = _get_model()
+        result = model.create_chat_completion(
+            messages=[
+                {"role": "system", "content": _bauplan_prompt()},
+                {"role": "user", "content": auftrag},
+            ],
+            max_tokens=300,
+            temperature=0.0,
+        )
+        text = result["choices"][0]["message"]["content"]
+        m = _JSON_OBJEKT.search(text)
+        if m is None:
+            return None
+        return json.loads(m.group(0))
+    except Exception as exc:
+        print(f"[SCHMIED] Bauplan-Lauf gescheitert ({exc})", file=sys.stderr)
+        return None
+
+
 if __name__ == "__main__":
     blatt = sys.argv[1] if len(sys.argv) > 1 else "weltfrage"
     beschreibung = " ".join(sys.argv[2:])

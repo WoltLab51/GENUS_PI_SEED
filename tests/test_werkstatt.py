@@ -166,3 +166,86 @@ def test_kern_nimmt_membran_code_mit_ehrlicher_herkunft_an(conn, tmp_path):
     assert result.exit_code == 0 and "werkstatt:schmied" in result.output
     handler = werkstatt.verzeichnis() / "zelle_weltfrage.py"
     assert handler.read_text(encoding="utf-8") == GUTER_CODE
+
+
+# --- Ronnys morphologische Zerlegung: Bauplan + Fügewerk ------------------------------
+# Die drei Benchmark-Aufgaben, an denen die Modelle als CODE-Schreiber scheiterten,
+# sind mit einem handgeschriebenen BAUPLAN deterministisch loesbar -- das Fuegewerk
+# traegt; das Modell muss nur noch den Plan finden.
+
+from genus import bauplan as bauplan_modul
+
+BENCHMARK_BAUPLAENE = {
+    "thema-echo": {
+        "waechter": "subject",
+        "beschaffung": {"art": "keine"},
+        "formulierung": "„{subject}“ ist mir als Thema bekannt.",
+    },
+    "verbindungs-zahl": {
+        "waechter": "subject",
+        "beschaffung": {"art": "anzahl_kanten"},
+        "formulierung": "Zu „{subject}“ kenne ich {anzahl} Verbindung(en).",
+    },
+    "erste-verbindung": {
+        "waechter": "subject",
+        "beschaffung": {"art": "erstes_objekt", "praedikat": "is_a"},
+        "formulierung": "„{subject}“ ist ein {wert}.",
+    },
+}
+
+
+def test_pruefe_bauplan_verweigert_halbgares():
+    p = bauplan_modul.pruefe_bauplan
+    assert p({"waechter": "zauber", "beschaffung": {"art": "keine"},
+              "formulierung": "x"}) != []
+    assert p({"waechter": "subject", "beschaffung": {"art": "gibt-es-nicht"},
+              "formulierung": "x"}) != []
+    # erstes_objekt braucht ein Praedikat; boese Praedikat-Formen fallen durch
+    assert p({"waechter": "subject", "beschaffung": {"art": "erstes_objekt"},
+              "formulierung": "{wert}"}) != []
+    assert p({"waechter": "subject",
+              "beschaffung": {"art": "erstes_objekt", "praedikat": "x; DROP TABLE"},
+              "formulierung": "{wert}"}) != []
+    # ein Slot, den die Beschaffung nicht liefert
+    assert p({"waechter": "subject", "beschaffung": {"art": "keine"},
+              "formulierung": "{anzahl}"}) != []
+    # und alle drei Benchmark-Bauplaene sind sauber
+    for plan in BENCHMARK_BAUPLAENE.values():
+        assert p(plan) == [], plan
+
+
+def test_fuegewerk_loest_alle_drei_benchmark_aufgaben_deterministisch(tmp_path):
+    # exakt die Sandbox-Tests des Benchmarks -- aber der Code kommt aus dem Fuegewerk,
+    # nicht aus einem Modell: vertragssicher per Konstruktion.
+    sys.path.insert(0, str(ROOT / "deploy"))
+    import importlib
+    benchmark = importlib.import_module("schmied_benchmark")
+
+    for aufgabe in benchmark.AUFGABEN:
+        plan = BENCHMARK_BAUPLAENE[aufgabe["blatt"]]
+        code = bauplan_modul.fuege_zusammen(aufgabe["blatt"], plan)
+        assert benchmark._pruefe(code, aufgabe), aufgabe["blatt"]
+
+
+def test_gefuegter_code_besteht_auch_die_schmied_leitplanke():
+    schmied = _schmied()
+    for blatt, plan in BENCHMARK_BAUPLAENE.items():
+        code = bauplan_modul.fuege_zusammen(blatt, plan)
+        assert schmied._ast_leitplanke(code, blatt) == code, blatt
+
+
+def test_cli_fuegt_bauplan_zum_entwurf(conn, tmp_path):
+    import json as _json
+    from click.testing import CliRunner
+    from genus import cli
+
+    plan_datei = tmp_path / "plan.json"
+    plan_datei.write_text(_json.dumps(BENCHMARK_BAUPLAENE["thema-echo"]),
+                          encoding="utf-8")
+    result = CliRunner().invoke(
+        cli.main, ["werkstatt", "entwerfe", "thema-echo",
+                   "--bauplan-datei", str(plan_datei)],
+    )
+    assert result.exit_code == 0 and "werkstatt:bauplan" in result.output
+    code = (werkstatt.verzeichnis() / "zelle_thema_echo.py").read_text(encoding="utf-8")
+    assert "„{subject}“ ist mir als Thema bekannt." in code

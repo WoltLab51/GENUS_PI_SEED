@@ -8,6 +8,7 @@ import click
 
 from genus import (
     anchor,
+    bauplan,
     companion,
     control,
     db,
@@ -715,11 +716,26 @@ def werkstatt_group() -> None:
 @click.option("--code-datei", default=None,
               help="fertiger Handler-Code aus einer Datei (die Membran schreibt, "
                    "der Kern nimmt an — z.B. vom Schmied)")
+@click.option("--bauplan-datei", default=None,
+              help="morphologischer Bauplan (JSON) — das Fügewerk baut den Code "
+                   "deterministisch (genus/bauplan.py)")
 @click.option("--quelle", default=None,
               help="Herkunfts-Angabe für die Ledger-Spur (z.B. werkstatt:schmied)")
-def werkstatt_entwerfe(blatt: str, code_datei: str | None, quelle: str | None) -> None:
+def werkstatt_entwerfe(blatt: str, code_datei: str | None, bauplan_datei: str | None,
+                       quelle: str | None) -> None:
     """Erzeugt ein Entwurfs-Paar (Handler + Sandbox-Test) für ein Raster-Blatt."""
     generator = None
+    if code_datei is not None and bauplan_datei is not None:
+        raise click.ClickException("--code-datei und --bauplan-datei schließen sich aus")
+    if bauplan_datei is not None:
+        plan = json.loads(Path(bauplan_datei).read_text(encoding="utf-8"))
+        fehler = bauplan.pruefe_bauplan(plan)
+        if fehler:
+            raise click.ClickException("Bauplan nicht fügbar:\n" + "\n".join(fehler))
+        code = bauplan.fuege_zusammen(blatt, plan)
+        generator = lambda _blatt: code   # noqa: E731 - gefügter Code kommt als Daten
+        if quelle is None:
+            quelle = "werkstatt:bauplan"
     if code_datei is not None:
         code = Path(code_datei).read_text(encoding="utf-8")
         generator = lambda _blatt: code   # noqa: E731 - bewusst: Code kommt als Daten herein

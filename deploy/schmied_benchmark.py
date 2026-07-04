@@ -117,7 +117,14 @@ def _pruefe(code: str, aufgabe: dict) -> bool:
         return lauf.returncode == 0
 
 
-def benchmark(modelle: list[str]) -> None:
+def benchmark(modelle: list[str], modus: str = "code") -> None:
+    """``modus="code"``: das Modell schreibt den Handler direkt (Schmied v1).
+    ``modus="bauplan"``: das Modell füllt nur den morphologischen Bauplan, das
+    deterministische Fügewerk (genus/bauplan.py) baut den Code (Ronnys Zerlegung,
+    Schmied v2) -- der A/B-Vergleich derselben Aufgaben und Modelle."""
+    if modus == "bauplan":
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from genus import bauplan as fuegewerk
     for modell in modelle:
         schmied.MODEL_PATH = modell
         schmied._model = None   # frisches, warmes Modell pro Kandidat
@@ -125,20 +132,38 @@ def benchmark(modelle: list[str]) -> None:
         bestanden = 0
         start = time.time()
         for aufgabe in AUFGABEN:
-            code = schmied.schmiede(aufgabe["blatt"], aufgabe["beschreibung"])
-            if code is None:
-                print(f"[BENCH] {name}  {aufgabe['blatt']:<20} LEITPLANKE (kein Entwurf)")
-                continue
+            if modus == "bauplan":
+                plan = schmied.schmiede_bauplan(aufgabe["blatt"], aufgabe["beschreibung"])
+                if plan is None:
+                    print(f"[BENCH:{modus}] {name}  {aufgabe['blatt']:<20} kein JSON")
+                    continue
+                try:
+                    code = fuegewerk.fuege_zusammen(aufgabe["blatt"], plan)
+                except ValueError as exc:
+                    print(f"[BENCH:{modus}] {name}  {aufgabe['blatt']:<20} "
+                          f"Bauplan ungültig ({str(exc).splitlines()[1][:60]})")
+                    continue
+            else:
+                code = schmied.schmiede(aufgabe["blatt"], aufgabe["beschreibung"])
+                if code is None:
+                    print(f"[BENCH:{modus}] {name}  {aufgabe['blatt']:<20} "
+                          f"LEITPLANKE (kein Entwurf)")
+                    continue
             ok = _pruefe(code, aufgabe)
             bestanden += ok
-            print(f"[BENCH] {name}  {aufgabe['blatt']:<20} "
+            print(f"[BENCH:{modus}] {name}  {aufgabe['blatt']:<20} "
                   f"{'BESTANDEN' if ok else 'tests rot'}")
         dauer = time.time() - start
-        print(f"[BENCH] {name}  => {bestanden}/{len(AUFGABEN)} in {dauer:.0f}s")
+        print(f"[BENCH:{modus}] {name}  => {bestanden}/{len(AUFGABEN)} in {dauer:.0f}s")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    argumente = sys.argv[1:]
+    modus = "code"
+    if argumente and argumente[0] == "--bauplan":
+        modus = "bauplan"
+        argumente = argumente[1:]
+    if not argumente:
         print(__doc__)
         sys.exit(2)
-    benchmark(sys.argv[1:])
+    benchmark(argumente, modus)
