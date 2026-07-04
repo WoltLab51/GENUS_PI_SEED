@@ -14,8 +14,11 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
-GENUS_USER="${GENUS_USER:-$(id -un)}"
-GENUS_HOME="${GENUS_HOME:-$HOME}"
+# sudo-fest wie pi_learn.sh/pi_clock_check.sh: unter sudo ist $HOME /root -- der Token,
+# die Logs und der Dienst gehören aber RONNYS Nutzer (live gefunden, 2026-07-04: der
+# Installer suchte /root/.genus/telegram_bot_token und verweigerte).
+GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"
+GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 TOKEN_FILE="$GENUS_HOME/.genus/telegram_bot_token"
@@ -67,6 +70,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=$GENUS_USER
 Restart=always
 RestartSec=10
 EnvironmentFile=-$ENV_FILE

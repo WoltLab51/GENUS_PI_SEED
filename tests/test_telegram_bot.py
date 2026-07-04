@@ -693,3 +693,13 @@ def test_deploy_beruehrt_das_neustart_flag():
     # "sudo systemctl restart" nach jedem Deploy ist vorbei.
     text = (ROOT / "deploy" / "pi_deploy.sh").read_text(encoding="utf-8")
     assert "telegram_bot.neustart" in text
+
+
+def test_bot_installer_ist_sudo_fest_und_setzt_den_nutzer():
+    # Live gefunden (2026-07-04): unter sudo ist $HOME /root -- der Installer suchte den
+    # Token am falschen Ort UND haette den Dienst als root laufen lassen. Struktur-Gate:
+    # SUDO_USER-Aufloesung wie in den anderen Pi-Skripten + User= in der Unit.
+    text = (ROOT / "deploy" / "pi_install_telegram_bot.sh").read_text(encoding="utf-8")
+    assert "SUDO_USER" in text
+    assert "getent passwd" in text
+    assert "User=$GENUS_USER" in text
