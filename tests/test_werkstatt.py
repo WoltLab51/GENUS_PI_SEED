@@ -249,3 +249,23 @@ def test_cli_fuegt_bauplan_zum_entwurf(conn, tmp_path):
     assert result.exit_code == 0 and "werkstatt:bauplan" in result.output
     code = (werkstatt.verzeichnis() / "zelle_thema_echo.py").read_text(encoding="utf-8")
     assert "„{subject}“ ist mir als Thema bekannt." in code
+
+
+def test_glaettung_normalisiert_notation_und_leitet_den_waechter_ab():
+    # Live im A/B gefunden: das Modell kopierte "<subject>" aus der Aufgabe woertlich
+    # und waehlte einen inkonsistenten Waechter -- beides glaettet der Fuege-Durchgang
+    # deterministisch (Zwickys Kreuz-Konsistenz: {subject} im Template => Waechter subject).
+    roh = {
+        "waechter": "keiner",
+        "beschaffung": {"art": "keine"},
+        "formulierung": "„<subject>“ ist mir als Thema bekannt.",
+    }
+    glatt = bauplan_modul.normalisiere(roh)
+    assert glatt["formulierung"] == "„{subject}“ ist mir als Thema bekannt."
+    assert glatt["waechter"] == "subject"
+    # und der geglaettete Plan fuegt sich zu Code, der die Benchmark-Tests besteht
+    sys.path.insert(0, str(ROOT / "deploy"))
+    import importlib
+    benchmark = importlib.import_module("schmied_benchmark")
+    code = bauplan_modul.fuege_zusammen("thema-echo", roh)
+    assert benchmark._pruefe(code, benchmark.AUFGABEN[0])

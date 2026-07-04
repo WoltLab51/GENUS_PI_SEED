@@ -39,6 +39,32 @@ BESCHAFFUNGEN: dict[str, dict] = {
 }
 
 _PRAEDIKAT = re.compile(r"^[a-z_]+$")
+_ALLE_SLOTS = {"subject", "anzahl", "wert"}
+_SPITZE_SLOTS = re.compile(r"<(" + "|".join(sorted(_ALLE_SLOTS)) + r")>")
+
+
+def normalisiere(plan: dict) -> dict:
+    """Der GLÄTTUNGS-Durchgang vor dem Fügen (Ronnys „ein Durchgang fügt alles
+    zusammen") -- deterministische Korrekturen eindeutiger Notations-Varianten, live im
+    A/B-Benchmark gefunden: (1) ein Modell kopiert die ``<subject>``-Notation einer
+    Aufgabenstellung wörtlich statt ``{subject}`` zu schreiben -- eindeutig, wird
+    umgeschrieben; (2) der WÄCHTER wird aus den Template-Slots ABGELEITET (nutzt die
+    Formulierung ``{subject}``, muss der Wächter subject sein -- Zwickys
+    Kreuz-Konsistenz, vom Kern erzwungen statt vom Modell erhofft). Niemals inhaltliche
+    Reparatur -- nur Notation und ableitbare Konsistenz."""
+    if not isinstance(plan, dict):
+        return plan
+    plan = dict(plan)
+    template = plan.get("formulierung")
+    if isinstance(template, str):
+        template = _SPITZE_SLOTS.sub(r"{\1}", template)
+        plan["formulierung"] = template
+        slots = {feld for _, feld, _, _ in string.Formatter().parse(template) if feld}
+        if "subject" in slots:
+            plan["waechter"] = "subject"   # ableitbar -- das Modell muss es nicht wissen
+        elif plan.get("waechter") is None:
+            plan["waechter"] = "keiner"
+    return plan
 
 
 def pruefe_bauplan(plan: dict) -> list[str]:
@@ -128,6 +154,7 @@ def fuege_zusammen(blatt: str, plan: dict) -> str:
     jeder Bestandteil ein fester, getesteter Baustein; das Template landet als
     repr()-Literal im Code (nie interpretiert, keine Injektion). Wirft ValueError bei
     einem Bauplan, der die Prüfung nicht besteht -- nie stilles Fügen."""
+    plan = normalisiere(plan)
     fehler = pruefe_bauplan(plan)
     if fehler:
         raise ValueError("Bauplan nicht fügbar:\n" + "\n".join(fehler))

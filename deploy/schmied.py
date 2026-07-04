@@ -146,6 +146,12 @@ def _bauplan_prompt() -> str:
         "der Aufgabe geforderten Wortlaut ZEICHENGENAU (inklusive deutscher "
         "Anführungszeichen „ und “), ersetze nur die variablen Teile durch Slots wie "
         "{subject}, {anzahl}, {wert}.\n"
+        "praedikat ist IMMER ein fester Kanten-Name aus der Aufgabe (z.B. is_a) — nie "
+        "ein Ausdruck, nie guess[...].\n"
+        "Beispiel — Aufgabe: 'Bei Kanten mit Prädikat teil_von gib \"{subject} gehört zu "
+        "{wert}.\" zurück, sonst None' ->\n"
+        '{"waechter": "subject", "beschaffung": {"art": "erstes_objekt", "praedikat": '
+        '"teil_von"}, "formulierung": "{subject} gehört zu {wert}."}\n'
         "Gib NUR das JSON-Objekt zurück, ohne Erklärtext."
     )
 
