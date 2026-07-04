@@ -40,6 +40,9 @@ _SYSTEM = (
 
 _QUOTED = re.compile(r"»([^»«]+)«")
 _NUMBER = re.compile(r"\b\d+[.,]\d+\b")
+_SATZ_TRENNER = re.compile(r"[.!?]+\s*")
+_TOKEN = re.compile(r"[\wäöüÄÖÜß»«]+")
+_SUBSTANTIV = re.compile(r"[A-ZÄÖÜ][a-zäöüß]{3,}")
 
 _model = None   # lazy singleton -- only used standalone; the bot shares deuter's warm model
 
@@ -47,6 +50,23 @@ _model = None   # lazy singleton -- only used standalone; the bot shares deuter'
 def _anchors(satz: str) -> list[str]:
     """The facts that must survive a rephrase: every quoted word, every confidence number."""
     return _QUOTED.findall(satz) + _NUMBER.findall(satz)
+
+
+def _inhaltsworte(satz: str) -> list[str]:
+    """Die zweite, härtere Leine — live gefunden (2026-07-04, beim ersten Anweisungs-Test):
+    unter einer Stil-Anweisung machte das 1.5B aus „Haustier" ein „Hausvögel", und die
+    Anker-Prüfung ließ es durch (sie sah nur zitierte Wörter + Zahlen, der Gloss-Text ist
+    frei). Deutsche GROSSSCHREIBUNG = Substantive = die tragenden Inhaltswörter: jedes
+    großgeschriebene Wort (≥4 Zeichen) muss die Umformulierung als Teilwort überleben.
+    Satzanfänge sind ausgenommen (großgeschrieben ohne Substantiv zu sein); GENUS selbst
+    fällt als Versalien-Wort automatisch heraus (der Sprecher darf wegformuliert werden)."""
+    worte: list[str] = []
+    for teil in _SATZ_TRENNER.split(satz):
+        for i, roh in enumerate(_TOKEN.findall(teil)):
+            tok = roh.strip("»«")
+            if i > 0 and _SUBSTANTIV.fullmatch(tok):
+                worte.append(tok)
+    return worte
 
 
 def _get_model():
@@ -94,6 +114,8 @@ def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | Non
         return None
     if any(anchor not in text for anchor in anchors):
         return None   # a fact/number went missing or was changed -- fail safe to the original
+    if any(wort not in text for wort in _inhaltsworte(satz)):
+        return None   # ein tragendes Substantiv wurde wegformuliert/korrumpiert (Hausvögel-Fund)
     return text
 
 

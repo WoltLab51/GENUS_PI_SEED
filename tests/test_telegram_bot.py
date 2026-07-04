@@ -231,8 +231,12 @@ def test_stimme_anchors_extracts_every_quoted_word_and_number():
 
 
 def test_stimme_formuliere_returns_the_rephrase_when_every_anchor_survives():
+    # seit dem Hausvögel-Fund (2026-07-04) gilt die doppelte Leine: Anker (zitierte
+    # Wörter, Zahlen) UND jedes tragende Substantiv müssen überleben -- eine Umformung,
+    # die "Vorfahre" zu "abstammt" macht, wäre legitim, wird aber bewusst geopfert
+    # (abgelehnter guter Stil kostet nichts, durchgelassene Korruption kostet Wahrheit)
     satz = "Unter »Hund« versteht GENUS: Haustier, dessen Vorfahre der Wolf ist."
-    model = _FakeModel("»Hund« ist laut GENUS ein Haustier, das vom Wolf abstammt.")
+    model = _FakeModel("Ein »Hund« ist ein Haustier — sein Vorfahre ist der Wolf.")
     result = stimme.formuliere(satz, model=model)
     assert result == model.reply
     assert model.calls and model.calls[0][1]["content"] == satz   # the original, unmodified

@@ -108,6 +108,35 @@ def test_deploy_stimme_traegt_die_anweisung_in_den_system_prompt():
                                    anweisung="Ton: herzlich und zugewandt.") is None
 
 
+def test_stimme_substantiv_leine_faengt_den_hausvoegel_fund():
+    # live gefunden beim ERSTEN Anweisungs-Test auf dem Pi: das 1.5B machte unter
+    # "Ton: freundlich und warm." aus "Haustier" ein "Hausvögel" -- die Anker-Prüfung
+    # (nur zitierte Wörter + Zahlen) ließ es durch, weil "Hund" im Text überlebte.
+    # Deutsche Großschreibung = Substantive = die tragende zweite Leine.
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy"))
+    import stimme as stimme_modul
+
+    satz = "Unter »Hund« versteht GENUS: Haustier, dessen Vorfahre der Wolf ist."
+
+    def fake(inhalt):
+        class M:
+            def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+                return {"choices": [{"message": {"content": inhalt}}]}
+        return M()
+
+    kaputt = "Hausvögel, die Vorfahre aus Wolfgruppen stammen, sind die Vorfahren von Hund."
+    assert stimme_modul.formuliere(satz, model=fake(kaputt),
+                                   anweisung="Ton: freundlich und warm.") is None
+    gut = "Ein Haustier, dessen Vorfahre der Wolf ist, ist ein Hund."
+    assert stimme_modul.formuliere(satz, model=fake(gut)) == gut
+    # Satzanfänge ("Unter") und Versalien ("GENUS") zählen bewusst nicht als Substantiv-Anker
+    worte = stimme_modul._inhaltsworte(satz)
+    assert "Unter" not in worte and "GENUS" not in worte
+    assert worte == ["Hund", "Haustier", "Vorfahre", "Wolf"]
+
+
 # --- die umgezogenen Verbraucher bleiben verhaltensgleich --------------------------------
 
 def test_gruss_und_dank_lesen_jetzt_aus_dem_wuerfel(conn):
