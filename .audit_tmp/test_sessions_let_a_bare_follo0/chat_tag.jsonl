@@ -1,2 +1,0 @@
-{"ts": "2026-07-04T21:22:39Z", "question": "Ist ein Hund ein Haustier?", "answer": "Ja. »Hund« zählt zu »Haustier«. (Vertrauen 0.50 — aus dem Wissensgraphen hergeleitet, nicht behauptet.)", "gelesen": ["beziehung"]}
-{"ts": "2026-07-04T21:22:39Z", "question": "warum?", "answer": "Warum »Hund« zu »Haustier« zählt — die Herleitung:\n  Hund@de —expresses→ Q144 (Hund)   ← wikidata (Vertrauen 0.50)\n  Q144 (Hund) —is_a→ Q_pet (Haustier)   ← wikidata (Vertrauen 0.50)\n  ⇒ Vertrauen 0.50 — die schwächste Prämisse der Kette.", "gelesen": []}

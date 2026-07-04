@@ -1,1 +1,0 @@
-{"algo":"sha256-chain-v1","core_id":"core-a","created_at":"2026-07-04T21:22:17.032Z","derivation":"ledger_anchor:v1","epoch_event_id":1,"event_count":2,"head":"d6604e816add915d5705cd228f45331f5ed6d19dc580df34c61a30169588d941","head_created_at":"2026-07-04T21:22:17.012Z","head_event_id":2,"head_event_type":"observation_created","schema":"genus-ledger-anchor-v1","signature":null}

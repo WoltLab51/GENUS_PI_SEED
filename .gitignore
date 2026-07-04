@@ -9,3 +9,6 @@ dist/
 
 # local pytest basetemp (Windows workaround)
 .pytest_tmp/
+
+# local pytest basetemp (Windows workaround, session convention)
+.audit_tmp/
