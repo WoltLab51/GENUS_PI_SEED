@@ -278,6 +278,30 @@ def observe_relation(
     return {"event_id": event_id, "events": events}
 
 
+def sae_fehlende(conn, tripel: list[tuple[str, str, str]], quelle: str) -> int:
+    """Idempotenter Sä-Helfer (Phase 0 der Ziel-Architektur): sät nur die Tripel, die im
+    Graphen noch fehlen, über den normalen Schreibpfad (``observe_relation`` -- Herkunft,
+    Widerspruchs-Check, Zyklus-Check inklusive). Gibt die Zahl NEU gesäter Kanten zurück.
+
+    Vorher lebte exakt dieses Idiom (vorhandene Tripel sammeln -> nur Fehlendes säen ->
+    zählen) zweimal handgeschrieben in ``ziele.seed_ziele`` und ``verstehen.seed_raster``.
+    ``erinnerung.migriere_notizen`` bleibt bewusst eigen: das ist Migrieren + Zurücknehmen,
+    kein Säen -- Gleiches gleich, Ungleiches ungleich."""
+    praedikate = sorted({p for _, p, _ in tripel})
+    vorhanden = {
+        (r["subject"], r["predicate"], r["object"])
+        for p in praedikate
+        for r in sources.relations(conn, predicate=p)
+    }
+    neu = 0
+    for s, p, o in tripel:
+        if (s, p, o) not in vorhanden:
+            observe_relation(conn, s, p, o, quelle)
+            vorhanden.add((s, p, o))   # ein doppeltes Tripel in der Liste sät nur einmal
+            neu += 1
+    return neu
+
+
 def retract_relation(
     conn, subject: str, predicate: str, object_: str, source: str | None = None, reason: str | None = None
 ) -> dict:

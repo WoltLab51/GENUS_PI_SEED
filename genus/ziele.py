@@ -109,33 +109,22 @@ ZIEL_BRAUCHT: tuple[tuple[str, str], ...] = (
 
 
 def seed_ziele(conn) -> int:
-    """Sät Mission, Ziele, Fähigkeiten und ihre Kanten -- idempotent wie seed_raster:
-    vorhandene Kanten werden übersprungen, zurückgegeben wird die Zahl NEU gesäter Kanten."""
+    """Sät Mission, Ziele, Fähigkeiten und ihre Kanten -- idempotent über den geteilten
+    Sä-Helfer (``reactors.sae_fehlende``, Phase 0 der Ziel-Architektur): vorhandene
+    Kanten werden übersprungen, zurückgegeben wird die Zahl NEU gesäter Kanten."""
     from genus import reactors
 
-    vorhanden = {
-        (r["subject"], r["predicate"], r["object"])
-        for pred in (INHALT, DIENT, BRAUCHT, STATUS)
-        for r in sources.relations(conn, predicate=pred)
-    }
-    neu = 0
-
-    def sow(s: str, p: str, o: str) -> None:
-        nonlocal neu
-        if (s, p, o) not in vorhanden:
-            reactors.observe_relation(conn, s, p, o, SEED_SOURCE)
-            neu += 1
-
+    tripel: list[tuple[str, str, str]] = []
     for ziel_id, inhalt in ZIEL_SEED:
-        sow(ziel_id, INHALT, inhalt)
+        tripel.append((ziel_id, INHALT, inhalt))
         if ziel_id != MISSION:
-            sow(ziel_id, DIENT, MISSION)
+            tripel.append((ziel_id, DIENT, MISSION))
     for f_id, inhalt, status in FAEHIGKEIT_SEED:
-        sow(f_id, INHALT, inhalt)
-        sow(f_id, STATUS, status)
+        tripel.append((f_id, INHALT, inhalt))
+        tripel.append((f_id, STATUS, status))
     for ziel_id, f_id in ZIEL_BRAUCHT:
-        sow(ziel_id, BRAUCHT, f_id)
-    return neu
+        tripel.append((ziel_id, BRAUCHT, f_id))
+    return reactors.sae_fehlende(conn, tripel, SEED_SOURCE)
 
 
 def _inhalt(conn, node: str) -> str:

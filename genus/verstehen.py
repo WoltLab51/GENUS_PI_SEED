@@ -135,39 +135,21 @@ RASTER_SEED: tuple[tuple[str, str], ...] = (
 
 def seed_raster(conn) -> int:
     """Sät die komplette Zwicky-Box: jede Zelle kombiniert_aus ihrem Sprechakt (+Gegenstand,
-    +Bezug), jedes Feinblatt is_a seiner Zelle. Idempotent (wie vorher): eine schon vorhandene
+    +Bezug), jedes Feinblatt is_a seiner Zelle. Idempotent über den geteilten Sä-Helfer
+    (``reactors.sae_fehlende``, Phase 0 der Ziel-Architektur): eine schon vorhandene
     Kante wird übersprungen. Gibt die Zahl neu gesäter Kanten zurück."""
     from genus import reactors
 
-    existing_komb = {
-        (r["subject"], r["object"]) for r in sources.relations(conn, predicate=KOMBINIERT_AUS)
-    }
-    existing_is_a = {
-        (r["subject"], r["object"])
-        for r in sources.relations(conn, predicate="is_a")
-        if r["subject"].startswith("absicht:")
-    }
-    sown = 0
-
+    tripel: list[tuple[str, str, str]] = []
     for (sprechakt, gegenstand), zelle in ZELLEN.items():
         zn = zelle_node(zelle)
-        kanten = [(zn, sprechakt_node(sprechakt)), (zn, bezug_node(_bezug_fuer(gegenstand)))]
+        tripel.append((zn, KOMBINIERT_AUS, sprechakt_node(sprechakt)))
+        tripel.append((zn, KOMBINIERT_AUS, bezug_node(_bezug_fuer(gegenstand))))
         if gegenstand is not None:
-            kanten.append((zn, gegenstand_node(gegenstand)))
-        for subj, obj in kanten:
-            if (subj, obj) in existing_komb:
-                continue
-            reactors.observe_relation(conn, subj, KOMBINIERT_AUS, obj, SEED_SOURCE)
-            sown += 1
-
+            tripel.append((zn, KOMBINIERT_AUS, gegenstand_node(gegenstand)))
     for leaf, zelle in RASTER_SEED:
-        edge = (node(leaf), zelle_node(zelle))
-        if edge in existing_is_a:
-            continue
-        reactors.observe_relation(conn, edge[0], "is_a", edge[1], SEED_SOURCE)
-        sown += 1
-
-    return sown
+        tripel.append((node(leaf), "is_a", zelle_node(zelle)))
+    return reactors.sae_fehlende(conn, tripel, SEED_SOURCE)
 
 
 def kinds(conn) -> set[str]:
