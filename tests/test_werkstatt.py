@@ -314,3 +314,15 @@ def test_schmiede_bauplan_reicht_die_grenze_ans_modell(monkeypatch):
     plan = schmied.schmiede_bauplan("thema-echo", grammatik="root ::= x")
     assert plan is not None and plan["waechter"] == "subject"
     assert fake.kwargs == {"grammar": f"KOMPILIERT:{len('root ::= x')}"}
+
+
+def test_glaettung_normalisiert_ascii_paare_zu_deutscher_typografie():
+    # Grenze-A/B-Fund: die Modelle trafen Struktur UND Semantik, fielen aber bei den
+    # Anfuehrungszeichen auf ASCII zurueck -- Typografie ist Kern-Sache, deterministisch.
+    roh = {
+        "waechter": "subject",
+        "beschaffung": {"art": "keine"},
+        "formulierung": '"{subject}" ist mir als Thema bekannt.',
+    }
+    glatt = bauplan_modul.normalisiere(roh)
+    assert glatt["formulierung"] == "„{subject}“ ist mir als Thema bekannt."

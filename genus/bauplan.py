@@ -41,6 +41,7 @@ BESCHAFFUNGEN: dict[str, dict] = {
 _PRAEDIKAT = re.compile(r"^[a-z_]+$")
 _ALLE_SLOTS = {"subject", "anzahl", "wert"}
 _SPITZE_SLOTS = re.compile(r"<(" + "|".join(sorted(_ALLE_SLOTS)) + r")>")
+_ASCII_PAAR = re.compile(r'"([^"]*)"')
 
 
 def normalisiere(plan: dict) -> dict:
@@ -58,6 +59,10 @@ def normalisiere(plan: dict) -> dict:
     template = plan.get("formulierung")
     if isinstance(template, str):
         template = _SPITZE_SLOTS.sub(r"{\1}", template)
+        # Deutsche Typografie ist KERN-Sache (jede narrate-Ausgabe nutzt „ “) -- ein
+        # Modell, das auf ASCII-Paare zurückfällt, wird deterministisch normalisiert
+        # (Grenze-A/B-Fund: die 1.5B trafen Struktur und Semantik, aber nie die „ “)
+        template = _ASCII_PAAR.sub("„\\1“", template)
         plan["formulierung"] = template
         slots = {feld for _, feld, _, _ in string.Formatter().parse(template) if feld}
         if "subject" in slots:
