@@ -1363,7 +1363,7 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                 # die Meta-Zellen bauen auf last_answer auf, das oft schon einen Hinweis trägt
                 # (Nochmal/Ausführlicher wiederholen ihn wörtlich mit) -- nie doppelt anhängen
                 text = text + marker
-            return {"text": text, "question": anchor}
+            return {"text": text, "question": anchor, "kind": kind}
     if hatte_handler:
         return None   # capability exists but nothing resolved here -- fail safe, never claim inability
     # known cell, no capability anywhere up the chain: say so, honestly -- and count it,
@@ -1371,7 +1371,7 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
     _record_still(verstehen.record_reading, conn, kind, "model:deuter")
     label = _ZELLEN_LABELS.get(kind, f"„{kind}“")
     return {"text": f"Ich lese das als {label} — das kann ich noch nicht. Ich habe es mir "
-                    f"als Lücke gemerkt.", "question": question}
+                    f"als Lücke gemerkt.", "question": question, "kind": kind}
 
 
 def _komponiere(teile: list[str]) -> str:
@@ -1389,9 +1389,50 @@ def _komponiere(teile: list[str]) -> str:
     return text
 
 
+_KORREKTUR_CUE = re.compile(
+    r"^\s*falsch\s+(?:verstanden|gedeutet)\s*(?::\s*([\wäöüß-]+))?\s*[.!?]*\s*$",
+    re.IGNORECASE | re.UNICODE,
+)
+
+
+def korrektur_cue(question: str) -> tuple[bool, str | None]:
+    """Der ENGE Korrektur-Kanal (Phase 3 Scheibe 3, Naht 1): exakt „falsch verstanden"
+    oder „falsch gedeutet", optional mit „: <blatt>" (dem exakten Blattnamen dessen, was
+    gemeint war). Bewusst fast deutungsfrei -- eine Freitext-Korrektur müsste durch
+    genau den Klassifikator, der eben danebengegriffen hat (zirkulär); die exakte
+    Kurzform braucht kein Modell. Ein längerer Satz („das hast du falsch verstanden,
+    glaube ich") ist KEIN Cue -- er läuft den normalen Weg."""
+    m = _KORREKTUR_CUE.match(question)
+    if not m:
+        return (False, None)
+    richtig = m.group(1)
+    return (True, richtig.lower() if richtig else None)
+
+
+def _korrektur_antwort(conn, letzte_lesarten: list[str], richtig: str | None) -> str:
+    """Nimmt die Korrektur an: jede Lesart des letzten Zugs wird als Fehlgriff festgehalten
+    (nur Struktur, nie Text), mit ``richtig`` zusätzlich die gerichtete Verwechslung.
+    Die Antwort benennt ehrlich, was korrigiert wurde."""
+    from genus import verstehen
+
+    bekannt = verstehen.kinds(conn) or {leaf for leaf, _ in verstehen.RASTER_SEED}
+    ziel = richtig if richtig in bekannt else None
+    for kind in letzte_lesarten:
+        _record_still(verstehen.record_fehlgriff, conn, kind, ziel, "ronny")
+    gelesen = " und ".join(f"„{k}“" for k in letzte_lesarten)
+    text = (f"Danke für die Korrektur — ich hatte das als {gelesen} gelesen. "
+            f"Den Fehlgriff habe ich mir gemerkt.")
+    if ziel:
+        text += f" Gemeint war „{ziel}“ — auch das habe ich festgehalten."
+    elif richtig:
+        text += f" („{richtig}“ kenne ich allerdings nicht als Lesart.)"
+    return text
+
+
 def respond_with_deuter(conn, question: str, last_question: str | None = None,
                          deuter=None, stimme=None, last_answer: str | None = None,
-                         verlauf: list[dict] | None = None) -> dict:
+                         verlauf: list[dict] | None = None,
+                         letzte_lesarten: list[str] | None = None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
     offene Deuter-SEGMENTIERUNG (eine Nachricht kann mehrere Sprechhandlungen enthalten, ISO
     24617-2 -- jedes Segment aufs Raster abgebildet, is_a-Fallback GENAU einen Schritt,
@@ -1428,9 +1469,24 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     one (that one stays reachable via ``last_question``/``last_answer`` as always). A question
     containing „von vorhin"/„von eben" (:func:`is_backreference`) re-answers the most recent
     earlier question GENUS can still answer, named honestly as a retrace -- never a guessed
-    word-substitution."""
+    word-substitution.
+
+    ``letzte_lesarten`` (optional, der Korrektur-Kanal): die Raster-Lesarten, auf die der
+    LETZTE Zug gehandelt hat (der Aufrufer fädelt ``result["gelesen"]`` genauso weiter wie
+    question/answer). Ein exaktes „falsch verstanden" hält sie als Fehlgriff fest --
+    deterministisch, VOR jeder Deutung, damit die Korrektur nie selbst durch den
+    Klassifikator muss, der eben danebengriff (Naht 1)."""
     from genus import verstehen
 
+    ist_korrektur, richtig = korrektur_cue(question)
+    if ist_korrektur:
+        if letzte_lesarten:
+            text = _korrektur_antwort(conn, letzte_lesarten, richtig)
+            anchor = last_question or question
+            return {"text": text, "question": anchor, "gelesen": []}
+        return {"text": "Da war keine letzte Deutung, die ich korrigieren könnte — "
+                        "die Korrektur bezieht sich immer auf meine vorige Antwort.",
+                "question": question, "gelesen": []}
     if last_question and is_why_followup(question):
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
         return {"text": text, "question": last_question}
@@ -1457,13 +1513,14 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                 if _werkzeug.stimme_geeignet(f"{ZELLE_PREFIX}{muster[1]}") else muster[0])
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
-        return {"text": text, "question": question}
+        return {"text": text, "question": question, "gelesen": [muster[1]]}
     if deuter is not None:
         segmente = deuter(question)
         if isinstance(segmente, dict):
             segmente = [segmente]
         if segmente is not None:   # der Deuter LIEF -- auch eine leere Liste zählt als Lauf
             teile: list[str] = []
+            gelesen: list[str] = []
             anchor = question
             for segment in segmente:
                 gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
@@ -1471,8 +1528,10 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                 if gedeutet is not None:
                     teile.append(gedeutet["text"])
                     anchor = gedeutet["question"]
+                    if gedeutet.get("kind"):
+                        gelesen.append(gedeutet["kind"])
             if teile:
-                return {"text": _komponiere(teile), "question": anchor}
+                return {"text": _komponiere(teile), "question": anchor, "gelesen": gelesen}
             # der Deuter lief und fand ehrlich nichts -- kein Rückfall auf den gierigen
             # Wort-Lookup mehr (siehe _NICHT_VERSTANDEN-Kommentar oben). Gezählt wird der
             # Fall trotzdem (Struktur, nie Text): auch ein leerer Lauf ist ein blinder Fleck

@@ -480,3 +480,95 @@ def test_fabrizierter_segment_text_wird_nicht_geglaubt(monkeypatch):
     monkeypatch.setattr(deuter, "_get_model", lambda: fake2)
     ergebnis2 = deuter.interpret("Was ist ein Hund? Danke!")
     assert ergebnis2 and ergebnis2[0]["text"] == "Danke!"
+
+
+# --- Phase 3 Scheibe 3: der enge Korrektur-Kanal (Naht 1) -----------------------------
+
+
+def test_korrektur_cue_ist_exakt_und_deutungsfrei():
+    from genus import companion
+
+    assert companion.korrektur_cue("falsch verstanden") == (True, None)
+    assert companion.korrektur_cue("Falsch gedeutet!") == (True, None)
+    assert companion.korrektur_cue("falsch verstanden: beziehung") == (True, "beziehung")
+    # ein laengerer Satz ist KEIN Cue -- er muesste sonst durch genau den Klassifikator,
+    # der eben danebengriff (zirkulaer, Naht 1)
+    assert companion.korrektur_cue("das hast du falsch verstanden, glaube ich") == (False, None)
+    assert companion.korrektur_cue("Was ist ein Hund?") == (False, None)
+
+
+def test_korrektur_haelt_fehlgriff_als_struktur_fest_nie_text():
+    from genus import companion, verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    result = companion.respond_with_deuter(
+        conn, "falsch verstanden", last_question="Wie wird das Wetter morgen?",
+        letzte_lesarten=["abschied"],
+    )
+    assert "abschied" in result["text"] and "gemerkt" in result["text"]
+    assert result["question"] == "Wie wird das Wetter morgen?"   # Anker bleibt beim Thema
+    assert verstehen.fehlgriffe(conn, "abschied")["gesamt"] == 1
+    # Ledger≠Memory: der Wortlaut der korrigierten Frage steht NIRGENDS im Ledger
+    rows = conn.execute("SELECT payload FROM event_log").fetchall()
+    assert all("Wetter morgen" not in r["payload"] for r in rows)
+
+
+def test_korrektur_mit_blattnamen_haelt_die_verwechslung_fest():
+    from genus import companion, sources, verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    result = companion.respond_with_deuter(
+        conn, "falsch verstanden: weltfrage", letzte_lesarten=["abschied"],
+    )
+    assert "weltfrage" in result["text"]
+    kanten = sources.relations(conn, subject="absicht:abschied",
+                               predicate=verstehen.FEHLGRIFF_STATT)
+    assert [k["object"] for k in kanten] == ["absicht:weltfrage"]
+
+
+def test_korrektur_mit_unbekanntem_blatt_bleibt_ehrlich():
+    from genus import companion, verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    result = companion.respond_with_deuter(
+        conn, "falsch verstanden: quatschblatt", letzte_lesarten=["dank"],
+    )
+    assert "kenne ich allerdings nicht" in result["text"]
+    assert verstehen.fehlgriffe(conn, "dank")["gesamt"] == 1   # der Fehlgriff zaehlt trotzdem
+
+
+def test_korrektur_ohne_letzte_deutung_antwortet_ehrlich_und_schreibt_nichts():
+    from genus import companion
+
+    conn = _fresh()
+    vorher = conn.execute("SELECT COUNT(*) AS n FROM event_log").fetchone()["n"]
+    result = companion.respond_with_deuter(conn, "falsch verstanden")
+    assert "keine letzte Deutung" in result["text"]
+    nachher = conn.execute("SELECT COUNT(*) AS n FROM event_log").fetchone()["n"]
+    assert nachher == vorher
+
+
+def test_bot_faedelt_gelesen_durch_die_session_ende_zu_ende(monkeypatch):
+    # Zug 1: der Deuter greift daneben (liest eine Wetterfrage als "abschied").
+    # Zug 2: das exakte "falsch verstanden" korrigiert -- Ende zu Ende ueber die Session.
+    from genus import verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    monkeypatch.setattr(deuter, "interpret",
+                        lambda q, absichten=None, grammatik=None:
+                        [{"text": q, "absicht": "abschied", "subject": None, "object": None}])
+    sessions: dict = {}
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "Wie wird das Wetter morgen?"),
+                               allowed={42}, sessions=sessions)
+    assert sessions[42][-1]["gelesen"] == ["abschied"]
+    chat_id, answer = telegram_bot.handle_update(conn, _msg(2, 42, "falsch verstanden"),
+                                                 allowed={42}, sessions=sessions)
+    assert chat_id == 42 and "abschied" in answer
+    assert verstehen.fehlgriffe(conn, "abschied")["gesamt"] == 1
+    # der Korrektur-Zug selbst traegt keine Lesart -- eine Doppel-Korrektur laeuft nie im Kreis
+    assert sessions[42][-1]["gelesen"] == []

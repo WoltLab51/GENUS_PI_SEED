@@ -233,9 +233,27 @@ def record_reading(conn, kind: str, quelle: str) -> None:
     reactors.observe_relation(conn, node(kind), READING_PREDICATE, quelle, quelle)
 
 
-def belegung(conn, kind: str) -> dict:
-    """Kennzahl 1 (QM am Verstehen), unverändert: wie oft dieses Blatt gelesen wurde, je
-    Herkunft, retraktions-bewusst gezählt (siehe frühere Fassung für die volle Begründung)."""
+FEHLGRIFF_PREDICATE = "fehlgriff"          # (absicht:X, fehlgriff, quelle) -- die Zähl-Kante
+FEHLGRIFF_STATT = "fehlgriff_statt"        # (absicht:X, fehlgriff_statt, absicht:Y) -- gemeint war Y
+
+
+def record_fehlgriff(conn, kind: str, richtig: str | None = None,
+                     quelle: str = "ronny") -> None:
+    """Der Korrektur-Kanal schreibt (Phase 3 Scheibe 3, Naht 1): die Lesart ``kind`` war
+    ein FEHLGRIFF -- als reine Struktur, exakt wie record_reading (nie Nutzer-Text,
+    Ledger≠Memory). Mit ``richtig`` zusätzlich die gerichtete Verwechslung
+    (absicht:X -fehlgriff_statt-> absicht:Y) -- das Rohmaterial für den späteren
+    Embedder-Lernkreis: WELCHE Verwechslungen häufig sind, ist selbst Wissen."""
+    from genus import reactors
+
+    reactors.observe_relation(conn, node(kind), FEHLGRIFF_PREDICATE, quelle, quelle)
+    if richtig:
+        reactors.observe_relation(conn, node(kind), FEHLGRIFF_STATT, node(richtig), quelle)
+
+
+def _zaehle_kante(conn, kind: str, predicate: str) -> dict:
+    """Retraktions-bewusste Zählung einer Struktur-Kante je Herkunft (der gemeinsame
+    Zähler hinter Belegung und Fehlgriffen)."""
     counts: dict[str, int] = {}
     for event_type, delta in (("relation_asserted", 1), ("relation_retracted", -1)):
         for row in conn.execute(
@@ -247,8 +265,21 @@ def belegung(conn, kind: str) -> dict:
               AND json_extract(payload, '$.predicate') = ?
             GROUP BY quelle
             """,
-            (event_type, node(kind), READING_PREDICATE),
+            (event_type, node(kind), predicate),
         ).fetchall():
             counts[row["quelle"]] = counts.get(row["quelle"], 0) + delta * row["n"]
     je_quelle = {q: n for q, n in counts.items() if n > 0}
     return {"kind": kind, "gesamt": sum(je_quelle.values()), "je_quelle": je_quelle}
+
+
+def belegung(conn, kind: str) -> dict:
+    """Kennzahl 1 (QM am Verstehen), unverändert: wie oft dieses Blatt gelesen wurde, je
+    Herkunft, retraktions-bewusst gezählt (siehe frühere Fassung für die volle Begründung)."""
+    return _zaehle_kante(conn, kind, READING_PREDICATE)
+
+
+def fehlgriffe(conn, kind: str) -> dict:
+    """Kennzahl 2 (QM am Verstehen): wie oft diese Lesart als Fehlgriff korrigiert wurde --
+    dieselbe retraktions-bewusste Zählung wie die Belegung. Viele Fehlgriffe auf einem
+    Blatt heißen: das DEUTEN dorthin muss besser werden, nicht das Können dort."""
+    return _zaehle_kante(conn, kind, FEHLGRIFF_PREDICATE)

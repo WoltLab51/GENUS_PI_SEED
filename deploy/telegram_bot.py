@@ -168,9 +168,14 @@ def handle_update(
                 stimme=stimme.formuliere,
                 last_answer=vorher.get("answer"),
                 verlauf=zuege[:-1],
+                letzte_lesarten=vorher.get("gelesen"),
             )
             answer = result["text"]
-            neuer_zug = {"question": result["question"], "answer": answer}
+            # "gelesen" wandert mit durch die Session (Korrektur-Kanal, Naht 1): ein
+            # exaktes "falsch verstanden" im nächsten Zug weiß dann, WELCHE Lesart(en)
+            # es korrigiert -- Struktur, nie der Nutzer-Text
+            neuer_zug = {"question": result["question"], "answer": answer,
+                         "gelesen": result.get("gelesen") or []}
             sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering {question!r}: {exc}")
