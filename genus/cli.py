@@ -1008,6 +1008,11 @@ def maturation_scan() -> None:
 
 @state_group.command("refresh")
 def state_refresh() -> None:
+    # autonomer Cron-Tick (1-59/5) -- respektiert den Pause-Schalter wie observe-all
+    # (Pause-Vertrags-Fund 2026-07-04: dieser Einstieg ignorierte ihn als einziger CLI-Tick)
+    if control.is_paused():
+        click.echo("[STATE] paused — skipping (genus resume to continue)")
+        return
     conn = get_conn()
     try:
         try:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 
 
@@ -9,8 +10,18 @@ SCHEMA_PATH = ROOT / "schema.sql"
 
 
 def connect(path: str | Path = "genus.sqlite3") -> sqlite3.Connection:
+    # Streu-DB-Schutz (live gefunden, 2026-07-04): ein Befehl ohne GENUS_DB_PATH legte
+    # still eine leere Datenbank im Arbeitsverzeichnis an und schrieb 27 Events daran
+    # vorbei am echten Ledger. Das Anlegen bleibt erlaubt (frische Installationen,
+    # Tests) -- aber es passiert nie mehr LAUTLOS.
+    neu = str(path) != ":memory:" and not Path(path).exists()
     conn = sqlite3.connect(path)
     init_schema(conn)
+    if neu:
+        print(f"[DB] NEU angelegt: {Path(path).resolve()} — beabsichtigt? "
+              f"(Das echte Ledger wählt GENUS_DB_PATH; ohne die Variable entsteht "
+              f"sonst still eine leere Streu-DB im Arbeitsverzeichnis.)",
+              file=sys.stderr)
     return conn
 
 

@@ -51,6 +51,14 @@ echo "[DEPLOY] installing package"
 
 export GENUS_DB_PATH="$DB_PATH"
 
+# Autonome Aktivität pausieren (Cron-Ticks, Membranen, Lerner), damit die Selbst-Checks
+# unten in Ruhe laufen -- live gefunden (2026-07-04): der Replay-Idempotenz-Check verlor
+# ein Rennen gegen einen 5-Minuten-Tick ("state changed after replay", ein Wettlauf, keine
+# Korruption) und brach den Deploy ab. Der trap garantiert das Aufwecken, auch bei Fehlern.
+echo "[DEPLOY] pausing autonomous activity for a quiet self-check"
+.venv/bin/genus pause --reason "deploy self-check"
+trap '.venv/bin/genus resume >/dev/null 2>&1 || true; echo "[DEPLOY] resumed autonomous activity"' EXIT
+
 if [ "$SKIP_TESTS" != "1" ]; then
     echo "[DEPLOY] running tests (hermetic: ambient GENUS_* unset so they never touch the live ledger)"
     env -u GENUS_DB_PATH -u GENUS_CORE_ID -u GENUS_PAUSE_FILE .venv/bin/python -m pytest
