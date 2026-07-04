@@ -402,19 +402,23 @@ def test_interpret_reicht_die_grenze_ans_modell_durch(monkeypatch):
 
 
 def test_unbrauchbare_grammatik_degradiert_ehrlich_statt_zu_schweigen(monkeypatch, capsys):
-    # llama_cpp fehlt auf dieser Maschine -> _gbnf kann nicht kompilieren -> lauter
-    # stderr-Hinweis, aber der Deuter laeuft UNBESCHRAENKT weiter (der Bot bleibt
-    # antwortfaehig; der Verlust der Garantie passiert nie still).
+    # _gbnf kann nicht kompilieren -> lauter stderr-Hinweis, aber der Deuter laeuft
+    # UNBESCHRAENKT weiter (der Bot bleibt antwortfaehig; der Verlust der Garantie
+    # passiert nie still). Hermetisch auf JEDER Maschine: ohne llama_cpp scheitert der
+    # Import, mit llama_cpp scheitert der Parser an der offenen Klammer -- der erste
+    # Pi-Deploy fing genau das: "root ::= kaputt" war dort GUELTIGES GBNF (llama_cpp
+    # installiert), der Test lief nur auf der Dev-Box gruen.
     fake = _FakeModelMitKwargs('[{"text": "hi", "absicht": "gruss", "subject": null, '
                                '"object": null}]')
     monkeypatch.setattr(deuter, "MODEL_PATH", __file__)
     monkeypatch.setattr(deuter, "_get_model", lambda: fake)
     deuter._grammatik_cache.clear()
 
-    ergebnis = deuter.interpret("hi", grammatik="root ::= kaputt")
+    ergebnis = deuter.interpret("hi", grammatik='root ::= ("nie-geschlossen"')
     assert ergebnis and ergebnis[0]["absicht"] == "gruss"
     assert fake.kwargs == [{}]   # keine Grammatik durchgereicht
     assert "UNBESCHRÄNKT" in capsys.readouterr().err
+    deuter._grammatik_cache.clear()
 
 
 def test_bot_leitet_die_grenze_aus_dem_lebenden_raster_ab(monkeypatch):
