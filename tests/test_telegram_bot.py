@@ -665,3 +665,31 @@ def test_naechste_nachricht_bekommt_den_rueckfluss_in_den_deuter(monkeypatch):
     k = empfangen["korrekturen"]
     assert {"gelesen": "abschied", "gemeint": "weltfrage"} in k
     assert any(e.get("beispiel") == "Wie wird das Wetter morgen?" for e in k)
+
+
+# --- der Selbst-Neustart: kein sudo mehr für Deploys (Ronny, 2026-07-04) --------------
+
+
+def test_neustart_flag_zaehlt_nur_wenn_frischer_als_der_prozess(monkeypatch, tmp_path):
+    import os as _os
+    import time as _time
+
+    flag = tmp_path / "telegram_bot.neustart"
+    monkeypatch.setattr(telegram_bot, "NEUSTART_DATEI", str(flag))
+    jetzt = _time.time()
+    # kein Flag -> kein Neustart
+    assert telegram_bot._neustart_angefordert(jetzt) is False
+    # ein ALTES Flag (Ueberbleibsel von vor dem Start) -> kein Neustart, keine Schleife
+    flag.write_text("", encoding="utf-8")
+    _os.utime(flag, (jetzt - 100, jetzt - 100))
+    assert telegram_bot._neustart_angefordert(jetzt) is False
+    # ein frisches Flag (Deploy NACH Prozess-Start) -> Neustart
+    _os.utime(flag, (jetzt + 5, jetzt + 5))
+    assert telegram_bot._neustart_angefordert(jetzt) is True
+
+
+def test_deploy_beruehrt_das_neustart_flag():
+    # Struktur-Gate: der Deploy fordert den Bot-Neustart automatisch an -- die Aera
+    # "sudo systemctl restart" nach jedem Deploy ist vorbei.
+    text = (ROOT / "deploy" / "pi_deploy.sh").read_text(encoding="utf-8")
+    assert "telegram_bot.neustart" in text

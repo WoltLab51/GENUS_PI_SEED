@@ -57,6 +57,24 @@ _VERLAUF_MAX = 6   # Mehr-Zug-Arbeitsgedächtnis: wie viele Züge pro Chat im Bl
 KORREKTUR_DATEI = os.environ.get(
     "GENUS_KORREKTUR_DATEI", os.path.join(GENUS_USER_HOME, ".genus", "korrekturen.jsonl")
 )
+
+# Der Selbst-Neustart (Ronnys Frage 2026-07-04: „eine einfachere Möglichkeit für die
+# nötigen Neustarts") -- derselbe Flag-Stil wie der Pause-Schalter, KEIN sudo: der Deploy
+# berührt diese Datei, der Bot sieht sie im nächsten Poll-Zyklus (~25 s), beendet sich
+# sauber, und systemd (Restart=always in der Unit) startet ihn mit dem frischen Code.
+NEUSTART_DATEI = os.environ.get(
+    "GENUS_BOT_NEUSTART_DATEI",
+    os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.neustart"),
+)
+
+
+def _neustart_angefordert(start_zeit: float) -> bool:
+    """Wurde das Neustart-Flag NACH dem Start dieses Prozesses berührt? Ein älteres Flag
+    (z.B. ein Überbleibsel) startet nie eine Schleife -- nur ein frisches zählt."""
+    try:
+        return os.path.getmtime(NEUSTART_DATEI) > start_zeit
+    except OSError:
+        return False
 _KORREKTUR_MAX = 50       # die Datei bleibt gedeckelt: die jüngsten 50 Korrekturen
 _HINWEIS_BEISPIELE = 3    # wie viele Beispiele der Prompt höchstens trägt (nie wachsend)
 
@@ -272,8 +290,17 @@ def main() -> int:
     conn = db.connect(DB_PATH)
 
     offset = _load_offset()
+    start_zeit = time.time()
     sessions: dict[int, list[dict]] = {}   # chat_id -> turn list; in-process only, see handle_update
     while True:
+        if _neustart_angefordert(start_zeit):
+            _log("Neustart angefordert (Deploy-Flag) — beende mich sauber; "
+                 "systemd bringt den frischen Code zurück")
+            try:
+                os.remove(NEUSTART_DATEI)
+            except OSError:
+                pass
+            return 0
         try:
             updates = _get_updates(token, offset)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
