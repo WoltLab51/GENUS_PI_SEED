@@ -655,11 +655,11 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
 def _notiz_bezug(conn, question: str) -> str | None:
     """Ein kurzer, ehrlicher Nebenbei-Hinweis, falls ``question`` denselben Begriff berührt wie
     eine gemerkte Episode -- ``None`` sonst. Nie erfunden: die Episode wird wörtlich zitiert.
-    Bei Knappheit „knapp" (Chat-Regler „sei knapper") entfällt das Beiläufige ganz — der
-    ehrliche Verbraucher dieser Achse: Persönlichkeit wirkt an der Sprache, nie am Wissen."""
-    from genus import erinnerung, persoenlichkeit  # local: keeps companion's import-time surface a leaf otherwise
+    Ob das Beiläufige überhaupt erscheint, entscheidet der Antwort-Würfel (Kreuz-Konsistenz:
+    knapp ⇒ kein Beiwerk) — Persönlichkeit wirkt an der Sprache, nie am Wissen."""
+    from genus import antwort, erinnerung  # local: keeps companion's import-time surface a leaf otherwise
 
-    if persoenlichkeit.register(conn, "plausch")["knappheit"] == "knapp":
+    if not antwort.belegung(conn, "plausch")["beiwerk_notiz"]:
         return None
     treffer = erinnerung.erwaehnter_bezug(conn, question)
     if treffer is None:
@@ -1211,7 +1211,7 @@ def _zelle_ausfuehrlicher(conn, guess, question, last_question, last_answer, sti
 def _zelle_anders_erklaeren(conn, guess, question, last_question, last_answer, stimme=None):
     if not last_answer:
         return None
-    anders = _stimme_versucht(last_answer, stimme)   # ihre eigentliche Aufgabe: neu formulieren
+    anders = _stimme_versucht(conn, last_answer, stimme)   # ihre eigentliche Aufgabe: neu formulieren
     if anders != last_answer:   # ein echter zweiter Versuch ist gelungen (Anker-geprüft)
         return anders
     return f"Ich kann es nur so sagen, wie ich es weiß: {last_answer}"   # ehrlich wiederholt, nie erfunden
@@ -1254,38 +1254,19 @@ def _ist_kurze_aeusserung(text: str) -> bool:
 def _zelle_gruss(conn, guess, question, last_question, last_answer, stimme=None):
     if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
-    # Persönlichkeit wirkt an der SPRACHE (Rolle: plausch): Wärme wählt die Variante,
-    # Neugier hängt die echte Frage an -- Fakten/Ehrlichkeit bleiben unberührt.
-    from genus import persoenlichkeit
+    # Persönlichkeit wirkt an der SPRACHE: Variante + Beiwerk wählt der Antwort-Würfel
+    # (genus.antwort, EINE Stelle) -- Fakten/Ehrlichkeit bleiben unberührt.
+    from genus import antwort
 
-    reg = persoenlichkeit.register(conn, "plausch")
-    varianten = {
-        "nuechtern": "Hallo.",
-        "neutral": "Hallo!",
-        "warm": "Hallo! Schön, dass du da bist.",
-        "herzlich": "Hallo! Wie schön, dass du da bist!",
-    }
-    text = varianten.get(reg["waerme"], "Hallo!")
-    if reg["neugier"] == "ja":
-        text += " Was beschäftigt dich gerade?"
-    else:
-        text += " Frag mich etwas, oder sag „was weißt du?“."
-    return text
+    return antwort.floskel(conn, "gruss")
 
 
 def _zelle_dank(conn, guess, question, last_question, last_answer, stimme=None):
     if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
-    from genus import persoenlichkeit
+    from genus import antwort
 
-    reg = persoenlichkeit.register(conn, "plausch")
-    varianten = {
-        "nuechtern": "Gern.",
-        "neutral": "Gern geschehen.",
-        "warm": "Gern geschehen!",
-        "herzlich": "Gern geschehen — jederzeit!",
-    }
-    return varianten.get(reg["waerme"], "Gern geschehen.")
+    return antwort.floskel(conn, "dank")
 
 
 def _zelle_lob(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1466,14 +1447,28 @@ _STIMME_TAG = " (Sprachlich vom Modell geglättet — Fakten unverändert.)"
 # Werkzeug-Spec (registriere_zellen / werkzeug.stimme_geeignet) -- eine Quelle, kein Paar.
 
 
-def _stimme_versucht(text: str, stimme) -> str:
+def _stimme_versucht(conn, text: str, stimme) -> str:
     """``text``, natürlicher formuliert via ``stimme`` (dependency-injected wie ``deuter``,
     z.B. ``deploy.stimme.formuliere``) -- unverändert, wenn ``stimme`` fehlt oder sein Versuch
     die Faktentreue-Prüfung nicht besteht (``None``). Nie stillschweigend: eine geglättete
-    Antwort trägt sichtbar :data:`_STIMME_TAG`."""
+    Antwort trägt sichtbar :data:`_STIMME_TAG`.
+
+    Die STIL-ANWEISUNG des Antwort-Würfels (``antwort.anweisung``, deterministisch aus der
+    Belegung) reist als reine Daten mit über die Membran -- das Modell formuliert INNERHALB
+    der gewählten Zelle, die Anker-Prüfung bleibt die Leine. Eine Stimme ohne
+    ``anweisung``-Parameter (ältere Membran, Test-Fakes) wird kompatibel ohne sie gerufen."""
     if stimme is None:
         return text
-    geglaettet = stimme(text)
+    from genus import antwort
+
+    anw = antwort.anweisung(antwort.belegung(conn, "plausch"))
+    if anw is not None:
+        try:
+            geglaettet = stimme(text, anweisung=anw)
+        except TypeError:
+            geglaettet = stimme(text)
+    else:
+        geglaettet = stimme(text)
     return text if geglaettet is None else geglaettet + _STIMME_TAG
 
 
@@ -1482,7 +1477,7 @@ def _personalisiert(conn, question: str, text: str, stimme, marker: str = "") ->
     (Personen-Gedächtnis Scheibe 2) -- in dieser Reihenfolge: die Notiz ist eine reine,
     deterministische Ergänzung ganz am Ende und darf die Anker-Prüfung der Stimme (die nur den
     narrate-Kern beurteilen soll) nicht verwirren."""
-    text = _stimme_versucht(text, stimme)
+    text = _stimme_versucht(conn, text, stimme)
     return text + marker + (_notiz_bezug(conn, question) or "")
 
 
@@ -1703,7 +1698,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         # niemand kann die Eignung mehr an einer zweiten Stelle vergessen
         registriere_zellen()
         from genus import werkzeug as _werkzeug
-        text = (_stimme_versucht(muster[0], stimme)
+        text = (_stimme_versucht(conn, muster[0], stimme)
                 if _werkzeug.stimme_geeignet(f"{ZELLE_PREFIX}{muster[1]}") else muster[0])
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
@@ -1735,7 +1730,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                     "question": question}
     text = _wort_antwort(conn, question)
     if text is not None:
-        text = _stimme_versucht(text, stimme)
+        text = _stimme_versucht(conn, text, stimme)
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
         return {"text": text, "question": question}

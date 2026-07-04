@@ -69,16 +69,29 @@ Beide Türen rufen dieselbe Implementierung (`_regler_stellen`) — ein Bestäti
 Wortlaut („Gern — Knappheit steht jetzt auf „knapp“. (Als Einstellung gemerkt — Quelle:
 du.)"), eine Grenz-Ehrlichkeit (an der Achsen-Grenze passiert nichts und GENUS sagt das).
 
-## Die heutigen Verbraucher (v1)
+## Der Antwort-Würfel (`genus/antwort.py`) — wo die Persönlichkeit wirkt
 
-- **Wärme** → Gruß-/Dank-Varianten (`companion._zelle_gruss/_zelle_dank`), Morgen-Gruß und -Schluss
-- **Neugier** → der Gruß fragt zurück („Was beschäftigt dich gerade?"); der Morgen fragt nach den Themen von gestern
-- **Knappheit** → bei „knapp" entfallen die beiläufigen Notiz-Einwebungen (`_notiz_bezug`)
-- **Humor** → bei „dezent" bekommt der Morgen-Schluss eine leichte Note
+Die Zwicky-Symmetrie an der Membran: der Verstehens-Würfel zerlegt, was **reinkommt**;
+der Antwort-Würfel setzt zusammen, was **rausgeht**. Er ist die EINE Stelle für:
 
-Benannter nächster Verbraucher: die **Stimme** nimmt eine Persönlichkeits-Anweisung an
-(`stimme(text, anweisung=…)`) und formuliert ganze Antworten im Register um — die
-Anker-Prüfung bleibt die Leine.
+- **Belegung** — das wirksame Register der Rolle plus Kreuz-Konsistenz (Zwickys Schritt 4)
+  als explizite Felder: *knapp ⇒ kein Beiwerk* (weder Notiz-Einwebung noch Rückfrage).
+  Die weiteren Regeln bleiben, wo sie strukturell hingehören: *wortlautfest ⇒ keine
+  Stimme* in der Werkzeug-Spec, die Rollen-Pins im Code der Persönlichkeit.
+- **Anweisung** — die Stil-Vorgabe an die Stimme (`stimme(text, anweisung=…)`), reine
+  Daten über die Membran (wie die GBNF-Grenze des Deuters): „Ton: freundlich und warm."
+  / „Fasse dich so knapp wie möglich." Die Anker-Prüfung bleibt die Leine — die Anweisung
+  ändert nur, WIE formuliert wird. **Ehrlich begrenzt:** „ausführlicher" kann die Stimme
+  nie leisten (sie fügt NIE hinzu) — mehr Umfang muss aus der Zelle kommen; Humor bleibt
+  aus der Wissens-Umformulierung draußen (Verbraucher: der Morgen-Schluss).
+- **Floskeln** — die Wärme-Varianten von Gruß/Dank an einer Stelle statt in jedem Handler;
+  der Gruß trägt sein Beiwerk (neugierige Rückfrage) gemäß Belegung.
+
+Die WAHL der Zelle im Kasten ist immer **deterministisch** (Graph + Pins); das Modell
+formuliert nur innerhalb. Ohne Modell zeigt sich die Persönlichkeit ehrlich an den
+deterministischen Stellen (Floskeln, Beiwerk, Morgen) — Umformulieren ohne Modell wäre
+Erfindung. Verbraucher heute: Gruß/Dank (Floskel), jede Stimme-geeignete Antwort
+(Anweisung), Notiz-Einwebung (Beiwerk), Morgen-Nachricht (Belegung der Rolle „morgen").
 
 ## Selbst-Justage (entschieden: später, gedeckelt)
 

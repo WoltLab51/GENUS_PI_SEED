@@ -57,22 +57,31 @@ def _get_model():
     return _model
 
 
-def formuliere(satz: str, model=None) -> str | None:
+def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | None:
     """A faithfulness-checked rephrasing of an ALREADY-VERIFIED sentence -- ``None`` on any
     problem (model missing, inference error, malformed output) OR when an anchor (a quoted
     word, a confidence number) went missing from the rephrase, so the caller always has a
     safe fallback: the original ``satz`` itself. Never invents new claims -- it can only
     reorder/rephrase words already present; the anchor check is what makes that a guarantee
-    and not just an instruction."""
+    and not just an instruction.
+
+    ``anweisung`` (der Antwort-Würfel, ``genus.antwort.anweisung``): eine deterministisch
+    gewählte STIL-Vorgabe („Ton: freundlich und warm."), als reine Daten über die Membran
+    gereicht -- dieselbe Rolle wie die GBNF-Grammatik beim Deuter. Sie ändert nur, WIE
+    formuliert wird; die Anker-Prüfung danach ist von ihr völlig unabhängig."""
     if model is None:
         if not os.path.exists(MODEL_PATH):
             return None
         model = _get_model()
     anchors = _anchors(satz)
+    system = _SYSTEM if not anweisung else (
+        _SYSTEM + " Halte dich zusaetzlich an diese Stil-Vorgabe, ohne je Fakten zu "
+        "aendern oder zu ergaenzen: " + anweisung
+    )
     try:
         result = model.create_chat_completion(
             messages=[
-                {"role": "system", "content": _SYSTEM},
+                {"role": "system", "content": system},
                 {"role": "user", "content": satz},
             ],
             max_tokens=200,

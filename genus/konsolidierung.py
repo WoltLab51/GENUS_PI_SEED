@@ -99,12 +99,13 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
     """Die EINE Morgen-Nachricht — warm, nativ, deterministisch komponiert (Ronnys
     Entscheidungen: nie leer; Zusammenfassung; nett). Reihenfolge: Gruß → gestern
     (falls konsolidiert) → Wartendes (Freigaben/Fragen) → falls sonst nichts: das
-    frisch Gelernte der Nacht → warmer Schluss. Der TON kommt aus der
-    Persönlichkeits-Schicht (Rolle „morgen": hebt die Wärme um eine Stufe) — die
-    Persönlichkeit wählt Formulierungen, nie Inhalte."""
-    from genus import inquiries, persoenlichkeit, proposals
+    frisch Gelernte der Nacht → warmer Schluss. Der TON kommt aus dem Antwort-Würfel
+    (Belegung der Rolle „morgen": hebt die Wärme um eine Stufe; Kreuz-Konsistenz zentral,
+    z.B. entfällt die Rückfrage bei „knapp") — die Persönlichkeit wählt Formulierungen,
+    nie Inhalte."""
+    from genus import antwort, inquiries, proposals
 
-    reg = persoenlichkeit.register(conn, "morgen")
+    reg = antwort.belegung(conn, "morgen")
     warm = reg["waerme"] in ("warm", "herzlich")
     teile: list[str] = ["Guten Morgen, Ronny!" if warm else "Guten Morgen, Ronny."]
     inhalt = False
@@ -115,7 +116,7 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
         teile.append(f"Gestern haben dich vor allem {namen} beschäftigt — "
                      f"ich habe es mir still gemerkt. Wenn etwas davon nicht stimmt, "
                      f"sag einfach Bescheid.")
-        if reg["neugier"] == "ja":
+        if reg["beiwerk_rueckfrage"]:
             teile.append("Magst du mir heute mehr davon erzählen?")
         inhalt = True
 
