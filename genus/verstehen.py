@@ -167,6 +167,38 @@ def leaf_kinds(conn) -> list[str]:
     return sorted(kinds(conn))
 
 
+def gbnf_grammatik(blaetter=None) -> str:
+    """Die GRENZE des Deutens als llama.cpp-Grammatik (GBNF, constrained decoding) --
+    Ronnys Prinzip (2026-07-04): "das nächste Wort darf nur innerhalb der Grenze sein".
+
+    Statt frei zu generieren und hinterher zu verwerfen, kann das Deuter-Modell pro Token
+    nur Fortsetzungen wählen, die dieser Grammatik genügen: ein JSON-Array von Segmenten,
+    jedes exakt {"text","absicht","subject","object"}, und ``absicht`` ist eine der hier
+    einkompilierten Alternativen -- eine NICHT existierende Kategorie ist damit strukturell
+    unmöglich, nicht bloß per Few-Shot erhofft. "unklar" (der ehrliche Ausgang) ist immer
+    Teil der Grenze; ob das Modell ihn richtig WÄHLT, bleibt Modell-Qualität (die Grammatik
+    garantiert wohlgeformt-im-Raum, nicht richtig -- Naht 2, docs/GENUS_ARCHITEKTUR.md §8).
+
+    Abgeleitet aus dem lebenden Angebot (``leaf_kinds(conn)``, vom Aufrufer übergeben);
+    ohne Angebot aus ``RASTER_SEED``. Wächst die Hülle, wächst die Grenze mit -- kein
+    Nachpflegen. Reine Daten (ein String): die Membran (deploy/deuter.py) bekommt sie
+    übergeben und importiert weiterhin nie genus.*."""
+    angebot = set(blaetter) if blaetter else {leaf for leaf, _ in RASTER_SEED}
+    angebot.add("unklar")
+    alternativen = " | ".join(f'"\\"{b}\\""' for b in sorted(angebot))
+    return "\n".join([
+        'root ::= "[" ws "]" | "[" ws segment (ws "," ws segment)* ws "]"',
+        'segment ::= "{" ws "\\"text\\"" ws ":" ws string ws "," ws "\\"absicht\\"" ws ":" ws'
+        ' absicht ws "," ws "\\"subject\\"" ws ":" ws wort ws "," ws "\\"object\\"" ws ":" ws'
+        ' wort ws "}"',
+        f"absicht ::= {alternativen}",
+        'wort ::= string | "null"',
+        'string ::= "\\"" zeichen* "\\""',
+        'zeichen ::= [^"\\\\] | "\\\\" ["\\\\/bfnrt]',
+        'ws ::= [ \\t\\n\\r]*',
+    ])
+
+
 def zelle_of(conn, kind: str) -> str | None:
     """Die Kreuzprodukt-Zelle eines Feinblatts (sein is_a-Elternteil) -- der EINE weiche
     Landeplatz, falls das Blatt selbst keinen Handler hat. Anders als die vorige mehrstufige

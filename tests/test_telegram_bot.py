@@ -110,7 +110,8 @@ def test_session_threads_last_answer_into_the_meta_zellen(monkeypatch):
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     lesarten = {"Was ist ein Hund?": {"absicht": "definition", "subject": "Hund"},
                 "nochmal bitte": {"absicht": "wiederholen"}}
-    monkeypatch.setattr(deuter, "interpret", lambda q, absichten=None: lesarten[q])
+    monkeypatch.setattr(deuter, "interpret",
+                        lambda q, absichten=None, grammatik=None: lesarten[q])
     sessions: dict = {}
 
     telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions)
@@ -174,7 +175,8 @@ def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     monkeypatch.setattr(deuter, "interpret",
-                        lambda q, absichten=None: {"absicht": "definition", "subject": "Hund"})
+                        lambda q, absichten=None, grammatik=None: {"absicht": "definition",
+                                                                   "subject": "Hund"})
 
     chat_id, answer = telegram_bot.handle_update(
         conn, _msg(1, 42, "so ne frage zu dem wuffwuff thema"), allowed={42}, sessions={},
@@ -330,3 +332,105 @@ def test_bot_verbindet_ueber_genus_db_connect_nicht_roh():
     quelle = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
     assert "db.connect(" in quelle
     assert "sqlite3.connect(" not in quelle
+
+
+# --- Phase 2 der Ziel-Architektur: die GRENZE (constrained decoding) + Naht 5 ---------
+
+
+def test_deuter_spiegel_driftet_nie_vom_raster(conn):
+    # Naht 5: der hartkodierte Spiegel (DEFAULT_ABSICHTEN/_GRUPPEN/_ERKLAERUNGEN) konnte
+    # vom gesaeten Raster wegdriften -- LIVE SO PASSIERT: "berechnen" war gesaet, aber im
+    # Spiegel unbekannt und wurde vom gruppierten Prompt still verschluckt. Dieser Pin
+    # bricht CI an der Stelle, wo die Drift entsteht (eine Code-Aenderung an nur einer
+    # der beiden Seiten).
+    from genus import verstehen
+
+    raster_blaetter = {leaf for leaf, _ in verstehen.RASTER_SEED}
+    assert set(deuter.DEFAULT_ABSICHTEN) == raster_blaetter | {"unklar"}
+    # jedes Blatt hat eine Erklaerung und einen Platz in genau einer Prompt-Gruppe
+    gruppiert = [b for _, blaetter in deuter._GRUPPEN for b in blaetter]
+    assert sorted(gruppiert) == sorted(set(gruppiert)), "ein Blatt in zwei Gruppen"
+    assert set(gruppiert) == raster_blaetter
+    assert set(deuter._ERKLAERUNGEN) == raster_blaetter | {"unklar"}
+
+
+def test_system_prompt_verschluckt_kein_angebotenes_blatt_mehr():
+    # Das Auffangnetz: ein im Graphen gesaetes Blatt ohne Gruppen-Zuordnung im Spiegel
+    # erscheint trotzdem im Prompt (unter WEITERE) statt still zu verschwinden.
+    prompt = deuter._system_prompt(("definition", "voellig-neues-blatt"))
+    assert "voellig-neues-blatt" in prompt
+    assert "WEITERE" in prompt
+
+
+def test_gbnf_grammatik_kompiliert_die_blaetter_als_grenze():
+    from genus import verstehen
+
+    grammatik = verstehen.gbnf_grammatik(("definition", "dank"))
+    assert grammatik.startswith("root ::=")
+    # jedes Blatt ist eine einkompilierte Alternative, unklar immer dabei
+    assert '"\\"definition\\""' in grammatik
+    assert '"\\"dank\\""' in grammatik
+    assert '"\\"unklar\\""' in grammatik
+    # der Segment-Vertrag (die vier Schluessel in fester Reihenfolge) steht drin
+    for schluessel in ("text", "absicht", "subject", "object"):
+        assert f'\\"{schluessel}\\"' in grammatik
+    # ohne Angebot: das RASTER_SEED ist die Grenze
+    voll = verstehen.gbnf_grammatik(None)
+    assert '"\\"berechnen\\""' in voll
+
+
+class _FakeModelMitKwargs(_FakeModel):
+    def __init__(self, reply: str):
+        super().__init__(reply)
+        self.kwargs: list[dict] = []
+
+    def create_chat_completion(self, messages, max_tokens=None, temperature=None, **kwargs):
+        self.kwargs.append(kwargs)
+        return super().create_chat_completion(messages, max_tokens, temperature)
+
+
+def test_interpret_reicht_die_grenze_ans_modell_durch(monkeypatch):
+    fake = _FakeModelMitKwargs('[{"text": "hi", "absicht": "gruss", "subject": null, '
+                               '"object": null}]')
+    monkeypatch.setattr(deuter, "MODEL_PATH", __file__)
+    monkeypatch.setattr(deuter, "_get_model", lambda: fake)
+    monkeypatch.setattr(deuter, "_gbnf", lambda text: f"KOMPILIERT:{len(text)}")
+
+    ergebnis = deuter.interpret("hi", grammatik="root ::= irgendwas")
+    assert ergebnis and ergebnis[0]["absicht"] == "gruss"
+    assert fake.kwargs == [{"grammar": f"KOMPILIERT:{len('root ::= irgendwas')}"}]
+
+
+def test_unbrauchbare_grammatik_degradiert_ehrlich_statt_zu_schweigen(monkeypatch, capsys):
+    # llama_cpp fehlt auf dieser Maschine -> _gbnf kann nicht kompilieren -> lauter
+    # stderr-Hinweis, aber der Deuter laeuft UNBESCHRAENKT weiter (der Bot bleibt
+    # antwortfaehig; der Verlust der Garantie passiert nie still).
+    fake = _FakeModelMitKwargs('[{"text": "hi", "absicht": "gruss", "subject": null, '
+                               '"object": null}]')
+    monkeypatch.setattr(deuter, "MODEL_PATH", __file__)
+    monkeypatch.setattr(deuter, "_get_model", lambda: fake)
+    deuter._grammatik_cache.clear()
+
+    ergebnis = deuter.interpret("hi", grammatik="root ::= kaputt")
+    assert ergebnis and ergebnis[0]["absicht"] == "gruss"
+    assert fake.kwargs == [{}]   # keine Grammatik durchgereicht
+    assert "UNBESCHRÄNKT" in capsys.readouterr().err
+
+
+def test_bot_leitet_die_grenze_aus_dem_lebenden_raster_ab(monkeypatch):
+    conn = _fresh()
+    from genus import verstehen
+    verstehen.seed_raster(conn)
+    empfangen: dict = {}
+
+    def fake_interpret(q, absichten=None, grammatik=None):
+        empfangen["absichten"] = absichten
+        empfangen["grammatik"] = grammatik
+        return [{"text": q, "absicht": "gruss", "subject": None, "object": None}]
+
+    monkeypatch.setattr(deuter, "interpret", fake_interpret)
+    telegram_bot.handle_update(conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions={})
+
+    assert empfangen["grammatik"] is not None and empfangen["grammatik"].startswith("root ::=")
+    # die Grenze kommt aus demselben lebenden Angebot wie der Prompt
+    assert '"\\"berechnen\\""' in empfangen["grammatik"]

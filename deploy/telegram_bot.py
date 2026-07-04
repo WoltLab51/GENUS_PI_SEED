@@ -147,8 +147,13 @@ def handle_update(
             answer = companion.respond(conn, question)
         else:
             # the OFFER of known Absichten comes from GENUS's own sown raster (the graph is
-            # authoritative); before the one clean seed-apply, the module default steps in
+            # authoritative); before the one clean seed-apply, the module default steps in.
+            # DIE GRENZE (Phase 2 der Ziel-Architektur): aus demselben lebenden Angebot wird
+            # die GBNF-Grammatik abgeleitet und als Daten über die Membran gereicht -- das
+            # Modell kann pro Token nur bekannte Blätter wählen, eine erfundene Kategorie
+            # ist strukturell unmöglich. Wächst das Raster, wächst die Grenze mit.
             angebot = verstehen.leaf_kinds(conn) or None
+            grenze = verstehen.gbnf_grammatik(angebot)
             # Deuter und Stimme haben JEWEILS ihr eigenes warmes Modell -- live gemessen
             # (2026-07-03): geteilt verwarf jeder Stimme-Aufruf den Prompt-Cache des Deuter
             # (ein anderer System-Prompt), sodass der NÄCHSTE Deuter-Aufruf seinen ganzen
@@ -159,7 +164,7 @@ def handle_update(
             vorher = zuege[-1] if zuege else {}
             result = companion.respond_with_deuter(
                 conn, question, vorher.get("question"),
-                deuter=lambda q: deuter.interpret(q, absichten=angebot),
+                deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze),
                 stimme=stimme.formuliere,
                 last_answer=vorher.get("answer"),
                 verlauf=zuege[:-1],

@@ -38,6 +38,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 
 MODEL_PATH = os.environ.get(
     "GENUS_DEUTER_MODEL",
@@ -57,7 +58,7 @@ DEFAULT_ABSICHTEN = (
     "weltfrage",
     "korrektur",
     "tatsache", "merken", "meinung",
-    "lernen",
+    "lernen", "berechnen",
     "kuerzer", "ausfuehrlicher", "anders-erklaeren", "wiederholen",
     "tun",
     "gruss", "dank", "lob", "kritik", "abschied",
@@ -78,7 +79,7 @@ _GRUPPEN = (
     ("FRAGEN über die WELT draußen (nicht im eigenen Graphen gespeichert)", ("weltfrage",)),
     ("AUSSAGEN über einen Begriff (Korrektur von Wissen)", ("korrektur",)),
     ("AUSSAGEN über dich", ("tatsache", "merken", "meinung")),
-    ("AUFFORDERUNGEN an GENUS (etwas lernen)", ("lernen",)),
+    ("AUFFORDERUNGEN an GENUS (etwas lernen oder rechnen)", ("lernen", "berechnen")),
     ("AUFFORDERUNGEN ans Gespräch (rückbezüglich)", ("kuerzer", "ausfuehrlicher",
                                                        "anders-erklaeren", "wiederholen")),
     ("AUFFORDERUNGEN in der Welt (eine Handlung, Planung, Hilfe)", ("tun",)),
@@ -108,6 +109,7 @@ _ERKLAERUNGEN = {
     "merken": "merk dir etwas",
     "meinung": "Meinung/Gefuehl der Person",
     "lernen": "lern etwas Neues",
+    "berechnen": "rechne etwas aus (Ableitung, Integral, Extremstellen ...)",
     "kuerzer": "bitte kuerzer",
     "ausfuehrlicher": "bitte ausfuehrlicher",
     "anders-erklaeren": "bitte anders erklaeren",
@@ -144,12 +146,23 @@ def _looks_like_question(text: str) -> bool:
 def _system_prompt(absichten) -> str:
     angebot_set = set(absichten or DEFAULT_ABSICHTEN)
     zeilen = []
+    gezeigt: set[str] = set()
     for titel, blaetter in _GRUPPEN:
         vorhanden = [b for b in blaetter if b in angebot_set]
         if not vorhanden:
             continue
         zeilen.append(f"{titel}:")
         zeilen += [f"  - {b}: {_ERKLAERUNGEN[b]}" for b in vorhanden if b in _ERKLAERUNGEN]
+        gezeigt.update(vorhanden)
+    # Auffangnetz gegen die Membran-Drift (Naht 5, docs/GENUS_ARCHITEKTUR.md §8): ein im
+    # Graphen gesätes Blatt, das dieser Spiegel (noch) keiner Gruppe zuordnet, wurde bisher
+    # STILL aus dem Prompt verschluckt -- das Modell konnte es nie wählen (live so passiert:
+    # "berechnen" war gesät, aber nie im Angebot). Das lebende Angebot ist autoritativ:
+    # alles Ungezeigte wird sichtbar nachgereicht statt zu verschwinden.
+    rest = sorted(angebot_set - gezeigt - {"unklar"})
+    if rest:
+        zeilen.append("WEITERE:")
+        zeilen += [f"  - {b}: {_ERKLAERUNGEN.get(b, '')}".rstrip(": ") for b in rest]
     zeilen.append("UNKLAR (passt wirklich zu nichts): unklar")
     angebot = "\n".join(zeilen)
     return (
@@ -204,6 +217,28 @@ def _get_model():
     return _model
 
 
+_grammatik_cache: dict[str, object] = {}   # GBNF-Text -> LlamaGrammar (einmal kompiliert, warm)
+
+
+def _gbnf(text: str):
+    """Kompiliert einen GBNF-Text zur llama.cpp-Grammatik, einmal pro Text (Cache).
+    Scheitert die Kompilierung (llama_cpp fehlt, Grammatik fehlerhaft), wird LAUT gewarnt
+    und ``None`` zurückgegeben -- der Deuter läuft dann unbeschränkt weiter (ehrliche
+    Degradation: der Bot bleibt antwortfähig, der Verlust der Garantie steht im Log,
+    er passiert nie still)."""
+    if text in _grammatik_cache:
+        return _grammatik_cache[text]
+    try:
+        from llama_cpp import LlamaGrammar
+        grammatik = LlamaGrammar.from_string(text, verbose=False)
+    except Exception as exc:
+        print(f"[DEUTER] Grammatik unbrauchbar ({exc}) — deute UNBESCHRÄNKT weiter",
+              file=sys.stderr)
+        grammatik = None
+    _grammatik_cache[text] = grammatik
+    return grammatik
+
+
 def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     """Ein rohes geparstes Segment in ein sauberes ``{"text","absicht","subject","object"}`` --
     ``None`` wenn kein gueltiges Blatt genannt wurde. ``text`` (die eigene Klausel des Segments)
@@ -229,7 +264,7 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     }
 
 
-def interpret(nachricht: str, absichten=None) -> list[dict] | None:
+def interpret(nachricht: str, absichten=None, grammatik: str | None = None) -> list[dict] | None:
     """Liest ``nachricht`` als eine LISTE von Sprechhandlungs-Segmenten -- ``[{"absicht",
     "subject", "object"}, ...]``. Zwei verschiedene "nichts"-Fälle, bewusst unterschieden:
     eine LEERE Liste ``[]`` heisst "das Modell lief und sagt ehrlich: keine Segmente passen"
@@ -240,11 +275,22 @@ def interpret(nachricht: str, absichten=None) -> list[dict] | None:
     ``None`` bleibt ein legitimer Grund, es trotzdem mit dem Wort-Lookup zu versuchen. Nie eine
     Ausnahme. Erfindet nie Fakten -- waehlt pro Segment nur ein Blatt und kopiert Woerter aus
     dem Text; der Aufrufer graph-verifiziert subject/object und liefert den eigentlichen
-    Antwort-Inhalt selbst."""
+    Antwort-Inhalt selbst.
+
+    ``grammatik`` (optional): ein GBNF-Text -- DIE GRENZE (genus.verstehen.gbnf_grammatik,
+    als Daten über die Membran gereicht; dieses Modul importiert weiterhin nie genus.*).
+    Mit Grenze kann das Modell pro Token nur innerhalb des JSON-Segment-Vertrags und der
+    bekannten Blätter fortsetzen -- eine erfundene Kategorie ist strukturell unmöglich.
+    Die Beschränkung ist pro Token, der Aufruf bleibt EIN Generierungslauf."""
     if not os.path.exists(MODEL_PATH):
         return None
     try:
         model = _get_model()
+        zusatz: dict = {}
+        if grammatik:
+            grammar = _gbnf(grammatik)
+            if grammar is not None:
+                zusatz["grammar"] = grammar
         result = model.create_chat_completion(
             messages=[
                 {"role": "system", "content": _system_prompt(absichten)},
@@ -252,6 +298,7 @@ def interpret(nachricht: str, absichten=None) -> list[dict] | None:
             ],
             max_tokens=300,
             temperature=0.0,
+            **zusatz,
         )
         text = result["choices"][0]["message"]["content"].strip()
         match = _JSON_ARRAY.search(text)
