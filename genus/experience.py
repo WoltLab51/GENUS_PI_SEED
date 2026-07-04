@@ -672,7 +672,8 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
         else:
             was = f"das Blatt „{kind}“, das ich lese, aber nicht beantworten kann"
             plan = ("dieses Blatt soll eine Fähigkeit bekommen — nach Freigabe verankere "
-                    "ich sie selbst als benanntes Ziel in meinem Ziel-Graphen")
+                    "ich sie selbst als benanntes Ziel in meinem Ziel-Graphen und lege "
+                    "ein Entwurfs-Paar in meiner Werkstatt bereit")
             # Selbst-Codieren Stufe 1: das Proposal trägt seine UMSETZUNG deklarativ mit --
             # nach der Freigabe führt genus/umsetzung.py sie aus (Graph-Wissen, nie Code)
             umsetzung = {

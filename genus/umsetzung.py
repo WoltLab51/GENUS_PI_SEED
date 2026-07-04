@@ -54,7 +54,17 @@ def _setze_faehigkeits_ziel(conn, umsetzung: dict) -> dict:
         (knoten, ziele.STATUS, "fehlt"),
         ("ziel:verstehen", ziele.BRAUCHT, knoten),
     ], STUFE1_SOURCE)
-    return {"faehigkeit": knoten, "neue_kanten": neu}
+    # Die BRÜCKE zur Werkstatt (Ronny, 2026-07-04): dieselbe Freigabe legt auch das
+    # Entwurfs-Paar bereit -- inert (läuft nie von allein), Verbots-Scan + Sandbox-
+    # Probefahrt + menschlicher Merge wie bei jedem Entwurf; das Gate war die Freigabe
+    # eben. Ein Scheitern hier kippt die Umsetzung NICHT (das Ziel-Wissen steht) --
+    # es wird ehrlich im Ergebnis benannt, der Entwurf lässt sich von Hand nachholen.
+    try:
+        from genus import werkstatt
+        entwurf = werkstatt.entwerfe_zelle(conn, blatt, quelle="werkstatt:umsetzung")
+    except Exception as exc:
+        entwurf = {"erstellt": False, "grund": f"Entwurf gescheitert: {exc}"}
+    return {"faehigkeit": knoten, "neue_kanten": neu, "entwurf": entwurf}
 
 
 # Das Umsetzungs-Register: Art -> reine Funktion (conn, umsetzung) -> Ergebnis-Dict.

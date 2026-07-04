@@ -5,8 +5,16 @@ keine Ausführung, nie doppelt, nur registrierte Graph-Wissen-Arten."""
 import json
 import sqlite3
 
+import pytest
+
 from genus import experience, proposals, umsetzung, verstehen, ziele
 from genus.db import init_schema
+
+
+@pytest.fixture(autouse=True)
+def _werkstatt_im_tmp(monkeypatch, tmp_path):
+    """Die Bruecke legt bei jeder Freigabe ein Entwurfs-Paar an -- nie ins echte ~/.genus."""
+    monkeypatch.setenv("GENUS_WERKSTATT", str(tmp_path / "werkstatt"))
 
 
 def _fresh():
@@ -184,3 +192,55 @@ def test_der_check_kostet_nie_eine_antwort(monkeypatch):
     fake = lambda q: [{"text": q, "absicht": "weltfrage", "subject": None, "object": None}]
     result = companion.respond_with_deuter(conn, "Wie wird das Wetter?", deuter=fake)
     assert "kann ich noch nicht" in result["text"]   # die ehrliche Antwort bleibt
+
+
+# --- die Bruecke Umsetzung -> Werkstatt: eine Freigabe, zwei Wirkungen ----------------
+
+
+def test_freigabe_legt_auch_den_werkstatt_entwurf_an():
+    from genus import werkstatt
+
+    conn = _fresh()
+    ziele.seed_ziele(conn)
+    pid = _luecken_proposal(conn)
+    proposals.review_proposal_governed(conn, pid, "accepted")
+    ergebnis = umsetzung.umsetzen(conn, pid)
+    assert ergebnis["umgesetzt"] is True
+    entwurf = ergebnis["ergebnis"]["entwurf"]
+    assert entwurf["erstellt"] is True
+    handler = werkstatt.verzeichnis() / "zelle_weltfrage.py"
+    assert handler.exists()
+    # Herkunft ehrlich: der Entwurf kam aus einer freigegebenen Umsetzung
+    row = conn.execute(
+        "SELECT payload FROM event_log WHERE event_type = 'code_entwurf_erstellt'"
+    ).fetchone()
+    assert "werkstatt:umsetzung" in row["payload"]
+
+
+def test_bestehender_entwurf_kippt_die_umsetzung_nicht():
+    from genus import werkstatt
+
+    conn = _fresh()
+    ziele.seed_ziele(conn)
+    verstehen.seed_raster(conn)
+    werkstatt.entwerfe_zelle(conn, "weltfrage")   # Entwurf existiert schon
+    pid = _luecken_proposal(conn)
+    proposals.review_proposal_governed(conn, pid, "accepted")
+    ergebnis = umsetzung.umsetzen(conn, pid)
+    assert ergebnis["umgesetzt"] is True          # Ziel-Wissen steht trotzdem
+    assert ergebnis["ergebnis"]["entwurf"]["erstellt"] is False
+    assert any(f["id"] == "faehigkeit:weltfrage" for f in ziele.fehlende_faehigkeiten(conn))
+
+
+def test_entwurfs_fehler_kippt_die_umsetzung_nicht(monkeypatch):
+    from genus import werkstatt
+
+    conn = _fresh()
+    ziele.seed_ziele(conn)
+    pid = _luecken_proposal(conn)
+    proposals.review_proposal_governed(conn, pid, "accepted")
+    monkeypatch.setattr(werkstatt, "entwerfe_zelle",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("Platte voll")))
+    ergebnis = umsetzung.umsetzen(conn, pid)
+    assert ergebnis["umgesetzt"] is True          # das Gate-Ergebnis bleibt gueltig
+    assert "gescheitert" in ergebnis["ergebnis"]["entwurf"]["grund"]
