@@ -143,7 +143,25 @@ def _looks_like_question(text: str) -> bool:
     return bool(m and m.group(1).lower() in _QUESTION_STARTERS)
 
 
-def _system_prompt(absichten) -> str:
+def _korrektur_abschnitt(korrekturen) -> str:
+    """Der Rückfluss des Lernkreises (Naht 4, v1) als Prompt-Abschnitt -- reine DATEN,
+    vom Bot über die Membran gereicht: bekannte Verwechslungen als Warnung, jüngste
+    korrigierte Beispiele als gedeckelte Few-Shots (nie unbegrenzt wachsend -- die
+    Auswahl trifft der Aufrufer, hier wird nur gerendert)."""
+    if not korrekturen:
+        return ""
+    zeilen = ["BEKANNTE FEHLGRIFFE (aus echten Korrekturen — im Zweifel gilt die Korrektur):"]
+    for k in korrekturen:
+        gelesen, gemeint = k.get("gelesen"), k.get("gemeint")
+        if gelesen and gemeint:
+            zeilen.append(f"- lies im Zweifel \"{gemeint}\" statt \"{gelesen}\"")
+        beispiel = k.get("beispiel")
+        if beispiel and gemeint:
+            zeilen.append(f"  Beispiel: {beispiel} -> {gemeint}")
+    return "\n" + "\n".join(zeilen) + "\n"
+
+
+def _system_prompt(absichten, korrekturen=None) -> str:
     angebot_set = set(absichten or DEFAULT_ABSICHTEN)
     zeilen = []
     gezeigt: set[str] = set()
@@ -206,6 +224,7 @@ def _system_prompt(absichten) -> str:
         "Fuer eindeutige, ALLTAEGLICHE Hoeflichkeitsfloskeln (Gruss, Dank, Abschied) waehle "
         "immer die passende Kategorie aus der Liste -- rate NIEMALS eine andere Absicht nur, "
         "weil ein Wort oberflaechlich aehnlich klingt. Wenn WIRKLICH nichts passt: unklar."
+        + _korrektur_abschnitt(korrekturen)
     )
 
 
@@ -271,7 +290,8 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     }
 
 
-def interpret(nachricht: str, absichten=None, grammatik: str | None = None) -> list[dict] | None:
+def interpret(nachricht: str, absichten=None, grammatik: str | None = None,
+              korrekturen=None) -> list[dict] | None:
     """Liest ``nachricht`` als eine LISTE von Sprechhandlungs-Segmenten -- ``[{"absicht",
     "subject", "object"}, ...]``. Zwei verschiedene "nichts"-Fälle, bewusst unterschieden:
     eine LEERE Liste ``[]`` heisst "das Modell lief und sagt ehrlich: keine Segmente passen"
@@ -288,7 +308,12 @@ def interpret(nachricht: str, absichten=None, grammatik: str | None = None) -> l
     als Daten über die Membran gereicht; dieses Modul importiert weiterhin nie genus.*).
     Mit Grenze kann das Modell pro Token nur innerhalb des JSON-Segment-Vertrags und der
     bekannten Blätter fortsetzen -- eine erfundene Kategorie ist strukturell unmöglich.
-    Die Beschränkung ist pro Token, der Aufruf bleibt EIN Generierungslauf."""
+    Die Beschränkung ist pro Token, der Aufruf bleibt EIN Generierungslauf.
+
+    ``korrekturen`` (optional): der Rückfluss des Lernkreises (Naht 4, v1) -- eine
+    GEDECKELTE Liste von {"gelesen", "gemeint", "beispiel"?}-Einträgen (bekannte
+    Verwechslungen aus dem Graphen + jüngste korrigierte Beispiele von der Membran),
+    pro Aufruf frisch berechnet, nie unbegrenzt wachsend."""
     if not os.path.exists(MODEL_PATH):
         return None
     try:
@@ -300,7 +325,7 @@ def interpret(nachricht: str, absichten=None, grammatik: str | None = None) -> l
                 zusatz["grammar"] = grammar
         result = model.create_chat_completion(
             messages=[
-                {"role": "system", "content": _system_prompt(absichten)},
+                {"role": "system", "content": _system_prompt(absichten, korrekturen)},
                 {"role": "user", "content": nachricht},
             ],
             max_tokens=300,

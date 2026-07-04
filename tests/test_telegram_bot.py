@@ -39,6 +39,13 @@ def _no_real_deuter_model(monkeypatch):
     monkeypatch.setattr(stimme, "MODEL_PATH", "/nonexistent/path/model.gguf")
 
 
+@pytest.fixture(autouse=True)
+def _korrektur_datei_im_tmp(monkeypatch, tmp_path):
+    """Die Lernkreis-Edge-Datei darf in Tests NIE ins echte ~/.genus schreiben."""
+    monkeypatch.setattr(telegram_bot, "KORREKTUR_DATEI",
+                        str(tmp_path / "korrekturen.jsonl"))
+
+
 def _fresh():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -111,7 +118,7 @@ def test_session_threads_last_answer_into_the_meta_zellen(monkeypatch):
     lesarten = {"Was ist ein Hund?": {"absicht": "definition", "subject": "Hund"},
                 "nochmal bitte": {"absicht": "wiederholen"}}
     monkeypatch.setattr(deuter, "interpret",
-                        lambda q, absichten=None, grammatik=None: lesarten[q])
+                        lambda q, absichten=None, grammatik=None, korrekturen=None: lesarten[q])
     sessions: dict = {}
 
     telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions)
@@ -175,7 +182,7 @@ def test_bot_is_wired_to_the_deuter_as_a_last_resort(monkeypatch):
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     monkeypatch.setattr(deuter, "interpret",
-                        lambda q, absichten=None, grammatik=None: {"absicht": "definition",
+                        lambda q, absichten=None, grammatik=None, korrekturen=None: {"absicht": "definition",
                                                                    "subject": "Hund"})
 
     chat_id, answer = telegram_bot.handle_update(
@@ -443,7 +450,7 @@ def test_bot_leitet_die_grenze_aus_dem_lebenden_raster_ab(monkeypatch):
     verstehen.seed_raster(conn)
     empfangen: dict = {}
 
-    def fake_interpret(q, absichten=None, grammatik=None):
+    def fake_interpret(q, absichten=None, grammatik=None, korrekturen=None):
         empfangen["absichten"] = absichten
         empfangen["grammatik"] = grammatik
         return [{"text": q, "absicht": "gruss", "subject": None, "object": None}]
@@ -559,7 +566,7 @@ def test_bot_faedelt_gelesen_durch_die_session_ende_zu_ende(monkeypatch):
     conn = _fresh()
     verstehen.seed_raster(conn)
     monkeypatch.setattr(deuter, "interpret",
-                        lambda q, absichten=None, grammatik=None:
+                        lambda q, absichten=None, grammatik=None, korrekturen=None:
                         [{"text": q, "absicht": "abschied", "subject": None, "object": None}])
     sessions: dict = {}
 
@@ -572,3 +579,89 @@ def test_bot_faedelt_gelesen_durch_die_session_ende_zu_ende(monkeypatch):
     assert verstehen.fehlgriffe(conn, "abschied")["gesamt"] == 1
     # der Korrektur-Zug selbst traegt keine Lesart -- eine Doppel-Korrektur laeuft nie im Kreis
     assert sessions[42][-1]["gelesen"] == []
+
+
+# --- Lernkreis v1 (Naht 4): Verwechslungs-Wissen + Korrektur-Beispiele ----------------
+
+
+def test_verwechslungen_trennen_muster_von_einzelfall():
+    from genus import verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    # zweimal dieselbe Verwechslung = Muster; einmal eine andere = Einzelfall
+    verstehen.record_fehlgriff(conn, "abschied", "weltfrage")
+    verstehen.record_fehlgriff(conn, "abschied", "weltfrage")
+    verstehen.record_fehlgriff(conn, "gruss", "dank")
+    v = verstehen.verwechslungen(conn)
+    assert v == [{"gelesen": "abschied", "gemeint": "weltfrage", "n": 2}]
+    # eine einzelne Korrektur allein bleibt unter der Gueltigkeits-Saat
+    conn2 = _fresh()
+    verstehen.record_fehlgriff(conn2, "gruss", "dank")
+    assert verstehen.verwechslungen(conn2) == []
+
+
+def test_deuter_prompt_traegt_den_lernkreis_rueckfluss():
+    prompt = deuter._system_prompt(None, [
+        {"gelesen": "abschied", "gemeint": "weltfrage"},
+        {"gelesen": "abschied", "gemeint": "weltfrage",
+         "beispiel": "Wie wird das Wetter morgen?"},
+    ])
+    assert "BEKANNTE FEHLGRIFFE" in prompt
+    assert 'lies im Zweifel "weltfrage" statt "abschied"' in prompt
+    assert "Wie wird das Wetter morgen? -> weltfrage" in prompt
+    # ohne Korrekturen: kein Abschnitt (der Prompt-Praefix bleibt exakt wie vorher)
+    assert "BEKANNTE FEHLGRIFFE" not in deuter._system_prompt(None)
+
+
+def test_merke_korrektur_datei_bleibt_gedeckelt():
+    import json as _json
+
+    for i in range(telegram_bot._KORREKTUR_MAX + 7):
+        telegram_bot._merke_korrektur(f"Frage {i}", ["abschied"], "weltfrage")
+    zeilen = open(telegram_bot.KORREKTUR_DATEI, encoding="utf-8").read().splitlines()
+    assert len(zeilen) == telegram_bot._KORREKTUR_MAX
+    assert _json.loads(zeilen[-1])["text"] == f"Frage {telegram_bot._KORREKTUR_MAX + 6}"
+
+
+def test_korrektur_zug_landet_als_beispiel_in_der_edge_datei(monkeypatch):
+    import json as _json
+    from genus import verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    monkeypatch.setattr(deuter, "interpret",
+                        lambda q, absichten=None, grammatik=None, korrekturen=None:
+                        [{"text": q, "absicht": "abschied", "subject": None, "object": None}])
+    sessions: dict = {}
+    telegram_bot.handle_update(conn, _msg(1, 42, "Wie wird das Wetter morgen?"),
+                               allowed={42}, sessions=sessions)
+    telegram_bot.handle_update(conn, _msg(2, 42, "falsch verstanden: weltfrage"),
+                               allowed={42}, sessions=sessions)
+    zeilen = open(telegram_bot.KORREKTUR_DATEI, encoding="utf-8").read().splitlines()
+    eintrag = _json.loads(zeilen[-1])
+    assert eintrag == {"text": "Wie wird das Wetter morgen?",
+                       "falsch": ["abschied"], "richtig": "weltfrage"}
+
+
+def test_naechste_nachricht_bekommt_den_rueckfluss_in_den_deuter(monkeypatch):
+    from genus import verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    # gelebte Historie: zweimal korrigierte Verwechslung im Graphen + ein Beispiel in der Datei
+    verstehen.record_fehlgriff(conn, "abschied", "weltfrage")
+    verstehen.record_fehlgriff(conn, "abschied", "weltfrage")
+    telegram_bot._merke_korrektur("Wie wird das Wetter morgen?", ["abschied"], "weltfrage")
+    empfangen: dict = {}
+
+    def fake_interpret(q, absichten=None, grammatik=None, korrekturen=None):
+        empfangen["korrekturen"] = korrekturen
+        return [{"text": q, "absicht": "gruss", "subject": None, "object": None}]
+
+    monkeypatch.setattr(deuter, "interpret", fake_interpret)
+    telegram_bot.handle_update(conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions={})
+
+    k = empfangen["korrekturen"]
+    assert {"gelesen": "abschied", "gemeint": "weltfrage"} in k
+    assert any(e.get("beispiel") == "Wie wird das Wetter morgen?" for e in k)

@@ -283,3 +283,50 @@ def fehlgriffe(conn, kind: str) -> dict:
     dieselbe retraktions-bewusste Zählung wie die Belegung. Viele Fehlgriffe auf einem
     Blatt heißen: das DEUTEN dorthin muss besser werden, nicht das Können dort."""
     return _zaehle_kante(conn, kind, FEHLGRIFF_PREDICATE)
+
+
+VERWECHSLUNG_SEED = 2   # Gültigkeits-Untergrenze: eine einzelne Korrektur ist noch kein Muster
+
+
+def verwechslungen(conn) -> list[dict]:
+    """Der Rückfluss des Korrektur-Kanals (Lernkreis v1, Naht 4): welche gerichteten
+    Verwechslungen (gelesen -> gemeint) sind HÄUFIG genug, um dem Deuter als Warnung
+    mitgegeben zu werden? Aggregiert die fehlgriff_statt-Kanten retraktions-bewusst und
+    trennt Muster von Einzelfällen über die eigene Population (breiteste Lücke; ohne
+    Rausch-Gruppe regiert die Saat -- dieselbe Lehre wie bei Reboot-Schwelle und
+    VerstehensLuecke: „abgeleitet" verlangt zwei echt unterscheidbare Gruppen).
+    Absteigend nach Häufigkeit; erinnern + neu rechnen, nie trainiert."""
+    from genus import self_calibration
+
+    counts: dict[tuple[str, str], int] = {}
+    for event_type, delta in (("relation_asserted", 1), ("relation_retracted", -1)):
+        for row in conn.execute(
+            """
+            SELECT json_extract(payload, '$.subject') AS gelesen,
+                   json_extract(payload, '$.object') AS gemeint,
+                   COUNT(*) AS n
+            FROM event_log
+            WHERE event_type = ?
+              AND json_extract(payload, '$.predicate') = ?
+            GROUP BY gelesen, gemeint
+            """,
+            (event_type, FEHLGRIFF_STATT),
+        ).fetchall():
+            paar = (row["gelesen"], row["gemeint"])
+            counts[paar] = counts.get(paar, 0) + delta * row["n"]
+    counts = {p: n for p, n in counts.items() if n > 0}
+    if not counts:
+        return []
+    if min(counts.values()) >= VERWECHSLUNG_SEED:
+        schwelle = VERWECHSLUNG_SEED
+    else:
+        schwelle = self_calibration.widest_gap_count_threshold(
+            list(counts.values()), VERWECHSLUNG_SEED
+        )
+    def _kind(node_name: str) -> str:
+        return node_name.split(":", 1)[1] if ":" in node_name else node_name
+    return [
+        {"gelesen": _kind(g), "gemeint": _kind(m), "n": n}
+        for (g, m), n in sorted(counts.items(), key=lambda kv: -kv[1])
+        if n >= schwelle
+    ]

@@ -50,6 +50,68 @@ UA = "GENUS-PI/0.1 (personal companion bridge)"
 _CTX = ssl.create_default_context()
 _VERLAUF_MAX = 6   # Mehr-Zug-Arbeitsgedächtnis: wie viele Züge pro Chat im Blick bleiben
 
+# Der Lernkreis v1 (Naht 4): korrigierte Beispiele sind MEMBRAN-Wissen -- eine Edge-Datei
+# wie die Lerner-Cursor (learn.cursor, learn.gap_attempts), nie das Ledger. Der Text der
+# korrigierten Frage wohnt nur hier: löschbar, nicht versiegelt, nicht Teil des Organismus.
+# Das Ledger trägt weiterhin nur die Struktur (fehlgriff/fehlgriff_statt-Kanten).
+KORREKTUR_DATEI = os.environ.get(
+    "GENUS_KORREKTUR_DATEI", os.path.join(GENUS_USER_HOME, ".genus", "korrekturen.jsonl")
+)
+_KORREKTUR_MAX = 50       # die Datei bleibt gedeckelt: die jüngsten 50 Korrekturen
+_HINWEIS_BEISPIELE = 3    # wie viele Beispiele der Prompt höchstens trägt (nie wachsend)
+
+
+def _merke_korrektur(frage: str, falsch: list[str], richtig: str | None) -> None:
+    """Ein korrigiertes Paar in die Edge-Datei -- das künftige Futter des Embedder-
+    Vergleichs. Gedeckelt auf die jüngsten _KORREKTUR_MAX Einträge."""
+    eintrag = json.dumps({"text": frage, "falsch": falsch, "richtig": richtig},
+                         ensure_ascii=False)
+    zeilen: list[str] = []
+    try:
+        with open(KORREKTUR_DATEI, encoding="utf-8") as f:
+            zeilen = [z for z in f.read().splitlines() if z.strip()]
+    except FileNotFoundError:
+        pass
+    zeilen = (zeilen + [eintrag])[-_KORREKTUR_MAX:]
+    os.makedirs(os.path.dirname(KORREKTUR_DATEI), exist_ok=True)
+    with open(KORREKTUR_DATEI, "w", encoding="utf-8") as f:
+        f.write("\n".join(zeilen) + "\n")
+
+
+def _korrektur_hinweise(conn) -> list[dict]:
+    """Der Rückfluss für den Deuter-Prompt, pro Nachricht frisch berechnet (erinnern +
+    neu rechnen): bekannte Verwechslungen aus dem Graphen (selbst-kalibrierte Schwelle)
+    plus die jüngsten korrigierten Beispiele mit benanntem Ziel-Blatt aus der Edge-Datei
+    -- beides gedeckelt. Stabil zwischen zwei Korrekturen, damit der Prompt-Präfix-Cache
+    des Deuters warm bleibt (der Abschnitt hängt am Prompt-ENDE)."""
+    from genus import verstehen
+
+    hinweise = [
+        {"gelesen": v["gelesen"], "gemeint": v["gemeint"]}
+        for v in verstehen.verwechslungen(conn)[:_HINWEIS_BEISPIELE]
+    ]
+    try:
+        with open(KORREKTUR_DATEI, encoding="utf-8") as f:
+            zeilen = [z for z in f.read().splitlines() if z.strip()]
+    except FileNotFoundError:
+        zeilen = []
+    beispiele = 0
+    for zeile in reversed(zeilen):
+        if beispiele >= _HINWEIS_BEISPIELE:
+            break
+        try:
+            k = json.loads(zeile)
+        except ValueError:
+            continue
+        if k.get("richtig") and k.get("text"):
+            hinweise.append({
+                "gelesen": (k.get("falsch") or [None])[0],
+                "gemeint": k["richtig"],
+                "beispiel": k["text"],
+            })
+            beispiele += 1
+    return hinweise
+
 
 def _log(msg: str) -> None:
     line = f"[TG] {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} {msg}"
@@ -162,15 +224,22 @@ def handle_update(
             # Latenz durchgehend vorhersagbar statt vom Zufall der Aufrufreihenfolge abzuhängen.
             zuege = sessions.get(chat_id) or []
             vorher = zuege[-1] if zuege else {}
+            hinweise = _korrektur_hinweise(conn)   # Lernkreis-Rückfluss, frisch berechnet
             result = companion.respond_with_deuter(
                 conn, question, vorher.get("question"),
-                deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze),
+                deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze,
+                                                  korrekturen=hinweise),
                 stimme=stimme.formuliere,
                 last_answer=vorher.get("answer"),
                 verlauf=zuege[:-1],
                 letzte_lesarten=vorher.get("gelesen"),
             )
             answer = result["text"]
+            # Lernkreis v1: eine angenommene Korrektur wird als Beispiel-Paar in der
+            # Edge-Datei festgehalten (Text wohnt NUR an der Membran, nie im Ledger)
+            ist_korrektur, richtig = companion.korrektur_cue(question)
+            if ist_korrektur and vorher.get("gelesen") and vorher.get("question"):
+                _merke_korrektur(vorher["question"], vorher["gelesen"], richtig)
             # "gelesen" wandert mit durch die Session (Korrektur-Kanal, Naht 1): ein
             # exaktes "falsch verstanden" im nächsten Zug weiß dann, WELCHE Lesart(en)
             # es korrigiert -- Struktur, nie der Nutzer-Text
