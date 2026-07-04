@@ -703,3 +703,32 @@ def test_bot_installer_ist_sudo_fest_und_setzt_den_nutzer():
     assert "SUDO_USER" in text
     assert "getent passwd" in text
     assert "User=$GENUS_USER" in text
+
+
+# --- der Tagespuffer: Mitschreiben in der Membran (Gedaechtnis Punkt 4) ---------------
+
+
+@pytest.fixture(autouse=True)
+def _tagespuffer_im_tmp(monkeypatch, tmp_path):
+    monkeypatch.setattr(telegram_bot, "TAGESPUFFER", str(tmp_path / "chat_tag.jsonl"))
+
+
+def test_jeder_zug_wandert_in_den_tagespuffer():
+    import json as _json
+
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss",
+                              "Haustier, Vorfahre der Wolf", "dbnary")
+    telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"),
+                               allowed={42}, sessions={})
+    zeilen = open(telegram_bot.TAGESPUFFER, encoding="utf-8").read().splitlines()
+    assert len(zeilen) == 1
+    zug = _json.loads(zeilen[0])
+    assert zug["question"] == "Was ist ein Hund?" and "Wolf" in zug["answer"]
+
+
+def test_morgen_push_und_nacht_stehen_im_cron_installer():
+    text = (ROOT / "deploy" / "pi_install_cron.sh").read_text(encoding="utf-8")
+    assert "nacht_konsolidierung.sh" in text
+    assert "morgen_push.sh" in text

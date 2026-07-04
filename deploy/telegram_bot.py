@@ -67,6 +67,29 @@ NEUSTART_DATEI = os.environ.get(
     os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.neustart"),
 )
 
+# Der TAGESPUFFER (docs/GENUS_GEDAECHTNIS.md, Punkt ④): jeder Zug wird mitgeschrieben --
+# Rohtext NUR hier in der Membran (Ledger ≠ Memory), bis die Nacht-Konsolidierung ihn
+# EINMAL liest, Struktur destilliert und den Puffer leert. Vergessen ist Funktion.
+TAGESPUFFER = os.environ.get(
+    "GENUS_TAGESPUFFER", os.path.join(GENUS_USER_HOME, ".genus", "chat_tag.jsonl")
+)
+
+
+def _schreibe_tagespuffer(frage: str, antwort: str, gelesen: list[str]) -> None:
+    """Ein Zug in den Tagespuffer -- darf nie eine Antwort kosten (still bei Fehlern)."""
+    try:
+        eintrag = json.dumps({
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "question": frage,
+            "answer": antwort[:500],
+            "gelesen": gelesen,
+        }, ensure_ascii=False)
+        os.makedirs(os.path.dirname(TAGESPUFFER), exist_ok=True)
+        with open(TAGESPUFFER, "a", encoding="utf-8") as f:
+            f.write(eintrag + "\n")
+    except Exception:
+        pass
+
 
 def _neustart_angefordert(start_zeit: float) -> bool:
     """Wurde das Neustart-Flag NACH dem Start dieses Prozesses berührt? Ein älteres Flag
@@ -264,6 +287,7 @@ def handle_update(
             neuer_zug = {"question": result["question"], "answer": answer,
                          "gelesen": result.get("gelesen") or []}
             sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
+            _schreibe_tagespuffer(question, answer, result.get("gelesen") or [])
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering {question!r}: {exc}")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."
