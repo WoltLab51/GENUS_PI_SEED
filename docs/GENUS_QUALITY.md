@@ -49,6 +49,13 @@ Nicht verhandelbar. Jede Änderung muss diese wahr lassen:
 
 **Review-Fragen (per Scheibe von Hand — Kandidaten, später zu Gates zu härten):**
 
+- [ ] **Keine zweite Wahrheit** — beantwortet die Scheibe eine Frage, für die es schon
+  einen Ort gibt (Raster, Registry, Graph)? Dann *dort* andocken, nie daneben.
+  (Gelernt am Chat-Regler 2026-07-04: eine zweite Cue-Tabelle neben dem Raster.)
+- [ ] **Registry nur bei wachsender Klasse** — kommt hier je ein gleichartiger Fall
+  dazu, und ginge sein Vergessen *still* schief? → Registry + Vertragstest (Vergessen
+  bricht laut). Echter Einzelfall? → einfach lassen; Struktur erst wenn erkannt +
+  notwendig. Bewusst Code statt Daten bleibt, was Schutz IST (Pins, Gate-Boden).
 - [ ] Kein neuer hartcodierter Schwellwert (self-kalibriert oder nur Seed-Fallback)?
 - [ ] Nichts berechnet-aber-gespeichert (read-time, wo immer ableitbar)?
 - [ ] **Die Eigenschaft getestet, nicht das Beispiel** (die Mathematik festgenagelt,
