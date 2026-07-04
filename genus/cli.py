@@ -703,6 +703,19 @@ def integral_command(term: str, untere_grenze: str, obere_grenze: str, variable:
     )
 
 
+@main.command("kurvendiskussion")
+@click.argument("term")
+@click.option("--variable", default="x", show_default=True)
+def kurvendiskussion_command(term: str, variable: str) -> None:
+    """Die Kurvendiskussion eines Funktionsterms -- das erste komponierte Werkzeug (Rezept):
+    Nullstellen -> Extremstellen -> Grenzverhalten, jeder Schritt exakt über sympy."""
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    w = werkzeug.registriert("kurvendiskussion")
+    r = w.implementierung(term, variable)
+    for zeile in w.formulierung(r).splitlines():
+        click.echo(f"[MATH] {zeile}")
+
+
 @main.command("werkzeuge")
 def werkzeuge_command() -> None:
     """Alle beim Werkzeugbauer registrierten Werkzeuge -- das, was ein Planer sehen würde

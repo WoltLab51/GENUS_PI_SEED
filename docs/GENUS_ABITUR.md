@@ -90,8 +90,16 @@ Menge wie der Deuter-Pfad — ein Fund am Rande, der die neue Rechen-Zelle sofor
   nächste Beobachtung. Braucht eine echte Quelle für Aufgaben+Lösungen (variiert je Bundesland).
 - **Weitere Aufgabenarten**: der reine Flächeninhalt (Betrag, braucht vorher die Nullstellen im
   Intervall — anders als das VORZEICHENBEHAFTETE bestimmte Integral, das schon gebaut ist),
-  Kurvendiskussion als Komposition der schon vorhandenen Bausteine (Nullstellen + Extremstellen
-  + Wendepunkte + Monotonie), Vektorrechnung/Analytische Geometrie, Stochastik.
+  Vektorrechnung/Analytische Geometrie, Stochastik. Erweiterung der Kurvendiskussion um
+  Wendepunkte + Monotonie (die Rezept-Form trägt das: zwei weitere Kern-Schritte registrieren,
+  zwei Zeilen im Rezept).
+- **GEBAUT (2026-07-04): die Kurvendiskussion — das erste echte REZEPT.** Komponiert aus drei
+  registrierten Kern-Schritten (Nullstellen → Extremstellen → Grenzverhalten), die Komposition
+  ist DATEN (`rezept`-Feld im Werkzeug), die Ausführung der eine generische Kern-Mechanismus
+  (`werkzeug.rezept_implementierung`); `pruefen()` verweigert ein Rezept, das auf
+  Unregistriertes zeigt. Neue Kern-Schritte `mathematik.nullstellen` und
+  `mathematik.verhalten_unendlich` (sin(x) → ehrlich „unbestimmt", nie geraten). Muster-Zelle
+  („Führe eine Kurvendiskussion für f(x) = … durch") + `genus kurvendiskussion` als CLI.
 - **Freie Deuter-Lesart** für kreativ formulierte Rechenaufgaben — bisher nur die feste
   Musterformulierung erkannt; math. Ausdrücke sind für die Deuter-Subjekt/Objekt-Extraktion
   (auf einzelne Wörter ausgelegt) riskanter als für Begriffs-Fragen.

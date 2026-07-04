@@ -97,6 +97,21 @@ def pruefen(werkzeug: Werkzeug) -> list[str]:
         )
     if werkzeug.formulierung is not None and not callable(werkzeug.formulierung):
         fehler.append(f"«{werkzeug.name}»: formulierung ist gesetzt, aber nicht aufrufbar.")
+    if werkzeug.rezept is not None:
+        for schritt in werkzeug.rezept:
+            if (not isinstance(schritt, tuple) or len(schritt) != 2
+                    or schritt[0] not in ("kern", "modell")):
+                fehler.append(
+                    f"«{werkzeug.name}»: Rezept-Schritt {schritt!r} ist nicht "
+                    f"(\"kern\"|\"modell\", <werkzeugname>)."
+                )
+                continue
+            art, schritt_name = schritt
+            if registriert(schritt_name) is None:
+                fehler.append(
+                    f"«{werkzeug.name}»: Rezept-Schritt «{schritt_name}» ist nicht "
+                    f"registriert -- ein Rezept darf nur auf geprüfte Werkzeuge zeigen."
+                )
     return fehler
 
 
@@ -130,6 +145,33 @@ def stimme_geeignet(name: str) -> bool:
     (genau die Lücke, die companion.py's _STIMME_GEEIGNET beim Muster-Pfad hatte)."""
     w = registriert(name)
     return w is not None and not w.wortlautfest
+
+
+def rezept_implementierung(rezept: tuple) -> Callable:
+    """Der generische Rezept-Ausführer (der erste echte Nutzer des ``rezept``-Felds):
+    die Komposition ist DATEN (eine geordnete Folge von Schritten, jeder ein registriertes
+    Werkzeug), die Ausführung ist dieser EINE Kern-Mechanismus -- kein komponiertes
+    Werkzeug schreibt je wieder seine eigene Schleife. Jeder Schritt wird zur LAUFZEIT
+    im Register nachgeschlagen (der Bauer verwendet Werkzeuge, wie Ronny vermutete);
+    das Vertrauen des Ganzen ist das des schwächsten Schritts -- hier sind alle "kern",
+    ein künftiger "modell"-Schritt (mit ausdrücklichem Wofür) deckelte das Ergebnis.
+    Ein gescheiterter Schritt bricht ehrlich ab (ok=False mit dem Schritt-Namen), die
+    schon gerechneten Schritte bleiben im Ergebnis sichtbar."""
+    def implementierung(term: str, variable: str = "x") -> dict:
+        schritte = []
+        for art, schritt_name in rezept:
+            schritt_werkzeug = registriert(schritt_name)
+            if schritt_werkzeug is None:
+                return {"ok": False, "term": term, "schritte": schritte,
+                        "fehler": f"Rezept-Schritt «{schritt_name}» ist nicht registriert."}
+            ergebnis = schritt_werkzeug.implementierung(term, variable)
+            schritte.append({"schritt": schritt_name, "art": art, **ergebnis})
+            if not ergebnis.get("ok"):
+                return {"ok": False, "term": term, "schritte": schritte,
+                        "fehler": f"Schritt «{schritt_name}»: {ergebnis.get('fehler')}"}
+        return {"ok": True, "term": schritte[0].get("term", term) if schritte else term,
+                "variable": variable, "schritte": schritte}
+    return implementierung
 
 
 def _vertrags_fingerabdruck(w: Werkzeug) -> dict:

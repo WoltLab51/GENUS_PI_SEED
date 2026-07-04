@@ -132,6 +132,54 @@ def extremstellen(term: str, variable: str = "x") -> dict:
         return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
 
 
+def nullstellen(term: str, variable: str = "x") -> dict:
+    """Die reellen Nullstellen von ``term`` (f=0) -- exakt über sympy, aufsteigend sortiert.
+    Dieselbe Vorprüfung und Ehrlichkeitsdisziplin wie überall: komplexe Lösungen werden im
+    Schulkontext weggelassen, ein unlösbarer Term wird ehrlich benannt, nie geraten."""
+    unbekannt = _unbekanntes_wort(term, variable)
+    if unbekannt is not None:
+        return {"ok": False, "fehler": f"«{unbekannt}» in «{term}» ist kein bekanntes Symbol."}
+    try:
+        ausdruck = _zu_ausdruck(term, variable)
+        var = sympy.symbols(variable)
+        loesungen = sympy.solve(sympy.Eq(ausdruck, 0), var)
+        reelle = [x0 for x0 in loesungen if x0.is_real]
+        reelle.sort(key=sympy.sympify)
+        return {
+            "ok": True, "term": str(ausdruck), "variable": variable,
+            "nullstellen": [str(x0) for x0 in reelle],
+        }
+    except (sympy.SympifyError, TypeError, ValueError, SyntaxError, NotImplementedError) as exc:
+        return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
+
+
+def verhalten_unendlich(term: str, variable: str = "x") -> dict:
+    """Das Verhalten von ``term`` im Unendlichen -- die Grenzwerte für x → +∞ und x → −∞,
+    exakt über sympy.limit. Ein Grenzwert kann eine Zahl, "oo"/"-oo" (bestimmt divergent)
+    oder ehrlich "unbestimmt" sein (z.B. sin(x): kein Grenzwert)."""
+    unbekannt = _unbekanntes_wort(term, variable)
+    if unbekannt is not None:
+        return {"ok": False, "fehler": f"«{unbekannt}» in «{term}» ist kein bekanntes Symbol."}
+    try:
+        ausdruck = _zu_ausdruck(term, variable)
+        var = sympy.symbols(variable)
+        grenzen = {}
+        for schluessel, richtung in (("plus_unendlich", sympy.oo), ("minus_unendlich", -sympy.oo)):
+            try:
+                grenzwert = sympy.limit(ausdruck, var, richtung)
+                # ein echter Grenzwert ist eine Zahl oder ±oo; alles andere (AccumBounds
+                # bei sin, freie Symbole, ...) ist KEIN Grenzwert -- ehrlich benennen
+                ist_echt = (getattr(grenzwert, "is_number", False)
+                            and not grenzwert.free_symbols
+                            and bool(grenzwert.is_extended_real))
+                grenzen[schluessel] = str(grenzwert) if ist_echt else "unbestimmt"
+            except (NotImplementedError, ValueError):
+                grenzen[schluessel] = "unbestimmt"
+        return {"ok": True, "term": str(ausdruck), "variable": variable, **grenzen}
+    except (sympy.SympifyError, TypeError, ValueError, SyntaxError, NotImplementedError) as exc:
+        return {"ok": False, "fehler": f"«{term}» ist kein lesbarer Funktionsterm ({exc})."}
+
+
 def stammfunktion(term: str, variable: str = "x") -> dict:
     """Eine Stammfunktion (unbestimmtes Integral) von ``term`` -- exakt über sympy, mit der
     Integrationskonstante "+ C" (Teil der korrekten Schulantwort; sympy liefert sie nicht von

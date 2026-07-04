@@ -230,3 +230,65 @@ def test_werkzeug_registriert_ist_bewusst_roh_und_replay_stabil(conn):
     werkzeug.protokolliere_registrierungen(conn)
     report = integrity.check(conn)
     assert report["ok"], report
+
+
+# --- das erste echte REZEPT: die Kurvendiskussion als Komposition ---------------------
+
+
+def test_rezept_darf_nur_auf_registrierte_werkzeuge_zeigen():
+    w = _leeres_werkzeug(rezept=(("kern", "gibt-es-nicht"),))
+    fehler = werkzeug.pruefen(w)
+    assert any("gibt-es-nicht" in f and "nicht registriert" in f for f in fehler)
+    # und ein missgeformter Schritt wird benannt
+    w2 = _leeres_werkzeug(rezept=(("zauber", "ableitung"),))
+    assert any("zauber" in f or "kern" in f for f in werkzeug.pruefen(w2))
+
+
+def test_kurvendiskussion_ist_eine_komposition_aus_kern_schritten():
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    w = werkzeug.registriert("kurvendiskussion")
+    assert w is not None and w.rezept == (
+        ("kern", "nullstellen"), ("kern", "extremstellen"), ("kern", "verhalten_unendlich"),
+    )
+    assert all(art == "kern" for art, _ in w.rezept)   # Vertrauen = schwächster Schritt: sympy
+    assert werkzeug.pruefen(w) == []
+
+    r = w.implementierung("x^3 - 3x")
+    assert r["ok"] is True
+    je = {s["schritt"]: s for s in r["schritte"]}
+    assert je["nullstellen"]["nullstellen"] == ["-sqrt(3)", "0", "sqrt(3)"]
+    arten = {p["x"]: p["art"] for p in je["extremstellen"]["punkte"]}
+    assert arten == {"-1": "Maximum", "1": "Minimum"}
+    assert je["verhalten_unendlich"]["plus_unendlich"] == "oo"
+    assert je["verhalten_unendlich"]["minus_unendlich"] == "-oo"
+
+
+def test_rezept_bricht_ehrlich_ab_und_zeigt_die_schon_gerechneten_schritte():
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    w = werkzeug.registriert("kurvendiskussion")
+    r = w.implementierung("das ist kein term")
+    assert r["ok"] is False and "nullstellen" in r["fehler"]
+    assert len(r["schritte"]) == 1   # der erste Schritt scheiterte, danach ehrlicher Abbruch
+
+
+def test_kurvendiskussion_antwortet_im_gespraech_ueber_die_registry():
+    import sqlite3
+    from genus.db import init_schema
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_schema(conn)
+    antwort = companion.respond(conn, "Führe eine Kurvendiskussion für f(x) = x^3 - 3x durch")
+    assert "Nullstellen" in antwort and "sqrt(3)" in antwort
+    assert "Maximum bei x = -1" in antwort and "Minimum bei x = 1" in antwort
+    assert "+∞" in antwort and "exakt berechnet" in antwort
+    # und niemals der Stimme angeboten (wortlautfest, wie alle Mathe-Werkzeuge)
+    assert werkzeug.stimme_geeignet("kurvendiskussion") is False
+
+
+def test_neue_kern_schritte_rechnen_ehrlich():
+    assert mathematik.nullstellen("x^2 - 4")["nullstellen"] == ["-2", "2"]
+    assert mathematik.nullstellen("x^2 + 1")["nullstellen"] == []   # keine reellen
+    v = mathematik.verhalten_unendlich("sin(x)")
+    assert v["plus_unendlich"] == "unbestimmt"   # sin hat KEINEN Grenzwert -- nie geraten
+    assert mathematik.nullstellen("kein term hier")["ok"] is False

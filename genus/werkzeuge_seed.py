@@ -77,3 +77,58 @@ def registriere_mathe_werkzeuge() -> None:
         implementierung=mathematik.integral,
         formulierung=companion.narrate_integral,
     ))
+    # Zwei weitere Kern-Schritte -- registriert primär als REZEPT-Bausteine (bewusst noch
+    # ohne eigene Muster-Schnellspur/Formulierung; die kommen, wenn sie als eigenständige
+    # Aufgabenarten gebraucht werden -- Merkmal erst wenn erkannt + notwendig).
+    werkzeug.verdrahten(werkzeug.Werkzeug(
+        name="nullstellen",
+        beschreibung="Die reellen Nullstellen eines Funktionsterms (f=0), exakt.",
+        parameter={
+            "term": werkzeug.Parameter("Text", pflicht=True),
+            "variable": werkzeug.Parameter("Text", standard="x"),
+        },
+        schreibt=False,
+        wortlautfest=True,
+        pruefbar_als="sympy",
+        implementierung=mathematik.nullstellen,
+    ))
+    werkzeug.verdrahten(werkzeug.Werkzeug(
+        name="verhalten_unendlich",
+        beschreibung="Das Grenzverhalten eines Funktionsterms für x gegen plus/minus Unendlich.",
+        parameter={
+            "term": werkzeug.Parameter("Text", pflicht=True),
+            "variable": werkzeug.Parameter("Text", standard="x"),
+        },
+        schreibt=False,
+        wortlautfest=True,
+        pruefbar_als="sympy",
+        implementierung=mathematik.verhalten_unendlich,
+    ))
+    # DAS ERSTE ECHTE REZEPT (das rezept-Feld war seit dem Werkzeugbauer vorgesehen, aber
+    # bewusst ungenutzt, bis der erste echte Anwendungsfall da ist -- das ist er): die
+    # Kurvendiskussion ist eine KOMPOSITION aus drei registrierten Kern-Schritten. Die
+    # Komposition ist DATEN, die Ausführung der eine generische Kern-Mechanismus
+    # (werkzeug.rezept_implementierung); das Vertrauen ist das des schwächsten Schritts --
+    # hier alle "kern"/sympy. pruefen() verweigert ein Rezept, das auf Unregistriertes zeigt.
+    kurvendiskussion_rezept = (
+        ("kern", "nullstellen"),
+        ("kern", "extremstellen"),
+        ("kern", "verhalten_unendlich"),
+    )
+    werkzeug.verdrahten(werkzeug.Werkzeug(
+        name="kurvendiskussion",
+        beschreibung=(
+            "Die Kurvendiskussion eines Funktionsterms -- komponiert aus Nullstellen, "
+            "Extremstellen und Grenzverhalten (das erste Rezept)."
+        ),
+        parameter={
+            "term": werkzeug.Parameter("Text", pflicht=True),
+            "variable": werkzeug.Parameter("Text", standard="x"),
+        },
+        schreibt=False,
+        wortlautfest=True,
+        pruefbar_als="sympy",
+        implementierung=werkzeug.rezept_implementierung(kurvendiskussion_rezept),
+        formulierung=companion.narrate_kurvendiskussion,
+        rezept=kurvendiskussion_rezept,
+    ))

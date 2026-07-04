@@ -506,6 +506,53 @@ def integral_frage(text: str) -> dict:
     return r
 
 
+_KURVENDISKUSSION_PATTERNS = [
+    re.compile(
+        r"\b(?:f(?:ü|ue)hre\s+" + _FILL + r"eine\s+)?kurvendiskussion\s+"
+        r"(?:f(?:ü|ue)r|von|zu)\s+f\(?(\w)\)?\s*=\s*" + _MATHTERM
+        + r"(?:\s+durch)?[.!?]?\s*$", re.I),
+]
+
+
+def kurvendiskussion_frage(text: str) -> dict:
+    """Die Kurvendiskussions-Aufgabe in ``text`` -- gerechnet DURCH die Werkzeug-Registry
+    (das erste komponierte Werkzeug im echten Dispatch): das Rezept schlägt seine drei
+    Kern-Schritte zur Laufzeit im Register nach. ``{"berechnung_q": False}``, wenn keine
+    erkennbare Aufgabenstellung vorliegt."""
+    from genus import werkzeug, werkzeuge_seed
+
+    m = _KURVENDISKUSSION_PATTERNS[0].search(text)
+    if m is None:
+        return {"berechnung_q": False}
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    r = werkzeug.registriert("kurvendiskussion").implementierung(m.group(2).strip(), m.group(1))
+    r["berechnung_q"] = True
+    return r
+
+
+def _unendlich_lesbar(wert: str) -> str:
+    return {"oo": "+∞", "-oo": "−∞"}.get(wert, wert)
+
+
+def narrate_kurvendiskussion(r: dict) -> str:
+    if not r["ok"]:
+        return f"Das kann ich nicht ausrechnen: {r['fehler']}"
+    je_schritt = {s["schritt"]: s for s in r["schritte"]}
+    v = r["variable"]
+    ns = je_schritt["nullstellen"]["nullstellen"]
+    ns_text = ", ".join(f"{v} = {n}" for n in ns) if ns else "keine"
+    punkte = je_schritt["extremstellen"]["punkte"]
+    ex_text = ("; ".join(f"{p['art']} bei {v} = {p['x']} (f({v}) = {p['y']})" for p in punkte)
+               if punkte else "keine")
+    vu = je_schritt["verhalten_unendlich"]
+    return (f"Kurvendiskussion für f({v}) = {r['term']}:\n"
+            f"• Nullstellen: {ns_text}\n"
+            f"• Extremstellen: {ex_text}\n"
+            f"• Verhalten im Unendlichen: f → {_unendlich_lesbar(vu['plus_unendlich'])} für "
+            f"{v} → +∞, f → {_unendlich_lesbar(vu['minus_unendlich'])} für {v} → −∞\n"
+            f"(exakt berechnet, als Rezept: Nullstellen → Extremstellen → Grenzverhalten)")
+
+
 def narrate_integral(r: dict) -> str:
     if not r["ok"]:
         return f"Das kann ich nicht ausrechnen: {r['fehler']}"
@@ -673,6 +720,9 @@ def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
     integ = integral_frage(question)
     if integ.get("berechnung_q"):
         return narrate_integral(integ), "berechnen"
+    kd = kurvendiskussion_frage(question)
+    if kd.get("berechnung_q"):
+        return narrate_kurvendiskussion(kd), "berechnen"
     stamm = stammfunktion_frage(question)
     if stamm.get("berechnung_q"):
         return narrate_stammfunktion(stamm), "berechnen"
