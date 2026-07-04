@@ -181,3 +181,53 @@ def insert_evidence_event(conn, created_at: datetime) -> int:
         ),
     )
     return int(cur.lastrowid)
+
+
+# --- Phase 0 der Ziel-Architektur: die EINE Belief-Zustandsmaschine -----------------
+
+
+def test_belief_uebergang_erstellen_bestaetigen_abloesen(conn):
+    # Vorher lebte diese Entscheidung dreimal wortgleich (rules._record_value_belief,
+    # rules.apply_binary_rule, operation._record_operation_belief) -- jetzt einmal.
+    r1 = projection.belief_uebergang(
+        conn, claim_key="test.zustand", claim_value="ruhig",
+        derivation="test_v1", supporting_events=[1],
+    )
+    assert (r1["event_type"], r1["fresh"]) == ("belief_created", True)
+
+    r2 = projection.belief_uebergang(
+        conn, claim_key="test.zustand", claim_value="ruhig",
+        derivation="test_v1", supporting_events=[2],
+    )
+    assert (r2["event_type"], r2["fresh"]) == ("belief_confirmed", False)
+    assert r2["belief_id"] == r1["belief_id"]
+
+    r3 = projection.belief_uebergang(
+        conn, claim_key="test.zustand", claim_value="unruhig",
+        derivation="test_v1", supporting_events=[3],
+    )
+    assert (r3["event_type"], r3["fresh"]) == ("belief_superseded", True)
+    assert r3["belief_id"] != r1["belief_id"]
+
+    alt = projection.get_belief(conn, r1["belief_id"])
+    assert alt["state"] == "superseded"
+    aktiv = projection.active_belief(conn, "test.zustand")
+    assert aktiv["claim_value"] == "unruhig"
+
+
+def test_belief_uebergang_abloese_grund_traegt_reason_key(conn):
+    # Der Binary-Pfad nennt historisch den metric_key im Ablöse-Grund, nicht den
+    # claim_key -- verhalten-erhaltend als Parameter beibehalten.
+    projection.belief_uebergang(
+        conn, claim_key="test.claim", claim_value="an",
+        derivation="test_v1", supporting_events=[1],
+    )
+    projection.belief_uebergang(
+        conn, claim_key="test.claim", claim_value="aus",
+        derivation="test_v1", supporting_events=[2], reason_key="test.metrik",
+    )
+    row = conn.execute(
+        "SELECT payload FROM event_log WHERE event_type = 'belief_superseded' "
+        "ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert json.loads(row["payload"])["reason"] == "test.metrik_changed_to_aus"

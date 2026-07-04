@@ -617,12 +617,9 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
 
     blaetter = verstehen.kinds(conn) or {leaf for leaf, _ in verstehen.RASTER_SEED}
     # die Lücken-Menge ist die ECHTE Fähigkeits-Karte, nicht eine Kopie: alles, was weder
-    # selbst einen Handler hat noch über seine Zwicky-Zelle einen erreicht -- plus "unklar"
-    luecken = {
-        kind for kind in blaetter
-        if kind not in companion._HANDELBAR
-        and (verstehen.zelle_of(conn, kind) or "") not in companion._HANDELBAR
-    }
+    # selbst einen Handler hat noch über seine Zwicky-Zelle einen erreicht -- plus "unklar".
+    # Öffentliche Auskunft (companion.hat_handler) statt privatem _HANDELBAR-Zugriff.
+    luecken = {kind for kind in blaetter if not companion.hat_handler(conn, kind)}
     luecken.add("unklar")
 
     nachfrage: dict[str, int] = {}

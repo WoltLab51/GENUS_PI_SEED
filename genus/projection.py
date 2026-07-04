@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from typing import Iterable
 
+from genus import ledger
 from genus.confidence import calculate_confidence
 
 
@@ -203,6 +204,76 @@ def supersede_belief(
         """,
         (SUPERSEDED, new_belief_id, updated_at, old_belief_id),
     )
+
+
+def belief_uebergang(
+    conn,
+    *,
+    claim_key: str,
+    claim_value: str,
+    derivation: str,
+    supporting_events: list[int],
+    reason_key: str | None = None,
+) -> dict:
+    """Die EINE Belief-Zustandsmaschine (Phase 0 der Ziel-Architektur): schau nach dem
+    aktiven Belief -- keiner: erstellen; gleicher Wert: bestätigen; anderer Wert:
+    ablösen. Schreibt das Ledger-Event UND wendet die Projektion an, immer als Paar.
+
+    Vorher lebte exakt diese Entscheidung dreimal wortgleich handgeschrieben
+    (``rules._record_value_belief``, ``rules.apply_binary_rule`` inline,
+    ``operation._record_operation_belief``) -- ein Bugfix an der Payload-Form musste an
+    drei Stellen zugleich richtig sein. ``rules.apply_threshold`` bleibt bewusst eigen:
+    seine Maschine ist wirklich anders (asymmetrisch -- bestätigt nur "high", löst nur
+    high->normal ab, kennt ein "weaken"; Gleiches gleich, Ungleiches ungleich).
+
+    ``reason_key`` überschreibt den Präfix des Ablöse-Grunds (der Binary-Pfad nennt
+    historisch den metric_key, nicht den claim_key -- verhalten-erhaltend beibehalten).
+    ``fresh`` im Ergebnis: hat der Belief den Wert FRISCH angenommen (erstellt oder
+    abgelöst)? Ein Bestätigen ist kein Übergang -- Aufrufer, die auf einen schlechten
+    Wert ein Proposal erheben, erheben es so einmal pro Episode, nicht pro Wiederholung.
+    """
+    active = active_belief(conn, claim_key)
+    if active is None:
+        belief_id = next_belief_id(conn)
+        payload = {
+            "belief_id": belief_id,
+            "claim_key": claim_key,
+            "claim_value": claim_value,
+            "derivation": derivation,
+            "supporting_events": list(supporting_events),
+        }
+        event_id = ledger.append(conn, "belief_created", payload)
+        payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+        apply_belief_created(conn, payload)
+        return {"event_type": "belief_created", "belief_id": belief_id,
+                "belief_event_id": event_id, "claim_value": claim_value, "fresh": True}
+
+    if active["claim_value"] == claim_value:
+        payload = {
+            "belief_id": int(active["id"]),
+            "new_supporting_event": supporting_events[-1],
+        }
+        event_id = ledger.append(conn, "belief_confirmed", payload)
+        payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+        apply_belief_confirmed(conn, payload)
+        return {"event_type": "belief_confirmed", "belief_id": int(active["id"]),
+                "belief_event_id": event_id, "claim_value": claim_value, "fresh": False}
+
+    new_belief_id = next_belief_id(conn)
+    payload = {
+        "old_belief_id": int(active["id"]),
+        "new_belief_id": new_belief_id,
+        "claim_key": claim_key,
+        "claim_value": claim_value,
+        "derivation": derivation,
+        "supporting_events": list(supporting_events),
+        "reason": f"{reason_key or claim_key}_changed_to_{claim_value}",
+    }
+    event_id = ledger.append(conn, "belief_superseded", payload)
+    payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+    apply_belief_superseded(conn, payload)
+    return {"event_type": "belief_superseded", "belief_id": new_belief_id,
+            "belief_event_id": event_id, "claim_value": claim_value, "fresh": True}
 
 
 def get_belief(conn, belief_id: int):

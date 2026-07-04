@@ -319,3 +319,14 @@ def test_main_refuses_to_start_with_an_empty_allowlist(monkeypatch):
     monkeypatch.setenv("GENUS_TELEGRAM_BOT_TOKEN", "fake-token-for-test")
     monkeypatch.delenv("GENUS_TELEGRAM_ALLOWED_IDS", raising=False)
     assert telegram_bot.main() == 1
+
+
+def test_bot_verbindet_ueber_genus_db_connect_nicht_roh():
+    # Phase 0 der Ziel-Architektur: der Bot bekommt dieselben Pragmas (WAL, busy_timeout)
+    # und Spalten-Migrationen wie die CLI. Ein roher sqlite3.connect in main() hiess:
+    # dieser eine Zugang konnte sich auf einer frischen/unmigrierten DB anders verhalten
+    # als jeder andere. Struktur-Gate wie test_membrane_purity: der Quelltext selbst
+    # wird geprueft, damit die Abweichung nicht zurueckschleichen kann.
+    quelle = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
+    assert "db.connect(" in quelle
+    assert "sqlite3.connect(" not in quelle

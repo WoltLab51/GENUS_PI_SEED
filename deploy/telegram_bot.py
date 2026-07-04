@@ -185,9 +185,12 @@ def main() -> int:
     _log(f"telegram bridge started — {len(allowed)} allowed id(s)")
 
     os.makedirs(LOG_DIR, exist_ok=True)
-    import sqlite3
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    # Über genus.db.connect statt rohem sqlite3.connect (Phase 0 der Ziel-Architektur):
+    # der Bot bekommt damit dieselben Pragmas (WAL, busy_timeout, foreign_keys) und
+    # Spalten-Migrationen wie die CLI -- vorher konnte dieser Pfad sich auf einer
+    # frischen oder unmigrierten DB anders verhalten als jeder andere Zugang.
+    from genus import db
+    conn = db.connect(DB_PATH)
 
     offset = _load_offset()
     sessions: dict[int, list[dict]] = {}   # chat_id -> turn list; in-process only, see handle_update

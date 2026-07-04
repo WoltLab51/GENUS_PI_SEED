@@ -531,6 +531,31 @@ def lexicalize(conn, concept: str, lang: str | None = None) -> list[str]:
     return sorted(set(out))
 
 
+def bekanntes_wort(conn, form: str, lang: str = "de") -> bool:
+    """Kennt GENUS dieses Wort? Wahr, sobald irgendeine Bedeutungs-Kante am Lexem hängt
+    (expresses, defined_as oder primary_gloss). Die gemeinsame "ist das ein Wort für
+    uns?"-Frage von Companion (Wort-Antwort) und Erinnerung (Anker-Auflösung) -- hierher
+    gehoben (Phase 0 der Ziel-Architektur), damit keine Wissensschicht mehr in
+    Companion-Interna greifen muss."""
+    key = lexeme_key(form, lang)
+    return any(
+        relations(conn, subject=key, predicate=predicate)
+        for predicate in (EXPRESSES, "defined_as", "primary_gloss")
+    )
+
+
+def prominentes_konzept(conn, form: str, lang: str = "de") -> str | None:
+    """Das Konzept, das ein Wort am prominentesten ausdrückt -- die geerdete
+    Wikidata-Wahl zuerst, sonst die erste bekannte expresses-Kante; ``None``, wenn das
+    Wort kein Konzept hat. Dieselbe grounded-zuerst-Regel, die Companion und Erinnerung
+    teilen (hierher gehoben, Phase 0 der Ziel-Architektur)."""
+    rows = relations(conn, subject=lexeme_key(form, lang), predicate=EXPRESSES)
+    if not rows:
+        return None
+    grounded = [r["object"] for r in rows if r["source"] == "wikidata"]
+    return grounded[0] if grounded else rows[0]["object"]
+
+
 def display(conn, node: str, langs: tuple[str, ...] = ("de", "en", "fr")) -> str:
     """Human-readable rendering of a graph node, so the raw graph stays glass-box.
     A language-neutral concept key (e.g. a Wikidata Q-id) gets its label appended --

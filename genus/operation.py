@@ -319,73 +319,17 @@ def _record_operation_belief(
     a caller that raises a proposal on a bad value raises it once per episode,
     not on every repeated check.
     """
-    active = projection.active_belief(conn, claim_key)
-    if active is None:
-        belief_id = projection.next_belief_id(conn)
-        event_payload = {
-            "belief_id": belief_id,
-            "claim_key": claim_key,
-            "claim_value": claim_value,
-            "derivation": DERIVATION_CHECK,
-            "supporting_events": [check_event_id],
-        }
-        belief_event_id = ledger.append(conn, "belief_created", event_payload)
-        event_payload["_event_created_at"] = ledger.event_created_at(
-            conn, belief_event_id
-        )
-        projection.apply_belief_created(conn, event_payload)
-        return (
-            {
-                "event_type": "belief_created",
-                "belief_id": belief_id,
-                "belief_event_id": belief_event_id,
-                "claim_value": claim_value,
-            },
-            True,
-        )
-
-    if active["claim_value"] == claim_value:
-        event_payload = {
-            "belief_id": int(active["id"]),
-            "new_supporting_event": check_event_id,
-        }
-        belief_event_id = ledger.append(conn, "belief_confirmed", event_payload)
-        event_payload["_event_created_at"] = ledger.event_created_at(
-            conn, belief_event_id
-        )
-        projection.apply_belief_confirmed(conn, event_payload)
-        return (
-            {
-                "event_type": "belief_confirmed",
-                "belief_id": int(active["id"]),
-                "belief_event_id": belief_event_id,
-                "claim_value": claim_value,
-            },
-            False,
-        )
-
-    new_belief_id = projection.next_belief_id(conn)
-    event_payload = {
-        "old_belief_id": int(active["id"]),
-        "new_belief_id": new_belief_id,
-        "claim_key": claim_key,
-        "claim_value": claim_value,
-        "derivation": DERIVATION_CHECK,
-        "supporting_events": [check_event_id],
-        "reason": f"{claim_key}_changed_to_{claim_value}",
-    }
-    belief_event_id = ledger.append(conn, "belief_superseded", event_payload)
-    event_payload["_event_created_at"] = ledger.event_created_at(conn, belief_event_id)
-    projection.apply_belief_superseded(conn, event_payload)
-    return (
-        {
-            "event_type": "belief_superseded",
-            "belief_id": new_belief_id,
-            "belief_event_id": belief_event_id,
-            "claim_value": claim_value,
-        },
-        True,
+    # Phase 0 der Ziel-Architektur: die eine geteilte Zustandsmaschine statt einer
+    # eigenen Kopie -- erstellen/bestätigen/ablösen wohnt jetzt in projection.
+    result = projection.belief_uebergang(
+        conn,
+        claim_key=claim_key,
+        claim_value=claim_value,
+        derivation=DERIVATION_CHECK,
+        supporting_events=[check_event_id],
     )
+    fresh = result.pop("fresh")
+    return result, fresh
 
 
 def _record_network_proposal(conn, belief_id: int, source_event: int) -> int:

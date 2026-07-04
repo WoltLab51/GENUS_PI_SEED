@@ -22,17 +22,14 @@ def _objects(conn, form: str, predicate: str) -> list[str]:
 
 
 def _prominent_concept(conn, form: str) -> str | None:
-    """The concept a word most prominently expresses (the grounded Wikidata pick), if known."""
-    rows = sources.relations(conn, subject=f"{form}@de", predicate="expresses")
-    if not rows:
-        return None
-    grounded = [r["object"] for r in rows if r["source"] == "wikidata"]
-    return grounded[0] if grounded else rows[0]["object"]
+    """The concept a word most prominently expresses -- lives in ``sources`` now
+    (Phase 0 der Ziel-Architektur: das Geteilte wandert nach unten); thin delegation
+    kept for the internal callers."""
+    return sources.prominentes_konzept(conn, form)
 
 
 def _known(conn, form: str) -> bool:
-    return bool(_objects(conn, form, "expresses") or _objects(conn, form, "defined_as")
-               or _objects(conn, form, "primary_gloss"))
+    return sources.bekanntes_wort(conn, form)
 
 
 def _last_known_word(conn, question: str) -> str | None:
@@ -1181,6 +1178,18 @@ _HANDELBAR = {
     "kritik": _zelle_kritik,
     "abschied": _zelle_abschied,
 }
+
+
+def hat_handler(conn, kind: str) -> bool:
+    """Kann GENUS auf diese Lesart handeln? Wahr, wenn das Blatt selbst oder seine
+    Zwicky-Zelle (ein is_a-Schritt hoch, wie im Dispatch) einen Handler trägt. Die
+    öffentliche Fähigkeits-Auskunft für andere Schichten (z.B. den VerstehensLuecke-
+    Detector) -- statt privater ``_HANDELBAR``-Zugriffe von außen. Wandert in Phase 3
+    der Ziel-Architektur in die Werkzeug-Registry."""
+    from genus import verstehen  # local: companion<->verstehen bleibt zyklenfrei
+
+    return (kind in _HANDELBAR
+            or (verstehen.zelle_of(conn, kind) or "") in _HANDELBAR)
 
 
 def _record_still(fn, *args) -> None:

@@ -351,69 +351,19 @@ def apply_binary_rule(conn, metric_key: str, rule: dict) -> list[str]:
     else:
         threshold = rule.get("threshold", 1.0)
         new_value = rule["active_value"] if value >= threshold else rule["idle_value"]
-    current = projection.active_belief(conn, claim_key)
     written: list[str] = []
 
-    if current is None:
-        belief_id = projection.next_belief_id(conn)
-        belief_event_id = ledger.append(
-            conn,
-            "belief_created",
-            {
-                "belief_id": belief_id,
-                "claim_key": claim_key,
-                "claim_value": new_value,
-                "derivation": derivation,
-                "supporting_events": [event_id],
-            },
-        )
-        projection.apply_belief_created(
-            conn,
-            {
-                "belief_id": belief_id,
-                "claim_key": claim_key,
-                "claim_value": new_value,
-                "derivation": derivation,
-                "supporting_events": [event_id],
-                "_event_created_at": ledger.event_created_at(conn, belief_event_id),
-            },
-        )
-        written.append("belief_created")
-    elif current["claim_value"] == new_value:
-        confirmation_event_id = ledger.append(
-            conn,
-            "belief_confirmed",
-            {
-                "belief_id": int(current["id"]),
-                "new_supporting_event": event_id,
-            },
-        )
-        projection.apply_belief_confirmed(
-            conn,
-            {
-                "belief_id": int(current["id"]),
-                "new_supporting_event": event_id,
-                "_event_created_at": ledger.event_created_at(conn, confirmation_event_id),
-            },
-        )
-        written.append("belief_confirmed")
-    else:
-        new_belief_id = projection.next_belief_id(conn)
-        superseded_payload = {
-            "old_belief_id": int(current["id"]),
-            "new_belief_id": new_belief_id,
-            "claim_key": claim_key,
-            "claim_value": new_value,
-            "derivation": derivation,
-            "supporting_events": [event_id],
-            "reason": f"{metric_key}_changed_to_{new_value}",
-        }
-        superseded_event_id = ledger.append(conn, "belief_superseded", superseded_payload)
-        superseded_payload["_event_created_at"] = ledger.event_created_at(
-            conn, superseded_event_id
-        )
-        projection.apply_belief_superseded(conn, superseded_payload)
-        written.append("belief_superseded")
+    # Phase 0 der Ziel-Architektur: die eine geteilte Zustandsmaschine. reason_key ist
+    # hier historisch der metric_key (nicht der claim_key) -- verhalten-erhaltend.
+    result = projection.belief_uebergang(
+        conn,
+        claim_key=claim_key,
+        claim_value=new_value,
+        derivation=derivation,
+        supporting_events=[event_id],
+        reason_key=metric_key,
+    )
+    written.append(result["event_type"])
 
     if metric_key == ACTIVITY_METRIC_KEY:
         written.extend(
@@ -524,72 +474,16 @@ def _record_value_belief(
     new_value: str,
     supporting_events: list[int],
 ) -> list[str]:
-    latest_event = supporting_events[-1]
-    current = projection.active_belief(conn, claim_key)
-    written: list[str] = []
-
-    if current is None:
-        belief_id = projection.next_belief_id(conn)
-        belief_event_id = ledger.append(
-            conn,
-            "belief_created",
-            {
-                "belief_id": belief_id,
-                "claim_key": claim_key,
-                "claim_value": new_value,
-                "derivation": derivation,
-                "supporting_events": supporting_events,
-            },
-        )
-        projection.apply_belief_created(
-            conn,
-            {
-                "belief_id": belief_id,
-                "claim_key": claim_key,
-                "claim_value": new_value,
-                "derivation": derivation,
-                "supporting_events": supporting_events,
-                "_event_created_at": ledger.event_created_at(conn, belief_event_id),
-            },
-        )
-        written.append("belief_created")
-    elif current["claim_value"] == new_value:
-        confirmation_event_id = ledger.append(
-            conn,
-            "belief_confirmed",
-            {
-                "belief_id": int(current["id"]),
-                "new_supporting_event": latest_event,
-            },
-        )
-        projection.apply_belief_confirmed(
-            conn,
-            {
-                "belief_id": int(current["id"]),
-                "new_supporting_event": latest_event,
-                "_event_created_at": ledger.event_created_at(conn, confirmation_event_id),
-            },
-        )
-        written.append("belief_confirmed")
-    else:
-        new_belief_id = projection.next_belief_id(conn)
-        superseded_payload = {
-            "old_belief_id": int(current["id"]),
-            "new_belief_id": new_belief_id,
-            "claim_key": claim_key,
-            "claim_value": new_value,
-            "derivation": derivation,
-            "supporting_events": supporting_events,
-            "reason": f"{claim_key}_changed_to_{new_value}",
-        }
-        superseded_event_id = ledger.append(conn, "belief_superseded", superseded_payload)
-        superseded_payload["_event_created_at"] = ledger.event_created_at(
-            conn, superseded_event_id
-        )
-        projection.apply_belief_superseded(conn, superseded_payload)
-        written.append("belief_superseded")
-
-    return written
+    # Phase 0 der Ziel-Architektur: die eine geteilte Zustandsmaschine statt einer
+    # eigenen Kopie -- erstellen/bestätigen/ablösen wohnt jetzt in projection.
+    result = projection.belief_uebergang(
+        conn,
+        claim_key=claim_key,
+        claim_value=new_value,
+        derivation=derivation,
+        supporting_events=supporting_events,
+    )
+    return [result["event_type"]]
 
 
 # Recency bound on the self-calibration scan: percentiles use the most recent

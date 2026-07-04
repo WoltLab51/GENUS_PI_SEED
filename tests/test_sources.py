@@ -1925,3 +1925,61 @@ def test_remember_command_always_takes_priority_over_other_routing():
     # hijacked by query.ask's command matching (the routing-shadowing class from earlier)
     result = companion.respond(conn, "Merke dir: mein Status-Update ist fertig")
     assert "Gemerkt" in result and "Status-Update" in result
+
+
+# --- Phase 0 der Ziel-Architektur: das Geteilte wandert nach unten -------------------
+
+
+def test_phase0_wortauskunft_wohnt_in_sources_grounded_zuerst():
+    # Die Text->Konzept-Aufloesung ist geteiltes Wissen (sources), keine Companion-
+    # Interna mehr -- erinnerung greift nie wieder in private Attribute einer hoeheren
+    # Schicht. Grounded-zuerst: die wikidata-Kante gewinnt vor anderen Quellen.
+    conn = _fresh()
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q99999", "dbnary")
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q11442", "wikidata")
+    assert sources.bekanntes_wort(conn, "Fahrrad")
+    assert not sources.bekanntes_wort(conn, "Nebelkraehe")
+    assert sources.prominentes_konzept(conn, "Fahrrad") == "Q11442"
+    conn.close()
+
+
+def test_phase0_wort_mit_nur_glosse_ist_bekannt_aber_ohne_konzept():
+    conn = _fresh()
+    reactors.observe_relation(
+        conn, "flanieren@de", "defined_as", "gemächlich spazieren gehen", "dbnary"
+    )
+    assert sources.bekanntes_wort(conn, "flanieren")
+    assert sources.prominentes_konzept(conn, "flanieren") is None
+    conn.close()
+
+
+def test_phase0_companion_delegiert_an_sources():
+    # Strangler: die alten privaten Companion-Helfer bleiben fuer interne Aufrufer,
+    # sind aber nur noch duenne Delegation -- eine Logik, ein Zuhause.
+    from genus import companion
+
+    conn = _fresh()
+    reactors.observe_relation(conn, "Tisch@de", "expresses", "Q14748", "wikidata")
+    assert companion._known(conn, "Tisch") == sources.bekanntes_wort(conn, "Tisch")
+    assert companion._prominent_concept(conn, "Tisch") == sources.prominentes_konzept(
+        conn, "Tisch"
+    )
+    conn.close()
+
+
+def test_phase0_hat_handler_entspricht_der_alten_luecken_logik():
+    # Die oeffentliche Faehigkeits-Auskunft (companion.hat_handler) ersetzt den privaten
+    # _HANDELBAR-Zugriff des VerstehensLuecke-Detectors -- exakt dieselbe Logik: das
+    # Blatt selbst oder seine Zwicky-Zelle (ein is_a-Schritt) traegt einen Handler.
+    from genus import companion, verstehen
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    for leaf, _zelle in verstehen.RASTER_SEED:
+        erwartet = (
+            leaf in companion._HANDELBAR
+            or (verstehen.zelle_of(conn, leaf) or "") in companion._HANDELBAR
+        )
+        assert companion.hat_handler(conn, leaf) == erwartet, leaf
+    assert not companion.hat_handler(conn, "voellig-unbekanntes-blatt")
+    conn.close()

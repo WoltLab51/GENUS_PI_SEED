@@ -19,7 +19,7 @@ Eine Episode ist jetzt ein eigener Knoten mit genau VIER Kanten -- keine weitere
 Damit sind Episoden DURCH DAS WISSEN vernetzt, nicht direkt aneinander -- exakt wie beim
 Menschen: zwei Erinnerungen über dasselbe Thema treffen sich am gemeinsamen Konzept-Knoten,
 nicht an einer Episode-zu-Episode-Kante. ``erwaehnt`` verankert dabei bevorzugt am KONZEPT
-(dem Wikidata-Qid, ``companion._prominent_concept``), nicht an der bloßen Wortform -- so
+(dem Wikidata-Qid, ``sources.prominentes_konzept``), nicht an der bloßen Wortform -- so
 finden sich zwei Erwähnungen auch über Synonyme oder Flexionsformen hinweg ("Fahrrad" und
 "Fahrräder" treffen sich am selben Konzept), nicht nur bei exakt gleicher Schreibung. Nur wenn
 ein Wort keinem Konzept zugeordnet ist (bloß eine DBnary-Glosse ohne Wikidata-Anker), bleibt
@@ -84,23 +84,23 @@ def _kandidaten(tok: str) -> list[str]:
 
 def _erwaehnte_anker(conn, text: str) -> list[str]:
     """Welche Graph-Knoten verankern ``text``? Stärker als reiner Wortabgleich: jedes
-    erkannte Lexem wird, wenn möglich, bis zu seinem KONZEPT aufgelöst (``_prominent_concept``,
-    dieselbe grounded-zuerst-Regel wie in ``companion``) -- so treffen sich zwei Erwähnungen
-    desselben Begriffs am Konzept-Knoten (z.B. der Wikidata-Qid), auch wenn ein Synonym oder
-    eine andere Flexionsform verwendet wurde, statt nur an einer exakten Wortform. Ist kein
-    Konzept bekannt (nur eine DBnary-Glosse ohne Wikidata-Anker), bleibt die Lexem-Kante
-    (``Form@de``) die Rückfalloption -- exakt das bisherige Verhalten."""
-    from genus import companion   # local: vermeidet einen Zyklus companion<->erinnerung
-
+    erkannte Lexem wird, wenn möglich, bis zu seinem KONZEPT aufgelöst
+    (``sources.prominentes_konzept``, die geteilte grounded-zuerst-Regel) -- so treffen
+    sich zwei Erwähnungen desselben Begriffs am Konzept-Knoten (z.B. der Wikidata-Qid),
+    auch wenn ein Synonym oder eine andere Flexionsform verwendet wurde, statt nur an
+    einer exakten Wortform. Ist kein Konzept bekannt (nur eine DBnary-Glosse ohne
+    Wikidata-Anker), bleibt die Lexem-Kante (``Form@de``) die Rückfalloption -- exakt
+    das bisherige Verhalten. (Phase 0 der Ziel-Architektur: die frühere Kopplung an
+    Companion-Interna ist aufgelöst, das Geteilte wohnt jetzt in ``sources``.)"""
     anker: list[str] = []
     gesehen: set[str] = set()
     for tok in _WORD.findall(text):
         if len(tok) < _MIN_WORTLAENGE:
             continue
         for form in _kandidaten(tok):
-            if not companion._known(conn, form):
+            if not sources.bekanntes_wort(conn, form):
                 continue
-            ziel = companion._prominent_concept(conn, form) or f"{form}@de"
+            ziel = sources.prominentes_konzept(conn, form) or f"{form}@de"
             if ziel not in gesehen:
                 anker.append(ziel)
                 gesehen.add(ziel)
