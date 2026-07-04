@@ -129,3 +129,58 @@ def test_rhythmus_proposals_bleiben_ohne_umsetzung():
     event_id = experience.record_experience_proposal(conn, candidate, 1)
     prop = proposals.list_proposals(conn)[-1]
     assert "umsetzung" not in json.loads(prop["payload"])
+
+
+# --- der gesprächsnahe Takt: das "Darf ich?" kommt im Chat, nicht erst nachts ---------
+
+
+def test_der_darf_ich_kommt_im_gespraech_nicht_erst_nachts():
+    from genus import companion
+
+    conn = _fresh()
+    ziele.seed_ziele(conn)
+    verstehen.seed_raster(conn)
+    fake = lambda q: [{"text": q, "absicht": "weltfrage", "subject": None, "object": None}]
+    antworten = [
+        companion.respond_with_deuter(conn, f"Wetterfrage Nummer {i}?", deuter=fake)["text"]
+        for i in range(4)
+    ]
+    # unter der Schwelle: die ehrliche Luecken-Antwort OHNE Vorschlag
+    assert all("Vorschlag" not in a for a in antworten[:2])
+    # im Moment des Schwellen-Risses: das "Darf ich?" steht IN der Antwort
+    assert "Vorschlag" in antworten[2] and "governance" in antworten[2]
+    # danach: kein Duplikat (die Experience existiert, der Kandidat kommt nie wieder)
+    assert "Vorschlag" not in antworten[3]
+    luecken = [r for r in proposals.list_proposals(conn)
+               if json.loads(r["payload"]).get("experience_type") == "VerstehensLuecke"]
+    assert len(luecken) == 1
+    assert json.loads(luecken[0]["payload"])["umsetzung"]["blatt"] == "weltfrage"
+
+
+def test_auch_der_unklar_fall_meldet_sich_im_gespraech():
+    from genus import companion
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    leer = lambda q: []   # der Deuter lief und fand ehrlich nichts
+    antworten = [
+        companion.respond_with_deuter(conn, f"voellig wirres Zeug {i}", deuter=leer)["text"]
+        for i in range(3)
+    ]
+    assert "Vorschlag" in antworten[2]
+    luecken = [r for r in proposals.list_proposals(conn)
+               if json.loads(r["payload"]).get("experience_type") == "VerstehensLuecke"]
+    assert len(luecken) == 1
+    assert "umsetzung" not in json.loads(luecken[0]["payload"])   # unklar: nichts Umsetzbares
+
+
+def test_der_check_kostet_nie_eine_antwort(monkeypatch):
+    from genus import companion, experience
+
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    monkeypatch.setattr(experience, "spontane_verstehens_luecke",
+                        lambda c: (_ for _ in ()).throw(RuntimeError("kaputt")))
+    fake = lambda q: [{"text": q, "absicht": "weltfrage", "subject": None, "object": None}]
+    result = companion.respond_with_deuter(conn, "Wie wird das Wetter?", deuter=fake)
+    assert "kann ich noch nicht" in result["text"]   # die ehrliche Antwort bleibt

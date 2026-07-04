@@ -1371,7 +1371,26 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
     _record_still(verstehen.record_reading, conn, kind, "model:deuter")
     label = _ZELLEN_LABELS.get(kind, f"„{kind}“")
     return {"text": f"Ich lese das als {label} — das kann ich noch nicht. Ich habe es mir "
-                    f"als Lücke gemerkt.", "question": question, "kind": kind}
+                    f"als Lücke gemerkt." + _luecken_vorschlag_hinweis(conn),
+            "question": question, "kind": kind}
+
+
+def _luecken_vorschlag_hinweis(conn) -> str:
+    """Der gesprächsnahe Lücken-Check (Ronny, 2026-07-04): läuft genau dann, wenn eine
+    Lücken-Lesart aufgezeichnet wurde -- reißt die selbst-kalibrierte Schwelle, entsteht
+    das Proposal SOFORT und das „Darf ich?" steht im selben Atemzug in der Antwort,
+    statt bis zum Nacht-Scan zu warten. Darf nie eine Antwort kosten (still bei jedem
+    Fehler); die Freigabe bleibt am Terminal (die Membran redet nur)."""
+    try:
+        from genus import experience
+        ergebnis = experience.spontane_verstehens_luecke(conn)
+    except Exception:
+        return ""
+    if not ergebnis or not ergebnis.get("proposal_id"):
+        return ""
+    return (f" Das kam jetzt so oft vor, dass ich daraus einen Vorschlag gemacht habe "
+            f"(Proposal #{ergebnis['proposal_id']}) — Freigabe wie immer über "
+            f"genus governance.")
 
 
 def _komponiere(teile: list[str]) -> str:
@@ -1537,7 +1556,8 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             # Fall trotzdem (Struktur, nie Text): auch ein leerer Lauf ist ein blinder Fleck
             if not segmente:
                 _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
-            return {"text": _NICHT_VERSTANDEN, "question": question}
+            return {"text": _NICHT_VERSTANDEN + _luecken_vorschlag_hinweis(conn),
+                    "question": question}
     text = _wort_antwort(conn, question)
     if text is not None:
         text = _stimme_versucht(text, stimme)

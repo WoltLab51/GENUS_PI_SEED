@@ -711,5 +711,27 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
     return candidates
 
 
+def spontane_verstehens_luecke(conn) -> dict | None:
+    """Der GESPRÄCHSNAHE Lücken-Check (Ronny, 2026-07-04: „nachts gehört, was tagsüber
+    stört" -- dieser Scan stört nicht, er war nur aus Metapher nachts; sein Signal
+    entsteht im Gespräch, also gehört sein Takt dorthin). Läuft im Moment einer
+    Lücken-Lesart: dieselben Kandidaten, dieselbe Aufzeichnung, dieselbe Kappe wie im
+    Nacht-Scan (der als Auffangnetz bleibt) -- nur eben JETZT, damit das „Darf ich?"
+    dort ankommt, wo die Lücke gerade gelebt wurde. Der Takt eines Detektors ist ein
+    Merkmal des Detektors, keine globale Cron-Zeile: die drei Historien-Betrachter
+    (Rhythmus/Stabilität/Kalibrierung) bleiben täglich -- ihr Signal bewegt sich nicht
+    schneller. Gibt ``{"kind", "proposal_id"}`` zurück, wenn ein Proposal entstand."""
+    for candidate in _verstehens_luecke_candidates(conn):
+        experience_event_id = record_experience_event(conn, candidate)
+        proposal_id = None
+        if candidate.get("proposable"):
+            record_experience_proposal(conn, candidate, experience_event_id)
+            row = conn.execute("SELECT MAX(id) AS id FROM proposal_log").fetchone()
+            proposal_id = int(row["id"])
+        conn.commit()
+        return {"kind": candidate["pattern"]["kind"], "proposal_id": proposal_id}
+    return None
+
+
 DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates,
              _rule_calibration_candidates, _verstehens_luecke_candidates)
