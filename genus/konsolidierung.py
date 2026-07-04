@@ -99,10 +99,14 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
     """Die EINE Morgen-Nachricht — warm, nativ, deterministisch komponiert (Ronnys
     Entscheidungen: nie leer; Zusammenfassung; nett). Reihenfolge: Gruß → gestern
     (falls konsolidiert) → Wartendes (Freigaben/Fragen) → falls sonst nichts: das
-    frisch Gelernte der Nacht → warmer Schluss."""
-    from genus import inquiries, proposals
+    frisch Gelernte der Nacht → warmer Schluss. Der TON kommt aus der
+    Persönlichkeits-Schicht (Rolle „morgen": hebt die Wärme um eine Stufe) — die
+    Persönlichkeit wählt Formulierungen, nie Inhalte."""
+    from genus import inquiries, persoenlichkeit, proposals
 
-    teile: list[str] = ["Guten Morgen, Ronny!"]
+    reg = persoenlichkeit.register(conn, "morgen")
+    warm = reg["waerme"] in ("warm", "herzlich")
+    teile: list[str] = ["Guten Morgen, Ronny!" if warm else "Guten Morgen, Ronny."]
     inhalt = False
 
     themen = (bericht or {}).get("themen") or []
@@ -111,6 +115,8 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
         teile.append(f"Gestern haben dich vor allem {namen} beschäftigt — "
                      f"ich habe es mir still gemerkt. Wenn etwas davon nicht stimmt, "
                      f"sag einfach Bescheid.")
+        if reg["neugier"] == "ja":
+            teile.append("Magst du mir heute mehr davon erzählen?")
         inhalt = True
 
     offene_proposals = [p for p in proposals.list_proposals(conn)]
@@ -136,5 +142,10 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
         else:
             teile.append("Die Nacht war ruhig — ich habe gelesen und gelernt.")
 
-    teile.append("Ich wünsche dir einen guten Start in den Tag!")
+    schluss = ("Ich wünsche dir einen richtig guten Start in den Tag!"
+               if reg["waerme"] == "herzlich"
+               else "Ich wünsche dir einen guten Start in den Tag!")
+    if reg["humor"] == "dezent":
+        schluss += " (Ich übe derweil weiter Vokabeln — einer muss es ja tun.)"
+    teile.append(schluss)
     return " ".join(teile)

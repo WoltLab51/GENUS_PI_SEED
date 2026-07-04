@@ -654,9 +654,13 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
 
 def _notiz_bezug(conn, question: str) -> str | None:
     """Ein kurzer, ehrlicher Nebenbei-Hinweis, falls ``question`` denselben Begriff berührt wie
-    eine gemerkte Episode -- ``None`` sonst. Nie erfunden: die Episode wird wörtlich zitiert."""
-    from genus import erinnerung  # local: keeps companion's import-time surface a leaf otherwise
+    eine gemerkte Episode -- ``None`` sonst. Nie erfunden: die Episode wird wörtlich zitiert.
+    Bei Knappheit „knapp" (Chat-Regler „sei knapper") entfällt das Beiläufige ganz — der
+    ehrliche Verbraucher dieser Achse: Persönlichkeit wirkt an der Sprache, nie am Wissen."""
+    from genus import erinnerung, persoenlichkeit  # local: keeps companion's import-time surface a leaf otherwise
 
+    if persoenlichkeit.register(conn, "plausch")["knappheit"] == "knapp":
+        return None
     treffer = erinnerung.erwaehnter_bezug(conn, question)
     if treffer is None:
         return None
@@ -675,10 +679,45 @@ def _notiz_bezug(conn, question: str) -> str | None:
 # The stages are factored so the Verstehens-Würfel (respond_with_deuter, below) can reuse them
 # in a different order without duplicating their logic.
 
+# Der Chat-Regler der Persönlichkeit (Ronnys Entscheidung 2026-07-04: „gleich mitbauen"):
+# EXAKTE Kommandos, ein Ritual wie „merke dir" -- eine klare Anweisung braucht keinen Deuter.
+# Jede Achse ist erreichbar; der Regler bewegt genau EINE Stufe (persoenlichkeit.stelle).
+_REGLER_CUES: dict[str, tuple[str, int]] = {
+    "sei knapper": ("knappheit", -1),
+    "sei ausführlicher": ("knappheit", +1),
+    "sei ausfuehrlicher": ("knappheit", +1),
+    "sei wärmer": ("waerme", +1),
+    "sei waermer": ("waerme", +1),
+    "sei nüchterner": ("waerme", -1),
+    "sei nuechterner": ("waerme", -1),
+    "mehr humor": ("humor", +1),
+    "weniger humor": ("humor", -1),
+    "sei neugieriger": ("neugier", +1),
+    "sei weniger neugierig": ("neugier", -1),
+}
+
+
+def _regler_antwort(conn, question: str) -> str | None:
+    """Erkennt ein exaktes Regler-Kommando (satzzeichen-tolerant) und stellt die Art —
+    ``None``, wenn die Frage kein Regler-Kommando ist."""
+    from genus import persoenlichkeit
+
+    cue = _REGLER_CUES.get(question.strip().strip(".!?— ").casefold())
+    if cue is None:
+        return None
+    res = persoenlichkeit.stelle(conn, *cue)
+    name = persoenlichkeit.ANZEIGE[cue[0]]
+    wert = persoenlichkeit.WERT_ANZEIGE.get(res["wert"], res["wert"])
+    if res["gestellt"]:
+        return (f"Gern — {name} steht jetzt auf „{wert}“. "
+                f"(Als Einstellung gemerkt — Quelle: du.)")
+    return f"{name} steht schon auf „{wert}“ — weiter geht es in diese Richtung nicht."
+
+
 def _ritual_antwort(conn, question: str) -> str | None:
-    """The unambiguous rituals -- explicit memory, recall, fixed state queries, GENUS's own
-    open questions. Exact/cue matches, deterministic, never model-deuted (a clear command
-    needs no interpretation). ``None`` when no ritual claims the question."""
+    """The unambiguous rituals -- explicit memory, recall, the personality dial, fixed state
+    queries, GENUS's own open questions. Exact/cue matches, deterministic, never model-deuted
+    (a clear command needs no interpretation). ``None`` when no ritual claims the question."""
     from genus import erinnerung, query  # local: keeps companion's import-time surface a leaf otherwise
 
     fact = remember_command(question)
@@ -687,6 +726,9 @@ def _ritual_antwort(conn, question: str) -> str | None:
         return f"Gemerkt: „{fact}“"
     if is_recall_question(question):
         return narrate_notes(erinnerung.bestaetigte_episoden(conn), erinnerung.vermutete_episoden(conn))
+    regler = _regler_antwort(conn, question)
+    if regler is not None:
+        return regler
     state = query.ask(conn, question)
     if state.get("kind") != "unknown":
         return state["answer"]
@@ -1171,13 +1213,38 @@ def _ist_kurze_aeusserung(text: str) -> bool:
 def _zelle_gruss(conn, guess, question, last_question, last_answer, stimme=None):
     if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
-    return "Hallo! Frag mich etwas, oder sag „was weißt du?“, um zu hören, was ich mir gemerkt habe."
+    # Persönlichkeit wirkt an der SPRACHE (Rolle: plausch): Wärme wählt die Variante,
+    # Neugier hängt die echte Frage an -- Fakten/Ehrlichkeit bleiben unberührt.
+    from genus import persoenlichkeit
+
+    reg = persoenlichkeit.register(conn, "plausch")
+    varianten = {
+        "nuechtern": "Hallo.",
+        "neutral": "Hallo!",
+        "warm": "Hallo! Schön, dass du da bist.",
+        "herzlich": "Hallo! Wie schön, dass du da bist!",
+    }
+    text = varianten.get(reg["waerme"], "Hallo!")
+    if reg["neugier"] == "ja":
+        text += " Was beschäftigt dich gerade?"
+    else:
+        text += " Frag mich etwas, oder sag „was weißt du?“."
+    return text
 
 
 def _zelle_dank(conn, guess, question, last_question, last_answer, stimme=None):
     if not _ist_kurze_aeusserung(guess.get("text") or question):
         return None
-    return "Gern geschehen."
+    from genus import persoenlichkeit
+
+    reg = persoenlichkeit.register(conn, "plausch")
+    varianten = {
+        "nuechtern": "Gern.",
+        "neutral": "Gern geschehen.",
+        "warm": "Gern geschehen!",
+        "herzlich": "Gern geschehen — jederzeit!",
+    }
+    return varianten.get(reg["waerme"], "Gern geschehen.")
 
 
 def _zelle_lob(conn, guess, question, last_question, last_answer, stimme=None):
