@@ -171,6 +171,22 @@ def record_experience_proposal(conn, candidate: dict, experience_event_id: int) 
     # VerstehensLuecke-Detector war die Erzeugung auf den Rhythmus-Detector hartkodiert
     # (claim_value "daily_rhythm", Rhythmus-Beschreibung); der Default bleibt unverändert.
     eigen = candidate.get("proposal") or {}
+    payload = {
+        "description": eigen.get("description") or (
+            f"Recurring experience detected: {candidate['summary']}. "
+            "Review whether this rhythm is expected."
+        ),
+        "observed_pattern": candidate["experience_key"],
+        "experience_id": candidate["experience_id"],
+        "experience_key": candidate["experience_key"],
+        "experience_type": candidate["experience_type"],
+        "action_required": eigen.get("action_required", False),
+        "review_recommended": True,
+    }
+    # Selbst-Codieren Stufe 1: ein Kandidat darf seinem Proposal eine deklarative
+    # UMSETZUNG mitgeben -- nach der Freigabe führt genus/umsetzung.py sie aus
+    if isinstance(eigen.get("umsetzung"), dict):
+        payload["umsetzung"] = eigen["umsetzung"]
     return proposals.record_proposal_created_event(
         conn,
         proposal_id=proposals.next_proposal_id(conn),
@@ -179,18 +195,7 @@ def record_experience_proposal(conn, candidate: dict, experience_event_id: int) 
         claim_value=eigen.get("claim_value", "daily_rhythm"),
         source_belief=None,
         source_event=experience_event_id,
-        payload={
-            "description": eigen.get("description") or (
-                f"Recurring experience detected: {candidate['summary']}. "
-                "Review whether this rhythm is expected."
-            ),
-            "observed_pattern": candidate["experience_key"],
-            "experience_id": candidate["experience_id"],
-            "experience_key": candidate["experience_key"],
-            "experience_type": candidate["experience_type"],
-            "action_required": eigen.get("action_required", False),
-            "review_recommended": True,
-        },
+        payload=payload,
     )
 
 
@@ -663,9 +668,34 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
             was = "Nachrichten, die ich gar nicht deuten konnte"
             plan = ("mein Deuten selbst muss besser werden — schärfere Anker-Beispiele "
                     "oder ein stärkeres Deuter-Modell")
+            umsetzung = None   # "unklar" ist kein Blatt -- es gibt nichts sicher Umsetzbares
         else:
             was = f"das Blatt „{kind}“, das ich lese, aber nicht beantworten kann"
-            plan = "dieses Blatt soll eine Fähigkeit bekommen"
+            plan = ("dieses Blatt soll eine Fähigkeit bekommen — nach Freigabe verankere "
+                    "ich sie selbst als benanntes Ziel in meinem Ziel-Graphen")
+            # Selbst-Codieren Stufe 1: das Proposal trägt seine UMSETZUNG deklarativ mit --
+            # nach der Freigabe führt genus/umsetzung.py sie aus (Graph-Wissen, nie Code)
+            umsetzung = {
+                "art": "faehigkeits_ziel",
+                "blatt": kind,
+                "beschreibung": (
+                    f"Eine Fähigkeit für die Verstehens-Lesart „{kind}“ — {total}-mal in "
+                    f"echten Gesprächen gelesen, aber nicht beantwortbar (selbst gespürt, "
+                    f"von Ronny freigegeben)."
+                ),
+            }
+        proposal = {
+            "claim_value": "verstehens_luecke",
+            "action_required": True,
+            "description": (
+                f"Ich spüre eine Lücke: {was} — {total}-mal in echten Gesprächen "
+                f"(selbst-kalibrierte Schwelle: {schwelle}). Mein Plan: {plan}. "
+                f"Darf ich das priorisieren? "
+                f"(Freigabe über genus governance; die Umsetzung bleibt gegated.)"
+            ),
+        }
+        if umsetzung is not None:
+            proposal["umsetzung"] = umsetzung
         candidates.append({
             "experience_key": f"verstehens_luecke:{kind}",
             "experience_type": VERSTEHENS_LUECKE_TYPE,
@@ -676,16 +706,7 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
             "derivation": VERSTEHENS_LUECKE_DERIVATION,
             "summary": f"Verstehens-Lücke „{kind}“: {total} Lesungen (Schwelle {schwelle})",
             "proposable": True,
-            "proposal": {
-                "claim_value": "verstehens_luecke",
-                "action_required": True,
-                "description": (
-                    f"Ich spüre eine Lücke: {was} — {total}-mal in echten Gesprächen "
-                    f"(selbst-kalibrierte Schwelle: {schwelle}). Mein Plan: {plan}. "
-                    f"Darf ich das priorisieren? "
-                    f"(Freigabe über genus governance; die Umsetzung bleibt gegated.)"
-                ),
-            },
+            "proposal": proposal,
         })
     return candidates
 

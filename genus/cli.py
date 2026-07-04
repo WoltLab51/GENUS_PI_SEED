@@ -32,6 +32,7 @@ from genus import (
     sensor,
     sources,
     state,
+    umsetzung,
     werkzeug,
     werkzeuge_seed,
 )
@@ -347,6 +348,9 @@ def _atlas_facts() -> str:
             f"- **Event-Router:** {len(event_router.PROJEKTOREN)} registrierte Projektoren, "
             f"{len(event_router.BEWUSST_ROH)} bewusst-rohe Event-Typen "
             f"(Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)",
+            f"- **Selbst-Codieren Stufe 1:** {len(umsetzung.UMSETZUNGEN)} registrierte "
+            f"Umsetzungs-Art(en) ({', '.join(sorted(umsetzung.UMSETZUNGEN))}) — nur "
+            f"Graph-Wissen, Ausführung erst nach Freigabe",
             "",
         ]
     )
@@ -1140,6 +1144,13 @@ def proposals_review(
         click.echo(f"[GOV] proposal {proposal_id} {decision}")
         if note:
             click.echo(f"[GOV] note: {note}")
+        # Selbst-Codieren Stufe 1: trägt das akzeptierte Proposal eine deklarative
+        # Umsetzung, wird sie JETZT ausgeführt -- die Freigabe eben war das Gate
+        # (Gate-Politik §8: Freigabe pro Stück), genau einmal, nur registrierte Arten.
+        if decision == "accepted":
+            ergebnis = umsetzung.umsetzen(conn, proposal_id)
+            if ergebnis["umgesetzt"]:
+                click.echo(f"[GOV] umgesetzt ({ergebnis['art']}): {ergebnis['ergebnis']}")
     finally:
         conn.close()
 

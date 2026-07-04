@@ -87,6 +87,8 @@ BEWUSST_ROH: frozenset[str] = frozenset({
     "ledger_epoch_opened",     # der Siegel-Epochen-Marker (sealing.py) -- Kette, kein Zustand
     "werkzeug_registriert",    # die Registrierungs-ENTSCHEIDUNG (Phase 3 Scheibe 2); die
                                # Laufzeit-Registry wird aus Code neu gebaut, nicht projiziert
+    "proposal_umgesetzt",      # Ausführungs-Spur von Stufe 1 (genus/umsetzung.py); die
+                               # WIRKUNG sind normale, projizierte relation_asserted-Events
 })
 
 

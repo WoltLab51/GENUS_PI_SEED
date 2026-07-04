@@ -175,6 +175,11 @@ REQUIRED_EVENT_KEYS = {
         "pruefbar_als",
         "quelle",
     },
+    "proposal_umgesetzt": {
+        "proposal_id",
+        "art",
+        "ergebnis",
+    },
 }
 
 
