@@ -101,12 +101,15 @@ def test_all_four_math_werkzeuge_pass_the_contract_check():
 
 
 def test_all_four_math_werkzeuge_are_wortlautfest_and_never_stimme_geeignet():
-    # Konsistenz-Beweis mit der ALTEN, handgepflegten Menge in companion.py: dieselbe
-    # Zelle "berechnen" darf dort auch nicht als Stimme-geeignet gelten
+    # Seit Phase 3 gibt es keine zweite handgepflegte Menge mehr: die Stimme-Eignung
+    # folgt überall strukturell aus der Spec. "berechnen" hat bewusst KEINEN
+    # Zellen-Registry-Eintrag (nur die vier Mathe-Werkzeuge + die Muster-Schnellspur)
+    # -- ein unregistrierter Name ist automatisch nie Stimme-geeignet.
     werkzeuge_seed.registriere_mathe_werkzeuge()
+    companion.registriere_zellen()
     for name in ("ableitung", "extremstellen", "stammfunktion", "integral"):
         assert werkzeug.stimme_geeignet(name) is False, name
-    assert "berechnen" not in companion._STIMME_GEEIGNET
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}berechnen") is False
 
 
 def test_ableitung_werkzeug_actually_computes_through_the_registry():
@@ -134,3 +137,44 @@ def test_alle_returns_werkzeuge_sorted_by_name():
     namen = [w.name for w in werkzeug.alle()]
     assert namen == sorted(namen)
     assert "ableitung" in namen and "integral" in namen
+
+
+# --- Phase 3 Scheibe 1: die Gesprächszellen laufen durch den Werkzeugbauer ------------
+
+
+def test_alle_zellen_sind_registrierte_geprueft_werkzeuge():
+    companion.registriere_zellen()
+    zellen = companion._handelbare_werkzeuge()
+    assert set(zellen) == set(companion._HANDELBAR)   # gleiche Namen, jetzt geprüft
+    for name, w in zellen.items():
+        assert werkzeug.pruefen(w) == [], name
+        assert w.name == f"{companion.ZELLE_PREFIX}{name}"
+        assert w.beschreibung.strip(), name
+        assert w.pruefbar_als, name
+
+
+def test_zellen_schreibrechte_sind_ausdruecklich():
+    # Nur merken/tatsache schreiben (via erinnerung.merke) -- alles andere liest.
+    zellen = companion._handelbare_werkzeuge()
+    schreibend = {name for name, w in zellen.items() if w.schreibt}
+    assert schreibend == {"merken", "tatsache"}
+
+
+def test_stimme_eignung_folgt_strukturell_aus_der_spec():
+    # Die frühere zweite Menge _STIMME_GEEIGNET ist weg -- Eignung = not wortlautfest.
+    companion.registriere_zellen()
+    frei = {name for name, w in companion._handelbare_werkzeuge().items()
+            if not w.wortlautfest}
+    assert frei == {"definition", "beziehung", "vergleich", "grammatik", "frage-begriff"}
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}definition")
+    assert not werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}wiederholen")
+    assert not hasattr(companion, "_STIMME_GEEIGNET")
+
+
+def test_dispatch_ueberlebt_eine_geleerte_registry():
+    # conftest leert die REGISTRY vor jedem Test -- der Dispatch registriert idempotent
+    # nach (dieselbe Selbstheilung wie registriere_mathe_werkzeuge): eine geleerte
+    # Registry darf nie eine stumme Antwort-Lücke erzeugen.
+    werkzeug.REGISTRY.clear()
+    zellen = companion._handelbare_werkzeuge()
+    assert "definition" in zellen and "dank" in zellen

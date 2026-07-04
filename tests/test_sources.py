@@ -1970,15 +1970,19 @@ def test_phase0_companion_delegiert_an_sources():
 def test_phase0_hat_handler_entspricht_der_alten_luecken_logik():
     # Die oeffentliche Faehigkeits-Auskunft (companion.hat_handler) ersetzt den privaten
     # _HANDELBAR-Zugriff des VerstehensLuecke-Detectors -- exakt dieselbe Logik: das
-    # Blatt selbst oder seine Zwicky-Zelle (ein is_a-Schritt) traegt einen Handler.
+    # Blatt selbst oder seine Zwicky-Zelle (ein is_a-Schritt) traegt eine Zelle. Seit
+    # Phase 3 liest hat_handler die Werkzeug-Registry; das Seed-Dict bleibt die
+    # inhaltliche Referenz (die Registry spiegelt es geprueft wider).
     from genus import companion, verstehen
 
     conn = _fresh()
     verstehen.seed_raster(conn)
+    zellen = companion._handelbare_werkzeuge()
+    assert set(zellen) == set(companion._HANDELBAR)
     for leaf, _zelle in verstehen.RASTER_SEED:
         erwartet = (
-            leaf in companion._HANDELBAR
-            or (verstehen.zelle_of(conn, leaf) or "") in companion._HANDELBAR
+            leaf in zellen
+            or (verstehen.zelle_of(conn, leaf) or "") in zellen
         )
         assert companion.hat_handler(conn, leaf) == erwartet, leaf
     assert not companion.hat_handler(conn, "voellig-unbekanntes-blatt")

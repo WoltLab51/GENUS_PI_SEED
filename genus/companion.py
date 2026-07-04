@@ -1153,6 +1153,11 @@ def _zelle_abschied(conn, guess, question, last_question, last_answer, stimme=No
 # ZELLEN). Die Schlüssel sind jetzt teils Feinblätter (definition, gruss, ...), teils die
 # Kreuzprodukt-Zelle selbst ("frage-begriff") -- der EINE weiche Landeplatz für Blätter ohne
 # eigenen Handler (verstehen.zelle_of macht daraus nie mehr als einen Klettersprung).
+# Der CODE-SEITIGE SEED der Gesprächszellen (Phase 3 der Ziel-Architektur): dieses Dict ist
+# nicht mehr die Dispatch-Tabelle, sondern das Rohmaterial, aus dem registriere_zellen()
+# geprüfte Werkzeug-Einträge baut -- derselbe Bootstrap-Boden wie RASTER_SEED/ZIEL_SEED.
+# Alle Laufzeit-Verbraucher (Dispatch, Stimme-Eignung, hat_handler, atlas-facts) lesen die
+# REGISTRY (via _handelbare_werkzeuge), nie mehr dieses Dict direkt.
 _HANDELBAR = {
     "frage-begriff": _zelle_frage_begriff,
     "definition": _zelle_definition,
@@ -1179,17 +1184,81 @@ _HANDELBAR = {
     "abschied": _zelle_abschied,
 }
 
+ZELLE_PREFIX = "zelle:"
+
+# Die zwei Pflicht-Entscheidungen der Werkzeug-Spec, pro Zelle ausdrücklich getroffen:
+# WELCHE Zellen schreiben (alles andere liest nur), und welche NICHT wortlautfest sind
+# (nur diese dürfen der Stimme angeboten werden -- die frühere zweite, handgepflegte
+# Menge _STIMME_GEEIGNET ist damit weg; die Eignung folgt strukturell aus der Spec,
+# genau die Bug-Klasse, für die werkzeug.wortlautfest gebaut wurde).
+_ZELLEN_SCHREIBEND = frozenset({"tatsache", "merken"})
+_ZELLEN_FREI_FORMULIERBAR = frozenset({
+    "definition", "beziehung", "vergleich", "grammatik", "frage-begriff",
+})
+_ZELLEN_PRUEFBAR = {
+    "definition": "graph", "beziehung": "graph", "vergleich": "graph",
+    "grammatik": "graph", "frage-begriff": "graph", "zustand": "graph",
+    "offene-fragen": "graph", "ziele": "graph",
+    "warum-herkunft": "sitzung", "vertiefung": "sitzung", "anschlussfrage": "sitzung",
+    "kuerzer": "sitzung", "ausfuehrlicher": "sitzung", "anders-erklaeren": "sitzung",
+    "wiederholen": "sitzung",
+    "tatsache": "erinnerung", "merken": "erinnerung", "erinnerungs-abruf": "erinnerung",
+    "gruss": "fest", "dank": "fest", "lob": "fest", "kritik": "fest", "abschied": "fest",
+}
+
+
+def registriere_zellen() -> None:
+    """Verdrahtet jede Gesprächszelle als geprüftes Werkzeug (Name ``zelle:<blatt>``) --
+    idempotent (Verdrahten ersetzt per Name). Damit laufen die Zellen durch denselben
+    Vertrag wie die Mathe-Werkzeuge: Signatur-Abgleich, Pflicht-Entscheidung wortlautfest,
+    explizites schreibt."""
+    from genus import werkzeug
+
+    parameter = {
+        "guess": werkzeug.Parameter(typ="Text", pflicht=True),
+        "question": werkzeug.Parameter(typ="Text", pflicht=True),
+        "last_question": werkzeug.Parameter(typ="Text"),
+        "last_answer": werkzeug.Parameter(typ="Text"),
+        "stimme": werkzeug.Parameter(typ="Text"),
+    }
+    for name, handler in _HANDELBAR.items():
+        beschreibung = (handler.__doc__ or "").strip().split("\n")[0].strip() \
+            or f"Gesprächszelle „{name}“ des Verstehens-Würfels"
+        werkzeug.verdrahten(werkzeug.Werkzeug(
+            name=f"{ZELLE_PREFIX}{name}",
+            beschreibung=beschreibung,
+            parameter=parameter,
+            schreibt=name in _ZELLEN_SCHREIBEND,
+            wortlautfest=name not in _ZELLEN_FREI_FORMULIERBAR,
+            pruefbar_als=_ZELLEN_PRUEFBAR[name],
+            implementierung=handler,
+        ))
+
+
+def _handelbare_werkzeuge() -> dict:
+    """Die lebende Dispatch-Sicht: Blattname -> Werkzeug, aus der Registry gelesen
+    (Registrierung idempotent sichergestellt). Die eine Quelle der Wahrheit für den
+    Dispatch, die Stimme-Eignung und die Fähigkeits-Auskunft."""
+    from genus import werkzeug
+
+    registriere_zellen()
+    return {
+        w.name[len(ZELLE_PREFIX):]: w
+        for w in werkzeug.alle()
+        if w.name.startswith(ZELLE_PREFIX)
+    }
+
 
 def hat_handler(conn, kind: str) -> bool:
     """Kann GENUS auf diese Lesart handeln? Wahr, wenn das Blatt selbst oder seine
-    Zwicky-Zelle (ein is_a-Schritt hoch, wie im Dispatch) einen Handler trägt. Die
-    öffentliche Fähigkeits-Auskunft für andere Schichten (z.B. den VerstehensLuecke-
-    Detector) -- statt privater ``_HANDELBAR``-Zugriffe von außen. Wandert in Phase 3
-    der Ziel-Architektur in die Werkzeug-Registry."""
+    Zwicky-Zelle (ein is_a-Schritt hoch, wie im Dispatch) ein registriertes Zellen-
+    Werkzeug trägt. Die öffentliche Fähigkeits-Auskunft für andere Schichten (z.B. den
+    VerstehensLuecke-Detector) -- liest die Werkzeug-Registry (Phase 3)."""
     from genus import verstehen  # local: companion<->verstehen bleibt zyklenfrei
 
-    return (kind in _HANDELBAR
-            or (verstehen.zelle_of(conn, kind) or "") in _HANDELBAR)
+    zellen = _handelbare_werkzeuge()
+    return (kind in zellen
+            or (verstehen.zelle_of(conn, kind) or "") in zellen)
 
 
 def _record_still(fn, *args) -> None:
@@ -1217,7 +1286,9 @@ def _record_still(fn, *args) -> None:
 # Zeile größer als der Stil-Gewinn.
 
 _STIMME_TAG = " (Sprachlich vom Modell geglättet — Fakten unverändert.)"
-_STIMME_GEEIGNET = {"definition", "beziehung", "vergleich", "grammatik", "frage-begriff"}
+# Die frühere Menge _STIMME_GEEIGNET ist weg (Phase 3): welche Zellen der Stimme angeboten
+# werden dürfen, folgt strukturell aus der wortlautfest-Pflichtentscheidung ihrer
+# Werkzeug-Spec (registriere_zellen / werkzeug.stimme_geeignet) -- eine Quelle, kein Paar.
 
 
 def _stimme_versucht(text: str, stimme) -> str:
@@ -1269,20 +1340,24 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         # (Selbst-Codieren Stufe 0 -- GENUS spürt selbst, wo sein Verstehen nicht hinreicht)
         _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
         return None
+    zellen = _handelbare_werkzeuge()
     zelle = verstehen.zelle_of(conn, kind)
     attempted = [kind] + ([zelle] if zelle else [])
     hatte_handler = False
     for step in attempted:
-        handler = _HANDELBAR.get(step)
-        if handler is None:
+        zellen_werkzeug = zellen.get(step)
+        if zellen_werkzeug is None:
             continue
         hatte_handler = True
-        text = handler(conn, guess, question, last_question, last_answer, stimme)
+        text = zellen_werkzeug.implementierung(conn, guess, question, last_question,
+                                               last_answer, stimme)
         if text is not None:
             _record_still(verstehen.record_reading, conn, kind, "model:deuter")
             marker = "" if step in ("tatsache", "merken") else _DEUTED
             anchor = last_question if step in _ANCHOR_BLEIBT else question
-            if step in _STIMME_GEEIGNET:
+            if not zellen_werkzeug.wortlautfest:
+                # Stimme-Eignung folgt strukturell aus der Spec (Phase 3) -- keine zweite,
+                # separat zu pflegende Menge mehr
                 text = _personalisiert(conn, question, text, stimme, marker)
             elif marker and marker not in text:
                 # die Meta-Zellen bauen auf last_answer auf, das oft schon einen Hinweis trägt
@@ -1331,10 +1406,11 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     werden über :func:`_komponiere` zu einer zusammengefügt.
 
     When a ``stimme`` callable is given, every narrate-style factual answer -- Muster/Wort AND
-    the Deuter-driven cells in :data:`_STIMME_GEEIGNET` (definition/beziehung/vergleich/
-    grammatik/frage-begriff; a plain "Was ist ein Hund?" reaches the Deuter now that it runs
-    before the word reading, so it must be covered too) -- is offered to it for a more natural
-    rephrase (:func:`_stimme_versucht`), always safe to fall back, never required. The SAME
+    the Deuter-driven cells whose Werkzeug-Spec says ``wortlautfest=False`` (definition/
+    beziehung/vergleich/grammatik/frage-begriff; a plain "Was ist ein Hund?" reaches the Deuter
+    now that it runs before the word reading, so it must be covered too) -- is offered to it
+    for a more natural rephrase (:func:`_stimme_versucht`), always safe to fall back, never
+    required. The SAME
     answers, on the conversational path only (``deuter is not None``), are also offered a
     Notiz-Bezug (:func:`_notiz_bezug`, Personen-Gedächtnis Scheibe 2) -- a personal note woven
     in beiläufig when its text shares a word with the question. Multi-line/structured answers
@@ -1371,11 +1447,14 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         if deuter is not None:   # recording/notes only on the conversational (bot) path, not
             # for the CLI -- Stimme itself stays independent of deuter (always offered when given)
             _record_still(verstehen.record_reading, conn, muster[1], "muster")
-        # dieselbe Eignungs-Prüfung wie beim Deuter-Pfad (_STIMME_GEEIGNET) -- live gefunden
-        # (2026-07-03): bislang lagen alle drei Muster-Zellen zufällig IN der Menge, sodass die
-        # fehlende Prüfung hier nie auffiel; die neue "berechnen"-Zelle (exakte Formel, viel zu
-        # hohes Korruptionsrisiko bei einer Umformulierung) deckte die Lücke sofort auf
-        text = _stimme_versucht(muster[0], stimme) if muster[1] in _STIMME_GEEIGNET else muster[0]
+        # dieselbe Eignungs-Prüfung wie beim Deuter-Pfad, jetzt strukturell aus der
+        # Werkzeug-Spec (Phase 3): eine Zelle ohne Registry-Eintrag (z.B. "berechnen",
+        # exakte Formel) ist automatisch wortlautfest -- stimme_geeignet ist dann False,
+        # niemand kann die Eignung mehr an einer zweiten Stelle vergessen
+        registriere_zellen()
+        from genus import werkzeug as _werkzeug
+        text = (_stimme_versucht(muster[0], stimme)
+                if _werkzeug.stimme_geeignet(f"{ZELLE_PREFIX}{muster[1]}") else muster[0])
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
         return {"text": text, "question": question}

@@ -316,8 +316,10 @@ def _atlas_facts() -> str:
     pattern_listen = [n for n in dir(companion) if n.isupper() and n.endswith("_PATTERNS")]
     muster_gesamt = sum(len(getattr(companion, n)) for n in pattern_listen)
     werkzeuge_seed.registriere_mathe_werkzeuge()
+    companion.registriere_zellen()
     werkzeuge = werkzeug.alle()
     wortlautfest_n = sum(1 for w in werkzeuge if w.wortlautfest)
+    zellen_n = sum(1 for w in werkzeuge if w.name.startswith(companion.ZELLE_PREFIX))
 
     return "\n".join(
         [
@@ -338,9 +340,10 @@ def _atlas_facts() -> str:
             f"- **Verstehens-Raster:** {len(verstehen.RASTER_SEED)} Feinblätter, "
             f"{len(verstehen.ZELLEN)} Zwicky-Zellen",
             f"- **Companion-Dispatch:** {len(pattern_listen)} Muster-Listen "
-            f"({muster_gesamt} Muster gesamt), {len(companion._HANDELBAR)} handelbare Zellen",
+            f"({muster_gesamt} Muster gesamt), {zellen_n} handelbare Zellen "
+            f"(als Werkzeuge registriert)",
             f"- **Werkzeugbauer:** {len(werkzeuge)} registrierte Werkzeuge "
-            f"({wortlautfest_n} wortlautfest)",
+            f"({wortlautfest_n} wortlautfest, davon {zellen_n} Gesprächszellen)",
             f"- **Event-Router:** {len(event_router.PROJEKTOREN)} registrierte Projektoren, "
             f"{len(event_router.BEWUSST_ROH)} bewusst-rohe Event-Typen "
             f"(Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)",
