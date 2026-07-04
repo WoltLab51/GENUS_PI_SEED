@@ -138,6 +138,62 @@ def test_morgen_nachricht_fragt_bei_neugier_nach_den_themen(conn):
     assert "Magst du mir heute mehr davon erzählen?" in text
 
 
+# --- der Umbau: der Regler ist eine Raster-Zelle (Charta: keine zweite Wahrheit) --------
+
+def test_einstellung_ist_ein_blatt_im_raster_unter_aufforderung_genus(conn):
+    from genus import verstehen
+    verstehen.seed_raster(conn)
+    eltern = [r["object"] for r in sources.relations(
+        conn, subject="absicht:einstellung", predicate="is_a")]
+    assert eltern == ["zelle:aufforderung-genus"]
+
+
+def test_regler_deute_liest_achse_und_richtung_aus_freier_formulierung():
+    assert companion._regler_deute("könntest du dich generell etwas kürzer fassen?") == ("knappheit", -1)
+    assert companion._regler_deute("etwas mehr Humor bitte") == ("humor", +1)
+    assert companion._regler_deute("bitte weniger humor") == ("humor", -1)
+    assert companion._regler_deute("antworte ruhig etwas herzlicher") == ("waerme", +1)
+    assert companion._regler_deute("bleib sachlicher") == ("waerme", -1)
+
+
+def test_regler_deute_faellt_bei_mehrdeutigem_oder_leerem_ehrlich_durch():
+    assert companion._regler_deute("sei wärmer und knapper") is None   # zwei Achsen -> nie raten
+    assert companion._regler_deute("stell dich anders ein") is None
+
+
+def test_einstellungs_zelle_stellt_ueber_den_deuter_pfad(conn):
+    deuter = lambda q: [{"absicht": "einstellung",
+                         "text": "könntest du dich generell etwas kürzer fassen?"}]
+    result = companion.respond_with_deuter(
+        conn, "könntest du dich generell etwas kürzer fassen?", deuter=deuter)
+    assert "Knappheit" in result["text"] and "„knapp“" in result["text"]
+    assert persoenlichkeit.art(conn)["knappheit"] == "knapp"
+
+
+def test_einstellungs_zelle_fragt_bei_unklarer_richtung_ehrlich_nach(conn):
+    deuter = lambda q: [{"absicht": "einstellung", "text": "stell dich mal anders ein"}]
+    result = companion.respond_with_deuter(conn, "stell dich mal anders ein", deuter=deuter)
+    assert "Richtung" in result["text"] and "Wärme" in result["text"]
+    assert persoenlichkeit.art(conn) == persoenlichkeit.ART_SEED   # nichts geraten
+
+
+def test_beide_tueren_fuehren_zur_selben_wahrheit(conn):
+    # Ritual-Schnellspur und Raster-Zelle teilen Implementierung UND Wortlaut
+    ritual = companion._ritual_antwort(conn, "sei knapper")
+    zelle = companion._zelle_einstellung(
+        conn, {"text": "sei doch bitte etwas knapper"}, "sei doch bitte etwas knapper",
+        None, None)
+    assert "Knappheit" in ritual and "steht schon" not in ritual
+    assert zelle == "Knappheit steht schon auf „knapp“ — weiter geht es in diese Richtung nicht."
+
+
+def test_einstellung_ist_ein_registriertes_schreibendes_werkzeug():
+    from genus import werkzeug
+    spec = companion._handelbare_werkzeuge()["einstellung"]
+    assert spec.schreibt is True
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}einstellung") is False
+
+
 def test_leitplanke_persoenlichkeit_aendert_nie_das_wissen(conn):
     # dieselbe Wissensfrage, extrem verschiedene Register -- der Fakten-Kern der Antwort
     # ist byte-identisch (nur Beiläufiges/Soziales darf variieren)

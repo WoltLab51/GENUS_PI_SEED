@@ -10,8 +10,9 @@
 - **Reifungs-Kandidaten (1):** _activity_expectation_candidates
 - **Preset-Budget (8 feste Schwellen):** CPU_HIGH_THRESHOLD, CPU_LOW_THRESHOLD, DISK_HIGH_THRESHOLD, DISK_LOW_THRESHOLD, MEMORY_HIGH_THRESHOLD, MEMORY_LOW_THRESHOLD, TEMP_HIGH_THRESHOLD, TEMP_LOW_THRESHOLD
 - **Ziele:** 6 Ziele, 8 Fähigkeiten (1 live, 4 teilweise, 3 fehlt), 12 braucht-Kanten
-- **Verstehens-Raster:** 33 Feinblätter, 11 Zwicky-Zellen
-- **Companion-Dispatch:** 8 Muster-Listen (17 Muster gesamt), 23 handelbare Zellen (als Werkzeuge registriert)
-- **Werkzeugbauer:** 30 registrierte Werkzeuge (25 wortlautfest, davon 23 Gesprächszellen)
+- **Verstehens-Raster:** 34 Feinblätter, 11 Zwicky-Zellen
+- **Companion-Dispatch:** 8 Muster-Listen (17 Muster gesamt), 24 handelbare Zellen (als Werkzeuge registriert)
+- **Werkzeugbauer:** 31 registrierte Werkzeuge (26 wortlautfest, davon 24 Gesprächszellen)
 - **Event-Router:** 20 registrierte Projektoren, 12 bewusst-rohe Event-Typen (Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)
 - **Selbst-Codieren Stufe 1:** 1 registrierte Umsetzungs-Art(en) (faehigkeits_ziel) — nur Graph-Wissen, Ausführung erst nach Freigabe
+

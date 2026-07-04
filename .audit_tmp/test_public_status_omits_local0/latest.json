@@ -1,0 +1,43 @@
+{
+  "cognition": {
+    "calibration": {
+      "accuracy": null,
+      "discrimination": null,
+      "held": 0,
+      "stable_judgments": 0
+    },
+    "learning": []
+  },
+  "core_id": "pi-core",
+  "counts": {
+    "active_beliefs": 0,
+    "active_rules": 0,
+    "active_states": 0,
+    "events": 2,
+    "experiences": 0,
+    "governance_decisions": 0,
+    "inquiries": 0,
+    "proposals": 0
+  },
+  "generated_at": "2026-07-04T21:22:34.427Z",
+  "issues": [],
+  "ok": true,
+  "privacy": {
+    "profile": "public-minimal-v2",
+    "redacted": [
+      "local_paths",
+      "raw_doctor",
+      "latest_events"
+    ]
+  },
+  "schema": "genus-pi-status-v1",
+  "sealing": {
+    "active": true,
+    "algo": "sha256-chain-v1",
+    "head": "000a727307c473ed18f474ffa7ef6e416128e65dd000bcf12342743819cb379a",
+    "head_created_at": "2026-07-04T21:22:34.410Z",
+    "head_event_id": 2,
+    "head_event_type": "observation_created"
+  },
+  "seed_commit": "abc123"
+}

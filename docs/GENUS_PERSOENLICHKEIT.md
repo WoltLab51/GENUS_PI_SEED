@@ -51,15 +51,23 @@ Repräsentations-Dimensionen) — jede Achse hat heute mindestens einen echten V
 | **Wache** | Gates, Fehler, Governance | **nüchtern, gepinnt im Code** — keine Einstellung macht je Ernstes verspielt |
 | **Morgen** | die eine Push-Nachricht | hebt die Wärme um eine Stufe |
 
-## Der Chat-Regler (Ritual, läuft VOR dem Deuter)
+## Der Chat-Regler — EINE Wahrheit, zwei Türen
 
-Exakte Kommandos, satzzeichen-tolerant — eine klare Anweisung braucht keine Deutung:
+Die FÄHIGKEIT ist die Raster-Zelle **`einstellung`** (unter `aufforderung-genus`,
+registriertes schreibendes Werkzeug — Umbau 2026-07-04 nach der Charta-Prüffrage „keine
+zweite Wahrheit": der Regler war zuerst eine Cue-Tabelle *neben* dem Raster gebaut).
+Damit erreichen auch **freie Formulierungen** den Regler über den Deuter: „könntest du
+dich generell etwas kürzer fassen?" → Zelle liest Achse+Richtung aus der eigenen Klausel;
+bei Mehrdeutigkeit (zwei Achsen in einem Satz) fragt sie ehrlich nach statt zu raten.
 
-„sei knapper" / „sei ausführlicher" · „sei wärmer" / „sei nüchterner" ·
-„mehr humor" / „weniger humor" · „sei neugieriger" / „sei weniger neugierig"
+Die **exakten Kommandos** bleiben als deterministische Ritual-Schnellspur (satzzeichen-
+tolerant, läuft vor dem Deuter — dieselbe Zwei-Türen-Logik wie „merke dir:" neben der
+merken-Zelle): „sei knapper" / „sei ausführlicher" · „sei wärmer" / „sei nüchterner" ·
+„mehr humor" / „weniger humor" · „sei neugieriger" / „sei weniger neugierig".
 
-Antwort bestätigt nativ („Gern — Knappheit steht jetzt auf „knapp“. (Als Einstellung
-gemerkt — Quelle: du.)"); an der Achsen-Grenze passiert ehrlich nichts und GENUS sagt das.
+Beide Türen rufen dieselbe Implementierung (`_regler_stellen`) — ein Bestätigungs-
+Wortlaut („Gern — Knappheit steht jetzt auf „knapp“. (Als Einstellung gemerkt — Quelle:
+du.)"), eine Grenz-Ehrlichkeit (an der Achsen-Grenze passiert nichts und GENUS sagt das).
 
 ## Die heutigen Verbraucher (v1)
 

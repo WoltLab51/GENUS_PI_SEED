@@ -154,10 +154,11 @@ def test_alle_zellen_sind_registrierte_geprueft_werkzeuge():
 
 
 def test_zellen_schreibrechte_sind_ausdruecklich():
-    # Nur merken/tatsache schreiben (via erinnerung.merke) -- alles andere liest.
+    # Nur merken/tatsache (via erinnerung.merke) und einstellung (via persoenlichkeit.stelle,
+    # art:*-Kanten) schreiben -- alles andere liest.
     zellen = companion._handelbare_werkzeuge()
     schreibend = {name for name, w in zellen.items() if w.schreibt}
-    assert schreibend == {"merken", "tatsache"}
+    assert schreibend == {"merken", "tatsache", "einstellung"}
 
 
 def test_stimme_eignung_folgt_strukturell_aus_der_spec():

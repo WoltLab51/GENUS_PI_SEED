@@ -58,7 +58,7 @@ DEFAULT_ABSICHTEN = (
     "weltfrage",
     "korrektur",
     "tatsache", "merken", "meinung",
-    "lernen", "berechnen",
+    "lernen", "berechnen", "einstellung",
     "kuerzer", "ausfuehrlicher", "anders-erklaeren", "wiederholen",
     "tun",
     "gruss", "dank", "lob", "kritik", "abschied",
@@ -79,7 +79,8 @@ _GRUPPEN = (
     ("FRAGEN über die WELT draußen (nicht im eigenen Graphen gespeichert)", ("weltfrage",)),
     ("AUSSAGEN über einen Begriff (Korrektur von Wissen)", ("korrektur",)),
     ("AUSSAGEN über dich", ("tatsache", "merken", "meinung")),
-    ("AUFFORDERUNGEN an GENUS (etwas lernen oder rechnen)", ("lernen", "berechnen")),
+    ("AUFFORDERUNGEN an GENUS (etwas lernen, rechnen oder sich anders verhalten)",
+     ("lernen", "berechnen", "einstellung")),
     ("AUFFORDERUNGEN ans Gespräch (rückbezüglich)", ("kuerzer", "ausfuehrlicher",
                                                        "anders-erklaeren", "wiederholen")),
     ("AUFFORDERUNGEN in der Welt (eine Handlung, Planung, Hilfe)", ("tun",)),
@@ -110,6 +111,8 @@ _ERKLAERUNGEN = {
     "meinung": "Meinung/Gefuehl der Person",
     "lernen": "lern etwas Neues",
     "berechnen": "rechne etwas aus (Ableitung, Integral, Extremstellen ...)",
+    "einstellung": "aendere deine Art zu antworten (kuerzer/waermer/nuechterner/mehr Humor "
+                   "-- dauerhaft, eine Einstellung, KEIN Wunsch zur letzten Antwort)",
     "kuerzer": "bitte kuerzer",
     "ausfuehrlicher": "bitte ausfuehrlicher",
     "anders-erklaeren": "bitte anders erklaeren",
@@ -219,6 +222,9 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         "kannst du das nochmal sagen -> "
         "[{\"text\": \"kannst du das nochmal sagen\", \"absicht\": \"wiederholen\", "
         "\"subject\": null, \"object\": null}]\n"
+        "koenntest du dich generell etwas kuerzer fassen? -> "
+        "[{\"text\": \"koenntest du dich generell etwas kuerzer fassen?\", "
+        "\"absicht\": \"einstellung\", \"subject\": null, \"object\": null}]\n"
         "danke dir -> [{\"text\": \"danke dir\", \"absicht\": \"dank\", \"subject\": null, "
         "\"object\": null}]\n"
         "Fuer eindeutige, ALLTAEGLICHE Hoeflichkeitsfloskeln (Gruss, Dank, Abschied) waehle "

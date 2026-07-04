@@ -679,9 +679,13 @@ def _notiz_bezug(conn, question: str) -> str | None:
 # The stages are factored so the Verstehens-Würfel (respond_with_deuter, below) can reuse them
 # in a different order without duplicating their logic.
 
-# Der Chat-Regler der Persönlichkeit (Ronnys Entscheidung 2026-07-04: „gleich mitbauen"):
-# EXAKTE Kommandos, ein Ritual wie „merke dir" -- eine klare Anweisung braucht keinen Deuter.
-# Jede Achse ist erreichbar; der Regler bewegt genau EINE Stufe (persoenlichkeit.stelle).
+# Der Chat-Regler der Persönlichkeit -- EINE Implementierung, zwei Türen (Charta §2,
+# „keine zweite Wahrheit", gelernt genau an dieser Stelle): die FÄHIGKEIT ist die
+# Raster-Zelle „einstellung" (aufforderung-genus, registriertes Werkzeug, schreibt) --
+# der Deuter erreicht sie für freie Formulierungen („könntest du dich kürzer fassen?").
+# Die EXAKTEN Kommandos („sei knapper") bleiben als deterministische Ritual-Schnellspur,
+# dieselbe Zwei-Türen-Logik wie „merke dir:" neben der merken-Zelle. Beide Türen rufen
+# _regler_stellen -- eine Wahrheit, ein Bestätigungs-Wortlaut, eine Grenz-Ehrlichkeit.
 _REGLER_CUES: dict[str, tuple[str, int]] = {
     "sei knapper": ("knappheit", -1),
     "sei ausführlicher": ("knappheit", +1),
@@ -696,22 +700,59 @@ _REGLER_CUES: dict[str, tuple[str, int]] = {
     "sei weniger neugierig": ("neugier", -1),
 }
 
+# Freie Formulierungen INNERHALB eines einstellung-Segments (der Deuter hat die Absicht
+# schon beurteilt -- hier wird nur noch Achse+Richtung aus der eigenen Klausel gelesen,
+# dieselbe Segment-Disziplin wie bei den Sozialgesten). Humor/Neugier brauchen ein
+# Richtungswort; mehrdeutige Wünsche fallen ehrlich durch statt zu raten.
+_REGLER_WORTE: tuple[tuple[str, int, tuple[str, ...]], ...] = (
+    ("knappheit", -1, ("knapper", "kürzer", "kuerzer", "knapp")),
+    ("knappheit", +1, ("ausführlicher", "ausfuehrlicher", "länger", "laenger")),
+    ("waerme", +1, ("wärmer", "waermer", "herzlicher")),
+    ("waerme", -1, ("nüchterner", "nuechterner", "sachlicher", "kühler", "kuehler")),
+)
+_REGLER_WENIGER = ("weniger", "keinen", "kein ", "nicht so", "ohne")
 
-def _regler_antwort(conn, question: str) -> str | None:
-    """Erkennt ein exaktes Regler-Kommando (satzzeichen-tolerant) und stellt die Art —
-    ``None``, wenn die Frage kein Regler-Kommando ist."""
+
+def _regler_deute(text: str) -> tuple[str, int] | None:
+    """Achse+Richtung aus einer frei formulierten Einstellungs-Klausel -- ``None``, wenn
+    nichts oder Mehrdeutiges erkannt wird (dann fragt die Zelle ehrlich nach)."""
+    t = text.casefold()
+    weniger = any(w in t for w in _REGLER_WENIGER)
+    treffer: set[tuple[str, int]] = set()
+    for merkmal, richtung, worte in _REGLER_WORTE:
+        if any(w in t for w in worte):
+            treffer.add((merkmal, richtung))
+    if "humor" in t or "witzig" in t or "lustig" in t:
+        treffer.add(("humor", -1 if weniger else +1))
+    if "neugier" in t:   # deckt neugierig/neugieriger mit ab
+        treffer.add(("neugier", -1 if weniger else +1))
+    if len(treffer) != 1:
+        return None
+    return treffer.pop()
+
+
+def _regler_stellen(conn, merkmal: str, richtung: int) -> str:
+    """Die EINE Stell-Implementierung hinter beiden Türen: bewegt die Achse um eine Stufe
+    (persoenlichkeit.stelle) und bestätigt nativ; an der Grenze passiert ehrlich nichts."""
     from genus import persoenlichkeit
 
-    cue = _REGLER_CUES.get(question.strip().strip(".!?— ").casefold())
-    if cue is None:
-        return None
-    res = persoenlichkeit.stelle(conn, *cue)
-    name = persoenlichkeit.ANZEIGE[cue[0]]
+    res = persoenlichkeit.stelle(conn, merkmal, richtung)
+    name = persoenlichkeit.ANZEIGE[merkmal]
     wert = persoenlichkeit.WERT_ANZEIGE.get(res["wert"], res["wert"])
     if res["gestellt"]:
         return (f"Gern — {name} steht jetzt auf „{wert}“. "
                 f"(Als Einstellung gemerkt — Quelle: du.)")
     return f"{name} steht schon auf „{wert}“ — weiter geht es in diese Richtung nicht."
+
+
+def _regler_antwort(conn, question: str) -> str | None:
+    """Die Ritual-Tür: erkennt ein EXAKTES Regler-Kommando (satzzeichen-tolerant) --
+    ``None``, wenn die Frage kein exaktes Kommando ist (freie Formulierungen gehen den
+    Deuter-Weg zur einstellung-Zelle)."""
+    cue = _REGLER_CUES.get(question.strip().strip(".!?— ").casefold())
+    if cue is None:
+        return None
+    return _regler_stellen(conn, *cue)
 
 
 def _ritual_antwort(conn, question: str) -> str | None:
@@ -1265,6 +1306,21 @@ def _zelle_abschied(conn, guess, question, last_question, last_answer, stimme=No
     return "Bis bald!"
 
 
+def _zelle_einstellung(conn, guess, question, last_question, last_answer, stimme=None):
+    """Die Regler-Zelle des Verstehens-Würfels: eine frei formulierte Bitte, GENUS' Art
+    zu verstellen („könntest du dich kürzer fassen?") -- liest Achse+Richtung aus der
+    eigenen Klausel und stellt über dieselbe Implementierung wie die exakten Kommandos."""
+    from genus import persoenlichkeit
+
+    deutung = _regler_deute(guess.get("text") or question)
+    if deutung is None:
+        achsen = ", ".join(persoenlichkeit.ANZEIGE[m] for m in persoenlichkeit.MERKMALE)
+        return ("Ich lese das als Wunsch, meine Art zu verstellen — sag mir die Richtung, "
+                "eine Achse auf einmal: z.B. „sei knapper“, „sei wärmer“, „mehr Humor“. "
+                f"(Meine Achsen: {achsen}.)")
+    return _regler_stellen(conn, *deutung)
+
+
 # Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;
 # which cells exist and how they relate lives in the ledger (genus.verstehen.RASTER_SEED +
 # ZELLEN). Die Schlüssel sind jetzt teils Feinblätter (definition, gruss, ...), teils die
@@ -1299,6 +1355,7 @@ _HANDELBAR = {
     "lob": _zelle_lob,
     "kritik": _zelle_kritik,
     "abschied": _zelle_abschied,
+    "einstellung": _zelle_einstellung,
 }
 
 ZELLE_PREFIX = "zelle:"
@@ -1308,7 +1365,7 @@ ZELLE_PREFIX = "zelle:"
 # (nur diese dürfen der Stimme angeboten werden -- die frühere zweite, handgepflegte
 # Menge _STIMME_GEEIGNET ist damit weg; die Eignung folgt strukturell aus der Spec,
 # genau die Bug-Klasse, für die werkzeug.wortlautfest gebaut wurde).
-_ZELLEN_SCHREIBEND = frozenset({"tatsache", "merken"})
+_ZELLEN_SCHREIBEND = frozenset({"tatsache", "merken", "einstellung"})
 _ZELLEN_FREI_FORMULIERBAR = frozenset({
     "definition", "beziehung", "vergleich", "grammatik", "frage-begriff",
 })
@@ -1321,6 +1378,7 @@ _ZELLEN_PRUEFBAR = {
     "wiederholen": "sitzung",
     "tatsache": "erinnerung", "merken": "erinnerung", "erinnerungs-abruf": "erinnerung",
     "gruss": "fest", "dank": "fest", "lob": "fest", "kritik": "fest", "abschied": "fest",
+    "einstellung": "graph",
 }
 
 
