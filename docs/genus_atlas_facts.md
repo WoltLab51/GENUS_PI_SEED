@@ -9,7 +9,7 @@
 - **Kognitions-Detektoren (4):** _activity_daily_rhythm_candidates, _belief_stability_candidates, _rule_calibration_candidates, _verstehens_luecke_candidates
 - **Reifungs-Kandidaten (1):** _activity_expectation_candidates
 - **Preset-Budget (8 feste Schwellen):** CPU_HIGH_THRESHOLD, CPU_LOW_THRESHOLD, DISK_HIGH_THRESHOLD, DISK_LOW_THRESHOLD, MEMORY_HIGH_THRESHOLD, MEMORY_LOW_THRESHOLD, TEMP_HIGH_THRESHOLD, TEMP_LOW_THRESHOLD
-- **Ziele:** 6 Ziele, 8 Fähigkeiten (0 live, 3 teilweise, 5 fehlt), 12 braucht-Kanten
+- **Ziele:** 6 Ziele, 8 Fähigkeiten (1 live, 4 teilweise, 3 fehlt), 12 braucht-Kanten
 - **Verstehens-Raster:** 33 Feinblätter, 11 Zwicky-Zellen
 - **Companion-Dispatch:** 8 Muster-Listen (17 Muster gesamt), 23 handelbare Zellen (als Werkzeuge registriert)
 - **Werkzeugbauer:** 30 registrierte Werkzeuge (25 wortlautfest, davon 23 Gesprächszellen)

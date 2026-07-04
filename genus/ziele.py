@@ -68,14 +68,13 @@ ZIEL_SEED: tuple[tuple[str, str], ...] = (
 FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
     ("faehigkeit:generator-organ",
      "Ein generatives Modell als Organ: entwirft Antworten, Pläne und Code-Vorschläge — "
-     "entscheidet nie (Organ, nicht Orakel).", "fehlt"),
+     "entscheidet nie (Organ, nicht Orakel).", "teilweise"),
     ("faehigkeit:vorschlags-loop",
-     "Lücke spüren → Plan als Proposal → Gate (Tests, Replay, Mensch) → Ledger. "
-     "Proposal≠Change existiert; der Konsument, der aus eigenen Fehlgriffen Vorschläge macht, "
-     "fehlt.", "fehlt"),
+     "Lücke spüren → Plan als Proposal → Gate → Umsetzung nach Freigabe → Werkstatt-Entwurf. "
+     "Proposal≠Change bleibt für immer hart.", "live"),
     ("faehigkeit:werkzeugkasten",
-     "Kern-Fähigkeiten als planbare Werkzeuge (Mathe exakt: live als Muster; Graph-Abfragen: "
-     "live als Muster; als frei planbares Tool-Set: fehlt).", "teilweise"),
+     "Kern-Fähigkeiten als geprüfte, registrierte Werkzeuge (Registry + Rezepte: live); "
+     "der freie Planer darüber fehlt.", "teilweise"),
     ("faehigkeit:gedaechtnis",
      "Episoden + Abruf über den Graphen + Mehr-Zug-Arbeitsgedächtnis: live. Tagespuffer, "
      "Nacht-Konsolidierung, Morgen-Bericht: fehlen.", "teilweise"),
@@ -125,6 +124,42 @@ def seed_ziele(conn) -> int:
     for ziel_id, f_id in ZIEL_BRAUCHT:
         tripel.append((ziel_id, BRAUCHT, f_id))
     return reactors.sae_fehlende(conn, tripel, SEED_SOURCE)
+
+
+def gleiche_seed_ab(conn) -> dict:
+    """Der SELBST-BILD-ABGLEICH (Querschnitt der Etappen-Roadmap, 2026-07-04): wenn sich
+    der ehrliche Stand einer Fähigkeit ändert (z.B. vorschlags-loop von „fehlt" auf
+    „live"), ändert sich die SAAT — dieser Abgleich zieht den lebenden Graphen nach.
+    Für die EIN-wertigen Prädikate (inhalt, status) gilt: eine veraltete Kante der
+    Seed-Quelle wird ZURÜCKGENOMMEN (ehrliche Historie: relation_retracted, nie stilles
+    Überschreiben) und die aktuelle gesät. Kanten anderer Quellen (z.B. genus:stufe1 aus
+    einer Umsetzung) bleiben unberührt; dient/braucht sind additiv und laufen weiter
+    über seed_ziele. Idempotent: ein zweiter Lauf tut nichts."""
+    from genus import reactors
+
+    gewuenscht: dict[tuple[str, str], str] = {}
+    for ziel_id, inhalt in ZIEL_SEED:
+        gewuenscht[(ziel_id, INHALT)] = inhalt
+    for f_id, inhalt, status in FAEHIGKEIT_SEED:
+        gewuenscht[(f_id, INHALT)] = inhalt
+        gewuenscht[(f_id, STATUS)] = status
+
+    zurueckgenommen = 0
+    gesaet = 0
+    for (subj, praed), soll in gewuenscht.items():
+        eigene = [r for r in sources.relations(conn, subject=subj, predicate=praed)
+                  if r["source"] == SEED_SOURCE]
+        falsche = [r for r in eigene if r["object"] != soll]
+        for r in falsche:
+            reactors.retract_relation(
+                conn, subj, praed, r["object"], source=SEED_SOURCE,
+                reason="Selbst-Bild-Abgleich: der Stand hat sich geändert",
+            )
+            zurueckgenommen += 1
+        if not any(r["object"] == soll for r in eigene):
+            reactors.observe_relation(conn, subj, praed, soll, SEED_SOURCE)
+            gesaet += 1
+    return {"zurueckgenommen": zurueckgenommen, "gesaet": gesaet}
 
 
 def _inhalt(conn, node: str) -> str:

@@ -58,7 +58,7 @@ def test_goal_dependencies_carry_capability_status():
     conn = _gesaet()
     selbst = next(z for z in ziele.ziele(conn) if z["id"] == "ziel:selbst-entwicklung")
     by_id = {f["id"]: f for f in selbst["braucht"]}
-    assert by_id["faehigkeit:vorschlags-loop"]["status"] == "fehlt"
+    assert by_id["faehigkeit:vorschlags-loop"]["status"] == "live"
     assert by_id["faehigkeit:selbst-bild"]["status"] == "teilweise"
 
 
@@ -96,7 +96,8 @@ def test_narrate_ziele_speaks_mission_goals_and_honest_gaps():
     assert "Menschen unterstützen. digital. GENUS." in text
     assert "Begleiter" in text
     assert "fehlt mir noch" in text            # die Lücken werden ehrlich benannt
-    assert "vorschlags-loop" in text
+    assert "generator-organ" in text          # eine ECHT offene Luecke
+    assert "vorschlags-loop" not in text      # der Loop ist live -- ehrlich weg
     assert "Quelle: Ronny" in text             # Herkunft, wie überall
 
 
@@ -120,3 +121,45 @@ def test_ziele_leaf_reaches_the_handler_via_the_deuter_path():
                                            deuter=deuter)
     assert "Meine Mission" in result["text"]
     assert "Sprachmodell gedeutet" in result["text"]   # nie stillschweigend modell-gedeutet
+
+
+# --- der Selbst-Bild-Abgleich: Stand-Aenderungen wandern sauber in den Graphen --------
+
+
+def test_abgleich_nimmt_veraltete_kanten_zurueck_und_saet_die_aktuellen():
+    from genus import reactors
+
+    conn = _fresh()
+    # ein Graph mit VERALTETEM Stand (wie der Pi vor der Migration 2026-07-04)
+    reactors.observe_relation(conn, "faehigkeit:vorschlags-loop", ziele.STATUS,
+                              "fehlt", ziele.SEED_SOURCE)
+    reactors.observe_relation(conn, "faehigkeit:vorschlags-loop", ziele.INHALT,
+                              "alter Text mit ... fehlt.", ziele.SEED_SOURCE)
+    ziele.seed_ziele(conn)   # additive Kanten (dient/braucht) wie auf dem Pi
+
+    ergebnis = ziele.gleiche_seed_ab(conn)
+    assert ergebnis["zurueckgenommen"] >= 2   # alter Status + alter Inhalt sind weg
+    # genau EINE Status-Kante bleibt, und sie sagt live
+    rows = [r for r in __import__("genus.sources", fromlist=["x"]).relations(
+        conn, subject="faehigkeit:vorschlags-loop", predicate=ziele.STATUS)]
+    assert [r["object"] for r in rows] == ["live"]
+    # und "was fehlt dir?" nennt den Loop nicht mehr
+    assert "faehigkeit:vorschlags-loop" not in [f["id"] for f in
+                                                 ziele.fehlende_faehigkeiten(conn)]
+
+
+def test_abgleich_ist_idempotent_und_schont_fremde_quellen():
+    from genus import reactors, sources
+
+    conn = _fresh()
+    ziele.seed_ziele(conn)
+    # eine Stufe-1-Kante (andere Quelle) darf der Abgleich NIE anfassen
+    reactors.observe_relation(conn, "faehigkeit:vorschlags-loop", ziele.STATUS,
+                              "irgendwas", "genus:stufe1")
+    erster = ziele.gleiche_seed_ab(conn)
+    zweiter = ziele.gleiche_seed_ab(conn)
+    assert zweiter == {"zurueckgenommen": 0, "gesaet": 0}   # idempotent
+    fremde = [r for r in sources.relations(conn, subject="faehigkeit:vorschlags-loop",
+                                           predicate=ziele.STATUS)
+              if r["source"] == "genus:stufe1"]
+    assert len(fremde) == 1   # unberührt
