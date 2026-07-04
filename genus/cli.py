@@ -712,11 +712,22 @@ def werkstatt_group() -> None:
 
 @werkstatt_group.command("entwerfe")
 @click.argument("blatt")
-def werkstatt_entwerfe(blatt: str) -> None:
+@click.option("--code-datei", default=None,
+              help="fertiger Handler-Code aus einer Datei (die Membran schreibt, "
+                   "der Kern nimmt an — z.B. vom Schmied)")
+@click.option("--quelle", default=None,
+              help="Herkunfts-Angabe für die Ledger-Spur (z.B. werkstatt:schmied)")
+def werkstatt_entwerfe(blatt: str, code_datei: str | None, quelle: str | None) -> None:
     """Erzeugt ein Entwurfs-Paar (Handler + Sandbox-Test) für ein Raster-Blatt."""
+    generator = None
+    if code_datei is not None:
+        code = Path(code_datei).read_text(encoding="utf-8")
+        generator = lambda _blatt: code   # noqa: E731 - bewusst: Code kommt als Daten herein
+        if quelle is None:
+            quelle = "werkstatt:datei"
     conn = get_conn()
     try:
-        ergebnis = werkstatt.entwerfe_zelle(conn, blatt)
+        ergebnis = werkstatt.entwerfe_zelle(conn, blatt, generator=generator, quelle=quelle)
     finally:
         conn.close()
     if not ergebnis["erstellt"]:

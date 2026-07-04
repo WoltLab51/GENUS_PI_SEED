@@ -92,3 +92,77 @@ def test_generator_ist_einschub_und_wird_ehrlich_benannt(conn):
 def test_pruefung_ohne_entwurf_bleibt_ehrlich(conn):
     ergebnis = werkstatt.protokolliere_pruefung(conn, "gibt-es-nicht")
     assert ergebnis["gefunden"] is False
+
+
+# --- Scheibe 2: der Schmied (Code-Modell als Einschub) + die AST-Leitplanke -----------
+
+
+def _schmied():
+    import importlib
+    sys.path.insert(0, str(ROOT / "deploy"))
+    return importlib.import_module("schmied")
+
+
+GUTER_CODE = (
+    "def zelle_weltfrage(conn, guess, question, last_question, last_answer, stimme=None):\n"
+    "    return None\n"
+)
+
+
+def test_ast_leitplanke_nimmt_den_vertrag_an():
+    schmied = _schmied()
+    assert schmied._ast_leitplanke(GUTER_CODE, "weltfrage") == GUTER_CODE
+
+
+def test_ast_leitplanke_verwirft_falsche_signatur_und_beiwerk():
+    schmied = _schmied()
+    # falsche Parameter
+    assert schmied._ast_leitplanke(
+        "def zelle_weltfrage(conn, frage):\n    return None\n", "weltfrage") is None
+    # falscher Funktionsname
+    assert schmied._ast_leitplanke(GUTER_CODE, "anderes-blatt") is None
+    # Code auf Modulebene (ein Aufruf) -- nie ein halbgarer Entwurf
+    assert schmied._ast_leitplanke(GUTER_CODE + "print('hallo')\n", "weltfrage") is None
+    # gar kein Python
+    assert schmied._ast_leitplanke("das ist kein code {", "weltfrage") is None
+
+
+def test_schmiede_zieht_codeblock_und_prueft(monkeypatch):
+    schmied = _schmied()
+
+    class _FakeModell:
+        def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+            return {"choices": [{"message": {"content":
+                "Hier ist der Code:\n```python\n" + GUTER_CODE + "```\nViel Erfolg!"}}]}
+
+    monkeypatch.setattr(schmied, "MODEL_PATH", __file__)
+    monkeypatch.setattr(schmied, "_get_model", lambda: _FakeModell())
+    assert schmied.schmiede("weltfrage") == GUTER_CODE
+
+
+def test_schmiede_gibt_none_bei_leitplanken_bruch(monkeypatch):
+    schmied = _schmied()
+
+    class _FakeModell:
+        def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+            return {"choices": [{"message": {"content":
+                "```python\nimport os\nos.system('rm -rf /')\n```"}}]}
+
+    monkeypatch.setattr(schmied, "MODEL_PATH", __file__)
+    monkeypatch.setattr(schmied, "_get_model", lambda: _FakeModell())
+    assert schmied.schmiede("weltfrage") is None
+
+
+def test_kern_nimmt_membran_code_mit_ehrlicher_herkunft_an(conn, tmp_path):
+    code_datei = tmp_path / "geschmiedet.py"
+    code_datei.write_text(GUTER_CODE, encoding="utf-8")
+    from click.testing import CliRunner
+    from genus import cli
+
+    result = CliRunner().invoke(
+        cli.main, ["werkstatt", "entwerfe", "weltfrage",
+                   "--code-datei", str(code_datei), "--quelle", "werkstatt:schmied"],
+    )
+    assert result.exit_code == 0 and "werkstatt:schmied" in result.output
+    handler = werkstatt.verzeichnis() / "zelle_weltfrage.py"
+    assert handler.read_text(encoding="utf-8") == GUTER_CODE

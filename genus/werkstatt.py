@@ -106,12 +106,14 @@ def _vorlage_test(blatt: str) -> str:
     )
 
 
-def entwerfe_zelle(conn, blatt: str, generator=None) -> dict:
+def entwerfe_zelle(conn, blatt: str, generator=None, quelle: str | None = None) -> dict:
     """Erzeugt ein Entwurfs-Paar (Handler + Sandbox-Test) für ein Raster-Blatt und
     protokolliert die Entscheidung im Ledger. Weigert sich, einen bestehenden Entwurf
     zu überschreiben (ein Entwurf ist Arbeitsstand -- Löschen ist eine menschliche,
     bewusste Handlung im Dateisystem). ``generator``: ``(blatt) -> code`` für den
-    Handler-Teil; Default ist die deterministische Vorlage."""
+    Handler-Teil; Default ist die deterministische Vorlage. ``quelle`` überschreibt die
+    Herkunfts-Angabe in der Ledger-Spur (z.B. ``werkstatt:schmied``, wenn die Membran
+    den Code eines Code-Modells überreicht)."""
     name = blatt.replace("-", "_")
     ziel = verzeichnis()
     handler_pfad = ziel / f"zelle_{name}.py"
@@ -125,7 +127,8 @@ def entwerfe_zelle(conn, blatt: str, generator=None) -> dict:
     handler_code = erzeuger(blatt)
     handler_pfad.write_text(handler_code, encoding="utf-8")
     test_pfad.write_text(_vorlage_test(blatt), encoding="utf-8")
-    quelle = "werkstatt:vorlage" if generator is None else "werkstatt:generator"
+    if quelle is None:
+        quelle = "werkstatt:vorlage" if generator is None else "werkstatt:generator"
     ledger.append(conn, ENTWURF_EVENT, {
         "blatt": blatt,
         "pfad": str(handler_pfad),
