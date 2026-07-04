@@ -116,6 +116,8 @@ def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | Non
         return None   # a fact/number went missing or was changed -- fail safe to the original
     if any(wort not in text for wort in _inhaltsworte(satz)):
         return None   # ein tragendes Substantiv wurde wegformuliert/korrumpiert (Hausvögel-Fund)
+    if text == satz:
+        return None   # wortidentisch ist keine Glättung -- ehrlich kein Gewinn, kein Tag
     return text
 
 

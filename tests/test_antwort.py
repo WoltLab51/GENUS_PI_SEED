@@ -137,6 +137,23 @@ def test_stimme_substantiv_leine_faengt_den_hausvoegel_fund():
     assert worte == ["Hund", "Haustier", "Vorfahre", "Wolf"]
 
 
+def test_stimme_wortidentische_rueckgabe_ist_keine_glaettung():
+    # live gesehen: das Modell gibt manchmal exakt den Eingabesatz zurück -- das darf
+    # nie den "geglättet"-Tag tragen (nichts wurde geglättet), also ehrlich None
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy"))
+    import stimme as stimme_modul
+
+    satz = "Unter »Hund« versteht GENUS: Haustier, dessen Vorfahre der Wolf ist."
+
+    class M:
+        def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+            return {"choices": [{"message": {"content": satz}}]}
+
+    assert stimme_modul.formuliere(satz, model=M()) is None
+
+
 # --- die umgezogenen Verbraucher bleiben verhaltensgleich --------------------------------
 
 def test_gruss_und_dank_lesen_jetzt_aus_dem_wuerfel(conn):
