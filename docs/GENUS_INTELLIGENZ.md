@@ -174,8 +174,17 @@ hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *mu
   zuerst) und taucht in „Was beschäftigt dich?" auf — inklusive der ehrlichen Ansage, wenn
   ein längst vorgeschlagenes Blatt seither NUR gewachsen ist. Er erzeugt KEINE Events, keine
   Proposals, keine Handlung (bewegt den Geist, nie die Hand); kein Preset (der Druck IST die
-  gemessene gelebte Nachfrage). Noch offen: den Druck auf offene Inquiries und fehlende
-  Operationen ausweiten; ihn dem inneren Loop als Gefälle geben.
+  gemessene gelebte Nachfrage).
+- **Auf alle drei Nöte ausgeweitet (2026-07-05):** der Druck ist jetzt ein Register von
+  QUELLEN (`druck.DRUCK_QUELLEN`), jede mit ihrem EIGENEN gelebten Zähler — `luecke`
+  (Belegung), `frage` (Wiederkehr einer offenen Inquiry, ihr `count`), `operation` (Fan-in:
+  wie viele Ziele eine fehlende Fähigkeit blockiert). Bewusst NICHT über die Quellen hinweg
+  zu einer Zahl verrechnet (das wäre ein Preset); der Druck konkurriert INNERHALB jeder
+  Quelle, und `druck.landschaft` zeigt alle drei nebeneinander — das Gefälle, das der
+  künftige innere Loop liest. „Was beschäftigt dich?" nennt jetzt die drängendste Lücke,
+  ordnet die offenen Fragen nach Wiederkehr und benennt die am meisten gebrauchte fehlende
+  Fähigkeit. Noch offen: dem inneren Loop das Gefälle wirklich GEBEN (ein Gedanke zieht den
+  nächsten).
 
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 

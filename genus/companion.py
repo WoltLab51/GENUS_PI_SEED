@@ -1064,7 +1064,10 @@ def narrate_inquiries(conn, oq: dict) -> str:
     Vorschlag weiter gewachsen ist (Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §9)."""
     from genus import druck
 
-    groups = oq["groups"]
+    # nach Wiederkehr-Druck geordnet: die am häufigsten aufgefallene Sorge zuerst (der
+    # Frage-Druck sichtbar gemacht, ohne die Aufzählung zu doppeln -- genus.druck.frage_druck
+    # trägt dieselbe Zahl für den strukturierten Blick / den künftigen inneren Loop).
+    groups = sorted(oq["groups"], key=lambda g: -g["count"])
     druck_satz = druck.satz(conn)
     if not groups and not druck_satz:
         return "Gerade beschäftigt mich nichts Offenes — alle meine Fragen sind beantwortet."
