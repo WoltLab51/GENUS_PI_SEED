@@ -96,8 +96,9 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
     ("faehigkeit:denkweisen",
      "Denkweisen als konfigurierbare Methoden auf dem EINEN Kern: Merkmal-Baupläne "
      "(braucht/bewirkt) + Subsumtion als verallgemeinerte Inferenz + Beweismaßstab je "
-     "Disziplin. Der Jurist ist die erste Tür; die Form (Bauplan, Rezept, Prämissenkette) "
-     "existiert bereits.", "fehlt"),
+     "Disziplin. ERSTE Denkweise LIVE: juristische Subsumtion (genus/recht.py, § 433 II "
+     "als Bauplan, Beweislast=schwächste Prämisse, Wertung=Mensch-Slot). Weitere Domänen "
+     "und die Deuter-Anbindung (Fakt→Merkmal) folgen.", "teilweise"),
     ("faehigkeit:abstrahieren",
      "Aus Mustern im eigenen Graphen eigene Begriffe bilden und gegen die Welt prüfen "
      "(Überraschungs-Schleife) — der Sprung vom Importieren zum Denken.", "fehlt"),

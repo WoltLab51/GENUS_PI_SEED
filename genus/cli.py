@@ -31,6 +31,7 @@ from genus import (
     proposals,
     query,
     reactors,
+    recht,
     sealing,
     sensor,
     sources,
@@ -805,6 +806,34 @@ def kurvendiskussion_command(term: str, variable: str) -> None:
     r = w.implementierung(term, variable)
     for zeile in w.formulierung(r).splitlines():
         click.echo(f"[MATH] {zeile}")
+
+
+@main.command("subsumtion")
+@click.argument("norm")
+@click.option("--erfuellt", "erfuellt", multiple=True, metavar="merkmal=quelle",
+              help="ein im Fall erfülltes Merkmal mit seiner Quelle, z.B. "
+                   "merkmal:angebot=dokument:vertrag  oder  merkmal:faelligkeit=ronny")
+def subsumtion_command(norm: str, erfuellt: tuple[str, ...]) -> None:
+    """Die erste Denkweise: juristische Subsumtion (docs/GENUS_INTELLIGENZ.md §4). Prüft eine
+    Anspruchsnorm (Bauplan im Graphen) gegen einen Sachverhalt (Merkmal=Quelle-Paare, flüchtig
+    -- kein Fall-Fakt wird ins Ledger gesät) und rendert den Beweisbaum inkl. Beweislast-Radar.
+    Read-only; kein Anwalt."""
+    conn = get_conn()
+    try:
+        recht.seed_normen(conn)
+        conn.commit()
+        sachverhalt: dict[str, str] = {}
+        for paar in erfuellt:
+            merkmal, _, quelle = paar.partition("=")
+            if merkmal and quelle:
+                sachverhalt[merkmal] = quelle
+        e = recht.subsumiere(conn, norm, sachverhalt)
+        for zeile in recht.narrate_subsumtion(conn, e).splitlines():
+            click.echo(f"[RECHT] {zeile}")
+        if e["vertrauen"] is not None:
+            click.echo(f"[RECHT] Vertrauen (schwächste Prämisse): {e['vertrauen']}")
+    finally:
+        conn.close()
 
 
 @main.command("besinnung")

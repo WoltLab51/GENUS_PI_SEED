@@ -209,6 +209,30 @@ hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *mu
   wächst mit jeder neuen Operation (das eigentliche Wachstum des Loops: dann kann die
   Besinnung eine Not BEARBEITEN, nicht nur benennen).
 
+## 9b · Die erste Denkweise lebt: juristische Subsumtion (genus/recht.py)
+
+Der Loop kann heute nur *aussprechen*; damit er eine Not *bearbeiten* kann, braucht er
+Operationen. Die erste ist gebaut — die juristische Subsumtion, wörtlich das
+Denkweisen-Muster aus §4:
+
+- **Norm = Bauplan im Graphen:** `norm:kaufpreis -braucht-> merkmal:kaufvertrag`,
+  `-braucht-> merkmal:faelligkeit`, `-bewirkt-> rechtsfolge:kaufpreiszahlung` (§ 433 II BGB,
+  hand-gesät wie RASTER_SEED, Quelle „gesetz"). **Rekursiv:** `merkmal:kaufvertrag` ist
+  selbst eine Norm (Angebot + Annahme) — der Merkmal-Baum, dieselbe Kletterei wie is_a.
+- **Subsumtion = Verallgemeinerung der is_a-Inferenz:** `recht.subsumiere` prüft jedes
+  Merkmal gegen den Sachverhalt (Merkmal → Quelle); sind alle erfüllt, folgt die Rechtsfolge.
+- **Vertrauen = schwächste Prämisse = Beweislast-Radar:** genau wie bei is_a. Ein Merkmal,
+  das nur an Parteivortrag hängt, ist die schwächste Stelle — GENUS benennt sie: „das wird
+  die Gegenseite bestreiten, dafür bräuchtest du einen Beleg."
+- **Wertung = ehrlicher Mensch-Slot:** ein Merkmal mit `-art-> wertung` wird NIE selbst
+  gefüllt — „braucht menschliches Urteil oder einen Anwalt."
+- Read-time und gläsern: die Norm ist dauerhaftes Wissen, der Sachverhalt flüchtige Eingabe
+  (kein Fall-Fakt ins Ledger — sensibel, Ledger ≠ Memory). Der gerenderte Beweisbaum ist
+  `genus why` in förmlich. `genus subsumtion norm:kaufpreis --erfuellt merkmal:…=quelle`.
+- Ehrlich offen: die Deuter-Anbindung (ein Modell liest „ich habe ein Auto verkauft" →
+  `merkmal:kaufvertrag erfüllt`) — das Mapping Fakt→Merkmal; weitere Domänen; die
+  Einwendungs-Baupläne (die Gegenseite als dieselbe Maschine).
+
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 
 - **Takt verallgemeinert** (genus/experience.py): der Takt ist ein Merkmal des Detektors
