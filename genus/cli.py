@@ -813,23 +813,40 @@ def kurvendiskussion_command(term: str, variable: str) -> None:
 @click.option("--erfuellt", "erfuellt", multiple=True, metavar="merkmal=quelle",
               help="ein im Fall erfülltes Merkmal mit seiner Quelle, z.B. "
                    "merkmal:angebot=dokument:vertrag  oder  merkmal:faelligkeit=ronny")
-def subsumtion_command(norm: str, erfuellt: tuple[str, ...]) -> None:
+@click.option("--text", "text", default=None, metavar="SCHILDERUNG",
+              help="freie Fallschilderung -- das Sprachmodell liest sie in Merkmale "
+                   "(Fakt→Merkmal, an der Grenze gehalten), der Kern rechnet die Subsumtion")
+def subsumtion_command(norm: str, erfuellt: tuple[str, ...], text: str | None) -> None:
     """Die erste Denkweise: juristische Subsumtion (docs/GENUS_INTELLIGENZ.md §4). Prüft eine
-    Anspruchsnorm (Bauplan im Graphen) gegen einen Sachverhalt (Merkmal=Quelle-Paare, flüchtig
-    -- kein Fall-Fakt wird ins Ledger gesät) und rendert den Beweisbaum inkl. Beweislast-Radar.
-    Read-only; kein Anwalt."""
+    Anspruchsnorm (Bauplan im Graphen) gegen einen Sachverhalt und rendert den Beweisbaum
+    inkl. Beweislast-Radar. Entweder --erfuellt (Merkmal=Quelle, exakt) ODER --text (freie
+    Schilderung, vom Modell gelesen). Read-only; kein Anwalt."""
     conn = get_conn()
     try:
         recht.seed_normen(conn)
         conn.commit()
-        sachverhalt: dict[str, str] = {}
-        for paar in erfuellt:
-            merkmal, _, quelle = paar.partition("=")
-            if merkmal and quelle:
-                sachverhalt[merkmal] = quelle
-        e = recht.subsumiere(conn, norm, sachverhalt)
-        for zeile in recht.narrate_subsumtion(conn, e).splitlines():
-            click.echo(f"[RECHT] {zeile}")
+        if text:
+            import sys as _sys
+            _sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "deploy"))
+            import deuter as _deuter
+
+            def _lies(t, blaetter):
+                grenze = recht.gbnf_sachverhalt([b["id"] for b in blaetter])
+                return _deuter.merkmale(t, blaetter, grammatik=grenze)
+
+            frei = recht.subsumiere_frei(conn, norm, text, _lies)
+            for zeile in recht.narrate_frei(conn, frei).splitlines():
+                click.echo(f"[RECHT] {zeile}")
+            e = frei["ergebnis"]
+        else:
+            sachverhalt: dict[str, str] = {}
+            for paar in erfuellt:
+                merkmal, _, quelle = paar.partition("=")
+                if merkmal and quelle:
+                    sachverhalt[merkmal] = quelle
+            e = recht.subsumiere(conn, norm, sachverhalt)
+            for zeile in recht.narrate_subsumtion(conn, e).splitlines():
+                click.echo(f"[RECHT] {zeile}")
         if e["vertrauen"] is not None:
             click.echo(f"[RECHT] Vertrauen (schwächste Prämisse): {e['vertrauen']}")
     finally:

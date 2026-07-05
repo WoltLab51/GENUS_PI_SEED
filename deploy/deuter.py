@@ -355,6 +355,59 @@ def interpret(nachricht: str, absichten=None, grammatik: str | None = None,
     return [s for s in (_segment(e, nachricht) for e in parsed) if s is not None]
 
 
+def _merkmale_prompt(blaetter) -> str:
+    zeilen = [f"  - {b['id']}: {b['inhalt']}" for b in blaetter]
+    return (
+        "Du bekommst die Schilderung eines Rechtsfalls und eine Liste rechtlicher "
+        "VORAUSSETZUNGEN (Merkmale). Beurteile fuer JEDE, ob die Schilderung sie erfuellt und "
+        "WOMIT sie belegt ist:\n"
+        "  urkunde       -- der Schildernde nennt dafuer ein Dokument, einen Vertrag, eine "
+        "Rechnung oder einen Zeugen\n"
+        "  parteivortrag -- er behauptet es nur mit seiner eigenen Aussage, ohne Beleg\n"
+        "  offen         -- aus der Schilderung nicht erkennbar\n"
+        "Die Voraussetzungen:\n" + "\n".join(zeilen) + "\n"
+        "Gib NUR ein kompaktes JSON-Objekt zurueck: {\"<merkmal-id>\": \"<urkunde|"
+        "parteivortrag|offen>\", ...}. Erfinde keine Voraussetzung, waehle nur aus der Liste. "
+        "Du entscheidest NICHT, ob der Anspruch besteht -- nur, was die Fakten belegen."
+    )
+
+
+def merkmale(text: str, blaetter, grammatik: str | None = None) -> dict | None:
+    """Liest eine freie Fallschilderung in ``{merkmal_id: evidenz}`` (evidenz ∈ urkunde/
+    parteivortrag/offen) -- die Fakt→Merkmal-Deutung fuer die Subsumtion (genus.recht.
+    subsumiere_frei). Das Modell liest die fuzzy Fakten, der Kern rechnet die Logik. ``None``
+    bei fehlendem Modell / Ausnahme / kaputtem JSON (der Kern behandelt das als "nichts
+    gelesen"). ``grammatik`` (GBNF, genus.recht.gbnf_sachverhalt) ist DIE GRENZE: nur bekannte
+    Merkmale, nur die drei Beweis-Arten -- ein erfundenes Merkmal ist unmoeglich. Dieses Modul
+    importiert weiterhin nie genus.*."""
+    if not os.path.exists(MODEL_PATH):
+        return None
+    try:
+        model = _get_model()
+        zusatz: dict = {}
+        if grammatik:
+            grammar = _gbnf(grammatik)
+            if grammar is not None:
+                zusatz["grammar"] = grammar
+        result = model.create_chat_completion(
+            messages=[
+                {"role": "system", "content": _merkmale_prompt(blaetter)},
+                {"role": "user", "content": text},
+            ],
+            max_tokens=300,
+            temperature=0.0,
+            **zusatz,
+        )
+        roh = result["choices"][0]["message"]["content"].strip()
+        m = _JSON_OBJECT.search(roh)
+        parsed = json.loads(m.group(0) if m else roh)
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return {k: v for k, v in parsed.items() if isinstance(k, str) and isinstance(v, str)}
+
+
 if __name__ == "__main__":
     import sys
     q = " ".join(sys.argv[1:]) or "Was ist ein Hund?"

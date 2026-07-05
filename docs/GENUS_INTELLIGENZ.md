@@ -229,9 +229,17 @@ Denkweisen-Muster aus §4:
 - Read-time und gläsern: die Norm ist dauerhaftes Wissen, der Sachverhalt flüchtige Eingabe
   (kein Fall-Fakt ins Ledger — sensibel, Ledger ≠ Memory). Der gerenderte Beweisbaum ist
   `genus why` in förmlich. `genus subsumtion norm:kaufpreis --erfuellt merkmal:…=quelle`.
-- Ehrlich offen: die Deuter-Anbindung (ein Modell liest „ich habe ein Auto verkauft" →
-  `merkmal:kaufvertrag erfüllt`) — das Mapping Fakt→Merkmal; weitere Domänen; die
-  Einwendungs-Baupläne (die Gegenseite als dieselbe Maschine).
+- **Deuter-Anbindung GEBAUT (Fakt→Merkmal):** das Modell liest eine freie Fallschilderung
+  in `{merkmal: evidenz}` (evidenz ∈ urkunde/parteivortrag/offen), an der GRENZE gehalten
+  (`recht.gbnf_sachverhalt` — nur bekannte Merkmale, nur die drei Beweis-Arten, ein
+  erfundenes Merkmal ist unmöglich); der Kern (`recht.subsumiere_frei`) übersetzt die
+  Beweis-Art in eine Quelle und rechnet die Subsumtion deterministisch. Arbeitsteilung wie
+  beim Intent-Deuter: **das Modell liest die fuzzy Fakten, der Kern rechnet die Logik** — das
+  Modell entscheidet NIE, ob der Anspruch besteht. Ehrlich gerahmt: „So lese ich deinen Fall
+  (meine Deutung — korrigiere mich); das rechtliche Prüfen darüber ist exakt." `genus
+  subsumtion norm:kaufpreis --text "…"`.
+- Ehrlich offen: weitere Domänen; die Einwendungs-Baupläne (die Gegenseite als dieselbe
+  Maschine); die Norm-WAHL aus einer Schilderung (heute given); die Anbindung in den Chat.
 
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 

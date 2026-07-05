@@ -141,6 +141,77 @@ def subsumiere(conn, norm: str, sachverhalt: dict[str, str]) -> dict:
     }
 
 
+# --- Deuter-Anbindung: freier Text → Merkmale (das Modell liest, der Kern rechnet) -------
+#
+# Die Arbeitsteilung wie beim Intent-Deuter: das MODELL liest die fuzzy Fakten in Struktur
+# (welche Merkmale die Schilderung erfüllt, und WOMIT belegt), der KERN rechnet die Subsumtion
+# (die Logik bleibt exakt). Das Modell entscheidet NIE, ob der Anspruch besteht -- nur, welche
+# Merkmale die Fakten berühren; alles, was es liest, ist Deutung (gedeckelte Quelle), vom
+# Menschen zu bestätigen ("korrigiere mich"), und an der GRENZE gehalten (gbnf_sachverhalt:
+# nur bekannte Merkmale, nur die drei Beweis-Arten -- ein erfundenes Merkmal ist unmöglich).
+
+EVIDENZ_ARTEN = ("urkunde", "parteivortrag", "offen")
+_EVIDENZ_QUELLE = {"urkunde": "dokument:genannt", "parteivortrag": "aussage"}
+
+
+def blatt_merkmale(conn, norm: str) -> list[dict]:
+    """Die BLATT-Merkmale einer Norm (rekursiv): die, die direkte Fakten brauchen (kein
+    Unter-Merkmal, keine Wertung) -- genau das, was das Modell aus der Schilderung lesen
+    soll. Jedes mit ``id`` und ``inhalt`` (für den Prompt)."""
+    blaetter: list[dict] = []
+    for m in _objekte(conn, norm, BRAUCHT):
+        if _ist_wertung(conn, m):
+            continue                                 # Wertung ist nie modell-lesbar (Mensch-Slot)
+        if _objekte(conn, m, BRAUCHT):
+            blaetter += blatt_merkmale(conn, m)       # zusammengesetzt -> hinabsteigen
+        else:
+            blaetter.append({"id": m, "inhalt": _inhalt(conn, m)})
+    return blaetter
+
+
+def gbnf_sachverhalt(blatt_ids) -> str:
+    """Die GRENZE für das Fakt→Merkmal-Lesen: ein JSON-Objekt, dessen Schlüssel nur die
+    bekannten Blatt-Merkmale und dessen Werte nur die drei Beweis-Arten sein können -- ein
+    erfundenes Merkmal oder eine erfundene Beweisart ist strukturell unmöglich (dieselbe
+    Grenze wie beim Raster-Deuter)."""
+    schluessel = " | ".join(f'"\\"{m}\\""' for m in blatt_ids) or '"\\"\\""'
+    evidenz = " | ".join(f'"\\"{e}\\""' for e in EVIDENZ_ARTEN)
+    return "\n".join([
+        'root ::= "{" ws "}" | "{" ws eintrag (ws "," ws eintrag)* ws "}"',
+        'eintrag ::= schluessel ws ":" ws evidenz',
+        f"schluessel ::= {schluessel}",
+        f"evidenz ::= {evidenz}",
+        'ws ::= [ \\t\\n\\r]*',
+    ])
+
+
+def subsumiere_frei(conn, norm: str, text: str, deuter) -> dict:
+    """Subsumtion aus einer FREIEN Schilderung: der (injizierte) ``deuter`` liest den Text in
+    ``{merkmal: evidenz}`` (evidenz ∈ EVIDENZ_ARTEN), der Kern übersetzt die Beweis-Art in
+    eine Quelle und rechnet die Subsumtion deterministisch. Gibt das Subsumtions-Ergebnis
+    plus die gelesene Deutung zurück -- read-time, nichts wird gesät. ``deuter`` ist
+    dependency-injected wie beim Intent-Deuter (Membran ruft das Modell; Test einen Fake)."""
+    blaetter = blatt_merkmale(conn, norm)
+    gelesen = deuter(text, blaetter) or {}
+    bekannt = {b["id"] for b in blaetter}
+    sachverhalt: dict[str, str] = {}
+    for merkmal, evidenz in gelesen.items():
+        if merkmal in bekannt and evidenz in _EVIDENZ_QUELLE:   # "offen"/Unbekanntes fällt raus
+            sachverhalt[merkmal] = _EVIDENZ_QUELLE[evidenz]
+    return {"ergebnis": subsumiere(conn, norm, sachverhalt),
+            "gelesen": gelesen, "sachverhalt": sachverhalt}
+
+
+def narrate_frei(conn, frei: dict) -> str:
+    """Der Beweisbaum aus freier Schilderung -- mit dem ehrlichen Rahmen, dass das Lesen der
+    Fakten eine DEUTUNG des Modells ist (bestätigbar/korrigierbar), während die Subsumtion
+    darüber deterministisch bleibt."""
+    kopf = ("So lese ich deinen Fall (das ist meine Deutung — sag mir, wo ich falsch liege):")
+    return kopf + "\n" + narrate_subsumtion(conn, frei["ergebnis"]) + (
+        "\n(Ich bin kein Anwalt; das Lesen der Fakten kann ich falsch verstanden haben, "
+        "das rechtliche Prüfen darüber ist exakt.)")
+
+
 def _merkmal_zeilen(m: dict, tiefe: int = 0) -> list[str]:
     """Eine Merkmal-Zeile, und -- bei einem zusammengesetzten Merkmal -- der eingerückte
     Unter-Baum darunter (der gerenderte Merkmal-Baum, so tief wie die Rekursion reicht)."""

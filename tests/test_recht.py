@@ -93,6 +93,66 @@ def test_subsumtion_erzeugt_keine_events_read_time(conn):
     assert conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"] == vorher
 
 
+# --- Deuter-Anbindung: freier Text → Merkmale (Modell liest, Kern rechnet) ---------------
+
+def test_blatt_merkmale_steigt_rekursiv_zu_den_faktbasierten_hinab(conn):
+    _mit_norm(conn)
+    ids = {b["id"] for b in recht.blatt_merkmale(conn, "norm:kaufpreis")}
+    # kaufvertrag ist zusammengesetzt -> seine BLÄTTER (angebot/annahme), nicht es selbst
+    assert ids == {"merkmal:angebot", "merkmal:annahme", "merkmal:faelligkeit"}
+    assert "merkmal:kaufvertrag" not in ids
+
+
+def test_die_grenze_laesst_nur_bekannte_merkmale_und_beweisarten_zu(conn):
+    _mit_norm(conn)
+    g = recht.gbnf_sachverhalt(["merkmal:angebot", "merkmal:faelligkeit"])
+    assert "merkmal:angebot" in g and "merkmal:faelligkeit" in g
+    assert "urkunde" in g and "parteivortrag" in g and "offen" in g
+
+
+def test_subsumiere_frei_uebersetzt_die_deutung_und_rechnet_deterministisch(conn):
+    _mit_norm(conn)
+    # ein FAKE-Deuter (kein Modell nötig) liest die Schilderung in Merkmale
+    def fake(text, blaetter):
+        return {"merkmal:angebot": "urkunde", "merkmal:annahme": "urkunde",
+                "merkmal:faelligkeit": "parteivortrag"}
+    frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "ich habe ein Auto verkauft ...", fake)
+    e = frei["ergebnis"]
+    assert e["erfuellt"] is True
+    # die Beweis-Art wurde in eine Quelle übersetzt: urkunde->dokument:genannt, parteivortrag->aussage
+    assert frei["sachverhalt"]["merkmal:angebot"] == "dokument:genannt"
+    assert frei["sachverhalt"]["merkmal:faelligkeit"] == "aussage"
+    assert e["schwaechste"]["merkmal"] == "merkmal:faelligkeit"   # nur Parteivortrag = schwächste
+
+
+def test_subsumiere_frei_wirft_erfundene_oder_offene_merkmale_weg(conn):
+    _mit_norm(conn)
+    def fake(text, blaetter):
+        return {"merkmal:angebot": "urkunde", "merkmal:erfunden": "urkunde",  # unbekannt -> raus
+                "merkmal:annahme": "offen"}                                    # offen -> nicht erfüllt
+    frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "...", fake)
+    assert "merkmal:erfunden" not in frei["sachverhalt"]
+    assert "merkmal:annahme" not in frei["sachverhalt"]
+    assert frei["ergebnis"]["erfuellt"] is False
+
+
+def test_narrate_frei_rahmt_die_deutung_ehrlich(conn):
+    _mit_norm(conn)
+    fake = lambda t, b: {"merkmal:angebot": "urkunde", "merkmal:annahme": "urkunde",
+                         "merkmal:faelligkeit": "parteivortrag"}
+    frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "...", fake)
+    text = recht.narrate_frei(conn, frei)
+    assert "meine Deutung" in text and "kein Anwalt" in text
+    assert "der Anspruch besteht" in text   # der exakte Kern darunter
+
+
+def test_subsumiere_frei_ist_read_time(conn):
+    _mit_norm(conn)
+    vorher = conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"]
+    recht.subsumiere_frei(conn, "norm:kaufpreis", "...", lambda t, b: {"merkmal:angebot": "urkunde"})
+    assert conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"] == vorher
+
+
 def test_der_beweisbaum_nennt_jede_voraussetzung_mit_ihrem_beleg(conn):
     _mit_norm(conn)
     sv = {"merkmal:angebot": "dokument:vertrag",
