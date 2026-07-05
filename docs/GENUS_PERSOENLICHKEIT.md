@@ -84,6 +84,14 @@ der Antwort-Würfel setzt zusammen, was **rausgeht**. Er ist die EINE Stelle fü
   ändert nur, WIE formuliert wird. **Ehrlich begrenzt:** „ausführlicher" kann die Stimme
   nie leisten (sie fügt NIE hinzu) — mehr Umfang muss aus der Zelle kommen; Humor bleibt
   aus der Wissens-Umformulierung draußen (Verbraucher: der Morgen-Schluss).
+- **Vertiefung** — der „ausführlich"-Verbraucher (`companion.vertiefung`): Länge aus
+  INHALT, nie aus Worten. Bei Umfang „ausführlich" zieht die Wort-Antwort mehr Material
+  aus dem Graphen — eine weitere Bedeutung, die Geschwister unter demselben Elternteil
+  („Unter »Haustier« kenne ich außerdem: »Katze«."), die Leiter eine Stufe hinauf, die
+  Quellen namentlich. Jeder Satz existiert nur, wenn das Material da ist; jeder benannte
+  Begriff steht in »« (Stimme-Anker); ein Knoten ohne menschlichen Namen bleibt draußen
+  (nie kryptisch). Rein deterministisch — so schreibt GENUS lange Texte, ohne je zu
+  erfinden.
 - **Floskeln** — die Wärme-Varianten von Gruß/Dank an einer Stelle statt in jedem Handler;
   der Gruß trägt sein Beiwerk (neugierige Rückfrage) gemäß Belegung.
 

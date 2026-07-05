@@ -154,6 +154,77 @@ def test_stimme_wortidentische_rueckgabe_ist_keine_glaettung():
     assert stimme_modul.formuliere(satz, model=M()) is None
 
 
+# --- die Vertiefungs-Komposition: Länge aus Inhalt, nie aus Worten -----------------------
+
+def _reiches_wissen(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss",
+                              "Haustier, dessen Vorfahre der Wolf ist", "dbnary")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_haustier", "wikidata")
+    reactors.observe_relation(conn, "Haustier@de", "expresses", "Q_haustier", "wikidata")
+    reactors.observe_relation(conn, "Q_katze", "is_a", "Q_haustier", "wikidata")
+    reactors.observe_relation(conn, "Katze@de", "expresses", "Q_katze", "wikidata")
+    reactors.observe_relation(conn, "Q_haustier", "is_a", "Q_tier", "wikidata")
+    reactors.observe_relation(conn, "Tier@de", "expresses", "Q_tier", "wikidata")
+
+
+def test_ausfuehrlich_zieht_mehr_material_aus_dem_graphen(conn):
+    _reiches_wissen(conn)
+    persoenlichkeit.stelle(conn, "knappheit", +1)   # mittel -> ausfuehrlich
+    text = companion.respond(conn, "Was ist ein Hund?")
+    assert "Unter »Haustier« kenne ich außerdem: »Katze«." in text
+    assert "»Haustier« zählt wiederum zu »Tier«." in text
+    assert "Meine Quellen zu »Hund«: dbnary, wikidata." in text
+
+
+def test_ausfuehrlich_nennt_eine_zweite_bedeutung_wenn_es_eine_gibt(conn):
+    # die Mehr-Sinn-Fülle (Hund = Haustier UND Feuerbock UND Förderwagen) wird bei
+    # „ausführlich" sichtbar -- der Kern-Satz trägt die eine, die Vertiefung die andere
+    _reiches_wissen(conn)
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss",
+                              "Feuerbock am offenen Kamin", "dbnary")
+    persoenlichkeit.stelle(conn, "knappheit", +1)
+    text = companion.respond(conn, "Was ist ein Hund?")
+    assert "weitere Bedeutung" in text
+    assert "Feuerbock" in text and "Haustier, dessen Vorfahre" in text
+
+
+def test_mittel_und_knapp_bleiben_bei_der_heutigen_antwort(conn):
+    _reiches_wissen(conn)
+    mittel = companion.respond(conn, "Was ist ein Hund?")
+    assert "Katze" not in mittel and "Meine Quellen" not in mittel
+    persoenlichkeit.stelle(conn, "knappheit", -1)
+    knapp = companion.respond(conn, "Was ist ein Hund?")
+    assert "Katze" not in knapp and "Meine Quellen" not in knapp
+
+
+def test_vertiefung_ohne_material_bleibt_ehrlich_leer(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "wikidata")
+    a = companion.answer(conn, "Was ist ein Hund?")
+    assert companion.vertiefung(conn, a) == []   # eine Quelle, keine Eltern: nichts erfunden
+
+
+def test_vertiefung_nennt_nie_einen_kryptischen_knoten(conn):
+    # ein Elternteil ohne menschlichen Namen (blanker Q-Knoten) bleibt draußen
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Q144", "label", "Hund@de", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q999999", "wikidata")
+    a = companion.answer(conn, "Was ist ein Hund?")
+    assert all("Q999999" not in satz for satz in companion.vertiefung(conn, a))
+
+
+def test_vertiefung_setzt_jeden_benannten_begriff_in_anker_guillemets(conn):
+    _reiches_wissen(conn)
+    a = companion.answer(conn, "Was ist ein Hund?")
+    saetze = companion.vertiefung(conn, a)
+    # jeder strukturell benannte Begriff (Geschwister, Leiter) ist ein Stimme-Anker
+    assert any("»Katze«" in s for s in saetze)
+    assert any("»Tier«" in s for s in saetze)
+    assert not any("Katze" in s and "»Katze«" not in s for s in saetze)
+
+
 # --- die umgezogenen Verbraucher bleiben verhaltensgleich --------------------------------
 
 def test_gruss_und_dank_lesen_jetzt_aus_dem_wuerfel(conn):

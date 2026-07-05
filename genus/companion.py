@@ -140,6 +140,65 @@ def narrate(a: dict) -> str:
     return sentence
 
 
+def _konzept_name(conn, node: str) -> str | None:
+    """Der menschliche Name eines Graph-Knotens für die Vertiefung -- ``None``, wenn es
+    keinen gibt (ein blanker Q-Knoten sagt einem Menschen nichts; nie kryptisch)."""
+    anzeige = sources.display(conn, node)
+    m = re.search(r"\(([^)]+)\)$", anzeige)
+    if m:
+        return m.group(1)
+    if "@" in anzeige:
+        return anzeige.rsplit("@", 1)[0]
+    return None
+
+
+def vertiefung(conn, a: dict) -> list[str]:
+    """Die VERTIEFUNGS-KOMPOSITION (Antwort-Würfel, Umfang „ausführlich" -- Ronnys Frage
+    2026-07-05: „wie schreibt GENUS so richtig schön lange Texte?"): Länge kommt aus
+    INHALT, nie aus Worten. Jeder Satz hier existiert nur, wenn das Material im Graphen
+    liegt -- eine weitere Bedeutung, die Geschwister unter demselben Elternteil, die
+    Leiter eine Stufe hinauf, die Quellen namentlich. Rein deterministisch, nichts
+    erfunden; jeder benannte Begriff steht in »« (Anker für die Stimme-Leine)."""
+    saetze: list[str] = []
+    if len(a.get("meaning") or []) > 1:
+        saetze.append(f"Daneben kenne ich eine weitere Bedeutung von »{a['word']}«: "
+                      f"{a['meaning'][1].rstrip('.')}.")
+    qid = a.get("concept")
+    if not qid:
+        return saetze
+    for eltern_kante in sources.relations(conn, subject=qid, predicate="is_a"):
+        eltern = eltern_kante["object"]
+        eltern_name = _konzept_name(conn, eltern)
+        if eltern_name is None:
+            continue
+        geschwister: list[str] = []
+        for r in sources.relations(conn, predicate="is_a", object=eltern):
+            if r["subject"] == qid:
+                continue
+            name = _konzept_name(conn, r["subject"])
+            if name and name not in geschwister:
+                geschwister.append(name)
+            if len(geschwister) == 3:
+                break
+        if geschwister:
+            saetze.append(f"Unter »{eltern_name}« kenne ich außerdem: "
+                          + _join_de([f"»{g}«" for g in geschwister]) + ".")
+        gross = [n for n in (_konzept_name(conn, r["object"]) for r in
+                             sources.relations(conn, subject=eltern, predicate="is_a")) if n]
+        if gross:
+            saetze.append(f"»{eltern_name}« zählt wiederum zu "
+                          + _join_de([f"»{g}«" for g in gross[:2]]) + ".")
+        break   # EIN Elternteil vertieft -- die Vertiefung ist ein Blick, kein Katalog
+    lexem = f"{a['word']}@de"
+    quellen = sorted(
+        {r["source"] for r in sources.relations(conn, subject=lexem, predicate="expresses")}
+        | {r["source"] for r in sources.relations(conn, subject=lexem, predicate="primary_gloss")}
+    )
+    if len(quellen) >= 2:
+        saetze.append(f"Meine Quellen zu »{a['word']}«: {', '.join(quellen)}.")
+    return saetze
+
+
 # --- relational questions ("Ist ein X ein Y?") -----------------------------------------
 #
 # A yes/no is_a question, answered by the *existing* inference primitive: map X to its
@@ -820,6 +879,12 @@ def _wort_antwort(conn, question: str) -> str | None:
     if not a["found"]:
         return None
     text = narrate(a)
+    # der Umfang-Verbraucher (Antwort-Würfel): bei „ausführlich" zieht die Antwort MEHR
+    # Material aus dem Graphen -- Länge aus Inhalt, nie aus Worten
+    from genus import antwort as _antwort
+
+    if _antwort.belegung(conn, "plausch")["knappheit"] == "ausfuehrlich":
+        text += "".join(f" {satz}" for satz in vertiefung(conn, a))
     if a.get("concept"):
         text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
     return text
