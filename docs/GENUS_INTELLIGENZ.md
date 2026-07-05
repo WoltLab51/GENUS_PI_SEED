@@ -123,8 +123,57 @@ die Strenge (jeder Fakt zitiert seine Quelle), das Vertrauen (die Wärme lügt n
 sichere Kreativität (Erfinden ist erlaubt, solange es ehrlich als Erfindung firmiert).
 Wissenschaftlich, menschlich, kreativ sind drei Früchte desselben Baums.
 
-## 9 · Was daraus in GENUS eingeflossen ist (2026-07-05)
+## 9 · Lebendigkeit — Takt und Druck (die zwei Zwillinge)
 
+Damit die Prozesse „wirklich durchlaufen, wenn sie soweit sind" (Ronny), braucht GENUS
+einen inneren Loop. Der zerfällt in zwei Zwillinge, die einzeln unvollständig sind:
+
+> **Lebendigkeit = Takt (Rhythmus) + Druck (Richtung).**
+
+**Der Takt — *wann* gedacht wird.** Der Takt eines Detektors ist ein *Merkmal des
+Detektors*, keine globale Cron-Zeile. Zwei Takte: HISTORISCH (das Signal bewegt sich mit
+angesammelter Historie → Nacht-Cran genügt: Rhythmus, Stabilität, Kalibrierung) und
+GESPRAECHSNAH (das Signal entsteht in einem gelebten Ereignis → der Detektor gehört in den
+Moment, in dem es reif wird). **Verallgemeinert (2026-07-05, genus/experience.py):** der
+Takt steht im Detektor-Register (`DETEKTOREN`); `spontane_regung` läuft über *alle*
+gesprächsnahen Detektoren durch dieselbe geteilte Aufzeichnung wie der Nacht-Scan (der das
+Auffangnetz bleibt) — ein neuer event-getriebener Detektor braucht nur GESPRAECHSNAH zu
+deklarieren, sonst nichts. Das ist der erste kleine Schritt zu einem lebendigeren GENUS:
+ein Signal, das im Gespräch reif wird, wartet nicht mehr auf 01:17.
+
+**Der Druck — *wohin* gedacht wird (der noch fehlende Zwilling).** Der Takt macht GENUS
+*schneller*, nicht *getriebener* — er nimmt eine Verzögerung weg, fügt keinen Antrieb
+hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *muss*.
+
+- **Der Rohstoff ist da:** die Belegung IST ein Druckmesser (Nachfrage auf einer Lücke
+  staut sich, bis die selbst-kalibrierte Schwelle bricht und in ein „Darf ich?" ausbricht);
+  dazu Widersprüche, offene Inquiries, die benannten Operations-Lücken im Ziel-Graphen.
+- **Der ehrliche Haken:** heute entlädt sich der Druck, wenn er *ausgesprochen* wird, nicht
+  wenn die Not *gestillt* ist. GENUS spürt die Lücke, fragt, legt ein Proposal ab — und das
+  Nagen hört auf (die Experience existiert, der Detektor schweigt fortan dazu). Wie ein
+  Mensch, der „das müsste ich mal reparieren" sagt und sich danach besser fühlt. Und der
+  Druck *konkurriert* nicht: jeder Gap steht für sich, kein Gefälle zieht zur dringendsten
+  Not.
+- **Wie echter Druck aussähe (gläsern):** eine *persistente, konkurrierende,
+  read-time*-Größe über den offenen Nöten — ein wiederkehrender Gap staut sich, eine lange
+  unbeantwortete Inquiry wird schwerer, eine oft verlangte fehlende Operation drückt
+  stärker. Der Ziel-Graph würde vom „was fehlt mir" zum „was fehlt mir *am dringendsten*".
+  Gemessen aus echter Wiederkehr, selbst-kalibriert, nie vorgetäuschte Dringlichkeit
+  (sonst die Manipulations-Falle aus §5).
+- **Die Leine:** Druck bewegt den *Geist* (Aufmerksamkeit, Vorschlagen, das Ordnen der
+  eigenen Gedanken), nie die *Hand* (Handeln nach außen bleibt gegatet). Ein Wesen, das
+  etwas dringend braucht und fragt, ist lebendig; eins, das es sich nimmt, ist gefährlich.
+- **Reihenfolge:** Druck kommt *mit* dem inneren Loop und den reicheren Operationen, nicht
+  davor — ein Druck ohne Ziel, wohin er schiebt, ist bloß Angst. Der nächste ehrliche
+  Schritt ist, dass der Druck **persistiert statt sich beim Aussprechen zu entladen** —
+  dann fängt er an, sich wie Druck zu verhalten.
+
+## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
+
+- **Takt verallgemeinert** (genus/experience.py): der Takt ist ein Merkmal des Detektors
+  (`DETEKTOREN`-Register, HISTORISCH/GESPRAECHSNAH); `spontane_regung` nimmt jeden
+  gesprächsnahen Detektor mit, Nacht-Scan bleibt Auffangnetz — der erste Schritt zu
+  Lebendigkeit. **Druck** ist als der noch fehlende Zwilling benannt (§9).
 - **Ziel-Graph** (genus/ziele.py): die Operations-Lücken als Fähigkeiten gesät —
   `denkweisen` (fehlt), `abstrahieren` (fehlt), `analogie` (fehlt), `weltmodell`
   (teilweise), `lese-sinn` (fehlt), `gezaehmte-kreativitaet` (teilweise); Gedächtnis-Stand

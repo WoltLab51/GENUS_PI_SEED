@@ -152,6 +152,64 @@ def test_unklar_segment_reading_is_recorded_too():
     assert verstehen.belegung(conn, "unklar")["gesamt"] == 1
 
 
+# --- Der Takt ist ein Merkmal des Detektors (Ronny 2026-07-05: „verallgemeinern") --------
+
+def test_takt_registry_trennt_gespraechsnah_von_historisch():
+    takte = {d.funktion.__name__: d.takt for d in experience.DETEKTOREN}
+    assert takte["_verstehens_luecke_candidates"] == experience.GESPRAECHSNAH
+    for hist in ("_activity_daily_rhythm_candidates", "_belief_stability_candidates",
+                 "_rule_calibration_candidates"):
+        assert takte[hist] == experience.HISTORISCH
+    # der gesprächsnahe Detektor ist genau der Lücken-Detektor
+    assert experience.gespraechsnahe_detektoren() == (experience._verstehens_luecke_candidates,)
+    # die rückwärts-kompatible Sicht bleibt die volle Funktionsliste
+    assert set(experience.DETECTORS) == {d.funktion for d in experience.DETEKTOREN}
+
+
+def test_spontane_regung_feuert_die_gelebte_luecke_sofort():
+    conn = _fresh()
+    for _ in range(4):
+        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+    regung = experience.spontane_regung(conn)
+    assert regung is not None
+    assert regung["kind"] == "weltfrage" and regung["proposal_id"]
+    # dieselbe Lücke wird danach nicht doppelt aufgezeichnet (der Nacht-Scan holt nichts nach)
+    assert _luecken_scan(conn) == []
+
+
+def test_spontane_regung_schweigt_ohne_reifes_signal():
+    conn = _fresh()
+    verstehen.record_reading(conn, "weltfrage", "model:deuter")   # 1 Lesung, unter der Schwelle
+    assert experience.spontane_regung(conn) is None
+
+
+def test_spontane_regung_laesst_die_historischen_detektoren_ruhen():
+    # ein gesprächsnaher Moment weckt NICHT die täglichen Historien-Betrachter
+    conn = _fresh()
+    for _ in range(4):
+        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+    experience.spontane_regung(conn)
+    typen = {r["experience_type"] for r in conn.execute(
+        "SELECT DISTINCT experience_type FROM experience_log").fetchall()}
+    assert typen == {experience.VERSTEHENS_LUECKE_TYPE}   # nur die Regung, kein Rhythmus/Stabilität
+
+
+def test_ein_neuer_gespraechsnaher_detektor_laeuft_ohne_scan_aenderung(monkeypatch):
+    # der Kern der Verallgemeinerung: einen neuen event-getriebenen Detektor registrieren
+    # heißt nur, GESPRAECHSNAH zu deklarieren -- spontane_regung nimmt ihn von selbst mit
+    gerufen = {"n": 0}
+
+    def _fake_detektor(conn):
+        gerufen["n"] += 1
+        return []   # kein Kandidat -> keine Nebenwirkung, wir prüfen nur, DASS er läuft
+
+    neu = experience.DETEKTOREN + (experience.Detektor(_fake_detektor, experience.GESPRAECHSNAH),)
+    monkeypatch.setattr(experience, "DETEKTOREN", neu)
+    conn = _fresh()
+    experience.spontane_regung(conn)
+    assert gerufen["n"] == 1   # ohne eine Zeile in scan/spontane_regung zu ändern
+
+
 def test_rhythm_proposals_keep_their_old_shape_backward_compatible():
     # die Generalisierung von record_experience_proposal darf den Rhythmus-Default nicht ändern
     candidate = {

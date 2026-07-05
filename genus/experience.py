@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, namedtuple
 
 from genus import inquiries, ledger, proposals
 
@@ -48,47 +48,45 @@ VERSTEHENS_LUECKE_MIN_DEMAND = 3  # Saat/Gültigkeits-Untergrenze: 1-2 Lesungen 
 
 
 def scan(conn) -> list[dict]:
-    # The mind grows by registering detectors, not by rewriting scan. Each is a
-    # pure function conn -> candidates, mirroring how RULES/TREND_RULES/
-    # CORRELATION_RULES make the eye's growth structural.
+    # The mind grows by registering detectors, not by rewriting scan. Each is a pure
+    # function conn -> candidates, mirroring how RULES/TREND_RULES/CORRELATION_RULES make
+    # the eye's growth structural. Der Nacht-Scan ist das AUFFANGNETZ: er läuft über ALLE
+    # Detektoren (jeden Takt); die gesprächsnahen feuern zusätzlich sofort (spontane_regung).
     recorded: list[dict] = []
     proposals_created = 0
-    for detector in DETECTORS:
-        for candidate in detector(conn):
-            existing = _active_experience(conn, candidate["experience_key"])
-            if existing is not None:
-                # The experience already exists; re-characterize it in place if its
-                # characterization changed (a belief that was stable now reads
-                # volatile), else leave it. Keeps self-knowledge current.
-                event_id = _maybe_recharacterize(conn, existing, candidate)
-                if event_id is not None:
-                    recorded.append(
-                        {
-                            "experience_event_id": event_id,
-                            "experience_id": int(existing["id"]),
-                            "recharacterized": True,
-                            **candidate,
-                        }
-                    )
+    for detektor in DETEKTOREN:
+        for candidate in detektor.funktion(conn):
+            ergebnis = _verarbeite_kandidat(
+                conn, candidate, darf_proposal=proposals_created < MAX_PROPOSALS_PER_SCAN)
+            if ergebnis is None:
                 continue
-            experience_event_id = record_experience_event(conn, candidate)
-            proposal_event_id = None
-            if candidate.get("proposable") and proposals_created < MAX_PROPOSALS_PER_SCAN:
-                proposal_event_id = record_experience_proposal(
-                    conn,
-                    candidate,
-                    experience_event_id,
-                )
+            if ergebnis.get("proposal_event_id"):
                 proposals_created += 1
-            recorded.append(
-                {
-                    "experience_event_id": experience_event_id,
-                    "proposal_event_id": proposal_event_id,
-                    **candidate,
-                }
-            )
+            recorded.append(ergebnis)
     _raise_stability_surprises(conn)
     return recorded
+
+
+def _verarbeite_kandidat(conn, candidate: dict, *, darf_proposal: bool) -> dict | None:
+    """Ein Kandidat -> Aufzeichnung -- die EINE Stelle für Nacht-Scan UND spontanen Takt
+    (fix-the-class: record / re-charakterisieren / Proposal leben nur hier, nicht doppelt).
+    Eine schon bekannte Erfahrung wird bei geänderter Charakterisierung in-place
+    re-charakterisiert (Selbst-Wissen aktuell), sonst übersprungen; eine neue wird
+    aufgezeichnet, und ein Proposal entsteht nur, wenn der Kandidat es trägt UND das Budget
+    (``darf_proposal``) es zulässt. ``None``, wenn nichts Neues geschah."""
+    existing = _active_experience(conn, candidate["experience_key"])
+    if existing is not None:
+        event_id = _maybe_recharacterize(conn, existing, candidate)
+        if event_id is None:
+            return None
+        return {"experience_event_id": event_id, "experience_id": int(existing["id"]),
+                "recharacterized": True, **candidate}
+    experience_event_id = record_experience_event(conn, candidate)
+    proposal_event_id = None
+    if candidate.get("proposable") and darf_proposal:
+        proposal_event_id = record_experience_proposal(conn, candidate, experience_event_id)
+    return {"experience_event_id": experience_event_id,
+            "proposal_event_id": proposal_event_id, **candidate}
 
 
 def _active_experience(conn, experience_key: str):
@@ -712,27 +710,64 @@ def _verstehens_luecke_candidates(conn) -> list[dict]:
     return candidates
 
 
-def spontane_verstehens_luecke(conn) -> dict | None:
-    """Der GESPRÄCHSNAHE Lücken-Check (Ronny, 2026-07-04: „nachts gehört, was tagsüber
-    stört" -- dieser Scan stört nicht, er war nur aus Metapher nachts; sein Signal
-    entsteht im Gespräch, also gehört sein Takt dorthin). Läuft im Moment einer
-    Lücken-Lesart: dieselben Kandidaten, dieselbe Aufzeichnung, dieselbe Kappe wie im
-    Nacht-Scan (der als Auffangnetz bleibt) -- nur eben JETZT, damit das „Darf ich?"
-    dort ankommt, wo die Lücke gerade gelebt wurde. Der Takt eines Detektors ist ein
-    Merkmal des Detektors, keine globale Cron-Zeile: die drei Historien-Betrachter
-    (Rhythmus/Stabilität/Kalibrierung) bleiben täglich -- ihr Signal bewegt sich nicht
-    schneller. Gibt ``{"kind", "proposal_id"}`` zurück, wenn ein Proposal entstand."""
-    for candidate in _verstehens_luecke_candidates(conn):
-        experience_event_id = record_experience_event(conn, candidate)
-        proposal_id = None
-        if candidate.get("proposable"):
-            record_experience_proposal(conn, candidate, experience_event_id)
-            row = conn.execute("SELECT MAX(id) AS id FROM proposal_log").fetchone()
-            proposal_id = int(row["id"])
-        conn.commit()
-        return {"kind": candidate["pattern"]["kind"], "proposal_id": proposal_id}
+def spontane_regung(conn) -> dict | None:
+    """Der EIGENE Takt der gesprächsnahen Detektoren (Ronny, 2026-07-05: „lass den
+    Lücken-Detektor-Takt sich verallgemeinern") -- der erste kleine Schritt zu einem
+    lebendigeren GENUS: ein Signal, das im Gespräch reif wird, wartet nicht mehr auf den
+    3-Uhr-Cron, sondern regt sich JETZT.
+
+    Läuft über ALLE Detektoren mit Takt GESPRAECHSNAH (heute der Lücken-Detektor; ein neuer
+    event-getriebener Detektor braucht nur GESPRAECHSNAH zu deklarieren -- sonst nichts).
+    Dieselbe geteilte Aufzeichnung wie der Nacht-Scan (:func:`_verarbeite_kandidat`), nur im
+    gelebten Moment, damit das „Darf ich?" dort ankommt, wo das Signal entstand. Höchstens
+    EINE Regung pro Aufruf (ein Gesprächsmoment löst keine Flut aus). Die HISTORISCHEN
+    Detektoren bleiben täglich -- ihr Signal bewegt sich nicht schneller. Gibt
+    ``{"experience_key", "kind", "proposal_id"}`` der ersten Regung zurück, sonst ``None``;
+    kostet nie eine Antwort (der Aufrufer fängt jeden Fehler still ab)."""
+    for funktion in gespraechsnahe_detektoren():
+        for candidate in funktion(conn):
+            ergebnis = _verarbeite_kandidat(conn, candidate, darf_proposal=True)
+            if ergebnis is None:
+                continue
+            conn.commit()
+            proposal_id = None
+            if ergebnis.get("proposal_event_id"):
+                row = conn.execute("SELECT MAX(id) AS id FROM proposal_log").fetchone()
+                proposal_id = int(row["id"])
+            return {"experience_key": candidate["experience_key"],
+                    "kind": candidate.get("pattern", {}).get("kind"),
+                    "proposal_id": proposal_id}
     return None
 
 
-DETECTORS = (_activity_daily_rhythm_candidates, _belief_stability_candidates,
-             _rule_calibration_candidates, _verstehens_luecke_candidates)
+# Der TAKT eines Detektors ist ein MERKMAL des Detektors, keine globale Cron-Zeile
+# (Ronny, 2026-07-05: „lass den Lücken-Detektor-Takt sich verallgemeinern"). Zwei Takte:
+#   HISTORISCH    -- das Signal bewegt sich mit angesammelter Historie; der Nacht-Cron ist
+#                    richtig (Rhythmus, Stabilität, Kalibrierung -- schneller gäbe es nichts
+#                    Neues zu sehen).
+#   GESPRAECHSNAH -- das Signal ENTSTEHT in einem gelebten Ereignis; der Detektor gehört in
+#                    den Moment, in dem sein Signal reif wird, nicht in die 3-Uhr-Nacht --
+#                    so steht das „Darf ich?" im selben Atemzug wie die gelebte Lücke.
+# Der Nacht-Scan bleibt das AUFFANGNETZ: er läuft über ALLE Detektoren (jeden Takt); was der
+# spontane Takt verpasst, holt der Scan nach. Ein neuer event-getriebener Detektor braucht
+# nur GESPRAECHSNAH zu deklarieren -- spontane_regung nimmt ihn dann von selbst mit.
+HISTORISCH = "historisch"
+GESPRAECHSNAH = "gespraechsnah"
+
+Detektor = namedtuple("Detektor", ("funktion", "takt"))
+
+DETEKTOREN = (
+    Detektor(_activity_daily_rhythm_candidates, HISTORISCH),
+    Detektor(_belief_stability_candidates, HISTORISCH),
+    Detektor(_rule_calibration_candidates, HISTORISCH),
+    Detektor(_verstehens_luecke_candidates, GESPRAECHSNAH),
+)
+
+# Rückwärts-kompatible Sicht (die eine Quelle bleibt DETEKTOREN): alle Detektor-Funktionen.
+DETECTORS = tuple(d.funktion for d in DETEKTOREN)
+
+
+def gespraechsnahe_detektoren() -> tuple:
+    """Die Detektoren, deren Signal im Gespräch entsteht -- sie laufen zusätzlich zum
+    Nacht-Scan sofort, sobald ihr Signal reif wird (:func:`spontane_regung`)."""
+    return tuple(d.funktion for d in DETEKTOREN if d.takt == GESPRAECHSNAH)

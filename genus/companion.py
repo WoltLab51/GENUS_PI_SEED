@@ -1611,14 +1611,15 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
 
 
 def _luecken_vorschlag_hinweis(conn) -> str:
-    """Der gesprächsnahe Lücken-Check (Ronny, 2026-07-04): läuft genau dann, wenn eine
-    Lücken-Lesart aufgezeichnet wurde -- reißt die selbst-kalibrierte Schwelle, entsteht
-    das Proposal SOFORT und das „Darf ich?" steht im selben Atemzug in der Antwort,
-    statt bis zum Nacht-Scan zu warten. Darf nie eine Antwort kosten (still bei jedem
-    Fehler); die Freigabe bleibt am Terminal (die Membran redet nur)."""
+    """Die gesprächsnahe Regung (Ronny, 2026-07-04/05): läuft genau dann, wenn ein
+    gesprächsnaher Detektor sein Signal reif werden lässt (heute der Lücken-Detektor) --
+    reißt die selbst-kalibrierte Schwelle, entsteht das Proposal SOFORT und das „Darf ich?"
+    steht im selben Atemzug in der Antwort, statt bis zum Nacht-Scan zu warten. Darf nie
+    eine Antwort kosten (still bei jedem Fehler); die Freigabe bleibt am Terminal (die
+    Membran redet nur)."""
     try:
         from genus import experience
-        ergebnis = experience.spontane_verstehens_luecke(conn)
+        ergebnis = experience.spontane_regung(conn)
     except Exception:
         return ""
     if not ergebnis or not ergebnis.get("proposal_id"):

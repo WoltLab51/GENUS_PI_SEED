@@ -187,7 +187,7 @@ def test_der_check_kostet_nie_eine_antwort(monkeypatch):
 
     conn = _fresh()
     verstehen.seed_raster(conn)
-    monkeypatch.setattr(experience, "spontane_verstehens_luecke",
+    monkeypatch.setattr(experience, "spontane_regung",
                         lambda c: (_ for _ in ()).throw(RuntimeError("kaputt")))
     fake = lambda q: [{"text": q, "absicht": "weltfrage", "subject": None, "object": None}]
     result = companion.respond_with_deuter(conn, "Wie wird das Wetter?", deuter=fake)
