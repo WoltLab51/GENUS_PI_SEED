@@ -164,9 +164,18 @@ hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *mu
   eigenen Gedanken), nie die *Hand* (Handeln nach außen bleibt gegatet). Ein Wesen, das
   etwas dringend braucht und fragt, ist lebendig; eins, das es sich nimmt, ist gefährlich.
 - **Reihenfolge:** Druck kommt *mit* dem inneren Loop und den reicheren Operationen, nicht
-  davor — ein Druck ohne Ziel, wohin er schiebt, ist bloß Angst. Der nächste ehrliche
-  Schritt ist, dass der Druck **persistiert statt sich beim Aussprechen zu entladen** —
-  dann fängt er an, sich wie Druck zu verhalten.
+  davor — ein Druck ohne Ziel, wohin er schiebt, ist bloß Angst.
+- **Erster Schritt GEBAUT (2026-07-05, genus/druck.py): Persistenz statt Entladung.** Der
+  Druck einer Verstehens-Lücke ist jetzt eine READ-TIME-Größe über den ungestillten Nöten:
+  er bleibt, solange das Blatt keinen Handler hat, und STEIGT, wenn nach dem Aussprechen
+  (dem Proposal) weitere Nachfrage kommt — der Zuwachs seit dem Vorschlag ist das
+  Persistenz-Signal (die Not wird nicht kleiner, sondern größer). Eine gestillte Not (jetzt
+  ein Handler) drückt gar nicht mehr. Er KONKURRIERT (nach Druck geordnet, die drängendste
+  zuerst) und taucht in „Was beschäftigt dich?" auf — inklusive der ehrlichen Ansage, wenn
+  ein längst vorgeschlagenes Blatt seither NUR gewachsen ist. Er erzeugt KEINE Events, keine
+  Proposals, keine Handlung (bewegt den Geist, nie die Hand); kein Preset (der Druck IST die
+  gemessene gelebte Nachfrage). Noch offen: den Druck auf offene Inquiries und fehlende
+  Operationen ausweiten; ihn dem inneren Loop als Gefälle geben.
 
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 

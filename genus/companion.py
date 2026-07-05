@@ -1058,16 +1058,26 @@ def _speak_inquiry(conn, g: dict) -> str:
 
 def narrate_inquiries(conn, oq: dict) -> str:
     """The open concerns as fluent German -- and the honest note that answering them happens
-    at the terminal, because this channel deliberately cannot write."""
+    at the terminal, because this channel deliberately cannot write. Zusätzlich der DRUCK
+    (genus.druck): die drängendste ungestillte Verstehens-Lücke -- die PERSISTIERT jetzt,
+    statt sich beim Aussprechen zu entladen, und wird als solche benannt, wenn sie seit dem
+    Vorschlag weiter gewachsen ist (Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §9)."""
+    from genus import druck
+
     groups = oq["groups"]
-    if not groups:
+    druck_satz = druck.satz(conn)
+    if not groups and not druck_satz:
         return "Gerade beschäftigt mich nichts Offenes — alle meine Fragen sind beantwortet."
-    header = ("Mich beschäftigt gerade eine Sache:" if len(groups) == 1
-              else f"Mich beschäftigen gerade {len(groups)} Dinge:")
-    lines = [header]
-    lines += ["• " + _speak_inquiry(conn, g) for g in groups]
-    lines.append("(Antworten kann ich hier nicht entgegennehmen — das geht am Terminal: "
-                 "„genus inquiries\" und „genus teach\".)")
+    lines: list[str] = []
+    if groups:
+        header = ("Mich beschäftigt gerade eine Sache:" if len(groups) == 1
+                  else f"Mich beschäftigen gerade {len(groups)} Dinge:")
+        lines.append(header)
+        lines += ["• " + _speak_inquiry(conn, g) for g in groups]
+        lines.append("(Antworten kann ich hier nicht entgegennehmen — das geht am Terminal: "
+                     "„genus inquiries\" und „genus teach\".)")
+    if druck_satz:
+        lines.append(druck_satz)
     return "\n".join(lines)
 
 
