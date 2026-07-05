@@ -738,6 +738,18 @@ def test_morgen_push_und_nacht_stehen_im_cron_installer():
     assert "morgen_push.sh" in text
 
 
+def test_der_besinnungs_herzschlag_ist_rein_reflektierend():
+    # der autonome Herzschlag (Ronny 2026-07-05): tickt GENUS' Geist, schreibt NUR ins
+    # Membran-Tagebuch -- kein --tick (kein Proposal), keine Außenwirkung, nichts ins Ledger
+    text = (ROOT / "deploy" / "besinnung.sh").read_text(encoding="utf-8")
+    assert "genus\" besinnung" in text or "genus besinnung" in text
+    assert "--tick" not in text                       # rein lesend: nie ein Proposal
+    assert "sendMessage" not in text and "curl" not in text   # keine Außenwirkung
+    assert "besinnung.log" in text                    # schreibt ins Membran-Tagebuch
+    cron = (ROOT / "deploy" / "pi_install_cron.sh").read_text(encoding="utf-8")
+    assert "besinnung.sh" in cron                      # als Herzschlag im Cron verdrahtet
+
+
 # --- Vokabel-bei-Begegnung: die Membran legt unbekannte Wörter in die Lern-Warteschlange ---
 
 

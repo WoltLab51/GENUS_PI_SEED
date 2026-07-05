@@ -59,6 +59,7 @@ fi
     echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '57 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] nacht-konsolidierung $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && bash ./deploy/nacht_konsolidierung.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/10 5-9 * * * cd "$GENUS_REPO_DIR" && bash ./deploy/morgen_push.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    echo '6,21,36,51 * * * * cd "$GENUS_REPO_DIR" && bash ./deploy/besinnung.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '27 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] doctor $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/doctor.log" 2>&1 && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
     echo '47 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] repo-observe $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_repo_on_pi.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     if [ "$STATUS_PUBLISH" = "1" ]; then

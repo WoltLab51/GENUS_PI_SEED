@@ -64,7 +64,7 @@ def test_pause_vertrag_jedes_autonome_skript_prueft_den_schalter():
     autonome_skripte = (
         "observe_weather.sh", "observe_weather_second.sh", "pi_learn.sh",
         "pi_network_watchdog.sh", "pi_clock_check.sh",
-        "nacht_konsolidierung.sh", "morgen_push.sh",
+        "nacht_konsolidierung.sh", "morgen_push.sh", "besinnung.sh",
     )
     for name in autonome_skripte:
         text = (root / "deploy" / name).read_text(encoding="utf-8")
