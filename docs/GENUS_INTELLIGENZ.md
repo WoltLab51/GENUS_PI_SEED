@@ -229,11 +229,17 @@ Denkweisen-Muster aus §4:
 - Read-time und gläsern: die Norm ist dauerhaftes Wissen, der Sachverhalt flüchtige Eingabe
   (kein Fall-Fakt ins Ledger — sensibel, Ledger ≠ Memory). Der gerenderte Beweisbaum ist
   `genus why` in förmlich. `genus subsumtion norm:kaufpreis --erfuellt merkmal:…=quelle`.
-- **Deuter-Anbindung GEBAUT (Fakt→Merkmal):** das Modell liest eine freie Fallschilderung
-  in `{merkmal: evidenz}` (evidenz ∈ urkunde/parteivortrag/offen), an der GRENZE gehalten
-  (`recht.gbnf_sachverhalt` — nur bekannte Merkmale, nur die drei Beweis-Arten, ein
-  erfundenes Merkmal ist unmöglich); der Kern (`recht.subsumiere_frei`) übersetzt die
-  Beweis-Art in eine Quelle und rechnet die Subsumtion deterministisch. Arbeitsteilung wie
+- **Deuter-Anbindung GEBAUT (Fakt→Merkmal), selbst ein ZWICKY-Kasten:** ein Fakt gegen ein
+  Merkmal zerfällt in unabhängige Achsen — **Erfüllung** (ja/nein/offen), **Beweismittel**
+  (Urkunde/Zeuge/Aussage), **Streitstand** (unstreitig/streitig/unbekannt). Das Modell wählt
+  je Merkmal genau EINE kreuz-konsistente Zelle (`MERKMAL_ZELLEN` = erfuellt_urkunde/
+  erfuellt_zeuge/erfuellt_aussage/nicht_erfuellt/offen — das Kreuzprodukt minus der
+  inkonsistenten Kombinationen, genau wie beim Verstehens-Würfel), an der GRENZE gehalten
+  (`recht.gbnf_sachverhalt`); der Kern (`recht.subsumiere_frei`) übersetzt eine erfüllte
+  Zelle in eine Quelle und rechnet deterministisch. Der Zwicky-Gewinn: „nein" (aktiv
+  verneint) wird von „offen" (nicht erwähnt) ehrlich unterschieden; das Beweislast-Radar wird
+  schärfer. **Streitstand ist erkannt, aber aufgeschoben** (ohne die Gegenseite nicht füllbar
+  — aktiviert mit den Einwendungs-Bauplänen; „Merkmal erst wenn notwendig"). Arbeitsteilung wie
   beim Intent-Deuter: **das Modell liest die fuzzy Fakten, der Kern rechnet die Logik** — das
   Modell entscheidet NIE, ob der Anspruch besteht. Ehrlich gerahmt: „So lese ich deinen Fall
   (meine Deutung — korrigiere mich); das rechtliche Prüfen darüber ist exakt." `genus

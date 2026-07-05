@@ -247,14 +247,14 @@ def test_deuter_merkmale_liest_die_fakten_in_beweisarten():
     # String→String-Paare durch (der Kern, genus.recht.subsumiere_frei, prüft gegen die Norm)
     blaetter = [{"id": "merkmal:angebot", "inhalt": "ein Angebot"},
                 {"id": "merkmal:faelligkeit", "inhalt": "fällig"}]
-    model = _FakeModel('{"merkmal:angebot": "urkunde", "merkmal:faelligkeit": "parteivortrag"}')
+    model = _FakeModel('{"merkmal:angebot": "erfuellt_urkunde", "merkmal:faelligkeit": "erfuellt_aussage"}')
     deuter._model = model
     try:
         deuter.MODEL_PATH = __file__   # os.path.exists True -> _get_model() wird gerufen
         gelesen = deuter.merkmale("ich habe verkauft ...", blaetter)
     finally:
         deuter._model = None
-    assert gelesen == {"merkmal:angebot": "urkunde", "merkmal:faelligkeit": "parteivortrag"}
+    assert gelesen == {"merkmal:angebot": "erfuellt_urkunde", "merkmal:faelligkeit": "erfuellt_aussage"}
     # der Merkmale-Prompt trägt die Voraussetzungen (der Kern liefert sie über die Membran)
     assert "merkmal:angebot" in model.calls[0][0]["content"]
 

@@ -150,8 +150,22 @@ def subsumiere(conn, norm: str, sachverhalt: dict[str, str]) -> dict:
 # Menschen zu bestätigen ("korrigiere mich"), und an der GRENZE gehalten (gbnf_sachverhalt:
 # nur bekannte Merkmale, nur die drei Beweis-Arten -- ein erfundenes Merkmal ist unmöglich).
 
-EVIDENZ_ARTEN = ("urkunde", "parteivortrag", "offen")
-_EVIDENZ_QUELLE = {"urkunde": "dokument:genannt", "parteivortrag": "aussage"}
+# Das Fakt→Merkmal-Lesen ist SELBST ein Zwicky-Kasten (Ronny 2026-07-05: „zwicky?"). Ein
+# Fakt gegen ein Tatbestandsmerkmal zerfällt in unabhängige Achsen:
+#   Erfüllung   ja | nein | offen         -- erfüllt der Fall das Merkmal? („nein"/aktiv
+#                                            verneint ist NICHT dasselbe wie „offen"/nicht erwähnt)
+#   Beweismittel urkunde | zeuge | aussage -- WOMIT belegt (Parteivortrag = nur „aussage")
+#   Streitstand  unstreitig | streitig | unbekannt  -- bestreitet die Gegenseite es?
+# Wie beim Verstehens-Würfel sät/nutzt GENUS die KREUZ-KONSISTENTEN Zellen (Zwicky Schritt 4),
+# nicht das rohe Kreuzprodukt: eine „offene"/„nicht erfüllte" Voraussetzung hat kein
+# Beweismittel. So bleibt es EINE Wahl pro Merkmal (modell-freundlich, wie ein Raster-Blatt),
+# und ein erfundenes/inkonsistentes Paar ist strukturell unmöglich (die Grenze).
+# Streitstand ist ERKANNT, aber AUFGESCHOBEN: ohne die Gegenseite (die Einwendungs-Baupläne,
+# noch nicht gebaut) ist er nicht füllbar -- er aktiviert später und multipliziert die Zellen.
+MERKMAL_ZELLEN = ("erfuellt_urkunde", "erfuellt_zeuge", "erfuellt_aussage", "nicht_erfuellt", "offen")
+_ZELLE_QUELLE = {"erfuellt_urkunde": "dokument:genannt",
+                 "erfuellt_zeuge": "zeuge:genannt",
+                 "erfuellt_aussage": "aussage"}   # die übrigen Zellen = nicht erfüllt
 
 
 def blatt_merkmale(conn, norm: str) -> list[dict]:
@@ -171,33 +185,34 @@ def blatt_merkmale(conn, norm: str) -> list[dict]:
 
 def gbnf_sachverhalt(blatt_ids) -> str:
     """Die GRENZE für das Fakt→Merkmal-Lesen: ein JSON-Objekt, dessen Schlüssel nur die
-    bekannten Blatt-Merkmale und dessen Werte nur die drei Beweis-Arten sein können -- ein
-    erfundenes Merkmal oder eine erfundene Beweisart ist strukturell unmöglich (dieselbe
-    Grenze wie beim Raster-Deuter)."""
+    bekannten Blatt-Merkmale und dessen Werte nur die kreuz-konsistenten Zwicky-ZELLEN
+    (:data:`MERKMAL_ZELLEN`) sein können -- ein erfundenes Merkmal oder eine inkonsistente
+    Erfüllung/Beweismittel-Kombination ist strukturell unmöglich (dieselbe Grenze wie beim
+    Raster-Deuter)."""
     schluessel = " | ".join(f'"\\"{m}\\""' for m in blatt_ids) or '"\\"\\""'
-    evidenz = " | ".join(f'"\\"{e}\\""' for e in EVIDENZ_ARTEN)
+    zelle = " | ".join(f'"\\"{z}\\""' for z in MERKMAL_ZELLEN)
     return "\n".join([
         'root ::= "{" ws "}" | "{" ws eintrag (ws "," ws eintrag)* ws "}"',
-        'eintrag ::= schluessel ws ":" ws evidenz',
+        'eintrag ::= schluessel ws ":" ws zelle',
         f"schluessel ::= {schluessel}",
-        f"evidenz ::= {evidenz}",
+        f"zelle ::= {zelle}",
         'ws ::= [ \\t\\n\\r]*',
     ])
 
 
 def subsumiere_frei(conn, norm: str, text: str, deuter) -> dict:
     """Subsumtion aus einer FREIEN Schilderung: der (injizierte) ``deuter`` liest den Text in
-    ``{merkmal: evidenz}`` (evidenz ∈ EVIDENZ_ARTEN), der Kern übersetzt die Beweis-Art in
-    eine Quelle und rechnet die Subsumtion deterministisch. Gibt das Subsumtions-Ergebnis
-    plus die gelesene Deutung zurück -- read-time, nichts wird gesät. ``deuter`` ist
-    dependency-injected wie beim Intent-Deuter (Membran ruft das Modell; Test einen Fake)."""
+    ``{merkmal: zelle}`` (zelle ∈ MERKMAL_ZELLEN, der Zwicky-Kasten Erfüllung × Beweismittel),
+    der Kern übersetzt eine erfüllte Zelle in eine Quelle und rechnet die Subsumtion
+    deterministisch. Gibt das Subsumtions-Ergebnis plus die gelesene Deutung zurück --
+    read-time, nichts wird gesät. ``deuter`` ist dependency-injected wie beim Intent-Deuter."""
     blaetter = blatt_merkmale(conn, norm)
     gelesen = deuter(text, blaetter) or {}
     bekannt = {b["id"] for b in blaetter}
     sachverhalt: dict[str, str] = {}
-    for merkmal, evidenz in gelesen.items():
-        if merkmal in bekannt and evidenz in _EVIDENZ_QUELLE:   # "offen"/Unbekanntes fällt raus
-            sachverhalt[merkmal] = _EVIDENZ_QUELLE[evidenz]
+    for merkmal, zelle in gelesen.items():
+        if merkmal in bekannt and zelle in _ZELLE_QUELLE:   # nur die erfüllten Zellen zählen
+            sachverhalt[merkmal] = _ZELLE_QUELLE[zelle]
     return {"ergebnis": subsumiere(conn, norm, sachverhalt),
             "gelesen": gelesen, "sachverhalt": sachverhalt}
 
@@ -207,7 +222,14 @@ def narrate_frei(conn, frei: dict) -> str:
     Fakten eine DEUTUNG des Modells ist (bestätigbar/korrigierbar), während die Subsumtion
     darüber deterministisch bleibt."""
     kopf = ("So lese ich deinen Fall (das ist meine Deutung — sag mir, wo ich falsch liege):")
-    return kopf + "\n" + narrate_subsumtion(conn, frei["ergebnis"]) + (
+    text = kopf + "\n" + narrate_subsumtion(conn, frei["ergebnis"])
+    # der Zwicky-Gewinn: „nein" (der Fall verneint es aktiv) ehrlich von „offen" (nicht
+    # erwähnt) unterschieden -- beides verhindert den Anspruch, heißt aber verschiedenes
+    verneint = [_inhalt(conn, m) for m, z in frei["gelesen"].items() if z == "nicht_erfuellt"]
+    if verneint:
+        text += "\nDeiner Schilderung nach ist ausdrücklich NICHT erfüllt: " \
+                + ", ".join(f"„{v}“" for v in verneint) + "."
+    return text + (
         "\n(Ich bin kein Anwalt; das Lesen der Fakten kann ich falsch verstanden haben, "
         "das rechtliche Prüfen darüber ist exakt.)")
 

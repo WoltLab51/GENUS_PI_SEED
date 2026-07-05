@@ -103,43 +103,59 @@ def test_blatt_merkmale_steigt_rekursiv_zu_den_faktbasierten_hinab(conn):
     assert "merkmal:kaufvertrag" not in ids
 
 
-def test_die_grenze_laesst_nur_bekannte_merkmale_und_beweisarten_zu(conn):
+def test_die_grenze_laesst_nur_bekannte_merkmale_und_zwicky_zellen_zu(conn):
     _mit_norm(conn)
     g = recht.gbnf_sachverhalt(["merkmal:angebot", "merkmal:faelligkeit"])
     assert "merkmal:angebot" in g and "merkmal:faelligkeit" in g
-    assert "urkunde" in g and "parteivortrag" in g and "offen" in g
+    for zelle in recht.MERKMAL_ZELLEN:
+        assert zelle in g   # die kreuz-konsistenten Zellen sind die einzigen erlaubten Werte
 
 
-def test_subsumiere_frei_uebersetzt_die_deutung_und_rechnet_deterministisch(conn):
+def test_subsumiere_frei_uebersetzt_die_zwicky_zelle_und_rechnet_deterministisch(conn):
     _mit_norm(conn)
-    # ein FAKE-Deuter (kein Modell nötig) liest die Schilderung in Merkmale
+    # ein FAKE-Deuter (kein Modell nötig) liest die Schilderung in Zwicky-Zellen
     def fake(text, blaetter):
-        return {"merkmal:angebot": "urkunde", "merkmal:annahme": "urkunde",
-                "merkmal:faelligkeit": "parteivortrag"}
+        return {"merkmal:angebot": "erfuellt_urkunde", "merkmal:annahme": "erfuellt_zeuge",
+                "merkmal:faelligkeit": "erfuellt_aussage"}
     frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "ich habe ein Auto verkauft ...", fake)
     e = frei["ergebnis"]
     assert e["erfuellt"] is True
-    # die Beweis-Art wurde in eine Quelle übersetzt: urkunde->dokument:genannt, parteivortrag->aussage
+    # Zelle -> Quelle: urkunde->dokument:genannt, zeuge->zeuge:genannt, aussage->aussage
     assert frei["sachverhalt"]["merkmal:angebot"] == "dokument:genannt"
+    assert frei["sachverhalt"]["merkmal:annahme"] == "zeuge:genannt"
     assert frei["sachverhalt"]["merkmal:faelligkeit"] == "aussage"
-    assert e["schwaechste"]["merkmal"] == "merkmal:faelligkeit"   # nur Parteivortrag = schwächste
+    assert e["schwaechste"]["merkmal"] == "merkmal:faelligkeit"   # nur Aussage = schwächste
 
 
-def test_subsumiere_frei_wirft_erfundene_oder_offene_merkmale_weg(conn):
+def test_subsumiere_frei_wirft_erfundene_und_unerfuellte_zellen_weg(conn):
     _mit_norm(conn)
     def fake(text, blaetter):
-        return {"merkmal:angebot": "urkunde", "merkmal:erfunden": "urkunde",  # unbekannt -> raus
-                "merkmal:annahme": "offen"}                                    # offen -> nicht erfüllt
+        return {"merkmal:angebot": "erfuellt_urkunde",
+                "merkmal:erfunden": "erfuellt_urkunde",   # unbekannt -> raus
+                "merkmal:annahme": "offen"}               # offen -> nicht erfüllt
     frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "...", fake)
     assert "merkmal:erfunden" not in frei["sachverhalt"]
     assert "merkmal:annahme" not in frei["sachverhalt"]
     assert frei["ergebnis"]["erfuellt"] is False
 
 
+def test_zwicky_gewinn_nein_wird_von_offen_unterschieden(conn):
+    # der eigentliche Zwicky-Gewinn: „nicht_erfuellt" (aktiv verneint) ist etwas anderes als
+    # „offen" (nicht erwähnt) -- beides verhindert den Anspruch, heißt aber Verschiedenes
+    _mit_norm(conn)
+    fake = lambda t, b: {"merkmal:angebot": "erfuellt_urkunde",
+                         "merkmal:annahme": "nicht_erfuellt",       # der Fall verneint sie
+                         "merkmal:faelligkeit": "offen"}            # der Fall schweigt dazu
+    frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "...", fake)
+    text = recht.narrate_frei(conn, frei)
+    assert "ausdrücklich NICHT erfüllt" in text and "Annahme" in text
+    assert frei["ergebnis"]["erfuellt"] is False
+
+
 def test_narrate_frei_rahmt_die_deutung_ehrlich(conn):
     _mit_norm(conn)
-    fake = lambda t, b: {"merkmal:angebot": "urkunde", "merkmal:annahme": "urkunde",
-                         "merkmal:faelligkeit": "parteivortrag"}
+    fake = lambda t, b: {"merkmal:angebot": "erfuellt_urkunde", "merkmal:annahme": "erfuellt_urkunde",
+                         "merkmal:faelligkeit": "erfuellt_aussage"}
     frei = recht.subsumiere_frei(conn, "norm:kaufpreis", "...", fake)
     text = recht.narrate_frei(conn, frei)
     assert "meine Deutung" in text and "kein Anwalt" in text
@@ -149,7 +165,8 @@ def test_narrate_frei_rahmt_die_deutung_ehrlich(conn):
 def test_subsumiere_frei_ist_read_time(conn):
     _mit_norm(conn)
     vorher = conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"]
-    recht.subsumiere_frei(conn, "norm:kaufpreis", "...", lambda t, b: {"merkmal:angebot": "urkunde"})
+    recht.subsumiere_frei(conn, "norm:kaufpreis", "...",
+                          lambda t, b: {"merkmal:angebot": "erfuellt_urkunde"})
     assert conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"] == vorher
 
 
