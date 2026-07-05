@@ -44,6 +44,46 @@ def _last_known_word(conn, question: str) -> str | None:
     return found
 
 
+# Vokabel-bei-Begegnung (Ronny 2026-07-05): der gesprächsnahe Zwilling des Lücken-Detektors --
+# statt einer Absicht, die fehlt, ein WORT, das fehlt. Der Kern SPÜRT das unbekannte Wort (rein
+# lesend, kein HTTP -- das Erwerben ist Membran-Sache); die Membran (Bot) legt es in die
+# Lern-Warteschlange, der Lerner-Daemon holt es beim nächsten Tick VOR den Frequenzlisten.
+_BEGEGNETES_WORT = re.compile(r"[A-ZÄÖÜ][A-Za-zäöüß]{3,}")   # großgeschrieben = substantiv-artig
+# Häufige großgeschriebene Funktionswörter (Satzanfang) sind keine Vokabeln -- nicht in die
+# Schlange, um die Membran-Quelle nicht mit „Was/Wie/Der" zu behelligen. Ein echtes Substantiv
+# am Satzanfang („Fernweh überkommt mich") ist NICHT hier und bleibt lernenswert.
+_WORT_STOPP = frozenset({
+    "was", "wie", "wo", "wann", "warum", "wieso", "weshalb", "wer", "wen", "wem", "wozu",
+    "welche", "welcher", "welches", "welchen", "welchem",
+    "ist", "sind", "war", "hat", "haben", "kann", "kannst", "kennst", "weißt", "weisst",
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer",
+    "und", "oder", "aber", "auch", "noch", "nur", "schon", "nicht", "sehr", "mehr",
+    "ich", "du", "er", "sie", "es", "wir", "ihr", "mir", "mich", "dir", "dich",
+    "hallo", "danke", "bitte", "übrigens", "also", "gibt",
+    # häufige großgeschriebene Imperative am Satzanfang (auch keine Substantive); die
+    # selteneren fängt der Lerner ohnehin gnädig ab (nicht auflösbar -> nichts gemerkt).
+    "gib", "sag", "mach", "zeig", "erzähl", "erzaehl", "nenn", "hör", "hoer", "schau",
+    "lass", "komm", "geh", "denk", "sieh", "guck", "warte", "erklär", "erklaer",
+})
+
+
+def unbekannte_woerter(conn, text: str) -> list[str]:
+    """Die (substantiv-artigen) Wörter in ``text``, die GENUS noch nicht kennt -- rein lesend,
+    kein HTTP. Großgeschrieben, weil ein Substantiv das ist, was GENUS heute lernt (die
+    Vokabel-Listen sind Substantive); häufige Funktionswörter am Satzanfang sind ausgefiltert.
+    Reihenerhaltend dedupliziert. Der gesprächsnahe Zwilling der Verstehens-Lücke: was hier
+    zurückkommt, hat der Bot im Moment der Begegnung zu lernen -- nicht erst der Nacht-Cron."""
+    from genus import sources
+
+    gefunden: list[str] = []
+    for tok in dict.fromkeys(_BEGEGNETES_WORT.findall(text)):
+        if tok.casefold() in _WORT_STOPP:
+            continue
+        if not sources.bekanntes_wort(conn, tok):
+            gefunden.append(tok)
+    return gefunden
+
+
 def answer(conn, question: str) -> dict:
     """Answer a question about a word GENUS knows; ``{found: False}`` if it knows no word in it.
 

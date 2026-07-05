@@ -174,6 +174,12 @@ hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *mu
   (`DETEKTOREN`-Register, HISTORISCH/GESPRAECHSNAH); `spontane_regung` nimmt jeden
   gesprächsnahen Detektor mit, Nacht-Scan bleibt Auffangnetz — der erste Schritt zu
   Lebendigkeit. **Druck** ist als der noch fehlende Zwilling benannt (§9).
+- **Vokabel-bei-Begegnung** (companion.unbekannte_woerter + Bot-Warteschlange +
+  pi_learn.learn_begegnung): der gesprächsnahe Zwilling des Lücken-Detektors, auf Wörter
+  statt Absichten — der Kern *spürt* das unbekannte Wort (rein lesend), die Membran *holt*
+  es (HTTP), der Lerner-Daemon vor den Frequenzlisten. Das Wort, das du gerade benutzt,
+  springt an die Spitze, statt auf die Liste zu warten. Sauberes Kriterium bestätigt:
+  geboren-Signal → Event, abgetastet-Signal → Uhr.
 - **Ziel-Graph** (genus/ziele.py): die Operations-Lücken als Fähigkeiten gesät —
   `denkweisen` (fehlt), `abstrahieren` (fehlt), `analogie` (fehlt), `weltmodell`
   (teilweise), `lese-sinn` (fehlt), `gezaehmte-kreativitaet` (teilweise); Gedächtnis-Stand

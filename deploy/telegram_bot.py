@@ -76,6 +76,37 @@ TAGESPUFFER = os.environ.get(
 )
 
 
+# Die LERN-WARTESCHLANGE (Vokabel-bei-Begegnung, Ronny 2026-07-05): begegnet der Bot einem
+# unbekannten Wort, landet es hier -- eine Membran-Datei wie die Lerner-Cursor, nie das Ledger.
+# Der Lerner-Daemon (pi_learn.sh) holt sie beim nächsten Tick VOR den Frequenzlisten: das Wort,
+# das DU gerade benutzt hast, springt an die Spitze, statt auf die Frequenzliste zu warten.
+LERNWUNSCH = os.environ.get(
+    "GENUS_LERNWUNSCH", os.path.join(GENUS_USER_HOME, ".genus", "lernwunsch.txt")
+)
+_LERNWUNSCH_MAX = 200   # die Schlange bleibt gedeckelt (jüngste Begegnungen zuletzt)
+
+
+def _schreibe_lernwunsch(woerter: list[str]) -> None:
+    """Unbekannt begegnete Wörter in die Lern-Warteschlange -- dedupliziert gegen die
+    bestehende Schlange, gedeckelt; darf nie eine Antwort kosten (still bei jedem Fehler)."""
+    try:
+        vorhanden: list[str] = []
+        try:
+            with open(LERNWUNSCH, encoding="utf-8") as f:
+                vorhanden = [z.strip() for z in f if z.strip()]
+        except FileNotFoundError:
+            pass
+        neu = [w for w in woerter if w not in vorhanden]
+        if not neu:
+            return
+        alle = (vorhanden + neu)[-_LERNWUNSCH_MAX:]
+        os.makedirs(os.path.dirname(LERNWUNSCH), exist_ok=True)
+        with open(LERNWUNSCH, "w", encoding="utf-8") as f:
+            f.write("\n".join(alle) + "\n")
+    except Exception:
+        pass
+
+
 def _schreibe_tagespuffer(frage: str, antwort: str, gelesen: list[str]) -> None:
     """Ein Zug in den Tagespuffer -- darf nie eine Antwort kosten (still bei Fehlern)."""
     try:
@@ -342,6 +373,15 @@ def handle_update(
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering {question!r}: {exc}")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."
+    # Vokabel-bei-Begegnung: GENUS spürt (Kern, rein lesend), welche Wörter der Nachricht es
+    # nicht kennt, und legt sie in die Lern-Warteschlange (Membran) -- der Lerner holt sie vor
+    # den Frequenzlisten. Nach der Antwort, nie sie kostend (still bei jedem Fehler).
+    try:
+        begegnet = companion.unbekannte_woerter(conn, question)
+        if begegnet:
+            _schreibe_lernwunsch(begegnet)
+    except Exception:
+        pass
     return chat_id, answer
 
 

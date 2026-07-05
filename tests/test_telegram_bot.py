@@ -738,6 +738,48 @@ def test_morgen_push_und_nacht_stehen_im_cron_installer():
     assert "morgen_push.sh" in text
 
 
+# --- Vokabel-bei-Begegnung: die Membran legt unbekannte Wörter in die Lern-Warteschlange ---
+
+
+@pytest.fixture(autouse=True)
+def _lernwunsch_im_tmp(monkeypatch, tmp_path):
+    monkeypatch.setattr(telegram_bot, "LERNWUNSCH", str(tmp_path / "lernwunsch.jsonl"))
+
+
+def _lernwunsch(bot):
+    with open(bot.LERNWUNSCH, encoding="utf-8") as f:
+        return [z.strip() for z in f if z.strip()]
+
+
+def test_ein_unbekanntes_wort_landet_in_der_lernwarteschlange():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
+    telegram_bot.handle_update(conn, _msg(1, 42, "Hat ein Hund auch Fernweh?"),
+                               allowed={42}, sessions={})
+    assert _lernwunsch(telegram_bot) == ["Fernweh"]   # „Hund" ist bekannt, „Hat" gefiltert
+
+
+def test_lernwarteschlange_dedupliziert_ueber_nachrichten():
+    conn = _fresh()
+    for _ in range(3):
+        telegram_bot.handle_update(conn, _msg(1, 42, "Was bedeutet Fernweh?"),
+                                   allowed={42}, sessions={})
+    assert _lernwunsch(telegram_bot) == ["Fernweh"]   # dreimal begegnet, einmal in der Schlange
+
+
+def test_schreibe_lernwunsch_bleibt_gedeckelt():
+    telegram_bot._schreibe_lernwunsch([f"Wort{i}" for i in range(telegram_bot._LERNWUNSCH_MAX + 30)])
+    assert len(_lernwunsch(telegram_bot)) == telegram_bot._LERNWUNSCH_MAX
+
+
+def test_der_lerner_holt_die_begegnung_vor_den_listen():
+    # struktureller Gate-Test: learn_begegnung läuft VOR learn_fach/next/gap (gesprächsnah)
+    text = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
+    assert "learn_begegnung || learn_fach || learn_next || learn_gap" in text
+    assert "if learn_begegnung; then" in text   # auch in der kontinuierlichen Schleife
+
+
 # --- die Morgenzeit-Zelle: Push-Zeit per Chat stellen (Membran-Konfiguration) ----------
 
 

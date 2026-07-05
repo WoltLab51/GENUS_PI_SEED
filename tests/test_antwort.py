@@ -154,6 +154,38 @@ def test_stimme_wortidentische_rueckgabe_ist_keine_glaettung():
     assert stimme_modul.formuliere(satz, model=M()) is None
 
 
+# --- Vokabel-bei-Begegnung: der Kern spürt das unbekannte Wort (rein lesend) -------------
+
+def test_unbekannte_woerter_meldet_ein_wort_das_genus_nicht_kennt(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
+    # „Fernweh" kennt GENUS nicht, „Hund" schon
+    woerter = companion.unbekannte_woerter(conn, "Was hat ein Hund mit Fernweh zu tun?")
+    assert woerter == ["Fernweh"]
+
+
+def test_unbekannte_woerter_filtert_funktionswoerter_am_satzanfang(conn):
+    # „Was/Wie/Der" am Satzanfang sind keine Vokabeln -- die Membran-Quelle nicht behelligen
+    assert companion.unbekannte_woerter(conn, "Was ist das?") == []
+    assert companion.unbekannte_woerter(conn, "Wie geht es dir?") == []
+
+
+def test_unbekannte_woerter_faengt_ein_substantiv_am_satzanfang(conn):
+    # ein echtes Substantiv am Satzanfang bleibt lernenswert (kein Funktionswort)
+    assert companion.unbekannte_woerter(conn, "Fernweh überkommt mich.") == ["Fernweh"]
+
+
+def test_unbekannte_woerter_dedupliziert_reihenerhaltend(conn):
+    woerter = companion.unbekannte_woerter(conn, "Zugvogel, ach der Zugvogel und der Wanderfalke!")
+    assert woerter == ["Zugvogel", "Wanderfalke"]
+
+
+def test_unbekannte_woerter_meldet_bekanntes_nie(conn):
+    reactors.observe_relation(conn, "Apfel@de", "expresses", "Q_apfel", "wikidata")
+    reactors.observe_relation(conn, "Apfel@de", "primary_gloss", "eine Frucht", "dbnary")
+    assert companion.unbekannte_woerter(conn, "Der Apfel ist reif.") == []
+
+
 # --- die Vertiefungs-Komposition: Länge aus Inhalt, nie aus Worten -----------------------
 
 def _reiches_wissen(conn):

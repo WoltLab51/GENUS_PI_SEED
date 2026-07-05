@@ -80,6 +80,34 @@ learn_from() {
     return 0
 }
 
+# Vokabel-bei-Begegnung (Ronny 2026-07-05): der gesprächsnahe Zwilling des Lücken-Detektors.
+# Der Bot (Membran) schreibt ein im Chat begegnetes, unbekanntes Wort in die Warteschlange;
+# hier wird das erste (FIFO) VOR allen Frequenzlisten gelernt -- das Wort, das der Nutzer
+# gerade benutzt hat, springt an die Spitze statt auf die Liste zu warten. One-shot: ein nicht
+# auflösbares Wort (Tippfehler/fremd) wird trotzdem entfernt (kein Retry-Hämmern). 1, wenn die
+# Schlange leer ist.
+LERNWUNSCH="${GENUS_LERNWUNSCH:-$(dirname "$DB_PATH")/lernwunsch.txt}"
+learn_begegnung() {
+    local word
+    [ -s "$LERNWUNSCH" ] || return 1
+    word="$(sed -n '1p' "$LERNWUNSCH" | tr -d '\r' | awk '{print $1}')"
+    # das erste Wort aus der Schlange nehmen (auch wenn das Lernen scheitert -- one-shot)
+    if tail -n +2 "$LERNWUNSCH" > "$LERNWUNSCH.tmp" 2>/dev/null; then
+        mv "$LERNWUNSCH.tmp" "$LERNWUNSCH"
+    else
+        rm -f "$LERNWUNSCH.tmp"
+    fi
+    [ -n "$word" ] || return 1
+    GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
+    GENUS_LEXEM_LANG=de "$SCRIPT_DIR/observe_lexem.sh" "$word" >/dev/null 2>&1 || true
+    GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
+    if [ -x "$EMBED_PY" ]; then
+        GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/bridge_senses.py" "$word" >/dev/null 2>&1 || true
+    fi
+    log "learned encountered word '$word' (Vokabel-bei-Begegnung, vor den Listen)"
+    return 0
+}
+
 # Tries each configured Fach-list in order (not round-robin -- a small, prioritized set, not
 # competing classes); 1 if none are configured or all are exhausted for this tick.
 learn_fach() {
@@ -147,7 +175,7 @@ if [ "$_have_list" = 0 ]; then log "no word lists found — nothing to learn"; e
 # the same choice the continuous loop makes.
 if [ "${GENUS_LEARN_ONCE:-0}" = "1" ]; then
     if [ -f "$PAUSED" ]; then log "paused — skipping"; exit 0; fi
-    learn_fach || learn_next || learn_gap || log "nothing to learn (list exhausted, no fresh gaps)"
+    learn_begegnung || learn_fach || learn_next || learn_gap || log "nothing to learn (list exhausted, no fresh gaps)"
     exit 0
 fi
 
@@ -157,7 +185,9 @@ while true; do
     if [ -f "$PAUSED" ]; then sleep "$IDLE_SLEEP"; continue; fi
     load1="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo 0)"
     if awk "BEGIN{exit !($load1 > $MAX_LOAD)}"; then sleep "$IDLE_SLEEP"; continue; fi
-    if learn_fach; then
+    if learn_begegnung; then
+        sleep "$DELAY"           # ein im Chat begegnetes Wort geht VOR allem (gesprächsnah)
+    elif learn_fach; then
         sleep "$DELAY"           # gezielte Fachliste geht vor der allgemeinen Breite
     elif learn_next; then
         sleep "$DELAY"
