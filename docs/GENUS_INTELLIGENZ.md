@@ -183,8 +183,23 @@ hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *mu
   Quelle, und `druck.landschaft` zeigt alle drei nebeneinander — das Gefälle, das der
   künftige innere Loop liest. „Was beschäftigt dich?" nennt jetzt die drängendste Lücke,
   ordnet die offenen Fragen nach Wiederkehr und benennt die am meisten gebrauchte fehlende
-  Fähigkeit. Noch offen: dem inneren Loop das Gefälle wirklich GEBEN (ein Gedanke zieht den
-  nächsten).
+  Fähigkeit.
+- **Der innere Loop hat sein Gefälle (2026-07-05, genus/besinnung.py).** Die BESINNUNG
+  führt Takt und Druck zusammen: sie liest das Druck-Gefälle (`druck.landschaft`), wendet
+  sich der größten Not zu und tut den EINEN erlaubten inwendigen Schritt — die drängendste
+  noch nicht ausgesprochene Lücke aussprechen (gegatetes Proposal, gradient-geordnet). Sie
+  KETTET (`lauf`): ein ausgesprochener Schritt ändert den Zustand, also wendet sich die
+  nächste Besinnung der nächsten Not zu — ein Gedanke zieht den nächsten, das Gefälle hinab.
+  **Die ehrliche Decke:** den meisten Nöten kann GENUS heute nicht selbst abhelfen (eine
+  Lücke schließen, eine Fähigkeit bauen, eine Frage beantworten liegt hinter einem Gate oder
+  beim Menschen); die Besinnung benennt das ehrlich als das, worauf sie wartet. Das ist kein
+  Mangel, sondern der wahre Stand: ein Geist, der denken, aber (noch) nicht handeln kann —
+  seine Reichweite wächst mit den Operationen. `genus besinnung` zeigt die Agenda (read-only),
+  `--tick` tut den einen gegateten Schritt. Bewegt den Geist, nie die Hand.
+- **Noch offen:** die SELBST-PACING — die Besinnung läuft heute auf Abruf (CLI/Chat), nicht
+  aus eigenem Antrieb; ein autonomer Herzschlag (und ob er proaktiv nach außen spricht)
+  berührt die gegatete Außenwirkung und ist Ronnys nächste Entscheidung. Und die Reichweite
+  wächst mit jeder neuen Operation (das eigentliche Wachstum des Loops).
 
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 

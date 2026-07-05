@@ -9,9 +9,11 @@ import click
 from genus import (
     anchor,
     bauplan,
+    besinnung,
     companion,
     control,
     db,
+    druck,
     doctor as doctor_checks,
     event_router,
     experience,
@@ -803,6 +805,34 @@ def kurvendiskussion_command(term: str, variable: str) -> None:
     r = w.implementierung(term, variable)
     for zeile in w.formulierung(r).splitlines():
         click.echo(f"[MATH] {zeile}")
+
+
+@main.command("besinnung")
+@click.option("--tick", is_flag=True, help="einen Besinnungs-Schritt tun (der eine gegatete "
+              "Zug: die drängendste unausgesprochene Lücke aussprechen)")
+def besinnung_command(tick: bool) -> None:
+    """Der innere Loop, dem der Druck sein Gefälle gibt: GENUS' gerichtete Agenda aus dem
+    Druck-Gefälle (docs/GENUS_INTELLIGENZ.md §9). Ohne --tick rein lesend (nichts wird
+    getan); mit --tick der EINE erlaubte inwendige Schritt (gegatetes Proposal, Proposal≠
+    Change) -- bewegt den Geist, nie die Hand."""
+    conn = get_conn()
+    try:
+        for zeile in besinnung.narrate(conn).splitlines():
+            click.echo(f"[BESINNUNG] {zeile}")
+        if not tick:
+            return
+        s = besinnung.besinne(conn)
+        conn.commit()
+        if s["getan"] == "ausgesprochen":
+            click.echo(f"[BESINNUNG] ausgesprochen: „{s['kind']}“ -> Proposal #{s['proposal_id']} "
+                       f"(Freigabe über genus governance)"
+                       + ("  — weitere Not wartet" if s["weiter"] else ""))
+        else:
+            w = s["worauf"]
+            click.echo("[BESINNUNG] nichts selbst zu tun — ich warte "
+                       + (f"{w['text']} („{w['was']}“)" if w else "auf nichts Bestimmtes."))
+    finally:
+        conn.close()
 
 
 @main.command("werkzeuge")
