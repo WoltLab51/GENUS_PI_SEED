@@ -368,7 +368,16 @@ def _merkmale_prompt(blaetter) -> str:
         "Die Voraussetzungen:\n" + "\n".join(zeilen) + "\n"
         "Gib NUR ein kompaktes JSON-Objekt zurueck: {\"<merkmal-id>\": \"<urkunde|"
         "parteivortrag|offen>\", ...}. Erfinde keine Voraussetzung, waehle nur aus der Liste. "
-        "Du entscheidest NICHT, ob der Anspruch besteht -- nur, was die Fakten belegen."
+        "Du entscheidest NICHT, ob der Anspruch besteht -- nur, was die Fakten belegen.\n"
+        "WICHTIG: 'erfuellt' heisst nicht 'bewiesen'. Schildert der Fall die Voraussetzung "
+        "ueberhaupt (auch nur durch Erzaehlen), dann ist sie mindestens 'parteivortrag'; nur "
+        "wenn die Schilderung dazu gar nichts hergibt, ist sie 'offen'. Nennt der Schildernde "
+        "dafuer ein Dokument/einen Vertrag/eine Rechnung/einen Zeugen, dann 'urkunde'.\n"
+        "Beispiel — Schilderung: \"Ich habe Herrn Kurz meinen Schrank fuer 80 Euro verkauft, "
+        "wir haben einen Kaufvertrag unterschrieben, den ich habe. Er hat ihn abgeholt, aber "
+        "nicht bezahlt, obwohl faellig.\" mit Voraussetzungen merkmal:angebot, merkmal:annahme, "
+        "merkmal:faelligkeit -> {\"merkmal:angebot\": \"urkunde\", \"merkmal:annahme\": "
+        "\"urkunde\", \"merkmal:faelligkeit\": \"parteivortrag\"}"
     )
 
 
