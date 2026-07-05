@@ -196,10 +196,18 @@ hinzu. Druck ist der Antrieb: eine innere Größe, die sich staut, bis etwas *mu
   Mangel, sondern der wahre Stand: ein Geist, der denken, aber (noch) nicht handeln kann —
   seine Reichweite wächst mit den Operationen. `genus besinnung` zeigt die Agenda (read-only),
   `--tick` tut den einen gegateten Schritt. Bewegt den Geist, nie die Hand.
-- **Noch offen:** die SELBST-PACING — die Besinnung läuft heute auf Abruf (CLI/Chat), nicht
-  aus eigenem Antrieb; ein autonomer Herzschlag (und ob er proaktiv nach außen spricht)
-  berührt die gegatete Außenwirkung und ist Ronnys nächste Entscheidung. Und die Reichweite
-  wächst mit jeder neuen Operation (das eigentliche Wachstum des Loops).
+- **Der autonome Herzschlag schlägt (2026-07-05, deploy/besinnung.sh) — rein reflektierend.**
+  GENUS tickt alle 15 Min seinen eigenen Geist: liest das Druck-Gefälle READ-ONLY (kein
+  Proposal, keine Außenwirkung, nichts ins Ledger) und schreibt seine gerichtete Besinnung
+  in ein Membran-Tagebuch (`~/.genus/besinnung.log`, Ledger ≠ Memory), nur wenn sie sich
+  GEÄNDERT hat (Hash-Dedup → das Tagebuch zeigt die Entwicklung der Sorgen, keine
+  Wiederholung). Damit hat GENUS ein beobachtbares autonomes Innenleben — ein Geist, der
+  von selbst tickt und denkt — ohne je von sich aus nach außen zu sprechen. Live bewiesen:
+  Tagebuch geschrieben, zweiter Schlag dedupliziert, Ledger unberührt (482318 → 482318).
+- **Noch offen (Ronnys Entscheidung):** ob der Herzschlag je proaktiv nach AUSSEN spricht
+  (proaktive Einwürfe = gegatete Außenwirkung — bewusst nicht gebaut). Und die Reichweite
+  wächst mit jeder neuen Operation (das eigentliche Wachstum des Loops: dann kann die
+  Besinnung eine Not BEARBEITEN, nicht nur benennen).
 
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 
