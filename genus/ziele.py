@@ -76,8 +76,9 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
      "Kern-Fähigkeiten als geprüfte, registrierte Werkzeuge (Registry + Rezepte: live); "
      "der freie Planer darüber fehlt.", "teilweise"),
     ("faehigkeit:gedaechtnis",
-     "Episoden + Abruf über den Graphen + Mehr-Zug-Arbeitsgedächtnis: live. Tagespuffer, "
-     "Nacht-Konsolidierung, Morgen-Bericht: fehlen.", "teilweise"),
+     "Episoden + Abruf über den Graphen + Mehr-Zug-Arbeitsgedächtnis + Tagespuffer + "
+     "Nacht-Konsolidierung + Morgen-Push: live. Semantischer Abruf (Embedding-Index): fehlt.",
+     "teilweise"),
     ("faehigkeit:foederation",
      "Ein Kern pro Person plus geteilte Räume für Familien/Gruppen.", "fehlt"),
     ("faehigkeit:markt-membran",
@@ -89,6 +90,33 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
     ("faehigkeit:selbst-bild",
      "Kennt eigenen Zustand, eigene Regeln, offene Fragen (live), eigene Ziele (dieser "
      "Schnitt). Versteht eigenen Code: fehlt.", "teilweise"),
+    # Die Intelligenz-Betrachtung (Ronny + Claude, 2026-07-05, docs/GENUS_INTELLIGENZ.md):
+    # Intelligenz = Operationen auf Material, nicht das Archiv. Die ehrlich fehlenden
+    # Kern-Operationen werden hier Wissen -- GENUS benennt sie fortan selbst.
+    ("faehigkeit:denkweisen",
+     "Denkweisen als konfigurierbare Methoden auf dem EINEN Kern: Merkmal-Baupläne "
+     "(braucht/bewirkt) + Subsumtion als verallgemeinerte Inferenz + Beweismaßstab je "
+     "Disziplin. Der Jurist ist die erste Tür; die Form (Bauplan, Rezept, Prämissenkette) "
+     "existiert bereits.", "fehlt"),
+    ("faehigkeit:abstrahieren",
+     "Aus Mustern im eigenen Graphen eigene Begriffe bilden und gegen die Welt prüfen "
+     "(Überraschungs-Schleife) — der Sprung vom Importieren zum Denken.", "fehlt"),
+    ("faehigkeit:analogie",
+     "Übertragen: eine Struktur aus einem Feld in einem anderen wiedererkennen — die "
+     "generative Kern-Operation, die in jeder tiefen Betrachtung wieder auftaucht "
+     "(Rechtsfortbildung, Metapher, Hypothese).", "fehlt"),
+    ("faehigkeit:weltmodell",
+     "Vorhersagen und Simulieren: Erwartungen bauen, an Brüchen lernen. Der Sensor-Forecast "
+     "und die Überraschungs-Schleife sind der Keim; ein Weltmodell über Begriffe fehlt.",
+     "teilweise"),
+    ("faehigkeit:lese-sinn",
+     "Dokumente und Bilder durch die Membran zu bequellten Fakten machen (Vision-Organ, "
+     "model:*, gedeckelt) — heute sind sie für GENUS unsichtbar.", "fehlt"),
+    ("faehigkeit:gezaehmte-kreativitaet",
+     "Der Generator darf Vorschläge erfinden (Hypothese, Entwurf, Metapher), weil das "
+     "Etikett immer eindeutig ist (model:*-Quelle, Proposal, Werkstatt) — Halluzination und "
+     "Kreativität sind derselbe Motor, der Unterschied ist Etikett + Gate. Filter: live; "
+     "bewusste generative Nutzung: fehlt.", "teilweise"),
 )
 
 ZIEL_BRAUCHT: tuple[tuple[str, str], ...] = (
@@ -104,6 +132,13 @@ ZIEL_BRAUCHT: tuple[tuple[str, str], ...] = (
     ("ziel:private-generierung", "faehigkeit:generator-organ"),
     ("ziel:verstehen", "faehigkeit:selbst-bild"),
     ("ziel:verstehen", "faehigkeit:werkzeugkasten"),
+    ("ziel:verstehen", "faehigkeit:abstrahieren"),
+    ("ziel:verstehen", "faehigkeit:analogie"),
+    ("ziel:verstehen", "faehigkeit:weltmodell"),
+    ("ziel:begleiter", "faehigkeit:denkweisen"),
+    ("ziel:begleiter", "faehigkeit:lese-sinn"),
+    ("ziel:selbst-entwicklung", "faehigkeit:gezaehmte-kreativitaet"),
+    ("ziel:unterhaltung", "faehigkeit:gezaehmte-kreativitaet"),
 )
 
 

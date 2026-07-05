@@ -1,11 +1,14 @@
 # GENUS — Der Material-Entwurf
 
-> **ENTWURF, Stand 2026-07-05.** Ronny: „was vor allem in GENUS fehlt ist Material.
-> Aber da weiß ich noch nicht so richtig, wie es in GENUS gespeichert wird und was das
-> richtige Material ist." — Dieser Entwurf beantwortet beide Fragen und legt einen Weg.
-> Er ist ein Entwurf zum Reagieren, nicht gebaute Architektur. Das Feintuning (Ausdruck,
-> Ton, wann-was-sagen) ist eine spätere, eigene Phase — Material kommt zuerst, weil alles
-> andere daraus schöpft.
+> **ENTWURF, Stand 2026-07-05 — mit WENDE (noch am selben Tag).** Ronny: „was vor allem
+> in GENUS fehlt ist Material." Dieser Entwurf beantwortet, wie Material gespeichert wird
+> und was das richtige ist. **Aber:** Ronnys Einwand auf den ersten Wurf („das hieße
+> GENUS wird so ein schlaues Wikipedia? das kommt mir flach vor") führte zur
+> Intelligenz-Betrachtung ([GENUS_INTELLIGENZ.md](GENUS_INTELLIGENZ.md)) und ihrer
+> Kern-Wende: **Material ist der Boden, nicht der Motor — es wird nur noch im Dienst
+> einer OPERATION geholt, nie um seiner selbst willen.** Die Analyse hier (Speicherform,
+> Breite-ohne-Tiefe-Diagnose, Pipeline) bleibt gültig; die Priorisierung in §7 ist durch
+> die Wende überholt und unten entsprechend markiert.
 
 ---
 
@@ -168,10 +171,15 @@ Substanz, dann ihr Schliff — dein Instinkt, bestätigt.
 
 ## 7 · Der phasenweise Plan (die Material-Etappen)
 
+> **WENDE (2026-07-05, siehe Kopfnote):** Diese Etappen laufen nicht mehr selbständig los.
+> Regel: **erst die Operation wählen, dann ihr Material holen.** M1 wird ausgelöst, wenn
+> eine Schließ-Operation die Kanten braucht (z. B. Teil-Ganzes-Inferenz oder die
+> Subsumtion der ersten Denkweise) — nicht vorher. M2 bleibt davon unberührt fällig.
+
 - **M1 — Relationale Tiefe aus Wikidata-Properties.** Den Konzept-Ernter um eine gewählte
   Property-Liste erweitern. *Messbar fertig:* die Zahl der Kanten-Typen pro Konzept steigt
-  sichtbar; die Vertiefung nennt neue Beziehungen ohne Code-Änderung. Billig, Hintergrund,
-  **braucht keine Entscheidung** — kann sofort beginnen.
+  sichtbar; die Vertiefung nennt neue Beziehungen ohne Code-Änderung. Billig, Hintergrund —
+  **ausgelöst durch eine Operation, die die Kanten braucht** (siehe Wende oben).
 - **M2 — Ledger-Wachstum messen** (vor jedem großen Ingest). Der nie gemessene Punkt,
   jetzt fällig.
 - **M3 — Fachwissen einer gewählten Domäne.** Braucht deine Domänen-Wahl + eine

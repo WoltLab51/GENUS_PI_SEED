@@ -71,6 +71,25 @@ def test_fehlende_faehigkeiten_lists_each_gap_once():
     assert all(f["status"] != "live" for f in fehlt)
 
 
+def test_die_operations_luecken_der_intelligenz_betrachtung_sind_wissen():
+    # docs/GENUS_INTELLIGENZ.md (2026-07-05): Intelligenz = Operationen auf Material --
+    # die ehrlich fehlenden Kern-Operationen stehen im Ziel-Graphen, GENUS benennt sie selbst
+    conn = _gesaet()
+    ids = {f["id"] for f in ziele.fehlende_faehigkeiten(conn)}
+    for op in ("faehigkeit:denkweisen", "faehigkeit:abstrahieren", "faehigkeit:analogie",
+               "faehigkeit:weltmodell", "faehigkeit:lese-sinn",
+               "faehigkeit:gezaehmte-kreativitaet"):
+        assert op in ids, op
+
+
+def test_selbst_bild_gedaechtnis_ist_aktuell_tagespuffer_lebt():
+    # der Abgleich-Grundsatz: eine gelieferte Fähigkeit darf im Selbst-Bild nicht mehr
+    # als fehlend stehen (Tagespuffer/Nacht/Morgen sind seit 2026-07-04 live)
+    conn = _gesaet()
+    inhalt = dict(((f_id, i) for f_id, i, _ in ziele.FAEHIGKEIT_SEED))["faehigkeit:gedaechtnis"]
+    assert "Morgen-Push: live" in inhalt and "fehlen" not in inhalt
+
+
 def test_seed_edges_never_pollute_the_concept_is_a_statistics():
     # bewusst KEIN is_a zwischen Zielen: die gelernten Schluss-Regeln kalibrieren sich aus
     # den is_a-Daten -- Ziel-Kanten dort hineinzumischen würde die Statistik verfälschen
