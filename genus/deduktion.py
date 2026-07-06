@@ -38,14 +38,22 @@ def ist_regel(conn, knoten: str, braucht: str = BRAUCHT) -> bool:
 
 
 def schliesse(conn, regel: str, gegeben: dict[str, str],
-              braucht: str = BRAUCHT, bewirkt: str = BEWIRKT) -> dict:
+              braucht: str = BRAUCHT, bewirkt: str = BEWIRKT, _pfad: frozenset = frozenset()) -> dict:
     """Prüft EINE Regel gegen ``gegeben`` (Atom → Quelle). Eine Prämisse ist erfüllt, wenn sie
     direkt gegeben ist ODER selbst eine Regel ist, deren Prämissen (rekursiv) alle gelten.
-    Vertrauen = schwächste erfüllte Prämisse. Read-time."""
+    Vertrauen = schwächste erfüllte Prämisse. Read-time. ``_pfad`` sind die Regeln über uns im
+    Rekursions-Ast: ist eine Regel ihr EIGENER Vorfahr (zyklischer braucht-Bauplan), wird der
+    Abstieg abgebrochen statt in einen RecursionError zu laufen -- ein Bauplan, der sich selbst
+    voraussetzt, ist unerfüllbar (dieselbe Azyklizität wie in der is_a-Inferenz)."""
+    if regel in _pfad:
+        offen = {"atom": regel, "erfuellt": False, "art": "zyklus", "quelle": None, "trust": None}
+        return {"regel": regel, "folge": None, "erfuellt": False, "praemissen": [offen],
+                "offen": [offen], "vertrauen": None, "zyklus": True}
+    _pfad = _pfad | {regel}
     praemissen: list[dict] = []
     for atom in _objekte(conn, regel, braucht):
         if ist_regel(conn, atom, braucht):                 # zusammengesetzt -> hinabsteigen
-            sub = schliesse(conn, atom, gegeben, braucht, bewirkt)
+            sub = schliesse(conn, atom, gegeben, braucht, bewirkt, _pfad)
             praemissen.append({"atom": atom, "erfuellt": sub["erfuellt"], "quelle": None,
                                "trust": sub["vertrauen"], "art": "abgeleitet", "unter": sub})
         elif atom in gegeben:                               # direkt gegeben, mit Quelle

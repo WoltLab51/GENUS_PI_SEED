@@ -15,6 +15,15 @@ def test_seed_ist_idempotent(conn):
     assert n1 == len(recht.NORM_SEED) and n2 == 0
 
 
+def test_zyklische_norm_stuerzt_nicht_ab(conn):
+    # eine Norm, die sich (über eine Merkmal-Kette) selbst voraussetzt -> früher RecursionError (P0.1)
+    reactors.observe_relation(conn, "norm:x", "braucht", "merkmal:y", "gesetz")
+    reactors.observe_relation(conn, "merkmal:y", "braucht", "norm:x", "gesetz")   # Ring
+    e = recht.subsumiere(conn, "norm:x", {})
+    assert e["erfuellt"] is False                              # unerfüllbar, KEIN Absturz
+    assert isinstance(recht.narrate_subsumtion(conn, e), str)  # narrate übersteht es
+
+
 def test_die_norm_ist_ein_bauplan_mit_rekursivem_merkmal_baum(conn):
     _mit_norm(conn)
     # norm:kaufpreis braucht kaufvertrag + faelligkeit; kaufvertrag ist selbst zusammengesetzt

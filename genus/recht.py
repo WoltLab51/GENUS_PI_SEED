@@ -89,11 +89,12 @@ def _evidenz_art(quelle: str) -> str:
 _SCHWAECHE = {"urkunde": 0, "abgeleitet": 1, "parteivortrag": 2}   # größer = schwächer belegt
 
 
-def _pruefe_merkmal(conn, merkmal: str, sachverhalt: dict[str, str]) -> dict:
+def _pruefe_merkmal(conn, merkmal: str, sachverhalt: dict[str, str],
+                    _pfad: frozenset = frozenset()) -> dict:
     """Ein Tatbestandsmerkmal gegen den Sachverhalt: direkt erfüllt (eine Quelle im
     Sachverhalt), abgeleitet erfüllt (ein zusammengesetztes Merkmal, dessen Unter-Merkmale
     alle erfüllt sind -- Rekursion) oder offen. Ein Wertungs-Merkmal wird NIE selbst
-    gefüllt -- es ist ein Mensch-Slot."""
+    gefüllt -- es ist ein Mensch-Slot. ``_pfad`` reicht die Zyklus-Wache der Subsumtion durch."""
     inhalt = _inhalt(conn, merkmal)
     if _ist_wertung(conn, merkmal):
         return {"merkmal": merkmal, "inhalt": inhalt, "erfuellt": False, "art": "wertung",
@@ -101,7 +102,7 @@ def _pruefe_merkmal(conn, merkmal: str, sachverhalt: dict[str, str]) -> dict:
                 "hinweis": "braucht menschliches Urteil (oder einen Anwalt) — das entscheide nicht ich"}
     unter = _objekte(conn, merkmal, BRAUCHT)
     if unter:                                    # zusammengesetztes Merkmal -> Unter-Norm, rekursiv
-        sub = subsumiere(conn, merkmal, sachverhalt)
+        sub = subsumiere(conn, merkmal, sachverhalt, _pfad)
         return {"merkmal": merkmal, "inhalt": inhalt, "erfuellt": sub["erfuellt"],
                 "art": "abgeleitet", "quelle": None, "trust": sub["vertrauen"], "unter": sub}
     if merkmal in sachverhalt:                   # direkt erfüllt, mit Quelle
@@ -113,17 +114,26 @@ def _pruefe_merkmal(conn, merkmal: str, sachverhalt: dict[str, str]) -> dict:
             "quelle": None, "trust": None}
 
 
-def subsumiere(conn, norm: str, sachverhalt: dict[str, str]) -> dict:
-    """Der Justizsyllogismus — die erste DOMÄNE des allgemeinen Deduktions-Schließers
-    (genus/deduktion.py, Modus Ponens über braucht/bewirkt). Diese Fassung fügt das
-    Juristische hinzu, das der allgemeine Schließer bewusst nicht kennt: den Wertungs-
-    Mensch-Slot und die Beweismittel-Art (Urkunde/Parteivortrag) fürs Beweislast-Radar.
+def subsumiere(conn, norm: str, sachverhalt: dict[str, str], _pfad: frozenset = frozenset()) -> dict:
+    """Der Justizsyllogismus — dasselbe Modus-Ponens-Muster wie der allgemeine Deduktions-Schließer
+    (genus/deduktion.py), hier aber als EIGENE, PARALLELE Fassung: sie fügt das Juristische hinzu,
+    das der allgemeine Schließer bewusst nicht kennt (den Wertungs-Mensch-Slot und die Beweismittel-
+    Art Urkunde/Parteivortrag fürs Beweislast-Radar). Ehrlich: recht importiert deduktion NICHT —
+    die Vereinheitlichung auf EINEN Schließer ist ein offener Schritt (P0.2), keine erledigte Tatsache.
 
-    prüft jedes Merkmal der ``norm`` gegen den ``sachverhalt``
-    (Merkmal -> Quelle). Sind ALLE erfüllt, folgt die Rechtsfolge. Vertrauen = schwächste
-    Prämisse (die Verallgemeinerung der is_a-Inferenz); die schwächste Stelle ist zugleich
-    das Beweislast-Radar. Read-time, erzeugt nichts."""
-    merkmale = [_pruefe_merkmal(conn, m, sachverhalt)
+    Prüft jedes Merkmal der ``norm`` gegen den ``sachverhalt`` (Merkmal -> Quelle). Sind ALLE
+    erfüllt, folgt die Rechtsfolge. Vertrauen = schwächste Prämisse (die Verallgemeinerung der
+    is_a-Inferenz); die schwächste Stelle ist zugleich das Beweislast-Radar. Read-time, erzeugt
+    nichts. ``_pfad`` ist die Zyklus-Wache: eine Norm, die sich (über eine Merkmal-Kette) selbst
+    voraussetzt, wird abgebrochen statt in einen RecursionError zu laufen."""
+    if norm in _pfad:
+        z = {"merkmal": norm, "inhalt": _inhalt(conn, norm), "erfuellt": False, "art": "zyklus",
+             "quelle": None, "trust": None}
+        return {"norm": norm, "inhalt": _inhalt(conn, norm), "rechtsfolge": None,
+                "rechtsfolge_inhalt": None, "erfuellt": False, "merkmale": [z], "offen": [z],
+                "vertrauen": None, "schwaechste": None, "zyklus": True}
+    _pfad = _pfad | {norm}
+    merkmale = [_pruefe_merkmal(conn, m, sachverhalt, _pfad)
                 for m in _objekte(conn, norm, BRAUCHT)]
     erfuellt = bool(merkmale) and all(m["erfuellt"] for m in merkmale)
     belegte = [m for m in merkmale if m["erfuellt"] and m["trust"] is not None]

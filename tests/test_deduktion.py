@@ -87,6 +87,18 @@ def test_narrate_ist_ein_glaeserner_beweis(conn):
     assert "bewiesen" in text and "schwächste Prämisse" in text
 
 
+def test_zyklischer_bauplan_stuerzt_nicht_ab(conn):
+    # A braucht B, B braucht A -> ein Ring im Bauplan; früher RecursionError, jetzt graceful (P0.1)
+    _regel(conn, "r:a", ["r:b"])
+    _regel(conn, "r:b", ["r:a"])
+    e = deduktion.schliesse(conn, "r:a", {})
+    assert e["erfuellt"] is False                        # unerfüllbar, aber KEIN Absturz
+    assert isinstance(deduktion.narrate(conn, e), str)   # narrate übersteht den Ring auch
+    # der direkte Selbst-Bezug (r:self braucht r:self) wird ebenso gefangen
+    _regel(conn, "r:self", ["r:self"])
+    assert deduktion.schliesse(conn, "r:self", {})["erfuellt"] is False
+
+
 def test_die_rechts_norm_ist_ueber_den_allgemeinen_schliesser_beweisbar(conn):
     # der Beweis der Heraushebung: der GENERAL-Schließer beweist eine Rechtsfolge über den
     # vorhandenen norm:kaufpreis-Bauplan, OHNE eine Zeile Recht zu kennen (Rückwärtsverkettung)
