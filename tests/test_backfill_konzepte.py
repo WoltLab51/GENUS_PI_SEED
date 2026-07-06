@@ -24,6 +24,16 @@ def test_extrahiere_kanten_mappt_die_dynamischen_praedikate(conn=None):
     assert objids == {"Q2", "Q3", "Q4"}
 
 
+def test_tiefung_erntet_is_a_hinzu():
+    # Der Default lässt is_a (P279) weg (Kletter-Lerner); die Tiefung nimmt es HINZU, um die
+    # Inseln zu platzieren. Dieselbe Antwort, zwei Prädikat-Maps -> unterschiedliche Ausbeute.
+    ent = {"Q1": {"claims": {**_item("P279", "Q5"), **_item("P361", "Q2")}}}
+    ohne, _ = bf.extrahiere_kanten(ent)                          # Default: nur dynamisch
+    mit, _ = bf.extrahiere_kanten(ent, bf.PROP_MAP_TIEFUNG)      # Tiefung: is_a dazu
+    assert ("Q1", "is_a", "Q5") not in ohne and ("Q1", "part_of", "Q2") in ohne
+    assert ("Q1", "is_a", "Q5") in mit and ("Q1", "part_of", "Q2") in mit
+
+
 def test_extrahiere_kanten_nimmt_nur_item_ziele():
     # ein Quantity/String/Koordinaten-Wert hat kein value.id -> keine Müll-Kante, kein Absturz
     ent = {"Q1": {"claims": {

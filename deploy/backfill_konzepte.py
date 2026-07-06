@@ -13,6 +13,11 @@ is_a (P279) sät der Backfill NICHT: die Taxonomie baut der Kletter-Lerner schon
 FEHLENDE Schicht ist das Verbindende (Teil-Ganzes, Zweck, Kausal) — genau der Rohstoff, nach dem
 die Hypothese-/Deduktions-Denkweisen hungern (Methoden-Landkarte 2026-07-05).
 
+Zwei Modi: der Default erntet die bestehenden Q-id-SUBJEKTE (dynamische Schicht, is_a hat der
+Kletter-Lerner). ``--tiefung`` erntet die INSELN — Q-ids, die erst durch den Backfill als Objekt
+auftauchten und noch kein Subjekt sind — und nimmt dabei is_a HINZU, um sie in der Hierarchie zu
+platzieren (der Kletterer erreicht sie nicht). Getrennte Fortschrittsdateien je Modus.
+
 Off-Pi testbar: ``--dry-run`` schreibt nichts, ``--ids Q11442,Q726`` erntet genau diese (statt
 aus dem Ledger zu lesen) — so lässt sich die Extraktion gegen echtes Wikidata prüfen, ohne den
 Organismus anzufassen.
@@ -29,9 +34,17 @@ from pathlib import Path
 
 API = "https://www.wikidata.org/w/api.php"
 UA = "GENUS-PI/0.1 (epistemic core research; ronnywolter87@gmail.com)"
-# Wikidata-Property -> GENUS-Prädikat. Bewusst OHNE P279/is_a (die Leiter ist schon dicht).
+# Wikidata-Property -> GENUS-Prädikat. Für die bestehenden Subjekte OHNE P279/is_a (die Leiter
+# ist dort schon dicht, der Kletter-Lerner baut sie). Die TIEFUNG neuer Objekt-Konzepte nimmt is_a
+# HINZU (PROP_MAP_TIEFUNG): eine Insel (nur als Objekt aufgetaucht, nie als Subjekt) erreicht der
+# Kletterer nicht (er klettert is_a-Objekte, keine dynamischen Objekte) -- sie braucht ihr is_a
+# hier, sonst bleibt sie ohne Platz in der Hierarchie und ohne Geschwister (kein Analogie-Anker).
 PROP_MAP = {"P361": "part_of", "P527": "has_part", "P186": "made_of",
             "P366": "used_for", "P1542": "causes", "P828": "caused_by"}
+PROP_MAP_TIEFUNG = {"P279": "is_a", **PROP_MAP}
+# die transitiven Prädikate: eine importierte Kante, die einen Ring schlösse, wird NICHT gesät
+# (Azyklizität; ein Fremd-Zyklus ist ein Quellen-Problem, kein Selbst-Widerspruch von GENUS).
+ZYKLUS_PRAEDIKATE = ("is_a", "part_of")
 LANGS = ("de", "en", "fr")
 BATCH = 50            # wbgetentities nimmt bis zu 50 Ids je Call
 PAUSE = 0.6           # höflich gegen die öffentliche API
@@ -53,14 +66,17 @@ def _hole(params: dict, tries: int = 3):
     return None
 
 
-def extrahiere_kanten(entities: dict) -> tuple[list[tuple[str, str, str]], set[str]]:
-    """Aus einer wbgetentities-Antwort (props=claims) die dynamischen (subject, praedikat, object)-
-    Tripel + die Menge der Objekt-Q-ids. REINE Funktion (testbar, kein I/O)."""
+def extrahiere_kanten(entities: dict, prop_map: dict | None = None
+                      ) -> tuple[list[tuple[str, str, str]], set[str]]:
+    """Aus einer wbgetentities-Antwort (props=claims) die (subject, praedikat, object)-Tripel für
+    ``prop_map`` (Default: die dynamische Schicht; die Tiefung reicht PROP_MAP_TIEFUNG mit is_a)
+    + die Menge der Objekt-Q-ids. REINE Funktion (testbar, kein I/O)."""
+    prop_map = prop_map or PROP_MAP
     tripel: list[tuple[str, str, str]] = []
     objids: set[str] = set()
     for qid, ent in entities.items():
         claims = ent.get("claims", {})
-        for pid, pred in PROP_MAP.items():
+        for pid, pred in prop_map.items():
             for c in claims.get(pid, []):
                 dv = c.get("mainsnak", {}).get("datavalue")
                 if not (dv and isinstance(dv.get("value"), dict)):
@@ -95,11 +111,27 @@ def _batches(xs: list, n: int):
         yield xs[i:i + n]
 
 
+_DYN = ("part_of", "has_part", "made_of", "used_for", "causes", "caused_by")
+
+
 def _ziel_qids(conn) -> list[str]:
     """Alle Q-id-Konzepte, die als Subjekt im Graphen stehen (die möglichen Analogie-Anker)."""
     rows = conn.execute("SELECT DISTINCT subject FROM relation_projection "
                         "WHERE subject GLOB 'Q[0-9]*' ORDER BY subject").fetchall()
     return [r["subject"] for r in rows]
+
+
+def _insel_qids(conn) -> list[str]:
+    """Die TIEFUNGS-Ziele: Q-ids, die als OBJEKT einer dynamischen Kante auftauchen, aber noch
+    KEIN Subjekt sind (Inseln — benannt, aber ohne is_a/Geschwister/eigene Kanten). Genau die, die
+    der Kletter-Lerner nicht erreicht (er klettert is_a-Objekte, keine dynamischen Objekte)."""
+    ph = ",".join("?" for _ in _DYN)
+    rows = conn.execute(
+        f"SELECT DISTINCT object FROM relation_projection "
+        f"WHERE predicate IN ({ph}) AND object GLOB 'Q[0-9]*' "
+        f"AND object NOT IN (SELECT subject FROM relation_projection WHERE subject GLOB 'Q[0-9]*') "
+        f"ORDER BY object", _DYN).fetchall()
+    return [r["object"] for r in rows]
 
 
 def _schon_gelabelt(conn) -> set[str]:
@@ -114,11 +146,15 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0, help="höchstens N Konzepte (0 = alle)")
     ap.add_argument("--ids", default="", help="genau diese Q-ids (Komma), statt aus dem Ledger")
     ap.add_argument("--skip-labels", action="store_true", help="Phase 2 (Objekt-Labels) auslassen")
+    ap.add_argument("--tiefung", action="store_true",
+                    help="TIEFUNG: die neuen Objekt-Konzepte (Inseln) ernten, MIT is_a (platzieren)")
     ap.add_argument("--resume-file", default="", help="Fortschrittsdatei (Default: neben dem Ledger)")
     args = ap.parse_args()
 
     if args.ids and not args.dry_run:
         ap.error("--ids ist nur für den Off-Pi-Test mit --dry-run vorgesehen (kein Ledger).")
+
+    prop_map = PROP_MAP_TIEFUNG if args.tiefung else PROP_MAP   # Tiefung platziert die Inseln (is_a)
 
     conn = None
     if args.ids:
@@ -127,12 +163,13 @@ def main() -> int:
     else:
         from genus import cli
         conn = cli.get_conn()
-        ziele = _ziel_qids(conn)
+        ziele = _insel_qids(conn) if args.tiefung else _ziel_qids(conn)
         gelabelt = _schon_gelabelt(conn)
 
     resume = Path(args.resume_file) if args.resume_file else None
     if resume is None and conn is not None:
-        resume = Path(conn.execute("PRAGMA database_list").fetchone()["file"] or ".").parent / "backfill_konzepte.done"
+        name = "backfill_tiefung.done" if args.tiefung else "backfill_konzepte.done"
+        resume = Path(conn.execute("PRAGMA database_list").fetchone()["file"] or ".").parent / name
     fertig: set[str] = set()
     if resume and resume.exists():
         fertig = set(resume.read_text(encoding="utf-8").split())
@@ -158,7 +195,7 @@ def main() -> int:
         from genus import reactors, inference
         neu, uebersprungen, rest = 0, 0, []
         for s, p, o in tripel:
-            if p == "part_of":
+            if p in ZYKLUS_PRAEDIKATE:              # is_a UND part_of sind transitiv
                 if inference.closes_cycle(conn, s, p, o):
                     uebersprungen += 1
                 else:                               # einzeln säen, damit der nächste Ring-Check
@@ -179,7 +216,7 @@ def main() -> int:
                   file=sys.stderr)
             time.sleep(PAUSE)
             continue
-        tripel, objids = extrahiere_kanten(data.get("entities", {}))
+        tripel, objids = extrahiere_kanten(data.get("entities", {}), prop_map)
         neu, uebersprungen = saee(tripel)
         kanten_neu += neu
         ringe += uebersprungen
@@ -194,8 +231,8 @@ def main() -> int:
                 print(f"    {s} {p} {o}")
         time.sleep(PAUSE)
 
-    print(f"[BF] Phase 1: {kanten_neu} dynamische Kanten aus {len(verarbeitet)} Konzepten "
-          f"({konzepte_mit} trugen welche); {ringe} part_of-Ringe nicht importiert (Azyklizität)",
+    print(f"[BF] Phase 1: {kanten_neu} Kanten aus {len(verarbeitet)} Konzepten "
+          f"({konzepte_mit} trugen welche); {ringe} Ringe nicht importiert (Azyklizität)",
           file=sys.stderr)
 
     if args.skip_labels:
