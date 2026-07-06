@@ -192,6 +192,20 @@ def _konzept_name(conn, node: str) -> str | None:
     return None
 
 
+# Die verbindenden (dynamischen) Prädikate → nativer Satz. Dieselben Prädikatnamen, die der
+# Konzept-Ernter (deploy/observe_konzept.sh) aus Wikidata zieht und die inference.py als
+# transitiv kennt (is_a, part_of). Merkmal erst wenn erkannt + notwendig: genau die, die eine
+# Denkweise füttern (Teil-Ganzes / Kausal / Zweck / Stoff).
+_DYNAMISCHE_KANTEN: tuple[tuple[str, str], ...] = (
+    ("part_of", "»{w}« ist Teil von {o}."),
+    ("has_part", "Zu »{w}« gehören: {o}."),
+    ("made_of", "»{w}« besteht aus {o}."),
+    ("used_for", "»{w}« wird verwendet für {o}."),
+    ("causes", "»{w}« verursacht {o}."),
+    ("caused_by", "»{w}« wird verursacht von {o}."),
+)
+
+
 def vertiefung(conn, a: dict) -> list[str]:
     """Die VERTIEFUNGS-KOMPOSITION (Antwort-Würfel, Umfang „ausführlich" -- Ronnys Frage
     2026-07-05: „wie schreibt GENUS so richtig schön lange Texte?"): Länge kommt aus
@@ -229,6 +243,22 @@ def vertiefung(conn, a: dict) -> list[str]:
             saetze.append(f"»{eltern_name}« zählt wiederum zu "
                           + _join_de([f"»{g}«" for g in gross[:2]]) + ".")
         break   # EIN Elternteil vertieft -- die Vertiefung ist ein Blick, kein Katalog
+    # Die DYNAMISCHE Schicht (2026-07-05, Methoden-Landkarte + Material-Wende): neben dem
+    # statischen is_a jetzt die VERBINDENDEN Relationen -- Teil-Ganzes, Kausal, Zweck. Sie
+    # sagen, was ein Ding HAT, WOFÜR es ist, was es BEWIRKT -- der Rohstoff, auf dem die
+    # nächsten Denkweisen laufen (Deduktion chained part_of schon). Nur benannte Ziele
+    # (nie kryptisch); jeder Begriff ein Stimme-Anker in »«.
+    for praedikat, vorlage in _DYNAMISCHE_KANTEN:
+        ziele: list[str] = []
+        for r in sources.relations(conn, subject=qid, predicate=praedikat):
+            name = _konzept_name(conn, r["object"])
+            if name and name not in ziele:
+                ziele.append(name)
+            if len(ziele) == 3:
+                break
+        if ziele:
+            saetze.append(vorlage.format(w=a["word"],
+                                         o=_join_de([f"»{z}«" for z in ziele])))
     lexem = f"{a['word']}@de"
     quellen = sorted(
         {r["source"] for r in sources.relations(conn, subject=lexem, predicate="expresses")}

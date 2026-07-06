@@ -247,6 +247,41 @@ def test_vertiefung_nennt_nie_einen_kryptischen_knoten(conn):
     assert all("Q999999" not in satz for satz in companion.vertiefung(conn, a))
 
 
+def test_vertiefung_zeigt_die_dynamische_schicht(conn):
+    # die neue verbindende Schicht (Methoden-Landkarte 2026-07-05): Teil-Ganzes/Kausal/Zweck
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q_fahrrad", "wikidata")
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad", "dbnary")
+    reactors.observe_relation(conn, "Q_fahrrad", "has_part", "Q_rad", "wikidata")
+    reactors.observe_relation(conn, "Rad@de", "expresses", "Q_rad", "wikidata")
+    reactors.observe_relation(conn, "Q_fahrrad", "used_for", "Q_fortbewegung", "wikidata")
+    reactors.observe_relation(conn, "Fortbewegung@de", "expresses", "Q_fortbewegung", "wikidata")
+    reactors.observe_relation(conn, "Q_fahrrad", "made_of", "Q_metall", "wikidata")
+    reactors.observe_relation(conn, "Metall@de", "expresses", "Q_metall", "wikidata")
+    saetze = companion.vertiefung(conn, companion.answer(conn, "Was ist ein Fahrrad?"))
+    text = " ".join(saetze)
+    assert "Zu »Fahrrad« gehören: »Rad«." in text
+    assert "»Fahrrad« wird verwendet für »Fortbewegung«." in text
+    assert "»Fahrrad« besteht aus »Metall«." in text
+
+
+def test_dynamische_schicht_nennt_nie_einen_kryptischen_knoten(conn):
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q_fahrrad", "wikidata")
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad", "dbnary")
+    reactors.observe_relation(conn, "Q_fahrrad", "causes", "Q999999", "wikidata")  # kein Label
+    saetze = companion.vertiefung(conn, companion.answer(conn, "Was ist ein Fahrrad?"))
+    assert not any("Q999999" in s for s in saetze)
+    assert not any("verursacht" in s for s in saetze)   # kein benanntes Ziel -> kein Satz
+
+
+def test_dynamische_schicht_nur_bei_ausfuehrlich(conn):
+    reactors.observe_relation(conn, "Fahrrad@de", "expresses", "Q_fahrrad", "wikidata")
+    reactors.observe_relation(conn, "Fahrrad@de", "primary_gloss", "ein Zweirad", "dbnary")
+    reactors.observe_relation(conn, "Q_fahrrad", "has_part", "Q_rad", "wikidata")
+    reactors.observe_relation(conn, "Rad@de", "expresses", "Q_rad", "wikidata")
+    mittel = companion.respond(conn, "Was ist ein Fahrrad?")
+    assert "gehören" not in mittel   # dynamische Schicht steckt in der Vertiefung (ausführlich)
+
+
 def test_vertiefung_setzt_jeden_benannten_begriff_in_anker_guillemets(conn):
     _reiches_wissen(conn)
     a = companion.answer(conn, "Was ist ein Hund?")

@@ -92,13 +92,21 @@ fi
 
 langs_pipe="$(printf '%s' "$LANGS" | tr ' ' '|')"
 wd_get "$API?action=wbgetentities&ids=$QID&props=labels|aliases&languages=$langs_pipe&format=json" "$TMP/labels.json"
-wd_get "$API?action=wbgetclaims&entity=$QID&property=P279&format=json" "$TMP/p279.json"
+# ALLE Claims in EINEM Call (statt nur P279): daraus die statische is_a-Leiter UND die
+# DYNAMISCHE Schicht (Teil-Ganzes, Kausal, Zweck) -- der Rohstoff der nächsten Denkweisen
+# (Methoden-Landkarte 2026-07-05: die meisten Methoden hungern nach genau diesen Kanten).
+wd_get "$API?action=wbgetclaims&entity=$QID&format=json" "$TMP/claims.json"
 
-# Emit (subject, predicate, object) triples: expresses (word@lang -> Q) + is_a (Q -> parentQ).
-facts="$(QID="$QID" LANGS="$LANGS" "$REPO_DIR/.venv/bin/python" - "$TMP/labels.json" "$TMP/p279.json" <<'PY'
+# Wikidata-Property -> GENUS-Prädikat. is_a bleibt die Taxonomie; die übrigen sind das
+# verbindende Material. Erweiterbar -- eine Zeile pro neuer Property.
+PROP_MAP='{"P279":"is_a","P361":"part_of","P527":"has_part","P186":"made_of","P366":"used_for","P1542":"causes","P828":"caused_by"}'
+
+# Emit (subject, predicate, object): expresses/label (word@lang -> Q) + is_a + dynamische Kanten.
+facts="$(QID="$QID" LANGS="$LANGS" PROP_MAP="$PROP_MAP" "$REPO_DIR/.venv/bin/python" - "$TMP/labels.json" "$TMP/claims.json" "$TMP/objids.txt" <<'PY'
 import json, os, sys
 qid = os.environ["QID"]
 langs = os.environ["LANGS"].split()
+prop_map = json.loads(os.environ["PROP_MAP"])
 out, seen = [], set()
 try:
     ent = json.load(open(sys.argv[1]))["entities"][qid]
@@ -118,16 +126,50 @@ try:
                 out.append("%s@%s\texpresses\t%s" % (t, lg, qid))
 except Exception:
     pass
+objids = set()
 try:
-    for c in json.load(open(sys.argv[2]))["claims"].get("P279", []):
-        ms = c.get("mainsnak", {})
-        if ms.get("datavalue"):
-            out.append("%s\tis_a\t%s" % (qid, ms["datavalue"]["value"]["id"]))
+    claims = json.load(open(sys.argv[2]))["claims"]
+    for pid, pred in prop_map.items():
+        for c in claims.get(pid, []):
+            dv = c.get("mainsnak", {}).get("datavalue")
+            if dv and isinstance(dv.get("value"), dict) and dv["value"].get("id"):
+                obj = dv["value"]["id"]
+                out.append("%s\t%s\t%s" % (qid, pred, obj))
+                if pred != "is_a":
+                    objids.add(obj)   # die is_a-Ziele holt der Kletter-Lerner ohnehin
+except Exception:
+    pass
+open(sys.argv[3], "w").write("\n".join(sorted(objids)))
+print("\n".join(out))
+PY
+)"
+
+# Die Ziel-Konzepte der dynamischen Kanten benennbar machen -- sonst blieben sie kryptische
+# Q-Ids und würden aus jeder Antwort gefiltert (die Vertiefung nennt nie einen blanken Knoten).
+# EIN Sammel-Call für alle Objekte, nur die Labels.
+objids="$(tr '\n' '|' < "$TMP/objids.txt" | sed 's/|$//')"
+if [ -n "$objids" ]; then
+    wd_get "$API?action=wbgetentities&ids=$objids&props=labels&languages=$langs_pipe&format=json" "$TMP/objlabels.json"
+    lblfacts="$(LANGS="$LANGS" "$REPO_DIR/.venv/bin/python" - "$TMP/objlabels.json" <<'PY'
+import json, os, sys
+langs = os.environ["LANGS"].split()
+out = []
+try:
+    for q, e in json.load(open(sys.argv[1])).get("entities", {}).items():
+        labels = e.get("labels", {})
+        for lg in langs:                       # eine Sprache genügt zum Benennen (Vorzug de>en>fr)
+            v = labels.get(lg, {}).get("value")
+            if v and "\t" not in v and "@" not in v:
+                out.append("%s@%s\tlabel\t%s" % (v, lg, q))
+                out.append("%s@%s\texpresses\t%s" % (v, lg, q))
+                break
 except Exception:
     pass
 print("\n".join(out))
 PY
 )"
+    facts="$(printf '%s\n%s' "$facts" "$lblfacts")"
+fi
 
 # The resolution itself is a fact from the source: the searched WORD expresses the concept
 # we picked. Wikidata may not list that exact form as a label/alias, so record it explicitly

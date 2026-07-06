@@ -176,10 +176,15 @@ Substanz, dann ihr Schliff — dein Instinkt, bestätigt.
 > eine Schließ-Operation die Kanten braucht (z. B. Teil-Ganzes-Inferenz oder die
 > Subsumtion der ersten Denkweise) — nicht vorher. M2 bleibt davon unberührt fällig.
 
-- **M1 — Relationale Tiefe aus Wikidata-Properties.** Den Konzept-Ernter um eine gewählte
-  Property-Liste erweitern. *Messbar fertig:* die Zahl der Kanten-Typen pro Konzept steigt
-  sichtbar; die Vertiefung nennt neue Beziehungen ohne Code-Änderung. Billig, Hintergrund —
-  **ausgelöst durch eine Operation, die die Kanten braucht** (siehe Wende oben).
+- **M1 — Relationale Tiefe aus Wikidata-Properties. GESTARTET (2026-07-05).** Der
+  Konzept-Ernter (`deploy/observe_konzept.sh`) zieht jetzt neben P279→is_a auch die
+  DYNAMISCHE Schicht: `part_of`/`has_part` (P361/P527), `made_of` (P186), `used_for` (P366),
+  `causes`/`caused_by` (P1542/P828) — als bequellte Kanten, mit einem Sammel-Call für die
+  Ziel-Labels (sonst kryptisch). Die Vertiefung nennt sie im „ausführlich"-Umfang
+  („besteht aus", „wird verwendet für", „verursacht"); `inference.py` behandelt `part_of`
+  schon als transitiv, die Deduktion konsumiert also die Teil-Ganzes-Kanten sofort. Ausgelöst
+  durch zwei unabhängig konvergierende Analysen (Material-Wende + Methoden-Landkarte:
+  „fast alle Denkweisen hungern nach genau diesem Material").
 - **M2 — Ledger-Wachstum messen** (vor jedem großen Ingest). Der nie gemessene Punkt,
   jetzt fällig.
 - **M3 — Fachwissen einer gewählten Domäne.** Braucht deine Domänen-Wahl + eine
