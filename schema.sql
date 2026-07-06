@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS relation_projection (
 
 CREATE INDEX IF NOT EXISTS idx_relation_subject ON relation_projection(subject);
 CREATE INDEX IF NOT EXISTS idx_relation_object ON relation_projection(object);
+-- predicate-Lookups (sources.relations(predicate=…), z.B. sae_fehlende, _unvereinbar) waren
+-- ein Full-Table-Scan; bei wachsender Projektion (Backfill) spürbar. Index hilft dem ganzen System.
+CREATE INDEX IF NOT EXISTS idx_relation_predicate ON relation_projection(predicate);
 
 -- The value-claim stream as an indexed projection (mirrors relation_projection for the
 -- value side): one row per evidence_recorded / assertion_recorded event. The events stay
