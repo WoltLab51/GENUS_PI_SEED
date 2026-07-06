@@ -176,7 +176,14 @@ Substanz, dann ihr Schliff — dein Instinkt, bestätigt.
 > eine Schließ-Operation die Kanten braucht (z. B. Teil-Ganzes-Inferenz oder die
 > Subsumtion der ersten Denkweise) — nicht vorher. M2 bleibt davon unberührt fällig.
 
-- **M1 — Relationale Tiefe aus Wikidata-Properties. GESTARTET (2026-07-05).** Der
+- **M1 — Relationale Tiefe aus Wikidata-Properties. BREIT GELIEFERT (2026-07-06).** Nach dem
+  Ernter für ein Konzept jetzt das BACKFILL über den ganzen Graphen: `deploy/backfill_konzepte.py`
+  (gebündelt, 50 Konzepte/Call, resumierbar) hat die ~12k Konzepte durchgezogen — **13.922
+  dynamische Kanten** (4.899 Konzepte, ~42% Abdeckung) + 15.450 Label-Kanten. Der Payoff live
+  gemessen: der Hypothese-Generator zündet jetzt breit (55 von 1500 Konzepten statt 6 von 400),
+  samt part_of-Vermutungen, die vorher unmöglich waren. Die Material-Wende wörtlich bestätigt —
+  das Material folgte der Operation (Hypothese/Analogie), nicht umgekehrt. Historie ↓:
+- **M1 (Keim) — Relationale Tiefe aus Wikidata-Properties. GESTARTET (2026-07-05).** Der
   Konzept-Ernter (`deploy/observe_konzept.sh`) zieht jetzt neben P279→is_a auch die
   DYNAMISCHE Schicht: `part_of`/`has_part` (P361/P527), `made_of` (P186), `used_for` (P366),
   `causes`/`caused_by` (P1542/P828) — als bequellte Kanten, mit einem Sammel-Call für die
