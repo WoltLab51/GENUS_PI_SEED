@@ -308,11 +308,24 @@ def relation_confidence(conn, subject: str, predicate: str, object: str) -> dict
 
 # Predicates where a subject genuinely has ONE object, so competing objects are a real
 # contradiction. Most knowledge predicates are NOT functional -- is_a (many parents),
-# expresses (polysemy), synonym -- and neither is `label`: a WORD is the label of many
-# concepts (homonymy -- "Bank@de" labels the bench AND the financial institution). Treating
-# `label` as functional flagged normal cross-lingual homonymy as conflicts (153 false inquiries
-# at scale), so nothing is functional here today; the machinery stays, ready for a truly
-# one-to-one predicate. (Value claims keep their own contradiction check in observe_assertion.)
+# expresses (polysemy), synonym. The empty set is DELIBERATE and CORRECT, not a forgotten
+# disable -- and the honest reason is deeper than it looks (measured 2026-07-06, P1.1):
+#
+#   The lexical predicates are keyed by WORD-FORM (`Bank@de`), which conflates homonyms. So even
+#   a predicate that is genuinely functional PER SENSE is multi-valued at the form key:
+#     * `label` -- "Bank@de" labels the bench AND the bank (153 false inquiries at scale).
+#     * `grammatical_gender` -- looks functional (a lexeme has ONE gender), but at the form key
+#       150 of 4106 German forms carry two genders, and they are HOMONYMY, not errors:
+#       "Alter@de" = der Alter (the old man) + das Alter (age). Flagging them would be 150 false
+#       inquiries -- the same wall.
+#
+# So there is no SAFELY-functional predicate to activate: functionality would need a CONCEPT-level
+# (Q-id-keyed, sense-separated) predicate, or a source-schema single-value constraint (Wikidata
+# knows P5185 is single-value) -- neither is harvested today. This is the same positive-only /
+# sense-distinction wall as disjointness. NOTE: the knowledge graph's OTHER self-correction tooth
+# -- acyclicity (an is_a/part_of ring = a contradiction) -- IS alive and wired at assertion time
+# (reactors.observe_relation -> closes_cycle -> inquiry). Only the functional tooth honestly waits.
+# (Value claims keep their own contradiction check in observe_assertion.)
 FUNCTIONAL_PREDICATES: set[str] = set()
 
 
