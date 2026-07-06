@@ -66,9 +66,14 @@ SUCH_TIEFE = 32
 # dokumentiert den Mechanismus und trägt die Off-Pi-Tests — die realen Q-id-Paare kommen bei
 # Bedarf über denselben Sä-Helfer dazu (teach/seed, Quelle welt).
 UNVEREINBAR_SEED: tuple[tuple[str, str, str], ...] = (
+    # symbolisch — dokumentiert den Mechanismus und trägt die Off-Pi-Tests
     ("konzept:fisch", UNVEREINBAR, "konzept:saeugetier"),
     ("konzept:fisch", INHALT, "Fisch — eine eigene Tierklasse, unvereinbar mit Säugetier"),
     ("konzept:saeugetier", INHALT, "Säugetier — eine eigene Tierklasse, unvereinbar mit Fisch"),
+    # real (Wikidata Q152 Fisch ⊥ Q7377 Säugetier) — damit die Widerlegung auf dem lebenden
+    # Graphen greift (ein Hauspferd erreicht Q7377, kann also kein Q152 sein). So universell
+    # wie das Gesetz in NORM_SEED; weitere reale Klassentrennungen kommen über denselben Helfer.
+    ("Q152", UNVEREINBAR, "Q7377"),
 )
 
 
