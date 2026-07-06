@@ -137,6 +137,7 @@ def zustand(conn) -> dict:
         },
         "erholung": {
             "schwelle": reboot, "seed": governance.RECOVERY_REBOOT_MIN_FAILURES,
+            "min_episoden": governance.MIN_RECOVERY_EPISODES,
             "reboot_ausgeloest": reboot_feuer, "erholungs_versuche": erholungs_versuche,
         },
         "verstehen": {
@@ -223,9 +224,15 @@ def narrate(conn) -> list[str]:
     if rb["derived"]:
         rb_text = (f"{rb['threshold']} — selbst-kalibriert aus {rb['episodes']} "
                    f"Erholungs-Episode(n) (Saat war {e['seed']})")
+    elif rb["episodes"] < e["min_episoden"]:
+        # zu wenige abgeschlossene Episoden, um überhaupt ein Muster zu zeigen
+        rb_text = (f"{rb['threshold']} — Saat (erst {rb['episodes']} von ≥{e['min_episoden']} "
+                   f"nötigen Erholungs-Episoden)")
     else:
-        rb_text = (f"{rb['threshold']} — Saat ({rb['episodes']} Episode(n), noch kein "
-                   f"trennendes Muster; braucht ≥5)")
+        # GENUG Episoden, aber ohne trennende Lücke (alle ähnlich lang) -- NICHT „zu wenige"
+        # (Live-Fund: 10 Episoden, alle gleich lang -> ehrlich „kein Muster", nicht „braucht mehr")
+        rb_text = (f"{rb['threshold']} — Saat ({rb['episodes']} Episoden, aber ohne trennende "
+                   f"Lücke — alle ähnlich lang, noch kein Muster)")
     L += [
         f"{MOT}   Reboot-Schwelle: {rb_text}",
         f"{MOT}   Reboot wirklich ausgelöst: {e['reboot_ausgeloest']} mal "

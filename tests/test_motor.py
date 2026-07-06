@@ -111,6 +111,20 @@ def test_recharakterisierungen_werden_nach_typ_getrennt(conn):
     assert z["glauben_stabilitaet"]["recharakterisierungen"] == 1  # NUR die Stabilität
 
 
+def test_reboot_saat_unterscheidet_zu_wenige_von_kein_muster(conn, monkeypatch):
+    # Live-Fund: die Reboot-Schwelle stand auf Saat trotz 10 Episoden -- der Grund war „kein
+    # trennendes Muster" (alle gleich lang), NICHT „zu wenige". Beide Fälle müssen ehrlich
+    # unterschieden werden statt pauschal „braucht ≥5" zu behaupten.
+    from genus import governance
+    monkeypatch.setattr(governance, "reboot_threshold_report",
+                        lambda c: {"threshold": 3, "episodes": 10, "derived": False})
+    t = _text(conn)
+    assert "ohne trennende Lücke" in t and "nötigen" not in t
+    monkeypatch.setattr(governance, "reboot_threshold_report",
+                        lambda c: {"threshold": 3, "episodes": 2, "derived": False})
+    assert "erst 2 von" in _text(conn)
+
+
 def test_unvermessene_denkweisen_werden_benannt_nicht_erfunden(conn):
     # die ehrliche Decke: Denkweisen ohne Spur werden NAMENTLICH genannt, nie mit Zahl geschönt
     t = _text(conn)
