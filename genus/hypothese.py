@@ -198,26 +198,38 @@ def _kausal_nachfolger(conn, knoten: str) -> set[str]:
     return ziele
 
 
-def _kausal_erreicht(conn, von: str, nach: str, max_depth: int = SUCH_TIEFE) -> bool:
-    """Erreicht ``von`` das Ziel ``nach`` über die vereinte KAUSALKETTE (causes + caused_by-
-    Inverse)? Ein tiefen-gedeckelter BFS — die transitive Verallgemeinerung der direkten
-    Gegenrichtung: eine Kausalkette B→…→A macht „A verursacht B" zum Ring, egal wie lang."""
+def kausal_pfad(conn, von: str, nach: str, max_depth: int = SUCH_TIEFE) -> list[str] | None:
+    """Der kürzeste KAUSAL-Pfad von ``von`` zu ``nach`` über die vereinte Kausalkette (causes +
+    caused_by-Inverse), als Knoten-Liste ``[von, …, nach]``, oder ``None``. Die EINE Kausal-
+    Erreichbarkeit — genutzt von der Refutation (:func:`_kausal_erreicht`) UND der gläsernen
+    Chat-Antwort (companion.relate_kausal), damit es keine zweite Wahrheit gibt. Tiefen-gedeckelt."""
     if von == nach:
-        return True
-    gesehen, front = {von}, [von]
+        return [von]
+    vorgaenger = {von: None}
+    front = [von]
     for _ in range(max_depth):
         neu = []
         for n in front:
             for o in _kausal_nachfolger(conn, n):
+                if o in vorgaenger:
+                    continue
+                vorgaenger[o] = n
                 if o == nach:
-                    return True
-                if o not in gesehen:
-                    gesehen.add(o)
-                    neu.append(o)
+                    pfad = [o]
+                    while vorgaenger[pfad[-1]] is not None:
+                        pfad.append(vorgaenger[pfad[-1]])
+                    return list(reversed(pfad))
+                neu.append(o)
         if not neu:
             break
         front = neu
-    return False
+    return None
+
+
+def _kausal_erreicht(conn, von: str, nach: str, max_depth: int = SUCH_TIEFE) -> bool:
+    """Erreicht ``von`` das Ziel ``nach`` über die vereinte Kausalkette? Die transitive
+    Verallgemeinerung der direkten Gegenrichtung (ein Ring, egal wie lang) — über den Pfad."""
+    return kausal_pfad(conn, von, nach, max_depth) is not None
 
 
 def _kausal_urteil(conn, subjekt: str, praedikat: str, objekt: str) -> str | None:

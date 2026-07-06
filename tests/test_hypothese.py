@@ -208,6 +208,14 @@ def test_vorwaerts_kette_widerlegt_die_vorwaerts_vermutung_nicht(conn):
     assert hypothese.teste_konjektur(conn, "A", "causes", "C")["urteil"] == "offen"
 
 
+def test_kausal_pfad_gibt_den_weg_zurueck(conn):
+    # die geteilte Kausal-Erreichbarkeit (auch von companion.relate_kausal genutzt) liefert den Weg
+    reactors.observe_relation(conn, "A", "causes", "B", "wikidata")
+    reactors.observe_relation(conn, "C", "caused_by", "B", "wikidata")   # == B causes C
+    assert hypothese.kausal_pfad(conn, "A", "C") == ["A", "B", "C"]
+    assert hypothese.kausal_pfad(conn, "C", "A") is None                 # keine Rück-Kette
+
+
 def test_causes_offen_wenn_richtung_unbekannt(conn):
     reactors.observe_relation(conn, "X", "causes", "Y", "wikidata")   # unabhängiger Fakt
     e = hypothese.teste_konjektur(conn, "Duerre", "causes", "Missernte")

@@ -762,6 +762,82 @@ def test_relate_is_case_lenient():
     assert companion.relate(conn, "ist ein hund ein säugetier?")["verdict"] == "yes"
 
 
+def _kausal_graph():
+    conn = _fresh()  # Feuer->Rauch->Smog (causes); Grippe verursacht Fieber (numerische Q-ids wie live)
+    for w, q in (("Feuer", "Q901"), ("Rauch", "Q902"), ("Smog", "Q903"),
+                 ("Fieber", "Q904"), ("Grippe", "Q905")):
+        reactors.observe_relation(conn, f"{w}@de", "expresses", q, "wikidata")
+    reactors.observe_relation(conn, "Q901", "causes", "Q902", "wikidata")
+    reactors.observe_relation(conn, "Q902", "causes", "Q903", "wikidata")
+    reactors.observe_relation(conn, "Q905", "causes", "Q904", "wikidata")
+    return conn
+
+
+def test_kausal_ja_direkt():
+    from genus import companion
+    conn = _kausal_graph()
+    r = companion.relate_kausal(conn, "Verursacht Feuer Rauch?")
+    assert r["kausal_q"] and r["art"] == "ja"
+    assert companion.narrate_kausal(conn, r) == "Ja. »Feuer« verursacht »Rauch«."
+
+
+def test_kausal_ja_transitiv_zeigt_den_weg():
+    from genus import companion
+    conn = _kausal_graph()   # Feuer -> Rauch -> Smog: mediierte Kausation, der Weg wird gezeigt
+    r = companion.relate_kausal(conn, "Verursacht Feuer Smog?")
+    assert r["art"] == "ja"
+    s = companion.narrate_kausal(conn, r)
+    assert "Kausalkette" in s and "→" in s and "»Rauch«" in s
+
+
+def test_kausal_was_verursacht_listet_ursachen():
+    from genus import companion
+    conn = _kausal_graph()
+    r = companion.relate_kausal(conn, "Was verursacht Fieber?")
+    assert r["art"] == "ursachen" and "Grippe" in r["ursachen"]
+    assert "»Grippe«" in companion.narrate_kausal(conn, r)
+
+
+def test_kausal_unbekannt_haelt_zurueck_statt_zu_verneinen():
+    from genus import companion
+    conn = _kausal_graph()   # „Rauch verursacht Feuer?" -> kein Pfad (Fluss geht Feuer->Rauch)
+    r = companion.relate_kausal(conn, "Verursacht Rauch Feuer?")
+    assert r["art"] == "unbekannt"
+    assert "kenne ich nicht" in companion.narrate_kausal(conn, r)   # open-world, kein „nein"
+
+
+def test_kausal_unbekannte_begriffe_fallen_durch():
+    from genus import companion
+    conn = _kausal_graph()
+    assert companion.relate_kausal(conn, "Verursacht Quux Blarg?")["kausal_q"] is False
+
+
+def test_kausal_synonym_ist_keine_erfundene_kausation():
+    # X und Y lösen auf DASSELBE Konzept auf (Synonyme) -> keine „Ja"-Aussage aus dem Identitäts-
+    # Kurzschluss (Review-Fund HOCH: sonst „Ja, Feuer verursacht Flamme" mit NULL causes-Kanten)
+    from genus import companion
+    conn = _kausal_graph()
+    reactors.observe_relation(conn, "Flamme@de", "expresses", "Q901", "wikidata")   # Synonym von Feuer
+    r = companion.relate_kausal(conn, "Verursacht Feuer Flamme?")
+    assert r["art"] == "unbekannt"
+    assert "kenne ich nicht" in companion.narrate_kausal(conn, r)
+
+
+def test_kausal_ohne_bekannte_ursache_faellt_durch():
+    # „Was verursacht Feuer?" — nichts verursacht Feuer -> durchfallen zum Wort-Pfad (Definition ist
+    # besser als die knappe Nicht-Antwort; Selbst-Prüfung wie relate — Review-Fund MITTEL)
+    from genus import companion
+    conn = _kausal_graph()
+    assert companion.relate_kausal(conn, "Was verursacht Feuer?")["kausal_q"] is False
+
+
+def test_muster_antwort_routet_die_kausal_frage():
+    from genus import companion
+    conn = _kausal_graph()
+    text, zelle = companion._muster_antwort(conn, "Verursacht Feuer Rauch?")
+    assert "verursacht" in text and zelle == "beziehung"
+
+
 def test_ask_cli_routes_relational_question(monkeypatch):
     conn = _isa_graph()  # a relational question reaches the inference route, not the word lookup
     monkeypatch.setattr(cli, "get_conn", lambda: conn)

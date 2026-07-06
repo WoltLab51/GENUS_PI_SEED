@@ -909,14 +909,110 @@ def _ritual_antwort(conn, question: str) -> str | None:
     return None
 
 
+# --- Kausal-Fragen ("Verursacht X Y?" / "Was verursacht X?") ----------------------------
+#
+# Der is_a-Frage-Pfad (relate) beantwortet „Ist ein X ein Y?"; die KAUSAL-Frage liest dieselbe
+# dichte causes/caused_by-Schicht + die transitive Kausalkette (genus/hypothese.kausal_pfad, EINE
+# Quelle -- keine zweite Wahrheit). Gläsern wie relate: bei „ja" wird der Kausal-WEG gezeigt.
+# Ehrlich: „kein bekannter Zusammenhang" heißt NICHT „nein" (open-world). Deterministisch, kein Modell.
+
+_KAUSAL_URSACHE = [
+    re.compile(r"\bwas\s+" + _FILL + r"verursacht\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwodurch\s+" + _FILL + r"entsteht\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+]
+_KAUSAL_JA_NEIN = re.compile(
+    r"\bverursacht\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I)
+
+
+def _qids_of(conn, form: str) -> set[str]:
+    return {r["object"] for r in sources.relations(conn, subject=f"{form}@de", predicate=sources.EXPRESSES)}
+
+
+def _ursachen_von(conn, x_tok: str) -> dict:
+    """Die bekannten Ursachen von X: ``{s : s causes X}`` ∪ ``{o : X caused_by o}``, benannt."""
+    x_form = _concept_form(conn, x_tok)
+    if x_form is None:
+        return {"kausal_q": False}
+    ursachen: set[str] = set()
+    for q in _qids_of(conn, x_form):
+        for r in sources.relations(conn, predicate="causes", object=q):
+            ursachen.add(r["subject"])
+        for r in sources.relations(conn, subject=q, predicate="caused_by"):
+            ursachen.add(r["object"])
+    namen = sorted({_label(conn, u) for u in ursachen})
+    if not namen:
+        # Kennt der Graph KEINE Ursache, ist die knappe „kenne keine" schlechter als die
+        # Definition -- also durchfallen lassen (Selbst-Prüfung wie relate), statt sie zu beschatten
+        # (causes ist dünn besät, „bekanntes Konzept ohne Ursache" ist der Normalfall). Review-Fund.
+        return {"kausal_q": False}
+    return {"kausal_q": True, "art": "ursachen", "subjekt": x_form, "ursachen": namen}
+
+
+def _kausal_zwischen(conn, x_tok: str, y_tok: str) -> dict:
+    """Erreicht X kausal Y (transitiv, über die vereinte Kette)? Bei ja mit dem gezeigten Weg."""
+    from genus import hypothese
+
+    x_form = _concept_form(conn, x_tok)
+    y_concepts, y_form = _concepts_of(conn, y_tok)
+    if x_form is None or not y_concepts:
+        return {"kausal_q": False}
+    for xq in sorted(_qids_of(conn, x_form)):
+        for yq in sorted(y_concepts):
+            if xq == yq:
+                continue                 # X und Y sind dasselbe Konzept (Synonyme) -- Identität
+            pfad = hypothese.kausal_pfad(conn, xq, yq)   # ist KEINE belegte Kausation (Review-Fund):
+            if pfad and len(pfad) >= 2:  # ein echter Kausal-Weg hat >= 2 Knoten (nicht der von==nach-Kurzschluss)
+                return {"kausal_q": True, "art": "ja", "subjekt": x_form, "objekt": y_form,
+                        "pfad": [_label(conn, p) for p in pfad]}
+    return {"kausal_q": True, "art": "unbekannt", "subjekt": x_form, "objekt": y_form}
+
+
+def relate_kausal(conn, question: str) -> dict:
+    """Eine Kausal-Frage aus dem Graphen: „Was verursacht X?" (die Ursachen) oder „Verursacht X Y?"
+    (ja/nein, mit Kausal-Weg). ``{kausal_q: False}``, wenn keine Kausal-Frage oder unauflösbar
+    (dann versucht der Wort-Pfad weiter — dieselbe Selbst-Prüfung wie bei relate)."""
+    for pat in _KAUSAL_URSACHE:
+        m = pat.search(question)
+        if m:
+            r = _ursachen_von(conn, m.group(1))
+            if r["kausal_q"]:
+                return r
+    m = _KAUSAL_JA_NEIN.search(question)
+    if m:
+        r = _kausal_zwischen(conn, m.group(1), m.group(2))
+        if r["kausal_q"]:
+            return r
+    return {"kausal_q": False}
+
+
+def narrate_kausal(conn, r: dict) -> str:
+    """Gläserne deutsche Kausal-Antwort — bei „ja" wird der Weg gezeigt, Unbekanntes ehrlich benannt."""
+    if r["art"] == "ursachen":
+        if r["ursachen"]:
+            liste = ", ".join(f"»{u}«" for u in r["ursachen"])
+            return f"Als Ursache von »{r['subjekt']}« kenne ich: {liste}."
+        return (f"Eine Ursache von »{r['subjekt']}« kenne ich nicht — das heißt nicht, dass es "
+                f"keine gibt, nur dass mein Graph keine nennt.")
+    if r["art"] == "ja":
+        pfad = r["pfad"]
+        if len(pfad) <= 2:
+            return f"Ja. »{r['subjekt']}« verursacht »{r['objekt']}«."
+        return "Ja, über eine Kausalkette: " + " → ".join(f"»{p}«" for p in pfad) + "."
+    return (f"Einen Kausal-Zusammenhang von »{r['subjekt']}« zu »{r['objekt']}« kenne ich nicht "
+            f"— das heißt nicht, dass es keinen gibt.")
+
+
 def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
-    """The fixed-pattern cells (relation/comparative/gender/derivative) -- self-verifying: a
+    """The fixed-pattern cells (relation/kausal/comparative/gender/derivative) -- self-verifying: a
     pattern only claims the question when its terms actually resolve (in the graph, or -- for
     the derivative cell -- as a valid computable term). Returns ``(text, zelle)`` so a caller
     can record WHICH cell answered; ``None`` otherwise."""
     rel = relate(conn, question)
     if rel.get("relational"):
         return narrate_relation(conn, rel), "beziehung"
+    kau = relate_kausal(conn, question)
+    if kau.get("kausal_q"):
+        return narrate_kausal(conn, kau), "beziehung"
     com = common(conn, question)
     if com.get("common"):
         return narrate_common(conn, com), "vergleich"
