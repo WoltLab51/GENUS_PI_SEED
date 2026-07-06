@@ -247,6 +247,22 @@ Denkweisen-Muster aus §4:
 - Ehrlich offen: weitere Domänen; die Einwendungs-Baupläne (die Gegenseite als dieselbe
   Maschine); die Norm-WAHL aus einer Schilderung (heute given); die Anbindung in den Chat.
 
+## 9c · Die Deduktion als allgemeines Werkzeug (genus/deduktion.py)
+
+Empfehlung 2 der Methoden-Landkarte, gebaut: das Modus-Ponens-Muster lag zweimal fest
+verdrahtet (`inference.py`: transitiver Kettenschluss über is_a/part_of; `recht.subsumiere`:
+Bauplan-Subsumtion) — jetzt zu EINEM domänenfreien Schließer herausgehoben. Eine REGEL ist ein
+Bauplan (`regel -braucht-> praemisse`, Konjunktion; `-bewirkt-> folge`), rekursiv. Drei
+Richtungen: `schliesse` (eine Regel prüfen), **`leite_ab`** (VORWÄRTS, bis zum Fixpunkt — eine
+abgeleitete Folge erfüllt die nächste Regel), **`beweise`** (RÜCKWÄRTS: „beweise mir Z" —
+suche die Regel, die Z bewirkt, zeige den Beweis; die neue Richtung, die es in keiner alten
+Engine gab). Gläsern: jede Folge trägt ihre Prämissenkette, Vertrauen = schwächste Prämisse.
+Read-time, kennt kein Recht. **Der Beweis der Heraushebung (live):** der allgemeine Schließer
+beweist die Rechtsfolge `rechtsfolge:kaufpreiszahlung` rückwärts über den vorhandenen
+`norm:kaufpreis`-Bauplan — Recht ist damit nur die erste Domäne des Schließers. `genus beweise
+<ziel> --gegeben atom=quelle`. Ehrlich: Mehr-Hop-Vertrauen (eine abgeleitete Folge als Prämisse
+der nächsten Regel) trägt seinen Herleitungs-Trust noch nicht weiter — ein benannter Feinschliff.
+
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 
 - **Takt verallgemeinert** (genus/experience.py): der Takt ist ein Merkmal des Detektors

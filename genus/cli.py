@@ -13,6 +13,7 @@ from genus import (
     companion,
     control,
     db,
+    deduktion,
     druck,
     doctor as doctor_checks,
     event_router,
@@ -849,6 +850,31 @@ def subsumtion_command(norm: str, erfuellt: tuple[str, ...], text: str | None) -
                 click.echo(f"[RECHT] {zeile}")
         if e["vertrauen"] is not None:
             click.echo(f"[RECHT] Vertrauen (schwächste Prämisse): {e['vertrauen']}")
+    finally:
+        conn.close()
+
+
+@main.command("beweise")
+@click.argument("ziel")
+@click.option("--gegeben", "gegeben", multiple=True, metavar="atom=quelle",
+              help="ein als gegeben angenommener Fakt mit seiner Quelle, mehrfach")
+def beweise_command(ziel: str, gegeben: tuple[str, ...]) -> None:
+    """Der allgemeine Deduktions-Schließer (Rückwärtsverkettung, docs/GENUS_INTELLIGENZ.md):
+    „beweise mir ZIEL" — sucht eine Regel (braucht/bewirkt-Bauplan im Graphen), die das Ziel
+    bewirkt, und zeigt den gläsernen Beweis inkl. schwächster Prämisse. Domänenfrei, read-only."""
+    conn = get_conn()
+    try:
+        fakten: dict[str, str] = {}
+        for paar in gegeben:
+            atom, _, quelle = paar.partition("=")
+            if atom and quelle:
+                fakten[atom] = quelle
+        b = deduktion.beweise(conn, ziel, fakten)
+        if b is None:
+            click.echo(f"[DED] Keine Regel bewirkt „{ziel}“ — kein ableitbares Ziel.")
+            return
+        for zeile in deduktion.narrate(conn, b["ergebnis"]).splitlines():
+            click.echo(f"[DED] {zeile}")
     finally:
         conn.close()
 

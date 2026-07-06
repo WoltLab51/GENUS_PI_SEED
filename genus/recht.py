@@ -114,7 +114,12 @@ def _pruefe_merkmal(conn, merkmal: str, sachverhalt: dict[str, str]) -> dict:
 
 
 def subsumiere(conn, norm: str, sachverhalt: dict[str, str]) -> dict:
-    """Der Justizsyllogismus: prüft jedes Merkmal der ``norm`` gegen den ``sachverhalt``
+    """Der Justizsyllogismus — die erste DOMÄNE des allgemeinen Deduktions-Schließers
+    (genus/deduktion.py, Modus Ponens über braucht/bewirkt). Diese Fassung fügt das
+    Juristische hinzu, das der allgemeine Schließer bewusst nicht kennt: den Wertungs-
+    Mensch-Slot und die Beweismittel-Art (Urkunde/Parteivortrag) fürs Beweislast-Radar.
+
+    prüft jedes Merkmal der ``norm`` gegen den ``sachverhalt``
     (Merkmal -> Quelle). Sind ALLE erfüllt, folgt die Rechtsfolge. Vertrauen = schwächste
     Prämisse (die Verallgemeinerung der is_a-Inferenz); die schwächste Stelle ist zugleich
     das Beweislast-Radar. Read-time, erzeugt nichts."""
