@@ -384,6 +384,10 @@ def ask_command(question: tuple[str, ...]) -> None:
         if rel.get("relational"):
             click.echo(f"[ASK] {companion.narrate_relation(conn, rel)}")
             return
+        kau = companion.relate_kausal(conn, q)     # then: a causal "verursacht X Y?" question?
+        if kau.get("kausal_q"):
+            click.echo(f"[ASK] {companion.narrate_kausal(conn, kau)}")
+            return
         com = companion.common(conn, q)            # then: "was haben X und Y gemeinsam?"
         if com.get("common"):
             click.echo(f"[ASK] {companion.narrate_common(conn, com)}")
