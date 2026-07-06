@@ -848,6 +848,65 @@ def test_muster_antwort_routet_die_kausal_frage():
     assert "verursacht" in text and zelle == "beziehung"
 
 
+# --- P3.1: die freie Kausalfrage über den Deuter (das „ursache"-Blatt hat jetzt einen Handler) ---
+
+def test_deuter_ursache_blatt_erreicht_die_kausal_faehigkeit():
+    # das „ursache"-Blatt bekam früher keinen Handler und kletterte zur Zelle frage-begriff ->
+    # es gab die DEFINITION von X statt seiner URSACHEN (eine andere Frage). Jetzt führt eine als
+    # „ursache" gelesene Frage zur gebauten Kausal-Fähigkeit -- die Ursachen, nicht die Definition.
+    from genus import companion
+    conn = _kausal_graph()
+    guess = {"absicht": "ursache", "subject": "Fieber", "object": None}
+    a = companion._deuter_antwort(conn, guess, "Wodurch entsteht Fieber?", None)
+    assert a is not None and a["kind"] == "ursache"
+    assert "»Grippe«" in a["text"] and "Ursache" in a["text"]
+
+
+def test_deuter_beziehung_blatt_traegt_auch_die_gerichtete_kausation():
+    # „Führt X zu Y?": beide Begriffe bekannt, KEINE is_a-Kante -> _relate_terms gibt
+    # relational=True/verdict=no_path. Dieser Fall darf NICHT von der is_a-Zurückhaltung
+    # geschluckt werden (sonst „zählt nicht nachweislich zu" statt der echten Kausalkette).
+    from genus import companion
+    conn = _kausal_graph()
+    guess = {"absicht": "beziehung", "subject": "Feuer", "object": "Smog"}
+    a = companion._deuter_antwort(conn, guess, "Führt Feuer zu Smog?", None)
+    assert a is not None and a["kind"] == "beziehung"
+    assert "Kausalkette" in a["text"] and "»Rauch«" in a["text"]
+
+
+def test_zelle_beziehung_is_a_ja_schlaegt_kausal_und_no_path_bleibt_ehrlich():
+    # Reihenfolge is_a-Ja > Kausal-Ja > ehrliche is_a-Zurückhaltung: eine echte is_a-Einordnung
+    # gewinnt; und wo weder is_a-ja noch belegte Kausation besteht (Rauch->Feuer: kein Pfad),
+    # bleibt die ehrliche is_a-Zurückhaltung erhalten -- der Kausal-Zweig verschluckt sie nicht.
+    from genus import companion
+    conn = _kausal_graph()
+    reactors.observe_relation(conn, "Q902", "is_a", "Q903", "wikidata")   # Rauch is_a Smog (künstlich)
+    ja = companion._zelle_beziehung(conn, {"subject": "Rauch", "object": "Smog"},
+                                    "Zählt Rauch zu Smog?", None, None)
+    assert ja is not None and "→" not in ja                              # is_a-Ja, kein Kausalpfad
+    ehrlich = companion._zelle_beziehung(conn, {"subject": "Rauch", "object": "Feuer"},
+                                         "Führt Rauch zu Feuer?", None, None)
+    assert ehrlich is not None and "nicht widerlegt" in ehrlich          # ehrliche Zurückhaltung
+
+
+def test_zelle_ursache_ohne_bekanntes_subjekt_klettert_ehrlich():
+    # unauflösbares subject -> _zelle_ursache gibt None, damit der Dispatch ehrlich weiterklettert
+    # (statt eine Kausal-Antwort über einen unbekannten Begriff zu erfinden)
+    from genus import companion
+    conn = _kausal_graph()
+    a = companion._zelle_ursache(conn, {"subject": "Quux", "object": None},
+                                 "Was verursacht Quux?", None, None)
+    assert a is None
+
+
+def test_ursache_und_beziehung_sind_wortlautfest():
+    # beide Kausal-Zellen sind gerichtet -> sie dürfen NICHT der Stimme angeboten werden
+    from genus import companion, werkzeug
+    companion.registriere_zellen()
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}ursache") is False
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung") is False
+
+
 def test_ask_cli_routes_relational_question(monkeypatch):
     conn = _isa_graph()  # a relational question reaches the inference route, not the word lookup
     monkeypatch.setattr(cli, "get_conn", lambda: conn)

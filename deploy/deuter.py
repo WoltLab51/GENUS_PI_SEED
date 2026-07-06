@@ -89,11 +89,13 @@ _GRUPPEN = (
 
 _ERKLAERUNGEN = {
     "definition": "was ist X",
-    "beziehung": "ist/zaehlt X (zu) ein(em) Y",
+    "beziehung": "ist/zaehlt X (zu) ein(em) Y -- ODER gerichtet: verursacht/fuehrt X zu Y "
+                 "(zwei genannte Dinge)",
     "vergleich": "was haben X und Y gemeinsam",
     "grammatik": "Artikel/Geschlecht eines Wortes",
     "eigenschaft": "welche Eigenschaft hat X",
-    "ursache": "warum ist etwas in der Welt so",
+    "ursache": "was verursacht X / wodurch entsteht X / was loest X aus (die Ursachen EINES "
+               "genannten Dings)",
     "menge": "wie viele",
     "zustand": "wie geht es dir / dein Zustand",
     "offene-fragen": "was beschaeftigt dich",
@@ -213,6 +215,12 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         "zaehlt ein Apfel zu den Pflanzen -> "
         "[{\"text\": \"zaehlt ein Apfel zu den Pflanzen\", \"absicht\": \"beziehung\", "
         "\"subject\": \"Apfel\", \"object\": \"Pflanze\"}]\n"
+        "Was verursacht Kopfschmerzen? -> "
+        "[{\"text\": \"Was verursacht Kopfschmerzen?\", \"absicht\": \"ursache\", "
+        "\"subject\": \"Kopfschmerz\", \"object\": null}]\n"
+        "Fuehrt Rauchen zu Krebs? -> "
+        "[{\"text\": \"Fuehrt Rauchen zu Krebs?\", \"absicht\": \"beziehung\", "
+        "\"subject\": \"Rauchen\", \"object\": \"Krebs\"}]\n"
         "Wie wird das Wetter morgen? -> "
         "[{\"text\": \"Wie wird das Wetter morgen?\", \"absicht\": \"weltfrage\", "
         "\"subject\": null, \"object\": null}]\n"

@@ -1328,8 +1328,9 @@ _DEUTED = " (Frage vom Sprachmodell gedeutet.)"
 # German voice for cells GENUS can read but not yet act on -- honest capability naming. Nur
 # noch Blätter, die tatsächlich bis zum ehrlichen Lücken-Satz durchfallen können (die anderen
 # lösen sich entweder direkt oder klettern zu einer Zelle mit eigenem Fallback -- z.B.
-# eigenschaft/ursache/menge landen bei frage-begriff und werden dort beantwortet, brauchen also
-# gar keine eigene Lücken-Formulierung mehr).
+# eigenschaft/menge landen bei frage-begriff und werden dort beantwortet; „ursache" hat seit
+# P3.1 ein eigenes Kausal-Blatt und fällt bei Unauflösbarkeit dorthin, brauchen also gar keine
+# eigene Lücken-Formulierung mehr).
 _ZELLEN_LABELS = {
     "faehigkeiten": "eine Frage danach, was ich kann",
     "empfehlungsfrage": "eine Bitte um Empfehlung",
@@ -1355,7 +1356,30 @@ def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=N
     if not (guess.get("subject") and guess.get("object")):
         return None
     r = _relate_terms(conn, guess["subject"], guess["object"])
+    if r["relational"] and r["verdict"] == "yes":
+        return narrate_relation(conn, r)      # eine echte is_a-Einordnung -- die stärkste Antwort
+    # keine POSITIVE is_a-Beziehung? -> dieselbe Zelle trägt auch die GERICHTETE Kausal-Beziehung
+    # („Verursacht X Y?", „Führt X zu Y?" -- Formulierungen, die die festen Muster von
+    # _muster_antwort verfehlen, der Deuter aber als beziehung liest). Wichtig: „beide bekannt,
+    # keine is_a-Kante" ist verdict=="no_path" (relational=True!) -- genau der Kausal-Fall; er darf
+    # NICHT von der is_a-Zurückhaltung geschluckt werden. Reihenfolge: is_a-Ja > Kausal-Ja >
+    # ehrliche is_a-Zurückhaltung. Die Kausal-Antwort ist selbst wortlautfest (Richtung = Wahrheit).
+    k = _kausal_zwischen(conn, guess["subject"], guess["object"])
+    if k["kausal_q"] and k["art"] == "ja":
+        return narrate_kausal(conn, k)
     return narrate_relation(conn, r) if r["relational"] else None
+
+
+def _zelle_ursache(conn, guess, question, last_question, last_answer, stimme=None):
+    # „Was verursacht X?" / „Wodurch entsteht X?" -- das eigene Blatt der Kausal-FRAGE nach
+    # Ursachen (früher ohne Handler: es kletterte zur Zelle frage-begriff und bekam die
+    # DEFINITION von X statt seiner Ursachen -- eine andere Frage beantwortet, P3.1). Jetzt
+    # führt es zur gebauten Kausal-Fähigkeit; unauflösbar -> None (klettert ehrlich weiter).
+    subject = guess.get("subject")
+    if not subject:
+        return None
+    r = _ursachen_von(conn, subject)
+    return narrate_kausal(conn, r) if r["kausal_q"] else None
 
 
 def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1560,6 +1584,7 @@ _HANDELBAR = {
     "frage-begriff": _zelle_frage_begriff,
     "definition": _zelle_definition,
     "beziehung": _zelle_beziehung,
+    "ursache": _zelle_ursache,
     "vergleich": _zelle_vergleich,
     "grammatik": _zelle_grammatik,
     "warum-herkunft": _zelle_nachfrage,
@@ -1599,7 +1624,7 @@ _ZELLEN_FREI_FORMULIERBAR = frozenset({
     "definition", "vergleich", "grammatik", "frage-begriff",
 })
 _ZELLEN_PRUEFBAR = {
-    "definition": "graph", "beziehung": "graph", "vergleich": "graph",
+    "definition": "graph", "beziehung": "graph", "ursache": "graph", "vergleich": "graph",
     "grammatik": "graph", "frage-begriff": "graph", "zustand": "graph",
     "offene-fragen": "graph", "ziele": "graph",
     "warum-herkunft": "sitzung", "vertiefung": "sitzung", "anschlussfrage": "sitzung",
