@@ -188,24 +188,54 @@ def _unvereinbar(conn, subjekt: str, objekt: str) -> dict | None:
     return None
 
 
+def _kausal_nachfolger(conn, knoten: str) -> set[str]:
+    """Was ``knoten`` (direkt) verursacht — die vereinte gerichtete Kausalrelation: die
+    ``causes``-Ziele PLUS die Knoten, die ``knoten`` als ``caused_by`` nennen (X caused_by knoten
+    == knoten causes X). So zählt beide Schreibweisen als eine Kausalrichtung."""
+    ziele = set(_objekte(conn, knoten, CAUSES))
+    for r in sources.relations(conn, predicate=CAUSED_BY, object=knoten):
+        ziele.add(r["subject"])
+    return ziele
+
+
+def _kausal_erreicht(conn, von: str, nach: str, max_depth: int = SUCH_TIEFE) -> bool:
+    """Erreicht ``von`` das Ziel ``nach`` über die vereinte KAUSALKETTE (causes + caused_by-
+    Inverse)? Ein tiefen-gedeckelter BFS — die transitive Verallgemeinerung der direkten
+    Gegenrichtung: eine Kausalkette B→…→A macht „A verursacht B" zum Ring, egal wie lang."""
+    if von == nach:
+        return True
+    gesehen, front = {von}, [von]
+    for _ in range(max_depth):
+        neu = []
+        for n in front:
+            for o in _kausal_nachfolger(conn, n):
+                if o == nach:
+                    return True
+                if o not in gesehen:
+                    gesehen.add(o)
+                    neu.append(o)
+        if not neu:
+            break
+        front = neu
+    return False
+
+
 def _kausal_urteil(conn, subjekt: str, praedikat: str, objekt: str) -> str | None:
-    """Kausal-Urteil über die INVERSE (caused_by ist die Umkehrung von causes). Eine Kausal-
-    Vermutung ist BESTÄTIGT, wenn dieselbe Richtung schon im Graphen steht (auch als Inverse),
-    und WIDERLEGT, wenn die GEGENrichtung steht — du kehrst dann eine bekannte Kausalrichtung um.
-    Das ist meist ein echter Widerspruch, selten ein wahrer Rückkopplungs-Kreis (Wetter↔Klima);
-    darum benennt narrate die Rest-Unsicherheit ehrlich, statt „bewiesen falsch" zu behaupten.
-    Read-time; ``None``, wenn der Graph zur Richtung nichts sagt (dann bleibt es offen)."""
+    """Kausal-Urteil über die INVERSE + die transitive KAUSALKETTE. Die Vermutung ist eine
+    gerichtete Kausalkante ``ursache → wirkung`` (bei caused_by getauscht). BESTÄTIGT, wenn die
+    Kante direkt (in einer der beiden Schreibweisen) steht; WIDERLEGT, wenn die ``wirkung`` die
+    ``ursache`` über eine KAUSALKETTE erreicht — dann schlösse die Vermutung einen Kausal-Ring
+    (du kehrst den bekannten Kausal-Fluss um). Das ist meist ein echter Widerspruch, selten ein
+    wahrer Rückkopplungs-Kreis (Wetter↔Klima); darum benennt narrate die Rest-Unsicherheit
+    ehrlich. Read-time; ``None``, wenn der Graph zur Richtung nichts sagt (dann bleibt es offen)."""
+    ursache, wirkung = (subjekt, objekt) if praedikat == CAUSES else (objekt, subjekt)
+
     def steht(s, p, o):
         return bool(sources.relations(conn, subject=s, predicate=p, object=o))
-    if praedikat == CAUSES:                       # Vermutung: subjekt verursacht objekt
-        gleich = steht(subjekt, CAUSES, objekt) or steht(objekt, CAUSED_BY, subjekt)
-        gegen = steht(objekt, CAUSES, subjekt) or steht(subjekt, CAUSED_BY, objekt)
-    else:                                         # caused_by: objekt verursacht subjekt
-        gleich = steht(subjekt, CAUSED_BY, objekt) or steht(objekt, CAUSES, subjekt)
-        gegen = steht(objekt, CAUSED_BY, subjekt) or steht(subjekt, CAUSES, objekt)
-    if gleich:
-        return "bestaetigt"
-    if gegen:
+
+    if steht(ursache, CAUSES, wirkung) or steht(wirkung, CAUSED_BY, ursache):
+        return "bestaetigt"                        # die Kante steht direkt -> nichts Neues
+    if _kausal_erreicht(conn, wirkung, ursache):   # Gegenrichtung (transitiv) bekannt -> Ring
         return "widerlegt"
     return None
 

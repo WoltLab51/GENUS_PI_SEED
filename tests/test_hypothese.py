@@ -191,6 +191,23 @@ def test_caused_by_widerlegt_nennt_die_richtige_ursache(conn):
     assert "»Schaden« steht als Ursache" not in text
 
 
+def test_causes_widerlegt_ueber_transitive_kette(conn):
+    # Kausalkette A->B->C (auch über die caused_by-Inverse) — „C verursacht A" schlösse den Ring
+    reactors.observe_relation(conn, "A", "causes", "B", "wikidata")
+    reactors.observe_relation(conn, "C", "caused_by", "B", "wikidata")   # == B causes C
+    e = hypothese.teste_konjektur(conn, "C", "causes", "A")              # kehrt den Fluss um
+    assert e["urteil"] == "widerlegt" and e["kausal"] == "widerlegt"
+    # die direkte Gegenrichtung steht NICHT (nur die Kette) -> beweist die Transitivität
+    assert not hypothese.sources.relations(conn, subject="A", predicate="causes", object="C")
+
+
+def test_vorwaerts_kette_widerlegt_die_vorwaerts_vermutung_nicht(conn):
+    # A->B->C: „A verursacht C" ist mediiert plausibel, KEIN Ring -> offen (nicht widerlegt)
+    reactors.observe_relation(conn, "A", "causes", "B", "wikidata")
+    reactors.observe_relation(conn, "B", "causes", "C", "wikidata")
+    assert hypothese.teste_konjektur(conn, "A", "causes", "C")["urteil"] == "offen"
+
+
 def test_causes_offen_wenn_richtung_unbekannt(conn):
     reactors.observe_relation(conn, "X", "causes", "Y", "wikidata")   # unabhängiger Fakt
     e = hypothese.teste_konjektur(conn, "Duerre", "causes", "Missernte")
