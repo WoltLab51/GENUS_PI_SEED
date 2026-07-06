@@ -918,7 +918,8 @@ def _ritual_antwort(conn, question: str) -> str | None:
 
 _KAUSAL_URSACHE = [
     re.compile(r"\bwas\s+" + _FILL + r"verursacht\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bwodurch\s+" + _FILL + r"entsteht\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwodurch\s+" + _FILL + r"entsteh(?:t|en)\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwoher\s+" + _FILL + r"komm(?:t|en)\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
 ]
 _KAUSAL_JA_NEIN = re.compile(
     r"\bverursacht\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I)
@@ -939,13 +940,12 @@ def _ursachen_von(conn, x_tok: str) -> dict:
             ursachen.add(r["subject"])
         for r in sources.relations(conn, subject=q, predicate="caused_by"):
             ursachen.add(r["object"])
-    namen = sorted({_label(conn, u) for u in ursachen})
-    if not namen:
-        # Kennt der Graph KEINE Ursache, ist die knappe „kenne keine" schlechter als die
-        # Definition -- also durchfallen lassen (Selbst-Prüfung wie relate), statt sie zu beschatten
-        # (causes ist dünn besät, „bekanntes Konzept ohne Ursache" ist der Normalfall). Review-Fund.
-        return {"kausal_q": False}
-    return {"kausal_q": True, "art": "ursachen", "subjekt": x_form, "ursachen": namen}
+    # Auch bei LEERER Ursachen-Liste kausal_q=True: „Was verursacht X?" verlangt eine Antwort auf
+    # die KAUSAL-Frage; die ehrliche „kenne keine Ursache" ist responsiver als eine Definition, die
+    # eine andere Frage beantwortet -- und im Bot führt Durchfallen zum Deuter -> „nicht verstanden"
+    # (kein Wort-Rückfall), nicht zur Definition. Kanal-sicher: der Kausal-Pfad antwortet selbst.
+    return {"kausal_q": True, "art": "ursachen", "subjekt": x_form,
+            "ursachen": sorted({_label(conn, u) for u in ursachen})}
 
 
 def _kausal_zwischen(conn, x_tok: str, y_tok: str) -> dict:
@@ -1591,8 +1591,12 @@ ZELLE_PREFIX = "zelle:"
 # Menge _STIMME_GEEIGNET ist damit weg; die Eignung folgt strukturell aus der Spec,
 # genau die Bug-Klasse, für die werkzeug.wortlautfest gebaut wurde).
 _ZELLEN_SCHREIBEND = frozenset({"tatsache", "merken", "einstellung"})
+# „beziehung" ist NICHT frei formulierbar: eine Relations-Aussage ist GERICHTET („A verursacht B",
+# „A zählt zu B") -- die Stimme kann die Richtung umkehren, und die Substantiv-Leine prüft nur
+# Vorkommen, nicht Reihenfolge (live gefunden 2026-07-06: „Staubsauger verursacht Sog" wurde zu
+# „Sog verursacht Staubsauger"). Bei gerichteten Fakten IST die Struktur die Wahrheit -> wortlautfest.
 _ZELLEN_FREI_FORMULIERBAR = frozenset({
-    "definition", "beziehung", "vergleich", "grammatik", "frage-begriff",
+    "definition", "vergleich", "grammatik", "frage-begriff",
 })
 _ZELLEN_PRUEFBAR = {
     "definition": "graph", "beziehung": "graph", "vergleich": "graph",

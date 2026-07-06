@@ -12,7 +12,7 @@
 - **Ziele:** 6 Ziele, 14 Fähigkeiten (1 live, 8 teilweise, 5 fehlt), 19 braucht-Kanten
 - **Verstehens-Raster:** 34 Feinblätter, 11 Zwicky-Zellen
 - **Companion-Dispatch:** 8 Muster-Listen (17 Muster gesamt), 24 handelbare Zellen (als Werkzeuge registriert)
-- **Werkzeugbauer:** 31 registrierte Werkzeuge (26 wortlautfest, davon 24 Gesprächszellen)
+- **Werkzeugbauer:** 31 registrierte Werkzeuge (27 wortlautfest, davon 24 Gesprächszellen)
 - **Event-Router:** 20 registrierte Projektoren, 12 bewusst-rohe Event-Typen (Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)
 - **Selbst-Codieren Stufe 1:** 1 registrierte Umsetzungs-Art(en) (faehigkeits_ziel) — nur Graph-Wissen, Ausführung erst nach Freigabe
 

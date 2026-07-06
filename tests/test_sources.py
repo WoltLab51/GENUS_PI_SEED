@@ -823,12 +823,22 @@ def test_kausal_synonym_ist_keine_erfundene_kausation():
     assert "kenne ich nicht" in companion.narrate_kausal(conn, r)
 
 
-def test_kausal_ohne_bekannte_ursache_faellt_durch():
-    # „Was verursacht Feuer?" — nichts verursacht Feuer -> durchfallen zum Wort-Pfad (Definition ist
-    # besser als die knappe Nicht-Antwort; Selbst-Prüfung wie relate — Review-Fund MITTEL)
+def test_kausal_ohne_bekannte_ursache_antwortet_ehrlich():
+    # „Was verursacht Feuer?" — nichts verursacht Feuer -> ehrliche Nicht-Antwort auf die KAUSAL-
+    # Frage (kanal-sicher: im Bot führt Durchfallen zu „nicht verstanden", nicht zur Definition)
     from genus import companion
     conn = _kausal_graph()
-    assert companion.relate_kausal(conn, "Was verursacht Feuer?")["kausal_q"] is False
+    r = companion.relate_kausal(conn, "Was verursacht Feuer?")
+    assert r["kausal_q"] is True and r["art"] == "ursachen" and r["ursachen"] == []
+    assert "kenne ich nicht" in companion.narrate_kausal(conn, r)
+
+
+def test_beziehung_ist_wortlautfest_die_stimme_dreht_nicht_um():
+    # gerichtete Relations-/Kausal-Aussagen („A verursacht B") dürfen NICHT vom Modell umformuliert
+    # werden -- die Substantiv-Leine prüft Vorkommen, nicht Richtung (live-Fund: Stimme kehrte um)
+    from genus import companion, werkzeug
+    companion.registriere_zellen()
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung") is False
 
 
 def test_muster_antwort_routet_die_kausal_frage():
@@ -1167,13 +1177,16 @@ def test_stimme_rephrases_a_deterministic_word_answer():
     assert "Sprachlich vom Modell geglättet" in result["text"]
 
 
-def test_stimme_rephrases_a_deterministic_relation_answer():
+def test_stimme_laesst_gerichtete_relation_wortlautfest():
+    # eine GERICHTETE Relations-Antwort wird NICHT vom Modell umformuliert (Richtungs-Umkehr-Schutz,
+    # live-Fund 2026-07-06): selbst eine angebotene Stimme greift nicht, das Template steht.
     from genus import companion
     conn = _isa_graph()
-    stimme = lambda satz: "»Hund« gehört laut GENUS zu »Säugetier«."
+    stimme = lambda satz: "»Säugetier« gehört laut GENUS zu »Hund«."   # das Modell KÖNNTE umkehren
     result = companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", stimme=stimme)
-    assert result["text"].startswith("»Hund« gehört laut GENUS")
-    assert "Sprachlich vom Modell geglättet" in result["text"]
+    assert "»Säugetier« gehört laut GENUS zu »Hund«" not in result["text"]   # die Umkehrung greift NIE
+    assert "geglättet" not in result["text"]                                # wortlautfest -> keine Stimme
+    assert result["text"].startswith("Ja.")                                 # das gläserne Template steht
 
 
 def test_stimme_none_or_failed_rephrase_keeps_the_original_template():
