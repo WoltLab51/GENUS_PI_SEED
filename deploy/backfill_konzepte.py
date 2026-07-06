@@ -140,6 +140,84 @@ def _schon_gelabelt(conn) -> set[str]:
     return {r["object"] for r in rows}
 
 
+def _saee(conn, tripel, dry_run: bool) -> tuple[int, int]:
+    """Sät die Tripel (idempotent, source=wikidata). Eine transitive Kante (is_a/part_of), die
+    einen Ring schlösse, wird NICHT importiert: ein Ring in Wikidatas Fremd-Daten ist ein
+    Quellen-Problem, kein Denkfehler von GENUS — ihn über observe_relation als eigenen
+    Selbst-Widerspruch (Inquiry) zu protokollieren würde die Introspektion mit Rauschen fluten.
+    So bleiben is_a und part_of azyklisch. Gibt (neu gesät, ring-übersprungen) zurück."""
+    if not tripel:
+        return 0, 0
+    if dry_run:
+        return len(tripel), 0
+    from genus import reactors, inference
+    neu, uebersprungen, rest = 0, 0, []
+    for s, p, o in tripel:
+        if p in ZYKLUS_PRAEDIKATE:                  # is_a UND part_of sind transitiv
+            if inference.closes_cycle(conn, s, p, o):
+                uebersprungen += 1
+            else:                                   # einzeln säen, damit der nächste Ring-Check
+                neu += reactors.sae_fehlende(conn, [(s, p, o)], SOURCE)   # diese Kante schon sieht
+        else:
+            rest.append((s, p, o))
+    if rest:
+        neu += reactors.sae_fehlende(conn, rest, SOURCE)
+    return neu, uebersprungen
+
+
+def _ernte(conn, ziele, prop_map, gelabelt, resume, dry_run, skip_labels) -> tuple[int, int, int]:
+    """Eine Ernte-Runde über ``ziele``: Phase 1 (Kanten) + Phase 2 (Objekt-Labels). Schreibt den
+    Fortschritt fortlaufend in ``resume`` (resumierbar) und aktualisiert ``gelabelt`` in-place.
+    Gibt (kanten_neu, ringe, labels_neu) zurück."""
+    kanten_neu, konzepte_mit, ringe = 0, 0, 0
+    alle_objids: set[str] = set()
+    verarbeitet: list[str] = []
+    for batch in _batches(ziele, BATCH):
+        data = _hole({"action": "wbgetentities", "ids": "|".join(batch), "props": "claims"})
+        if data is None:
+            print(f"[BF] Batch fehlgeschlagen ({batch[0]}…) — übersprungen, wird beim nächsten Lauf erneut versucht",
+                  file=sys.stderr)
+            time.sleep(PAUSE)
+            continue
+        tripel, objids = extrahiere_kanten(data.get("entities", {}), prop_map)
+        neu, uebersprungen = _saee(conn, tripel, dry_run)
+        kanten_neu += neu
+        ringe += uebersprungen
+        konzepte_mit += len({s for s, _, _ in tripel})
+        alle_objids |= objids
+        verarbeitet += batch
+        if resume and not dry_run:                       # Fortschritt sofort festhalten
+            with resume.open("a", encoding="utf-8") as f:
+                f.write("\n".join(batch) + "\n")
+        if dry_run:
+            for s, p, o in tripel[:12]:
+                print(f"    {s} {p} {o}")
+        time.sleep(PAUSE)
+    print(f"[BF] Phase 1: {kanten_neu} Kanten aus {len(verarbeitet)} Konzepten "
+          f"({konzepte_mit} trugen welche); {ringe} Ringe nicht importiert (Azyklizität)",
+          file=sys.stderr)
+    labels_neu = 0
+    if not skip_labels:
+        zu_labeln = sorted(alle_objids - gelabelt)
+        print(f"[BF] Phase 2: {len(zu_labeln)} Objekt-Konzepte zu benennen", file=sys.stderr)
+        for batch in _batches(zu_labeln, BATCH):
+            data = _hole({"action": "wbgetentities", "ids": "|".join(batch),
+                          "props": "labels", "languages": "|".join(LANGS)})
+            if data is None:
+                time.sleep(PAUSE)
+                continue
+            lbls = extrahiere_labels(data.get("entities", {}))
+            neu, _ = _saee(conn, lbls, dry_run)
+            labels_neu += neu
+            gelabelt |= {o for _, _, o in lbls}          # frisch benannte nicht erneut holen
+            if dry_run:
+                for s, p, o in lbls[:8]:
+                    print(f"    {s} {p} {o}")
+            time.sleep(PAUSE)
+        print(f"[BF] Phase 2: {labels_neu} Label-Kanten gesät", file=sys.stderr)
+    return kanten_neu, ringe, labels_neu
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Backfill der dynamischen Schicht aus Wikidata")
     ap.add_argument("--dry-run", action="store_true", help="nichts schreiben, nur zählen/zeigen")
@@ -148,11 +226,17 @@ def main() -> int:
     ap.add_argument("--skip-labels", action="store_true", help="Phase 2 (Objekt-Labels) auslassen")
     ap.add_argument("--tiefung", action="store_true",
                     help="TIEFUNG: die neuen Objekt-Konzepte (Inseln) ernten, MIT is_a (platzieren)")
+    ap.add_argument("--rekursiv", action="store_true",
+                    help="REKURSIV: Tiefung Runde um Runde über die immer neuen Schalen, gedeckelt")
+    ap.add_argument("--max-runden", type=int, default=3, dest="max_runden",
+                    help="harter Runden-Deckel für --rekursiv (die Schale schrumpft nicht von selbst)")
     ap.add_argument("--resume-file", default="", help="Fortschrittsdatei (Default: neben dem Ledger)")
     args = ap.parse_args()
 
     if args.ids and not args.dry_run:
         ap.error("--ids ist nur für den Off-Pi-Test mit --dry-run vorgesehen (kein Ledger).")
+    if args.rekursiv:
+        args.tiefung = True                          # Rekursion tieft, also is_a-platzierend
 
     prop_map = PROP_MAP_TIEFUNG if args.tiefung else PROP_MAP   # Tiefung platziert die Inseln (is_a)
 
@@ -178,82 +262,29 @@ def main() -> int:
     if args.limit:
         ziele = ziele[:args.limit]
 
-    print(f"[BF] {len(ziele)} Konzepte zu ernten"
-          f"{' (dry-run)' if args.dry_run else ''}"
-          f"{f', {len(fertig)} schon fertig' if fertig else ''}", file=sys.stderr)
-
-    def saee(tripel) -> tuple[int, int]:
-        """Sät die Tripel (idempotent, source=wikidata). Eine ``part_of``-Kante, die einen Ring
-        schlösse, wird NICHT importiert: part_of ist transitiv, ein Ring in Wikidatas Fremd-Daten
-        ist ein Quellen-Problem, kein Denkfehler von GENUS — ihn über observe_relation als eigenen
-        Selbst-Widerspruch (Inquiry) zu protokollieren würde die Introspektion mit Rauschen fluten.
-        So bleibt die Teil-Ganzes-Hierarchie azyklisch. Gibt (neu gesät, ring-übersprungen) zurück."""
-        if not tripel:
-            return 0, 0
-        if args.dry_run:
-            return len(tripel), 0
-        from genus import reactors, inference
-        neu, uebersprungen, rest = 0, 0, []
-        for s, p, o in tripel:
-            if p in ZYKLUS_PRAEDIKATE:              # is_a UND part_of sind transitiv
-                if inference.closes_cycle(conn, s, p, o):
-                    uebersprungen += 1
-                else:                               # einzeln säen, damit der nächste Ring-Check
-                    neu += reactors.sae_fehlende(conn, [(s, p, o)], SOURCE)   # diese Kante schon sieht
-            else:
-                rest.append((s, p, o))
-        if rest:
-            neu += reactors.sae_fehlende(conn, rest, SOURCE)
-        return neu, uebersprungen
-
-    kanten_neu, konzepte_mit, ringe = 0, 0, 0
-    alle_objids: set[str] = set()
-    verarbeitet: list[str] = []
-    for batch in _batches(ziele, BATCH):
-        data = _hole({"action": "wbgetentities", "ids": "|".join(batch), "props": "claims"})
-        if data is None:
-            print(f"[BF] Batch fehlgeschlagen ({batch[0]}…) — übersprungen, wird beim nächsten Lauf erneut versucht",
-                  file=sys.stderr)
-            time.sleep(PAUSE)
-            continue
-        tripel, objids = extrahiere_kanten(data.get("entities", {}), prop_map)
-        neu, uebersprungen = saee(tripel)
-        kanten_neu += neu
-        ringe += uebersprungen
-        konzepte_mit += len({s for s, _, _ in tripel})
-        alle_objids |= objids
-        verarbeitet += batch
-        if resume and not args.dry_run:                      # Fortschritt sofort festhalten (resumierbar)
-            with resume.open("a", encoding="utf-8") as f:
-                f.write("\n".join(batch) + "\n")
-        if args.dry_run:
-            for s, p, o in tripel[:12]:
-                print(f"    {s} {p} {o}")
-        time.sleep(PAUSE)
-
-    print(f"[BF] Phase 1: {kanten_neu} Kanten aus {len(verarbeitet)} Konzepten "
-          f"({konzepte_mit} trugen welche); {ringe} Ringe nicht importiert (Azyklizität)",
-          file=sys.stderr)
-
-    if args.skip_labels:
+    if not args.rekursiv:
+        print(f"[BF] {len(ziele)} Konzepte zu ernten"
+              f"{' (dry-run)' if args.dry_run else ''}"
+              f"{f', {len(fertig)} schon fertig' if fertig else ''}", file=sys.stderr)
+        _ernte(conn, ziele, prop_map, gelabelt, resume, args.dry_run, args.skip_labels)
         return 0
-    zu_labeln = sorted(alle_objids - gelabelt)
-    print(f"[BF] Phase 2: {len(zu_labeln)} Objekt-Konzepte zu benennen", file=sys.stderr)
-    labels_neu = 0
-    for batch in _batches(zu_labeln, BATCH):
-        data = _hole({"action": "wbgetentities", "ids": "|".join(batch),
-                      "props": "labels", "languages": "|".join(LANGS)})
-        if data is None:
-            time.sleep(PAUSE)
-            continue
-        lbls = extrahiere_labels(data.get("entities", {}))
-        neu, _ = saee(lbls)
-        labels_neu += neu
-        if args.dry_run:
-            for s, p, o in lbls[:8]:
-                print(f"    {s} {p} {o}")
-        time.sleep(PAUSE)
-    print(f"[BF] Phase 2: {labels_neu} Label-Kanten gesät", file=sys.stderr)
+
+    # --rekursiv: gebundene Schleife über die immer NEUEN Schalen. Wichtig (Befund 2026-07-06):
+    # die Schale schrumpft NICHT von selbst (jede Ebene ~gleich breit — die Wikidata-Nachbarschaft
+    # weitet sich konstant), „bis leer" würde halb Wikidata importieren. Darum HART gedeckelt.
+    for runde in range(1, args.max_runden + 1):
+        if not ziele:
+            print(f"[BF] Runde {runde}: keine neuen Inseln mehr — konvergiert.", file=sys.stderr)
+            return 0
+        print(f"[BF] === Runde {runde}/{args.max_runden}: {len(ziele)} neue Inseln ===", file=sys.stderr)
+        _ernte(conn, ziele, prop_map, gelabelt, resume, args.dry_run, args.skip_labels)
+        fertig |= set(ziele)
+        ziele = [] if conn is None else [q for q in _insel_qids(conn) if q not in fertig]
+        if args.limit:
+            ziele = ziele[:args.limit]
+    print(f"[BF] Runden-Deckel ({args.max_runden}) erreicht; noch {len(ziele)} Inseln offen — "
+          f"die Schale schrumpft nicht, bewusst gestoppt (sonst importierte man ganz Wikidata).",
+          file=sys.stderr)
     return 0
 
 
