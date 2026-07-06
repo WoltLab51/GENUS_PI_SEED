@@ -66,15 +66,29 @@ def calibrated_reliability_cut(conn) -> float:
     (same shape: a population of RATES, split at its widest gap). Suffixes with too little
     support (< MIN_SUPPORT) don't enter the population -- a 2-noun "rule" proves nothing. Falls
     back to the seed MIN_RELIABILITY when there aren't enough suffixes yet to show a gap."""
+    return reliability_cut_report(conn)["cut"]
+
+
+def reliability_cut_report(conn) -> dict:
+    """Glass-box readout behind :func:`calibrated_reliability_cut`: the active cut, how many
+    suffixes (with enough support) form the population it's split from, and whether it's actually
+    DERIVED from that population or still the seed fallback (too few suffixes to show a gap).
+    Mirrors :func:`genus.governance.reboot_threshold_report` -- the same honest derived-vs-seed
+    distinction the motor-status report needs (an equal-to-seed cut from an empty population is
+    "fell back", not "validated by the data")."""
     rates = sorted(
         rate for counts in suffix_evidence(conn).values()
         for _, rate, support in [_reliability(counts)]
         if support >= MIN_SUPPORT
     )
-    if len(rates) < 2:
-        return MIN_RELIABILITY
-    _, lo, hi = max((rates[i + 1] - rates[i], rates[i], rates[i + 1]) for i in range(len(rates) - 1))
-    return round((lo + hi) / 2, 4)
+    derived = len(rates) >= 2
+    if derived:
+        _, lo, hi = max((rates[i + 1] - rates[i], rates[i], rates[i + 1])
+                        for i in range(len(rates) - 1))
+        cut = round((lo + hi) / 2, 4)
+    else:
+        cut = MIN_RELIABILITY
+    return {"cut": cut, "population": len(rates), "derived": derived}
 
 
 def predict_gender(conn, noun_form: str, cut: float | None = None) -> dict:

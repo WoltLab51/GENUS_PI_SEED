@@ -28,6 +28,7 @@ from genus import (
     ledger,
     mathematik,
     maturation,
+    motor,
     operation,
     projection,
     proposals,
@@ -604,6 +605,19 @@ def knowledge_command(weakest: int) -> None:
                     f"[KNOW]   {sources.display(conn, r['subject'])} -[{r['predicate']}]-> "
                     f"{sources.display(conn, r['object'])}   conf {r['confidence']:.2f}  ({r['n_sources']} src)"
                 )
+    finally:
+        conn.close()
+
+
+@main.command("motor")
+def motor_command() -> None:
+    """GENUS's live self-measurement of its own reasoning engine (der Denk-Motor): for each
+    Denkweise, whether its calibration is learned or still on seed, and how often it actually
+    fires -- naming honestly the modes that leave no countable trace. Read-time, writes nothing."""
+    conn = get_conn()
+    try:
+        for line in motor.narrate(conn):
+            click.echo(line)
     finally:
         conn.close()
 
