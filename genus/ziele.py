@@ -107,7 +107,8 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
      "Übertragen: eine Struktur aus einem Feld in einem anderen wiedererkennen — die "
      "generative Kern-Operation, die in jeder tiefen Betrachtung wieder auftaucht "
      "(Rechtsfortbildung, Metapher, Hypothese). ERSTER Keim LIVE: die Geschwister-Analogie "
-     "der Hypothese-Denkweise (genus/hypothese.py) überträgt Eigenschaften unter Geschwistern; "
+     "der Hypothese-Denkweise (genus/hypothese.py) überträgt Eigenschaften unter Geschwistern "
+     "— is_a/part_of und (über die caused_by-Inverse ehrlich widerlegbar) causes/caused_by; "
      "feldübergreifender Transfer und freie Analogie fehlen noch.", "teilweise"),
     ("faehigkeit:weltmodell",
      "Vorhersagen und Simulieren: Erwartungen bauen, an Brüchen lernen. Der Sensor-Forecast "

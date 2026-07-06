@@ -141,10 +141,71 @@ def test_offen_ist_ehrlich_nicht_wahr(conn):
 
 
 def test_ueber_nicht_transitives_praedikat_nicht_widerlegbar(conn):
+    # used_for bleibt bewusst DRAUSSEN: keine Inverse, keine Azyklizität -> nicht ehrlich widerlegbar
     reactors.observe_relation(conn, "A", "used_for", "B", "wikidata")
     e = hypothese.teste_konjektur(conn, "A", "used_for", "C")
     assert e["widerlegbar"] is False and e["urteil"] != "widerlegt"
     assert "weder beweisen noch widerlegen" in hypothese.narrate_hypothese(conn, e)
+
+
+def test_used_for_wird_nie_konjekturiert(conn):
+    # der Generator übertraegt used_for NICHT (nicht in ANALOGIE_PRAEDIKATE), sonst waeren es
+    # unwiderlegbare Vermutungen; nur is_a/part_of/causes/caused_by sind zugelassen
+    for x in ("Saege", "Hammer", "Bohrer"):
+        _isa(conn, x, "Werkzeug")
+    for x in ("Hammer", "Bohrer"):
+        reactors.observe_relation(conn, x, "used_for", "Bau", "wikidata")
+    assert not any(v["praedikat"] == "used_for" for v in hypothese.vermute(conn, "Saege"))
+    assert set(hypothese.ANALOGIE_PRAEDIKATE) == {"is_a", "part_of", "causes", "caused_by"}
+
+
+def test_causes_bestaetigt_gleiche_richtung(conn):
+    reactors.observe_relation(conn, "Regen", "causes", "Ueberschwemmung", "wikidata")
+    e = hypothese.teste_konjektur(conn, "Regen", "causes", "Ueberschwemmung")
+    assert e["urteil"] == "bestaetigt"
+    # dieselbe Richtung auch als Inverse erkannt (B caused_by A == A causes B)
+    reactors.observe_relation(conn, "Blitz", "caused_by", "Gewitter", "wikidata")
+    assert hypothese.teste_konjektur(conn, "Gewitter", "causes", "Blitz")["urteil"] == "bestaetigt"
+
+
+def test_causes_widerlegt_gegenrichtung(conn):
+    # der Graph kennt „Ueberschwemmung causes Regen"? nein — aber die GEGENrichtung der Vermutung:
+    reactors.observe_relation(conn, "Feuer", "causes", "Rauch", "wikidata")
+    e = hypothese.teste_konjektur(conn, "Rauch", "causes", "Feuer")   # kehrt die Richtung um
+    assert e["urteil"] == "widerlegt" and e["kausal"] == "widerlegt"
+    assert "GEGENrichtung" in hypothese.narrate_hypothese(conn, e)
+    assert "Rückkopplungs-Kreis" in hypothese.narrate_hypothese(conn, e)   # ehrlicher Vorbehalt
+    # auch über die Inverse: A caused_by B  ==  B causes A  -> „A causes B" umgekehrt = widerlegt
+    reactors.observe_relation(conn, "Krankheit", "caused_by", "Erreger", "wikidata")
+    assert hypothese.teste_konjektur(conn, "Krankheit", "causes", "Erreger")["urteil"] == "widerlegt"
+
+
+def test_caused_by_widerlegt_nennt_die_richtige_ursache(conn):
+    # bei einer caused_by-Vermutung „A wird verursacht von B" (widerlegt, weil A causes B im Graphen)
+    # ist A die bekannte Ursache — der Beweistext darf NICHT B als Ursache nennen (Review-Fund).
+    reactors.observe_relation(conn, "Sturm", "causes", "Schaden", "wikidata")
+    e = hypothese.teste_konjektur(conn, "Sturm", "caused_by", "Schaden")   # kehrt die Richtung um
+    assert e["urteil"] == "widerlegt" and e["kausal"] == "widerlegt"
+    text = hypothese.narrate_hypothese(conn, e)
+    assert "»Sturm« steht als Ursache" in text          # A (Sturm) ist die Ursache, nicht B (Schaden)
+    assert "»Schaden« steht als Ursache" not in text
+
+
+def test_causes_offen_wenn_richtung_unbekannt(conn):
+    reactors.observe_relation(conn, "X", "causes", "Y", "wikidata")   # unabhängiger Fakt
+    e = hypothese.teste_konjektur(conn, "Duerre", "causes", "Missernte")
+    assert e["urteil"] == "offen" and e["widerlegbar"] is True        # widerlegbar, aber kein Widerspruch
+
+
+def test_vermute_erzeugt_kausal_konjektur(conn):
+    # Geschwister teilen eine Wirkung -> der Generator vermutet sie auch fuer den Anker
+    for x in ("Grippe", "Erkaeltung", "Angina"):
+        _isa(conn, x, "Infektion")
+    for x in ("Grippe", "Erkaeltung"):
+        reactors.observe_relation(conn, x, "causes", "Fieber", "wikidata")
+    treffer = [v for v in hypothese.vermute(conn, "Angina")
+               if v["praedikat"] == "causes" and v["objekt"] == "Fieber"]
+    assert treffer and treffer[0]["herleitung"]["k"] == 2
 
 
 # --- Der eine Zug + die Emission ----------------------------------------------------------

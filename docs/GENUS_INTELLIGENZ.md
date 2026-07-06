@@ -302,6 +302,21 @@ abstrahieren). **Damit ist der Methoden-Bogen zu (① dynamisches Material → �
 Hypothese): GENUS kann jetzt aus wenig selbst eine Vermutung bilden und sie an seinem eigenen
 Wissen prüfen — der Kreis, den §1 als Kern der Intelligenz benannt hat.**
 
+**Nachtrag (2026-07-06) — die ehrliche Decke bestimmt, WORÜBER vermutet werden darf.** Ronny:
+„used_for/causes im Generator widerlegbar machen." Der Generator ließ nur is_a/part_of zu, weil
+eine Vermutung, die man NIE widerlegen kann, unehrlich ist (vakuöses „offen"). Sie einzulassen
+heißt also nicht die Regel zu lockern, sondern für sie einen echten Widerlegungs-Mechanismus zu
+finden — und der Befund war ASYMMETRISCH: **`causes` hat eine Inverse (`caused_by`)**, also ist
+„A verursacht B" ehrlich widerlegbar, wenn der Graph die Gegenrichtung kennt (du kehrst eine
+bekannte Kausalrichtung um) — mit dem ehrlichen Rest-Vorbehalt, dass es selten ein echter
+Rückkopplungs-Kreis ist. **`used_for` hat keine Inverse** und keine saubere Azyklizität; es
+widerlegbar zu machen bräuchte eine Typ-Disjunktheits-Saat, die echte Wikidata-Kanten
+fehlwiderlegen würde — darum bleibt es bewusst DRAUSSEN. Das ist die Lehre in einem Satz: *man
+darf nur dort vermuten, wo man auch falsch liegen kann* — die Widerlegbarkeit ist die
+Eintrittskarte einer Operation, nicht ihre Nachbesserung. (`causes`/`caused_by` live im Generator,
+über einen Verstehen→Entwurf-Workflow + adversarialen Review abgesichert — der einen echten
+Beweistext-Fehler in der Kausalrichtung fand, bevor er den Pi erreichte.)
+
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 
 - **Takt verallgemeinert** (genus/experience.py): der Takt ist ein Merkmal des Detektors

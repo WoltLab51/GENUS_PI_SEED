@@ -14,10 +14,12 @@ Kreativität nicht, sie macht sie erst sicher.
                          und der Anker A nicht, wird zur Konjektur „A p o". Die Herleitung
                          (k von m Geschwistern) ist im narrate sichtbar — kein verstecktes Preset.
   Prüfen (teste)       = der read-time Test über genus/inference.py — KEIN zweiter Schließer:
-                         BESTÄTIGT (der Graph entailt es schon, deduktiv) · WIDERLEGT (ein
-                         is_a/part_of-Ring würde kollabieren ODER eine geerdete Unvereinbarkeit
-                         greift — der Wal ist kein Fisch) · OFFEN (ehrlich „mit meinem Wissen
-                         nicht widerlegbar" — das ist NICHT dasselbe wie „wahr").
+                         BESTÄTIGT (der Graph entailt es schon) · WIDERLEGT (ein is_a/part_of-Ring
+                         würde kollabieren · eine geerdete Unvereinbarkeit greift — der Wal ist
+                         kein Fisch · ODER eine causes-Vermutung kehrt eine bekannte Kausalrichtung
+                         um, denn caused_by ist die Inverse) · OFFEN (ehrlich „mit meinem Wissen
+                         nicht widerlegbar" — das ist NICHT dasselbe wie „wahr"). Prädikate ohne
+                         ehrliche Widerlegung (used_for) bleiben bewusst DRAUSSEN.
   Aussprechen (--tick) = die EINE offene Top-Vermutung als gedeckelte Kante (Quelle
                          model:hypothese, Trust ≤ 0.25 — überstimmt NIE Geerdetes). Proposal ≠
                          Change: sie liegt vor, wiegt aber fast nichts; der Mensch bestätigt/verwirft.
@@ -40,10 +42,20 @@ UNVEREINBAR = "unvereinbar_mit"      # symmetrisch gemeint, ISOLIERT — nie in 
 INHALT = "inhalt"
 IS_A = "is_a"
 PART_OF = "part_of"
-# nur die transitiv-sicheren Prädikate taugen zur Konjektur: über sie lässt sich eine Vermutung
-# überhaupt beweisen ODER widerlegen. used_for/causes/has_part/made_of bewusst NICHT — sie wären
-# unwiderlegbar, und eine unwiderlegbare Vermutung ist unehrlich (die ehrliche Decke).
-ANALOGIE_PRAEDIKATE = (IS_A, PART_OF)
+CAUSES = "causes"
+CAUSED_BY = "caused_by"               # die INVERSE von causes: A caused_by B  ==  B causes A
+# Ein Prädikat darf nur dann zur Konjektur, wenn eine Vermutung über es ehrlich WIDERLEGBAR ist
+# (sonst ist „offen" vakuum — eine unwiderlegbare Vermutung ist unehrlich, die ehrliche Decke):
+#   is_a/part_of  -- transitiv & STRENG azyklisch (ein Ring ist ein echter Widerspruch) + is_a
+#                    zusätzlich über Klassen-Disjunktheit (unvereinbar_mit).
+#   causes/caused_by -- über die INVERSE: „A verursacht B" ist widerlegt, wenn der Graph die
+#                    Gegenrichtung kennt (B verursacht A) — du kehrst eine bekannte Kausalrichtung
+#                    um. Echtes, nicht-triviales Widerlegen ohne riskante Saat (Ronny 2026-07-06).
+# BEWUSST DRAUSSEN: used_for (P366) hat KEINE Inverse und keine saubere Azyklizität; es ehrlich
+# widerlegbar zu machen bräuchte eine Typ-Disjunktheits-Saat, die echte Wikidata-Kanten
+# fehlwiderlegen würde. „Draußen lassen" ist hier die ehrlichere Antwort als eine Scheinprüfung.
+KAUSAL_PRAEDIKATE = (CAUSES, CAUSED_BY)
+ANALOGIE_PRAEDIKATE = (IS_A, PART_OF, CAUSES, CAUSED_BY)
 
 MODEL_QUELLE = "model:hypothese"     # Präfix model: -> Trust automatisch auf 0.25 gedeckelt
 WELT_QUELLE = "welt"                 # geerdetes Disjunktheits-Weltwissen, KEIN Modell-Rateschluss
@@ -176,13 +188,36 @@ def _unvereinbar(conn, subjekt: str, objekt: str) -> dict | None:
     return None
 
 
+def _kausal_urteil(conn, subjekt: str, praedikat: str, objekt: str) -> str | None:
+    """Kausal-Urteil über die INVERSE (caused_by ist die Umkehrung von causes). Eine Kausal-
+    Vermutung ist BESTÄTIGT, wenn dieselbe Richtung schon im Graphen steht (auch als Inverse),
+    und WIDERLEGT, wenn die GEGENrichtung steht — du kehrst dann eine bekannte Kausalrichtung um.
+    Das ist meist ein echter Widerspruch, selten ein wahrer Rückkopplungs-Kreis (Wetter↔Klima);
+    darum benennt narrate die Rest-Unsicherheit ehrlich, statt „bewiesen falsch" zu behaupten.
+    Read-time; ``None``, wenn der Graph zur Richtung nichts sagt (dann bleibt es offen)."""
+    def steht(s, p, o):
+        return bool(sources.relations(conn, subject=s, predicate=p, object=o))
+    if praedikat == CAUSES:                       # Vermutung: subjekt verursacht objekt
+        gleich = steht(subjekt, CAUSES, objekt) or steht(objekt, CAUSED_BY, subjekt)
+        gegen = steht(objekt, CAUSES, subjekt) or steht(subjekt, CAUSED_BY, objekt)
+    else:                                         # caused_by: objekt verursacht subjekt
+        gleich = steht(subjekt, CAUSED_BY, objekt) or steht(objekt, CAUSES, subjekt)
+        gegen = steht(objekt, CAUSED_BY, subjekt) or steht(subjekt, CAUSES, objekt)
+    if gleich:
+        return "bestaetigt"
+    if gegen:
+        return "widerlegt"
+    return None
+
+
 def teste_konjektur(conn, subjekt: str, praedikat: str, objekt: str) -> dict:
     """DER Tester (read-time, erzeugt nichts — spiegelt recht.subsumiere: rechnet, gibt ein dict).
     Prüft „subjekt praedikat objekt" gegen den Graphen mit der Inferenz als Schiedsrichter:
-      bestaetigt  der Graph enthält/entailt es schon (direkt behauptet ODER transitiv erreichbar);
-      widerlegt   ein is_a/part_of-Ring würde kollabieren ODER eine geerdete Unvereinbarkeit greift;
+      bestaetigt  der Graph enthält/entailt es schon (direkt/transitiv, oder kausal via Inverse);
+      widerlegt   ein is_a/part_of-Ring würde kollabieren · eine geerdete Unvereinbarkeit greift ·
+                  ODER eine causes/caused_by-Vermutung kehrt eine bekannte Kausalrichtung um;
       offen       weder noch — ehrlich unbewiesen (open-world), NICHT „wahr".
-    Über ein nicht-transitives Prädikat ist keine Widerlegung möglich (``widerlegbar``)."""
+    Über ein Prädikat ohne ehrliche Widerlegung (z.B. used_for) ist ``widerlegbar`` False."""
     transitiv = inference.is_transitive(conn, praedikat)
     direkt = bool(sources.relations(conn, subject=subjekt, predicate=praedikat, object=objekt))
     # Bestätigung UND Zyklus-Widerlegung suchen tief (SUCH_TIEFE), nicht mit dem flachen
@@ -194,10 +229,12 @@ def teste_konjektur(conn, subjekt: str, praedikat: str, objekt: str) -> dict:
     # Klassen-Disjunktheit widerlegt nur eine KLASSEN-Zugehörigkeit (is_a), nicht ein part_of:
     # ein Metallteil kann Teil eines Holzstuhls sein (Metall/Holz unvereinbar, part_of trotzdem).
     unvereinbar = _unvereinbar(conn, subjekt, objekt) if praedikat == IS_A else None
+    # Kausal: die INVERSE (caused_by) macht causes ehrlich widerlegbar (Gegenrichtung bekannt).
+    kausal = _kausal_urteil(conn, subjekt, praedikat, objekt) if praedikat in KAUSAL_PRAEDIKATE else None
 
-    if entailt:
+    if entailt or kausal == "bestaetigt":
         urteil = "bestaetigt"
-    elif schliesst_ring or unvereinbar is not None:
+    elif schliesst_ring or unvereinbar is not None or kausal == "widerlegt":
         urteil = "widerlegt"
     else:
         urteil = "offen"
@@ -212,8 +249,9 @@ def teste_konjektur(conn, subjekt: str, praedikat: str, objekt: str) -> dict:
                 break
     return {"subjekt": subjekt, "praedikat": praedikat, "objekt": objekt, "urteil": urteil,
             "transitiv": transitiv, "direkt": direkt, "entailt": entailt,
-            "schliesst_ring": schliesst_ring, "unvereinbar_kette": unvereinbar,
-            "widerlegbar": transitiv or praedikat == IS_A, "vertrauen": vertrauen, "chain": chain}
+            "schliesst_ring": schliesst_ring, "unvereinbar_kette": unvereinbar, "kausal": kausal,
+            "widerlegbar": transitiv or praedikat == IS_A or praedikat in KAUSAL_PRAEDIKATE,
+            "vertrauen": vertrauen, "chain": chain}
 
 
 def vermute_und_teste(conn, A: str) -> dict | None:
@@ -257,7 +295,8 @@ def narrate_hypothese(conn, e: dict) -> str:
     Urteil (bei widerlegt die Kette samt Quelle) → ehrliche Einordnung. Deutsch, deterministisch,
     modellfrei — im Ton von recht.narrate_subsumtion / deduktion.narrate."""
     A, Z = _name(conn, e["subjekt"]), _name(conn, e["objekt"])
-    verb = "ist ein" if e["praedikat"] == IS_A else "gehört zu"
+    verb = {IS_A: "ist ein", PART_OF: "gehört zu", CAUSES: "verursacht",
+            CAUSED_BY: "wird verursacht von"}.get(e["praedikat"], "gehört zu")
     zeilen = [f"Vermutung: {A} {verb} »{Z}«."]
     h = e.get("herleitung")
     if h and h.get("muster") == "geschwister_analogie":
@@ -270,7 +309,15 @@ def narrate_hypothese(conn, e: dict) -> str:
         zeilen.append(f"Test: schon BESTÄTIGT — der Graph leitet es bereits ab{wie}. Nichts Neues.")
     elif e["urteil"] == "widerlegt":
         u = e.get("unvereinbar_kette")
-        if u:
+        if e.get("kausal") == "widerlegt":
+            # WELCHE Seite der Graph als Ursache kennt, hängt vom Prädikat ab: bei „A verursacht B"
+            # (causes) steht die Gegenrichtung, also ist B (=Z) die bekannte Ursache; bei „A wird
+            # verursacht von B" (caused_by) steht A als Ursache. Sonst lügt der Beweistext (Review).
+            ursache = Z if e["praedikat"] == CAUSES else A
+            zeilen.append(f"Test: WIDERLEGT — der Graph kennt bereits die GEGENrichtung (»{ursache}« "
+                          f"steht als Ursache, nicht als Wirkung). Eine bekannte Kausalrichtung "
+                          f"umzukehren ist meist falsch (nur selten ein echter Rückkopplungs-Kreis).")
+        elif u:
             xi, yi = _name(conn, u["subjekt_ist"]), _name(conn, u["objekt_ist"])
             zeilen.append(f"Test: WIDERLEGT. {A} ist ein »{xi}«, und »{xi}« ist unvereinbar mit "
                           f"»{yi}« (Quelle: {u['quelle']}). Die Analogie war verführerisch, aber "
