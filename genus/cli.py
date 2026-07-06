@@ -20,6 +20,7 @@ from genus import (
     experience,
     gender_rule,
     governance,
+    hypothese,
     inference,
     inquiries,
     integrity,
@@ -850,6 +851,45 @@ def subsumtion_command(norm: str, erfuellt: tuple[str, ...], text: str | None) -
                 click.echo(f"[RECHT] {zeile}")
         if e["vertrauen"] is not None:
             click.echo(f"[RECHT] Vertrauen (schwächste Prämisse): {e['vertrauen']}")
+    finally:
+        conn.close()
+
+
+@main.command("hypothese")
+@click.argument("subjekt")
+@click.option("--tick", is_flag=True,
+              help="die eine offene Top-Vermutung als gedeckelte Kante aussprechen (Proposal≠Change)")
+def hypothese_command(subjekt: str, tick: bool) -> None:
+    """Die Denkweise HYPOTHESE (docs/GENUS_INTELLIGENZ.md): GENUS VERMUTET per Geschwister-Analogie
+    eine neue Beziehung und PRÜFT sie mit der Inferenz (bestätigt/widerlegt/offen) — der aktive
+    Halbkreis, der den Methoden-Bogen schließt. Ohne --tick wird KEINE VERMUTUNG geschrieben (das
+    Reflektieren ist schreibfrei; nur das geerdete Disjunktheits-Weltwissen wird einmalig gesät,
+    wie die Norm); --tick spricht die eine offene Vermutung gedeckelt aus (model:hypothese, Trust
+    ≤ 0.25 — überstimmt nie Geerdetes)."""
+    conn = get_conn()
+    try:
+        hypothese.seed_hypothesen(conn)   # geerdetes Bootstrap-Wissen (welt), idempotent — wie recht.seed_normen
+        conn.commit()
+        e = hypothese.vermute_und_teste(conn, subjekt)
+        if e is None:
+            click.echo(f"[HYP] Zu „{subjekt}“ finde ich keine testbare Vermutung "
+                       f"(zu wenige Geschwister oder alles schon bekannt).")
+            return
+        for z in hypothese.narrate_hypothese(conn, e).splitlines():
+            click.echo(f"[HYP] {z}")
+        if not tick:
+            if e["urteil"] == "offen":
+                click.echo(f"[HYP] (genus hypothese {subjekt} --tick, um sie als Vermutung "
+                           f"auszusprechen — gedeckelt, überstimmt nichts.)")
+            return
+        if e["urteil"] != "offen":
+            click.echo("[HYP] Diese Vermutung ist nicht offen — ich spreche nur offene aus.")
+            return
+        if hypothese.emit_vermutung(conn, e):
+            conn.commit()
+            click.echo("[HYP] ausgesprochen als Vermutung (model:hypothese, Trust ≤ 0.25).")
+        else:
+            click.echo("[HYP] war schon ausgesprochen — kein Duplikat.")
     finally:
         conn.close()
 

@@ -263,6 +263,45 @@ beweist die Rechtsfolge `rechtsfolge:kaufpreiszahlung` rückwärts über den vor
 <ziel> --gegeben atom=quelle`. Ehrlich: Mehr-Hop-Vertrauen (eine abgeleitete Folge als Prämisse
 der nächsten Regel) trägt seinen Herleitungs-Trust noch nicht weiter — ein benannter Feinschliff.
 
+## 9d · Die Hypothese — Vermuten und Prüfen (genus/hypothese.py), der Bogen schließt sich
+
+Empfehlung 3 der Methoden-Landkarte, gebaut — der AKTIVE Halbkreis. Die Deduktion (§9c) ist
+wahrheitsbewahrend: sie entfaltet nur, was schon impliziert ist, sie schafft nie etwas Neues. Die
+Hypothese ist der Generator davor: sie **vermutet** eine Konjektur und **testet** sie — und der
+Tester ist ausgerechnet die Inferenz/Deduktion, sodass die beiden Hälften ineinandergreifen (② wird
+der Schiedsrichter für ③). Das ist die **gezähmte Kreativität** aus §4 ④ wörtlich gebaut: eine
+Vermutung ist eine *etikettierte, gedeckelte, geprüfte Halluzination* — „Ehrlichkeit verbietet
+Kreativität nicht, sie macht sie erst sicher."
+
+- **Erzeugen** (`vermute`): Geschwister-Analogie, deterministisch aus dem Graphen, KEIN Modell —
+  was die Mehrheit der Geschwister unter demselben is_a-Elternteil trägt und der Anker nicht, wird
+  zur Vermutung „A p o". Die Herleitung (k von m Geschwistern) steht sichtbar im Beweis, kein
+  verstecktes Preset. Konjekturiert nur über die transitiv-sicheren Prädikate (is_a/part_of) —
+  über used_for/causes ließe sich eine Vermutung weder beweisen noch widerlegen, sie wäre
+  unwiderlegbar, und das wäre unehrlich (die ehrliche Decke).
+- **Prüfen** (`teste_konjektur`): drei Urteile über die Inferenz. **bestätigt** (der Graph entailt
+  es schon, deduktiv — dann ist es nichts Neues, wird verworfen); **widerlegt** (ein is_a/part_of-
+  Ring würde kollabieren — die Azyklizität als Refutations-Anker — ODER eine geerdete
+  Unvereinbarkeit greift: *der Wal ist kein Fisch*, weil er ein Säugetier ist und Säugetier
+  unvereinbar mit Fisch); **offen** (ehrlich „mit meinem Wissen nicht widerlegbar" — das ist
+  ausdrücklich NICHT dasselbe wie „wahr"; die Analogie-Stärke k/m ist Herleitungs-Zahl, kein
+  Urteil — Häufung ist kein Beweis).
+- **Aussprechen** (`--tick`): die eine offene Top-Vermutung als gedeckelte Kante (Quelle
+  `model:hypothese`, Trust ≤ 0.25 — überstimmt NIE Geerdetes). Proposal ≠ Change: sie liegt vor,
+  wiegt aber fast nichts; der Mensch bestätigt oder verwirft. Bewegt den Geist, nie die Hand:
+  ohne `--tick` wird NICHTS geschrieben; eine widerlegte Vermutung wird nie ausgesprochen.
+
+Die eine neue Wissens-Saat ist die Disjunktheit (`unvereinbar_mit`, Quelle „welt", gesät wie die
+Norm) — ein ISOLIERTES, symmetrisch gemeintes Prädikat, das NIE in die is_a-Inferenz fließt (nur
+der Refutations-Test liest es, in beiden Richtungen). Read-time, gläsern, kein zweites
+Wahrheitslager. Selbst-Bild: `faehigkeit:analogie` fehlt→teilweise (der erste echte
+Analogie-Keim). `genus hypothese <knoten> [--tick]`. Ehrlich offen: die Abdeckung ist winzig (nur
+die hand-gesäten Klassentrennungen + Ringe), used_for/causes bleiben unwiderlegbar, freie/LLM-
+Konjektur + feldübergreifender Transfer + Begriffsbildung sind die Vollausbaustufe (faehigkeit:
+abstrahieren). **Damit ist der Methoden-Bogen zu (① dynamisches Material → ② Deduktion → ③
+Hypothese): GENUS kann jetzt aus wenig selbst eine Vermutung bilden und sie an seinem eigenen
+Wissen prüfen — der Kreis, den §1 als Kern der Intelligenz benannt hat.**
+
 ## 10 · Was daraus in GENUS eingeflossen ist (2026-07-05)
 
 - **Takt verallgemeinert** (genus/experience.py): der Takt ist ein Merkmal des Detektors

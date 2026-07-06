@@ -97,15 +97,18 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
      "Denkweisen als konfigurierbare Methoden auf dem EINEN Kern: Merkmal-Baupläne "
      "(braucht/bewirkt) + Subsumtion als verallgemeinerte Inferenz + Beweismaßstab je "
      "Disziplin. ERSTE Denkweise LIVE: juristische Subsumtion (genus/recht.py, § 433 II "
-     "als Bauplan, Beweislast=schwächste Prämisse, Wertung=Mensch-Slot). Weitere Domänen "
-     "und die Deuter-Anbindung (Fakt→Merkmal) folgen.", "teilweise"),
+     "als Bauplan, Beweislast=schwächste Prämisse, Wertung=Mensch-Slot). Deduktion als "
+     "allgemeines Werkzeug (genus/deduktion.py, vorwärts/rückwärts) und die dritte Denkweise "
+     "HYPOTHESE (genus/hypothese.py, Vermuten+Prüfen) leben. Weitere Domänen folgen.", "teilweise"),
     ("faehigkeit:abstrahieren",
      "Aus Mustern im eigenen Graphen eigene Begriffe bilden und gegen die Welt prüfen "
      "(Überraschungs-Schleife) — der Sprung vom Importieren zum Denken.", "fehlt"),
     ("faehigkeit:analogie",
      "Übertragen: eine Struktur aus einem Feld in einem anderen wiedererkennen — die "
      "generative Kern-Operation, die in jeder tiefen Betrachtung wieder auftaucht "
-     "(Rechtsfortbildung, Metapher, Hypothese).", "fehlt"),
+     "(Rechtsfortbildung, Metapher, Hypothese). ERSTER Keim LIVE: die Geschwister-Analogie "
+     "der Hypothese-Denkweise (genus/hypothese.py) überträgt Eigenschaften unter Geschwistern; "
+     "feldübergreifender Transfer und freie Analogie fehlen noch.", "teilweise"),
     ("faehigkeit:weltmodell",
      "Vorhersagen und Simulieren: Erwartungen bauen, an Brüchen lernen. Der Sensor-Forecast "
      "und die Überraschungs-Schleife sind der Keim; ein Weltmodell über Begriffe fehlt.",
