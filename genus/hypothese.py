@@ -188,29 +188,33 @@ def _unvereinbar(conn, subjekt: str, objekt: str) -> dict | None:
     return None
 
 
-def _kausal_nachfolger(conn, knoten: str) -> set[str]:
+def _kausal_nachfolger(conn, knoten: str, inverse: str | None = None) -> set[str]:
     """Was ``knoten`` (direkt) verursacht — die vereinte gerichtete Kausalrelation: die
-    ``causes``-Ziele PLUS die Knoten, die ``knoten`` als ``caused_by`` nennen (X caused_by knoten
-    == knoten causes X). So zählt beide Schreibweisen als eine Kausalrichtung."""
+    ``causes``-Ziele PLUS die Knoten, die ``knoten`` über die INVERSE nennen (X <inverse> knoten
+    == knoten causes X). Die Inverse wird aus dem Graphen GELERNT (``inference.inverse_of``, Seed-
+    Rückfall), nicht unterstellt; ``inverse`` kann einmal vorberechnet durchgereicht werden."""
     ziele = set(_objekte(conn, knoten, CAUSES))
-    for r in sources.relations(conn, predicate=CAUSED_BY, object=knoten):
-        ziele.add(r["subject"])
+    inv = inverse if inverse is not None else inference.inverse_of(conn, CAUSES)
+    if inv:
+        for r in sources.relations(conn, predicate=inv, object=knoten):
+            ziele.add(r["subject"])
     return ziele
 
 
 def kausal_pfad(conn, von: str, nach: str, max_depth: int = SUCH_TIEFE) -> list[str] | None:
     """Der kürzeste KAUSAL-Pfad von ``von`` zu ``nach`` über die vereinte Kausalkette (causes +
-    caused_by-Inverse), als Knoten-Liste ``[von, …, nach]``, oder ``None``. Die EINE Kausal-
-    Erreichbarkeit — genutzt von der Refutation (:func:`_kausal_erreicht`) UND der gläsernen
-    Chat-Antwort (companion.relate_kausal), damit es keine zweite Wahrheit gibt. Tiefen-gedeckelt."""
+    die aus dem Graphen gelernte Inverse), als Knoten-Liste ``[von, …, nach]``, oder ``None``. Die
+    EINE Kausal-Erreichbarkeit — genutzt von der Refutation (:func:`_kausal_erreicht`) UND der
+    gläsernen Chat-Antwort (companion.relate_kausal), damit es keine zweite Wahrheit gibt."""
     if von == nach:
         return [von]
+    inverse = inference.inverse_of(conn, CAUSES)   # einmal lernen, durch den BFS reichen
     vorgaenger = {von: None}
     front = [von]
     for _ in range(max_depth):
         neu = []
         for n in front:
-            for o in _kausal_nachfolger(conn, n):
+            for o in _kausal_nachfolger(conn, n, inverse):
                 if o in vorgaenger:
                     continue
                 vorgaenger[o] = n
@@ -241,12 +245,13 @@ def _kausal_urteil(conn, subjekt: str, praedikat: str, objekt: str) -> str | Non
     wahrer Rückkopplungs-Kreis (Wetter↔Klima); darum benennt narrate die Rest-Unsicherheit
     ehrlich. Read-time; ``None``, wenn der Graph zur Richtung nichts sagt (dann bleibt es offen)."""
     ursache, wirkung = (subjekt, objekt) if praedikat == CAUSES else (objekt, subjekt)
+    inverse = inference.inverse_of(conn, CAUSES)   # aus dem Graphen gelernt, nicht unterstellt
 
     def steht(s, p, o):
-        return bool(sources.relations(conn, subject=s, predicate=p, object=o))
+        return bool(p and sources.relations(conn, subject=s, predicate=p, object=o))
 
-    if steht(ursache, CAUSES, wirkung) or steht(wirkung, CAUSED_BY, ursache):
-        return "bestaetigt"                        # die Kante steht direkt -> nichts Neues
+    if steht(ursache, CAUSES, wirkung) or steht(wirkung, inverse, ursache):
+        return "bestaetigt"                        # die Kante steht direkt (als causes ODER Inverse)
     if _kausal_erreicht(conn, wirkung, ursache):   # Gegenrichtung (transitiv) bekannt -> Ring
         return "widerlegt"
     return None

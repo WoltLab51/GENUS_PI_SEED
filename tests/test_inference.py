@@ -327,3 +327,37 @@ def test_symmetry_rate_is_calibrated_and_drives_the_hot_path():
     assert inference.stored_symmetry_rate(conn) == r                  # ...records the derived rate
     assert inference.is_symmetric(conn, "twin") is True               # 1.0 >= cut -> symmetric
     assert inference.is_symmetric(conn, "chain") is False             # ~0.09 < cut -> not (nor a seed)
+
+
+# --- Inverse-Erkennung (der Kreuz-Prädikat-Zwilling der Symmetrie) -----------------------
+
+def test_inverse_pairs_are_learned_from_the_graph():
+    from genus import experience
+    conn = _fresh()  # causes/caused_by systematisch gespiegelt; used_for ganz ohne Spiegel
+    for a, b in [("Q1", "Q2"), ("Q3", "Q4"), ("Q5", "Q6"), ("Q7", "Q8")]:
+        _rel(conn, a, "causes", b); _rel(conn, b, "caused_by", a)     # jedes causes hat sein caused_by
+    _rel(conn, "Q9", "used_for", "Q10")                              # kein Spiegel -> keine Inverse
+    inv = inference.calibrated_inverses(conn)
+    assert inv == {"causes": "caused_by", "caused_by": "causes"}
+    assert "used_for" not in inv
+    assert inference.stored_inverses(conn) is None                    # noch nicht gescannt
+    experience.scan(conn)                                             # die periodische Kalibrierung
+    assert inference.stored_inverses(conn) == {"causes": "caused_by", "caused_by": "causes"}
+
+
+def test_inverse_seed_fallback_and_unknown():
+    conn = _fresh()  # kein Kausal-Material -> der Seed trägt, sonst None
+    assert inference.calibrated_inverses(conn) == {}
+    assert inference.inverse_of(conn, "causes") == "caused_by"        # Seed-Rückfall
+    assert inference.inverse_of(conn, "caused_by") == "causes"        # Seed, beidseitig gelesen
+    assert inference.inverse_of(conn, "used_for") is None             # keine bekannte Inverse
+
+
+def test_inverse_of_returns_a_learned_NON_seed_pair():
+    # der Beweis, dass die Inverse GELERNT ist (nicht caused_by unterstellt): ein FREMDES Prädikat
+    from genus import experience
+    conn = _fresh()
+    for a, b in [("Q1", "Q2"), ("Q3", "Q4"), ("Q5", "Q6"), ("Q7", "Q8")]:
+        _rel(conn, a, "causes", b); _rel(conn, b, "folgt_aus", a)    # folgt_aus spiegelt causes
+    experience.scan(conn)
+    assert inference.inverse_of(conn, "causes") == "folgt_aus"        # aus dem Graphen, nicht der Seed

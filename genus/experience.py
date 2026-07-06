@@ -608,6 +608,22 @@ def _rule_calibration_candidates(conn) -> list[dict]:
             "characterization": f"{srate:.4f}",
         })
 
+    inverses = inference.calibrated_inverses(conn)
+    if inverses:  # der Graph zeigt systematisch gespiegelte Prädikat-Paare -> Inverse LERNEN
+        klass = ",".join(f"{p}={q}" for p, q in sorted(inverses.items()))
+        candidates.append({
+            "experience_key": inference.INVERSE_CALIBRATION_KEY,
+            "experience_type": RULE_CALIBRATION_TYPE,
+            "subject_key": "inverse",
+            "pattern": {"inverses": inverses, "seed": inference.INVERSE_PREDICATES,
+                        "classification": klass},
+            "supporting_events": [],
+            "derivation": RULE_CALIBRATION_DERIVATION,
+            "summary": f"inverse pairs {inverses} (aus dem Graphen gelernt)",
+            "proposable": False,
+            "characterization": klass,   # neu aufzeichnen, wenn sich die erkannten Paare ändern
+        })
+
     return candidates
 
 

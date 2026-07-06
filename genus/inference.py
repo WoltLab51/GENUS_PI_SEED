@@ -38,6 +38,17 @@ TRANSITIVITY_CALIBRATION_KEY = "rule_calibration:transitivity"
 MIN_SYMMETRY_RATE = 0.10
 SYMMETRY_CALIBRATION_KEY = "rule_calibration:symmetry"
 
+# An INVERSE pair: two DIFFERENT predicates where `X P Y` systematically implies `Y Q X`
+# (causes↔caused_by, part_of↔has_part). The CROSS-predicate twin of symmetry -- and, like it,
+# LEARNED from the graph (a systematic inverse mirrors far above incidental cross-predicate
+# coincidences) rather than declared. The seed is only the cold-start fallback (thin graph/tests);
+# the active map is self-calibrated (calibrated_inverses) and recorded by the scan under this key,
+# read cheaply on the hot path (stored_inverses). This is what lets the causal reasoning ASK the
+# graph "what is the inverse of causes?" instead of hardcoding caused_by.
+INVERSE_PREDICATES = {"causes": "caused_by", "part_of": "has_part"}   # Seed (Rückfall), beidseitig gelesen
+MIN_INVERSE_RATE = 0.10
+INVERSE_CALIBRATION_KEY = "rule_calibration:inverse"
+
 # Structural bound on the chain length, so traversal can't run away (like the evidence
 # window). A safety bound, not an epistemic threshold.
 MAX_DEPTH = 6
@@ -317,6 +328,76 @@ def stored_symmetry_rate(conn) -> float | None:
     import json
     value = json.loads(row["pattern"]).get("rate")
     return float(value) if value is not None else None
+
+
+# --- Inverse-Erkennung: welches Prädikat spiegelt ein anderes systematisch (aus dem Graphen) ----
+
+_SEP = "\x1f"   # ein Trennzeichen (Unit Separator), das in keinem Q-id/Wort vorkommt
+
+
+def _seed_inverse(predicate: str) -> str | None:
+    """Der Seed-Rückfall für die Inverse, in BEIDE Richtungen gelesen (causes→caused_by UND zurück)."""
+    if predicate in INVERSE_PREDICATES:
+        return INVERSE_PREDICATES[predicate]
+    return next((a for a, b in INVERSE_PREDICATES.items() if b == predicate), None)
+
+
+def _inverse_rates_per_pair(conn) -> dict[tuple[str, str], float]:
+    """Für jedes geordnete Prädikat-Paar (p, q≠p): der Anteil der p-Kanten (s,o), deren Spiegel
+    (o,q,s) im Graphen steht -- über EINE indizierte SQL, quellen-dedupliziert. Ein systematisches
+    Inversen-Paar (causes↔caused_by ~1.0) sitzt weit über den zufälligen Kreuz-Spiegeln. Der
+    Zwilling von :func:`_mirror_rates_per_predicate`, nur KREUZ-Prädikat statt gleiches Prädikat."""
+    total = {r["predicate"]: r["n"] for r in conn.execute(
+        f"SELECT predicate, COUNT(DISTINCT subject || '{_SEP}' || object) AS n "
+        "FROM relation_projection WHERE subject <> object GROUP BY predicate")}
+    rows = conn.execute(
+        f"SELECT r1.predicate AS p, r2.predicate AS q, "
+        f"COUNT(DISTINCT r1.subject || '{_SEP}' || r1.object) AS n "
+        "FROM relation_projection r1 JOIN relation_projection r2 "
+        "ON r2.subject = r1.object AND r2.object = r1.subject "
+        "WHERE r1.predicate <> r2.predicate AND r1.subject <> r1.object "
+        "GROUP BY r1.predicate, r2.predicate")
+    return {(r["p"], r["q"]): r["n"] / total[r["p"]] for r in rows if total.get(r["p"], 0) > 0}
+
+
+def calibrated_inverses(conn) -> dict[str, str]:
+    """Die Inversen-Paare, die GENUS aus dem Graphen LERNT: je Prädikat das ANDERE Prädikat, das es
+    systematisch spiegelt -- über dem selbst-kalibrierten Schnitt (der natürliche Gap zwischen
+    systematischen Inversen und zufälligen Kreuz-Spiegeln, :func:`self_calibration.widest_gap_rate_cut`).
+    Nur GEGENSEITIGE Paare (p spiegelt q UND q spiegelt p) zählen -- ein einseitiger Zufall ist keine
+    Inverse. ``{}`` bei zu dünner Evidenz (dann trägt der Seed im Verbraucher). Der Symmetrie-Zwilling."""
+    rates = _inverse_rates_per_pair(conn)
+    if not rates:
+        return {}
+    cut = self_calibration.widest_gap_rate_cut(rates.values(), MIN_INVERSE_RATE)
+    best: dict[str, tuple[str, float]] = {}
+    for (p, q), rate in rates.items():
+        if rate >= cut and rate > best.get(p, ("", 0.0))[1]:
+            best[p] = (q, rate)
+    paare = {p: q for p, (q, _) in best.items()}
+    return {p: q for p, q in paare.items() if paare.get(q) == p}   # nur wechselseitig bestätigte Paare
+
+
+def stored_inverses(conn) -> dict[str, str] | None:
+    """Die selbst-kalibrierten Inversen-Paare, die der Scan aufgezeichnet hat (experience
+    ``rule_calibration:inverse``), ein billiger indizierter Lookup; ``None`` bis zum ersten Scan."""
+    row = conn.execute(
+        "SELECT pattern FROM experience_log WHERE experience_key = ?",
+        (INVERSE_CALIBRATION_KEY,),
+    ).fetchone()
+    if row is None:
+        return None
+    import json
+    return json.loads(row["pattern"]).get("inverses") or {}
+
+
+def inverse_of(conn, predicate: str) -> str | None:
+    """Das Prädikat, das ``predicate``s Inverse ist -- aus dem Graphen GELERNT (der systematische
+    Kreuz-Spiegel), vom Scan aufgezeichnet (billig gelesen), Seed nur als Rückfall, wo der Scan
+    noch nicht lief oder die Evidenz dünn ist. ``None``, wenn GENUS keine Inverse kennt. Damit
+    fragt die Kausal-Denkweise den Graphen statt caused_by zu unterstellen."""
+    stored = stored_inverses(conn) or {}
+    return stored.get(predicate) or _seed_inverse(predicate)
 
 
 def is_transitive(conn, predicate: str, edges=None, threshold: int | None = None) -> bool:

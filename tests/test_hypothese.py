@@ -208,6 +208,15 @@ def test_vorwaerts_kette_widerlegt_die_vorwaerts_vermutung_nicht(conn):
     assert hypothese.teste_konjektur(conn, "A", "causes", "C")["urteil"] == "offen"
 
 
+def test_kausal_nachfolger_folgt_der_gelernten_inverse(conn):
+    # _kausal_nachfolger fragt inference.inverse_of statt caused_by zu unterstellen: mit einer
+    # FREMDEN Inverse („folgt_aus") zieht die Kausalkette über sie, nicht über caused_by
+    reactors.observe_relation(conn, "A", "causes", "B", "wikidata")
+    reactors.observe_relation(conn, "X", "folgt_aus", "A", "wikidata")   # X folgt_aus A == A causes X
+    assert hypothese._kausal_nachfolger(conn, "A", "folgt_aus") == {"B", "X"}   # Inverse gefolgt
+    assert hypothese._kausal_nachfolger(conn, "A", "caused_by") == {"B"}        # andere Inverse -> X nicht
+
+
 def test_kausal_pfad_gibt_den_weg_zurueck(conn):
     # die geteilte Kausal-Erreichbarkeit (auch von companion.relate_kausal genutzt) liefert den Weg
     reactors.observe_relation(conn, "A", "causes", "B", "wikidata")
