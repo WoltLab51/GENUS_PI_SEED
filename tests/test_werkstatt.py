@@ -128,6 +128,24 @@ def test_unpruefbarer_abnahme_vertrag_laesst_nichts_entstehen(conn):
     assert not (werkstatt.verzeichnis() / "zelle_erste_verbindung.py").exists()
 
 
+def test_planer_findet_und_die_gefundene_zelle_besteht(conn):
+    # der VOLLE Kreis (Ronny 2026-07-07): aus dem Abnahme-Vertrag SCHLIESST der Planer den
+    # Bauplan (kein LLM), das Fuegewerk baut die Zelle, und derselbe Vertrag beweist sie am
+    # gefuegten Code in der Sandbox -> bestanden. bewaehrter Baustein, verdient.
+    from genus import planer
+    vertrag = _erste_verbindung_vertrag()
+    plan = planer.finde_bauplan(vertrag)
+    assert plan is not None and plan["beschaffung"]["art"] == "erstes_objekt"
+    code = bauplan_modul.fuege_zusammen("erste-verbindung", plan)
+    ergebnis = werkstatt.entwerfe_zelle(conn, "erste-verbindung", generator=lambda _b: code,
+                                        quelle="werkstatt:planer", vertrag=vertrag)
+    assert ergebnis["erstellt"] is True
+    lauf = _probefahrt("erste-verbindung")
+    assert lauf.returncode == 0, lauf.stdout + lauf.stderr
+    pruefung = werkstatt.protokolliere_pruefung(conn, "erste-verbindung", tests_exit=lauf.returncode)
+    assert pruefung["bestanden"] is True
+
+
 def test_untergeschobener_marker_test_loest_die_klinke_nicht(conn):
     # Review-Fund HOCH: ein MARKER-tragender Skip-Test darf die Verhaltens-Klinke NICHT
     # ausloesen. Der Anker ist der versiegelte Ledger-Eintrag (hier: abnahme=False, weil kein

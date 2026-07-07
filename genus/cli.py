@@ -31,6 +31,7 @@ from genus import (
     maturation,
     motor,
     operation,
+    planer,
     projection,
     proposals,
     query,
@@ -779,6 +780,40 @@ def werkstatt_entwerfe(blatt: str, code_datei: str | None, bauplan_datei: str | 
     try:
         ergebnis = werkstatt.entwerfe_zelle(conn, blatt, generator=generator, quelle=quelle,
                                             vertrag=vertrag)
+    finally:
+        conn.close()
+    if not ergebnis["erstellt"]:
+        click.echo(f"[WERKSTATT] {ergebnis['grund']}")
+        raise click.exceptions.Exit(1)
+    click.echo(f"[WERKSTATT] Entwurf erstellt ({ergebnis['quelle']}):")
+    click.echo(f"[WERKSTATT]   Handler: {ergebnis['handler']}")
+    click.echo(f"[WERKSTATT]   Test:    {ergebnis['test']}")
+    click.echo("[WERKSTATT] Probefahrt: deploy/werkstatt_probefahrt.sh " + blatt)
+
+
+@werkstatt_group.command("finde")
+@click.argument("blatt")
+@click.option("--abnahme-datei", required=True,
+              help="Abnahme-Vertrag (JSON): die Beispielfälle, aus denen GENUS den Bauplan SCHLIESST")
+def werkstatt_finde(blatt: str, abnahme_datei: str) -> None:
+    """SCHLIESST aus einem Abnahme-Vertrag selbst einen Bauplan (Deduktion über die bewährten
+    Bausteine, KEIN LLM) und legt daraus einen Entwurf an -- gläsern: zeigt, was es sich
+    zusammengeschlossen hat. Der Abnahme-Vertrag beweist die Zelle in der Probefahrt; der
+    Merge bleibt menschlich."""
+    daten = json.loads(Path(abnahme_datei).read_text(encoding="utf-8"))
+    vertrag = abnahme.aus_json(daten)
+    fehler = abnahme.pruefe_vertrag(vertrag)
+    if fehler:
+        raise click.ClickException("Abnahme-Vertrag nicht prüfbar:\n" + "\n".join(fehler))
+    plan = planer.finde_bauplan(vertrag)
+    click.echo(f"[PLANER] {planer.narrate(plan)}")
+    if plan is None:
+        raise click.exceptions.Exit(1)
+    code = bauplan.fuege_zusammen(blatt, plan)
+    conn = get_conn()
+    try:
+        ergebnis = werkstatt.entwerfe_zelle(conn, blatt, generator=lambda _b: code,
+                                            quelle="werkstatt:planer", vertrag=vertrag)
     finally:
         conn.close()
     if not ergebnis["erstellt"]:
