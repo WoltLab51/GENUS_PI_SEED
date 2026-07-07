@@ -30,10 +30,11 @@ verankert:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 
-from genus import doctor, ledger
+from genus import abnahme, doctor, ledger
 
 ENTWURF_EVENT = "code_entwurf_erstellt"
 PRUEFUNG_EVENT = "code_entwurf_geprueft"
@@ -106,14 +107,20 @@ def _vorlage_test(blatt: str) -> str:
     )
 
 
-def entwerfe_zelle(conn, blatt: str, generator=None, quelle: str | None = None) -> dict:
+def entwerfe_zelle(conn, blatt: str, generator=None, quelle: str | None = None,
+                   vertrag=None) -> dict:
     """Erzeugt ein Entwurfs-Paar (Handler + Sandbox-Test) für ein Raster-Blatt und
     protokolliert die Entscheidung im Ledger. Weigert sich, einen bestehenden Entwurf
     zu überschreiben (ein Entwurf ist Arbeitsstand -- Löschen ist eine menschliche,
     bewusste Handlung im Dateisystem). ``generator``: ``(blatt) -> code`` für den
     Handler-Teil; Default ist die deterministische Vorlage. ``quelle`` überschreibt die
     Herkunfts-Angabe in der Ledger-Spur (z.B. ``werkstatt:schmied``, wenn die Membran
-    den Code eines Code-Modells überreicht)."""
+    den Code eines Code-Modells überreicht).
+
+    ``vertrag`` (:class:`genus.abnahme.Abnahmevertrag`, optional): der forger-UNABHÄNGIGE
+    Erwartungssatz. Ist einer da, wird statt des geskippten Vorlage-Tests ein echter
+    VERHALTENS-Test erzeugt (``abnahme.baue_test``) -- erst der macht „bestanden" zu einer
+    Aussage über Korrektheit. Ein nicht prüfbarer Vertrag lässt gar nichts entstehen."""
     name = blatt.replace("-", "_")
     ziel = verzeichnis()
     handler_pfad = ziel / f"zelle_{name}.py"
@@ -122,22 +129,32 @@ def entwerfe_zelle(conn, blatt: str, generator=None, quelle: str | None = None) 
         return {"erstellt": False,
                 "grund": f"Entwurf für „{blatt}“ existiert schon ({handler_pfad}) — "
                          f"Überschreiben ist eine menschliche Entscheidung."}
+    if vertrag is not None:
+        maengel = abnahme.pruefe_vertrag(vertrag)
+        if maengel:
+            return {"erstellt": False,
+                    "grund": "Abnahme-Vertrag nicht prüfbar:\n" + "\n".join(maengel)}
+        test_code = abnahme.baue_test(vertrag)
+    else:
+        test_code = _vorlage_test(blatt)
     ziel.mkdir(parents=True, exist_ok=True)
     erzeuger = generator or _vorlage_handler
     handler_code = erzeuger(blatt)
     handler_pfad.write_text(handler_code, encoding="utf-8")
-    test_pfad.write_text(_vorlage_test(blatt), encoding="utf-8")
+    test_pfad.write_text(test_code, encoding="utf-8")
     if quelle is None:
         quelle = "werkstatt:vorlage" if generator is None else "werkstatt:generator"
     ledger.append(conn, ENTWURF_EVENT, {
         "blatt": blatt,
         "pfad": str(handler_pfad),
         "fingerabdruck": _fingerabdruck(handler_code),
+        "test_fingerabdruck": _fingerabdruck(test_code),
         "quelle": quelle,
+        "abnahme": vertrag is not None,
     })
     conn.commit()
     return {"erstellt": True, "handler": str(handler_pfad), "test": str(test_pfad),
-            "quelle": quelle}
+            "quelle": quelle, "abnahme": vertrag is not None}
 
 
 def liste() -> list[dict]:
@@ -160,13 +177,28 @@ def _verbots_scan(code: str) -> list[str]:
     return sorted({token for token in _VERBOTENE_TOKENS if token in code})
 
 
+def _letzter_entwurf(conn, blatt: str) -> dict | None:
+    """Der jüngste Entwurfs-Eintrag für ein Blatt aus dem VERSIEGELTEN Ledger -- die
+    fälschungssichere Quelle für „lag beim Entwurf ein Abnahme-Vertrag vor, und welchen
+    Test-Fingerabdruck hatte er". Der Werkstatt-Ordner ist löschbares Randmaterial; der
+    Ledger nicht (append-only, gesiegelt) -- darum wird die Verhaltens-Klinke HIER verankert,
+    nicht an einer Marke in der mutierbaren Datei (Review-Fund 2026-07-07)."""
+    row = conn.execute(
+        "SELECT payload FROM event_log WHERE event_type = ? "
+        "AND json_extract(payload, '$.blatt') = ? ORDER BY id DESC LIMIT 1",
+        (ENTWURF_EVENT, blatt),
+    ).fetchone()
+    return json.loads(row[0]) if row else None
+
+
 def protokolliere_pruefung(conn, blatt: str, tests_exit: int | None = None) -> dict:
     """Die Prüfung eines Entwurfs, als Entscheidungs-Spur protokolliert. Der VERBOTS-SCAN
     läuft immer hier im Kern (deterministisch, zum Zeitpunkt der Protokollierung, gegen
     den aktuellen Datei-Stand). ``tests_exit`` ist das Ergebnis der Sandbox-PROBEFAHRT,
     die die Membran gefahren hat (``deploy/werkstatt_probefahrt.sh``) -- ``None`` heißt:
     noch nicht probegefahren, nur statisch geprüft. „Bestanden" (merge-REIF, nie gemergt:
-    der Merge bleibt menschlich) verlangt beides: keine Verbote UND tests_exit == 0."""
+    der Merge bleibt menschlich) verlangt jetzt DREI Klinken: keine Verbote, tests_exit == 0
+    UND einen Abnahme-Vertrag (der Test prueft wirklich VERHALTEN, nicht nur die Signatur)."""
     name = blatt.replace("-", "_")
     handler_pfad = verzeichnis() / f"zelle_{name}.py"
     if not handler_pfad.exists():
@@ -174,15 +206,29 @@ def protokolliere_pruefung(conn, blatt: str, tests_exit: int | None = None) -> d
                 "grund": f"kein Entwurf für „{blatt}“ in {verzeichnis()}"}
     code = handler_pfad.read_text(encoding="utf-8")
     verbote = _verbots_scan(code)
-    bestanden = not verbote and tests_exit == 0
+    # die dritte, VERHALTENS-Klinke (Ronny 2026-07-07) muss BINDEND sein, nicht bloss eine Marke:
+    # ein Substring in der Datei ist faelschbar (Review-Fund HOCH -- ein untergeschobener Skip-Test
+    # mit der Marke kaeme sonst durch). Der Anker ist der versiegelte Ledger-Eintrag des Entwurfs:
+    # (a) beim Entwurf lag ein echter Abnahme-Vertrag vor UND (b) die Test-Datei ist BYTE-genau
+    # noch die damals erzeugte (Fingerabdruck-Abgleich gegen das Ledger). Ohne Entwurfs-Eintrag
+    # oder bei veraenderter Test-Datei traegt tests_exit==0 keine Verhaltens-Aussage -> kein bestanden.
+    test_pfad = verzeichnis() / f"test_zelle_{name}.py"
+    test_code = test_pfad.read_text(encoding="utf-8") if test_pfad.exists() else ""
+    entwurf = _letzter_entwurf(conn, blatt)
+    abnahme_vorhanden = bool(
+        entwurf and entwurf.get("abnahme")
+        and entwurf.get("test_fingerabdruck") == _fingerabdruck(test_code)
+    )
+    bestanden = not verbote and tests_exit == 0 and abnahme_vorhanden
     ledger.append(conn, PRUEFUNG_EVENT, {
         "blatt": blatt,
         "pfad": str(handler_pfad),
         "fingerabdruck": _fingerabdruck(code),
         "verbote": verbote,
         "tests_exit": tests_exit,
+        "abnahme": abnahme_vorhanden,
         "bestanden": bestanden,
     })
     conn.commit()
     return {"gefunden": True, "blatt": blatt, "verbote": verbote,
-            "tests_exit": tests_exit, "bestanden": bestanden}
+            "tests_exit": tests_exit, "abnahme": abnahme_vorhanden, "bestanden": bestanden}

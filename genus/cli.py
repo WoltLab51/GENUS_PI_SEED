@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from genus import (
+    abnahme,
     anchor,
     bauplan,
     besinnung,
@@ -742,12 +743,22 @@ def werkstatt_group() -> None:
 @click.option("--bauplan-datei", default=None,
               help="morphologischer Bauplan (JSON) — das Fügewerk baut den Code "
                    "deterministisch (genus/bauplan.py)")
+@click.option("--abnahme-datei", default=None,
+              help="Abnahme-Vertrag (JSON) — Beispielfälle (guess+Graph → erwarteter Satz "
+                   "oder None), aus denen der Kern den VERHALTENS-Test erzeugt (genus/abnahme.py)")
 @click.option("--quelle", default=None,
               help="Herkunfts-Angabe für die Ledger-Spur (z.B. werkstatt:schmied)")
 def werkstatt_entwerfe(blatt: str, code_datei: str | None, bauplan_datei: str | None,
-                       quelle: str | None) -> None:
+                       abnahme_datei: str | None, quelle: str | None) -> None:
     """Erzeugt ein Entwurfs-Paar (Handler + Sandbox-Test) für ein Raster-Blatt."""
     generator = None
+    vertrag = None
+    if abnahme_datei is not None:
+        daten = json.loads(Path(abnahme_datei).read_text(encoding="utf-8"))
+        vertrag = abnahme.aus_json(daten)
+        fehler = abnahme.pruefe_vertrag(vertrag)
+        if fehler:
+            raise click.ClickException("Abnahme-Vertrag nicht prüfbar:\n" + "\n".join(fehler))
     if code_datei is not None and bauplan_datei is not None:
         raise click.ClickException("--code-datei und --bauplan-datei schließen sich aus")
     if bauplan_datei is not None:
@@ -766,7 +777,8 @@ def werkstatt_entwerfe(blatt: str, code_datei: str | None, bauplan_datei: str | 
             quelle = "werkstatt:datei"
     conn = get_conn()
     try:
-        ergebnis = werkstatt.entwerfe_zelle(conn, blatt, generator=generator, quelle=quelle)
+        ergebnis = werkstatt.entwerfe_zelle(conn, blatt, generator=generator, quelle=quelle,
+                                            vertrag=vertrag)
     finally:
         conn.close()
     if not ergebnis["erstellt"]:

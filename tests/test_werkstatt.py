@@ -53,9 +53,10 @@ def test_verbots_scan_faengt_ausbruchs_bausteine(conn):
     assert ergebnis["bestanden"] is False
 
 
-def test_probefahrt_ergebnis_wird_ueberreicht_und_protokolliert(conn):
-    # Die Membran faehrt die Sandbox-Tests wirklich (hier direkt, wie
-    # deploy/werkstatt_probefahrt.sh es tut) und ueberreicht nur das Ergebnis.
+def test_probefahrt_ohne_abnahme_ist_nie_bestanden(conn):
+    # Ronny 2026-07-07: ein Vorlage-Entwurf hat einen GESKIPPTEN Faehigkeits-Test. Der Lauf ist
+    # gruen, sagt aber nichts ueber Verhalten -> ohne Abnahme-Vertrag kein „bestanden" (frueher
+    # galt er faelschlich als merge-reif -- genau die Blindstelle, die der Abnahme-Vertrag schliesst).
     werkstatt.entwerfe_zelle(conn, "weltfrage")
     testdatei = werkstatt.verzeichnis() / "test_zelle_weltfrage.py"
     lauf = subprocess.run(
@@ -64,7 +65,95 @@ def test_probefahrt_ergebnis_wird_ueberreicht_und_protokolliert(conn):
     )
     assert lauf.returncode == 0   # Signatur-Pin gruen, Faehigkeits-Test ehrlich geskippt
     ergebnis = werkstatt.protokolliere_pruefung(conn, "weltfrage", tests_exit=lauf.returncode)
-    assert ergebnis["bestanden"] is True   # merge-REIF -- gemergt wird nur menschlich
+    assert ergebnis["abnahme"] is False and ergebnis["bestanden"] is False
+
+
+# --- Der Abnahme-Vertrag: die dritte, Verhaltens-Sperrklinke (Ronny 2026-07-07) ----------
+
+_ERSTE_VERBINDUNG_PLAN = {
+    "waechter": "subject",
+    "beschaffung": {"art": "erstes_objekt", "praedikat": "is_a"},
+    "formulierung": "„{subject}“ ist ein {wert}.",
+}
+
+
+def _erste_verbindung_vertrag():
+    from genus import abnahme
+    return abnahme.Abnahmevertrag("erste-verbindung", (
+        abnahme.Abnahmefall({"subject": "Dackel"}, (("Dackel", "is_a", "Hund", "test"),),
+                            erwartet="„Dackel“ ist ein Hund."),
+        abnahme.Abnahmefall({"subject": "Nirgendwo"}, (), erwartet=None),
+    ))
+
+
+def _probefahrt(blatt):
+    testdatei = werkstatt.verzeichnis() / f"test_zelle_{blatt.replace('-', '_')}.py"
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", str(testdatei)],
+        cwd=str(werkstatt.verzeichnis()), capture_output=True, text=True, timeout=180,
+    )
+
+
+def test_abnahme_vertrag_beweist_verhalten_echte_zelle_besteht(conn):
+    # eine ECHTE, aus dem Bauplan gefuegte Zelle besteht ihren forger-unabhaengigen
+    # Erwartungssatz -> abnahme=True, bestanden=True (verdient sich das »bewaehrt«).
+    handler = bauplan_modul.fuege_zusammen("erste-verbindung", _ERSTE_VERBINDUNG_PLAN)
+    ergebnis = werkstatt.entwerfe_zelle(conn, "erste-verbindung", generator=lambda _b: handler,
+                                        vertrag=_erste_verbindung_vertrag())
+    assert ergebnis["erstellt"] is True and ergebnis["abnahme"] is True
+    lauf = _probefahrt("erste-verbindung")
+    assert lauf.returncode == 0, lauf.stdout + lauf.stderr
+    pruefung = werkstatt.protokolliere_pruefung(conn, "erste-verbindung", tests_exit=lauf.returncode)
+    assert pruefung["abnahme"] is True and pruefung["bestanden"] is True
+
+
+def test_return_none_attrappe_faellt_am_abnahme_vertrag_durch(conn):
+    # der eigentliche Beweis, dass die Blindstelle zu ist: dieselbe „return None"-Attrappe,
+    # die frueher als merge-reif galt, besteht den Verhaltens-Test jetzt NICHT.
+    attrappe = ("def zelle_erste_verbindung(conn, guess, question, last_question, "
+                "last_answer, stimme=None):\n    return None\n")
+    werkstatt.entwerfe_zelle(conn, "erste-verbindung", generator=lambda _b: attrappe,
+                             vertrag=_erste_verbindung_vertrag())
+    lauf = _probefahrt("erste-verbindung")
+    assert lauf.returncode != 0   # der Treffer-Fall schlaegt fehl: None statt Satz
+    pruefung = werkstatt.protokolliere_pruefung(conn, "erste-verbindung", tests_exit=lauf.returncode)
+    assert pruefung["bestanden"] is False
+
+
+def test_unpruefbarer_abnahme_vertrag_laesst_nichts_entstehen(conn):
+    from genus import abnahme
+    leer = abnahme.Abnahmevertrag("erste-verbindung", ())   # kein Fall -> nicht pruefbar
+    ergebnis = werkstatt.entwerfe_zelle(conn, "erste-verbindung", vertrag=leer)
+    assert ergebnis["erstellt"] is False and "Abnahme-Vertrag" in ergebnis["grund"]
+    assert not (werkstatt.verzeichnis() / "zelle_erste_verbindung.py").exists()
+
+
+def test_untergeschobener_marker_test_loest_die_klinke_nicht(conn):
+    # Review-Fund HOCH: ein MARKER-tragender Skip-Test darf die Verhaltens-Klinke NICHT
+    # ausloesen. Der Anker ist der versiegelte Ledger-Eintrag (hier: abnahme=False, weil kein
+    # Vertrag), nicht ein Substring in der loeschbaren Werkstatt-Datei.
+    from genus import abnahme
+    werkstatt.entwerfe_zelle(conn, "weltfrage")   # kein Vertrag -> Ledger sagt abnahme=False
+    test_pfad = werkstatt.verzeichnis() / "test_zelle_weltfrage.py"
+    test_pfad.write_text(
+        f"{abnahme.MARKER}: gefaelscht\nimport pytest\n\n"
+        "def test_abnahme_fall_0():\n    pytest.skip('leer')\n", encoding="utf-8")
+    ergebnis = werkstatt.protokolliere_pruefung(conn, "weltfrage", tests_exit=0)
+    assert ergebnis["abnahme"] is False and ergebnis["bestanden"] is False
+
+
+def test_swap_der_test_datei_bricht_den_fingerabdruck(conn):
+    # Review-Fund: ein core-erzeugter Verhaltens-Test darf nicht gegen eine Marker-tragende
+    # Attrappe austauschbar sein -- der Test-Fingerabdruck im versiegelten Ledger bindet ihn.
+    from genus import abnahme
+    handler = bauplan_modul.fuege_zusammen("erste-verbindung", _ERSTE_VERBINDUNG_PLAN)
+    werkstatt.entwerfe_zelle(conn, "erste-verbindung", generator=lambda _b: handler,
+                             vertrag=_erste_verbindung_vertrag())
+    test_pfad = werkstatt.verzeichnis() / "test_zelle_erste_verbindung.py"
+    test_pfad.write_text(f"{abnahme.MARKER}: gefaelscht\ndef test_x():\n    assert True\n",
+                         encoding="utf-8")   # Marke bleibt, echtes Verhalten ausgetauscht
+    ergebnis = werkstatt.protokolliere_pruefung(conn, "erste-verbindung", tests_exit=0)
+    assert ergebnis["abnahme"] is False and ergebnis["bestanden"] is False   # Fingerabdruck bricht
 
 
 def test_nur_statische_pruefung_ist_nie_bestanden(conn):
