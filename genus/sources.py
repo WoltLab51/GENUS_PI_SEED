@@ -492,6 +492,12 @@ def concept_meaning(conn, qid: str) -> dict:
     for r in relations(conn, subject=qid, predicate="defined_as"):
         if r["object"] not in meaning:
             meaning.append(r["object"])
+    # direkt an den Knoten gebundene Definitionen (`inhalt`): der Gloss eines selbst geprägten
+    # Abstraktions-Knotens, einer Norm, eines konzept:* -- so wird ein SELBST gebildeter Begriff
+    # über ``genus concept`` ansprechbar. Herkunft via `relations` (model:* bleibt gedeckelt).
+    for r in relations(conn, subject=qid, predicate="inhalt"):
+        if r["object"] not in meaning:
+            meaning.append(r["object"])
     parents = [r["object"] for r in relations(conn, subject=qid, predicate="is_a")]
     return {
         "concept": qid,

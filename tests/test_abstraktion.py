@@ -170,6 +170,18 @@ def test_konzept_id_ist_stabil_und_reihenfolge_unabhaengig():
     assert abstraktion._konzept_id(["b", "a", "c"]) == abstraktion._konzept_id(["c", "b", "a"])
 
 
+def test_gepraegter_begriff_ist_ueber_concept_meaning_ansprechbar():
+    # der selbst-geschriebene Gloss (inhalt) taucht in concept_meaning auf -> `genus concept` kann
+    # den selbst gebildeten Begriff erklären, nicht nur seinen is_a-Elternteil zeigen.
+    conn = _fresh()
+    _geraet_gruppe(conn)
+    k = abstraktion.verdichte(conn, "geraet")[0]
+    r = abstraktion.praege(conn, k)
+    bedeutung = sources.concept_meaning(conn, r["konzept"])
+    assert bedeutung["meaning"] and "geraet" in bedeutung["meaning"][0].lower()
+    assert "geraet" in bedeutung["is_a"]
+
+
 def test_praege_gloss_bleibt_einmalig_auch_wenn_namen_sich_aendern():
     # Review-Fund (MEDIUM): der Gloss wird aus VERAENDERLICHEN Anzeigenamen gebaut. Ein zweiter Tick,
     # nachdem ein Label eingetroffen ist (Routine, wenn Wikidata/DBnary nachfliessen), darf keinen
