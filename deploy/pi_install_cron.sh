@@ -21,6 +21,17 @@ if [ "${GENUS_ENABLE_STATUS_PUBLISH:-0}" = "1" ]; then
 fi
 if [ -f "$STATUS_FLAG_FILE" ]; then STATUS_PUBLISH=1; else STATUS_PUBLISH=0; fi
 
+# GENUS_CORE_ID ist EBENFALLS STICKY (Ronny 2026-07-08, Betriebsdrift-Fix): einmal gesetzt,
+# persistiert der Wert in einer Marker-Datei; spätere Reinstalls ohne die Env-Variable lassen ihn
+# NICHT mehr still fallen. Genau dieses Fallenlassen war die Ursache, warum Status-Publish nächtlich
+# mit „GENUS_CORE_ID is required" scheiterte und der versiegelte Anker-Export übersprungen wurde.
+CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"
+if [ -n "${GENUS_CORE_ID:-}" ]; then
+    printf '%s' "$GENUS_CORE_ID" > "$CORE_ID_FILE"
+elif [ -f "$CORE_ID_FILE" ]; then
+    GENUS_CORE_ID="$(cat "$CORE_ID_FILE")"
+fi
+
 tmp_existing="$(mktemp)"
 tmp_new="$(mktemp)"
 cleanup() {

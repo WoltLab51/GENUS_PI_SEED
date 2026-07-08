@@ -52,6 +52,9 @@ def test_cron_installation_writes_timestamped_ticks():
     # carry the env flag (the regression that silently dropped the daily status tick)
     assert "status_publish.enabled" in script
     assert "STATUS_PUBLISH" in script
+    # GENUS_CORE_ID is STICKY too (2026-07-08): a marker file persists it across reinstalls that
+    # don't carry the env var -- the regression that made status-publish + anchor fail nightly
+    assert "CORE_ID_FILE" in script and "core_id" in script
     assert r"date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ" in script
 
 
