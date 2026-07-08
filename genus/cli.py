@@ -965,12 +965,15 @@ def hypothese_command(subjekt: str, tick: bool) -> None:
               help="wie viele Begriffs-Kandidaten höchstens zeigen")
 @click.option("--unter", "unter", default=None, metavar="KNOTEN",
               help="nur unter diesem is_a-Elternteil suchen (sonst der ganze Graph)")
-def abstraktion_command(limit: int, unter: str | None) -> None:
-    """Die Operation ABSTRAHIEREN (faehigkeit:abstrahieren, Scheibe 1): GENUS findet Gruppen von
-    Geschwistern, die ein noch UNBENANNTES Merkmal-Bündel teilen UND eine weitere Eigenschaft
-    vorhersagen — der Keim eines eigenen Begriffs (docs/GENUS_INTELLIGENZ.md: Verdichtung, kürzer
-    als die Fakten). REIN LESEND: zeigt nur, was GENUS abstrahieren würde; schreibt nichts, ruft
-    kein Modell. Das Prägen (gedeckelt, --tick, Mensch bestätigt) ist eine spätere Scheibe."""
+@click.option("--tick", is_flag=True,
+              help="den EINEN stärksten Kandidaten als gedeckelten Knoten PRÄGEN (Proposal≠Change)")
+def abstraktion_command(limit: int, unter: str | None, tick: bool) -> None:
+    """Die Operation ABSTRAHIEREN (faehigkeit:abstrahieren): GENUS findet Gruppen von Geschwistern,
+    die ein noch UNBENANNTES Merkmal-Bündel teilen UND eine weitere Eigenschaft vorhersagen — der
+    Keim eines eigenen Begriffs (docs/GENUS_INTELLIGENZ.md: Verdichtung, kürzer als die Fakten).
+    Ohne --tick REIN LESEND (zeigt nur, was GENUS abstrahieren würde; schreibt nichts, ruft kein
+    Modell). --tick PRÄGT den stärksten Kandidaten als gedeckelten Knoten (Quelle model:abstraktion,
+    Trust ≤ 0.25 — überstimmt nie Geerdetes); der Mensch bestätigt (teach) oder verwirft (retract)."""
     conn = get_conn()
     try:
         kandidaten = (abstraktion.verdichte(conn, unter) if unter
@@ -985,6 +988,18 @@ def abstraktion_command(limit: int, unter: str | None) -> None:
             click.echo("")
             for z in abstraktion.narrate(conn, k).splitlines():
                 click.echo(f"[ABS] {z}")
+        if not tick:
+            click.echo("")
+            click.echo("[ABS] (--tick, um den stärksten zu PRÄGEN — gedeckelt, überstimmt nichts.)")
+            return
+        ergebnis = abstraktion.praege(conn, kandidaten[0])
+        if ergebnis["gesaet"]:
+            conn.commit()
+            click.echo(f"\n[ABS] geprägt: {ergebnis['konzept']} ({ergebnis['gesaet']} Kanten, "
+                       f"model:abstraktion, Trust ≤ 0.25). Fragen: genus concept "
+                       f"{ergebnis['konzept']}. Bestätigen/verwerfen wie jede model:*-Kante.")
+        else:
+            click.echo(f"\n[ABS] {ergebnis['konzept']} war schon geprägt — kein Duplikat.")
     finally:
         conn.close()
 

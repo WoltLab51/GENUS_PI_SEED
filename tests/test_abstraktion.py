@@ -3,7 +3,7 @@ Merkmal-Buendel unter Geschwistern im eigenen Graphen -- rein lesend, modellfrei
 Ueberraschungs-Test gegen die Tautologie (docs/GENUS_INTELLIGENZ.md: Verdichtung, widerlegbar)."""
 import sqlite3
 
-from genus import abstraktion, reactors
+from genus import abstraktion, reactors, sources
 from genus.db import init_schema
 
 
@@ -136,3 +136,49 @@ def test_entdecke_findet_den_kandidaten_ueber_den_ganzen_graphen():
     _geraet_gruppe(conn)
     kandidaten = abstraktion.entdecke(conn)
     assert any(set(k["mitglieder"]) == {"bohrer", "foehn", "toaster"} for k in kandidaten)
+
+
+def test_praege_bildet_gedeckelten_begriffs_knoten():
+    # Scheibe 2: konzept is_a Elternteil, jedes Mitglied is_a konzept, plus Gloss -- alles
+    # model:abstraktion (Trust <= 0.25, ueberstimmt nie Geerdetes), Proposal != Change.
+    conn = _fresh()
+    _geraet_gruppe(conn)
+    k = abstraktion.verdichte(conn, "geraet")[0]
+    r = abstraktion.praege(conn, k)
+    kid = r["konzept"]
+    assert kid.startswith("konzept:auto:") and r["gesaet"] > 0
+    assert any(x["object"] == "geraet"
+               for x in sources.relations(conn, subject=kid, predicate="is_a"))
+    for m in k["mitglieder"]:
+        assert any(x["object"] == kid
+                   for x in sources.relations(conn, subject=m, predicate="is_a"))
+    assert sources.relations(conn, subject=kid, predicate="inhalt")   # ansprechbar via genus concept
+    for x in sources.relations(conn, subject=kid, predicate="is_a"):
+        assert x["source"] == abstraktion.MODEL_QUELLE                # gedeckelte Herkunft
+    assert sources.source_trust(conn, abstraktion.MODEL_QUELLE) <= 0.25
+
+
+def test_praege_ist_idempotent():
+    conn = _fresh()
+    _geraet_gruppe(conn)
+    k = abstraktion.verdichte(conn, "geraet")[0]
+    abstraktion.praege(conn, k)
+    assert abstraktion.praege(conn, k)["gesaet"] == 0     # dieselbe Gruppe -> dieselbe Id, kein Duplikat
+
+
+def test_konzept_id_ist_stabil_und_reihenfolge_unabhaengig():
+    assert abstraktion._konzept_id(["b", "a", "c"]) == abstraktion._konzept_id(["c", "b", "a"])
+
+
+def test_praege_gloss_bleibt_einmalig_auch_wenn_namen_sich_aendern():
+    # Review-Fund (MEDIUM): der Gloss wird aus VERAENDERLICHEN Anzeigenamen gebaut. Ein zweiter Tick,
+    # nachdem ein Label eingetroffen ist (Routine, wenn Wikidata/DBnary nachfliessen), darf keinen
+    # ZWEITEN, abweichenden inhalt saeen -- ein Begriff hat EINEN Gloss.
+    conn = _fresh()
+    _geraet_gruppe(conn)
+    k = abstraktion.verdichte(conn, "geraet")[0]
+    abstraktion.praege(conn, k)
+    _rel(conn, "Geraet@de", "label", "geraet")     # jetzt aendert sich der Anzeigename -> "Geraet"
+    abstraktion.praege(conn, k)                     # zweiter Tick
+    kid = abstraktion._konzept_id(k["mitglieder"])
+    assert len(sources.relations(conn, subject=kid, predicate="inhalt")) == 1

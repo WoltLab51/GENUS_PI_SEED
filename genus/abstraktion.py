@@ -21,8 +21,13 @@ ist bewusst Scheibe 2.
 """
 from __future__ import annotations
 
+import hashlib
+
 from genus import sources
 from genus.hypothese import IS_A, _name, _objekte
+
+MODEL_QUELLE = "model:abstraktion"   # Präfix model: -> Trust automatisch auf 0.25 gedeckelt
+INHALT = "inhalt"
 
 # Das Bündel wird über die DYNAMISCHE (verbindende) Schicht gebildet -- was die Dinge TUN, woraus
 # sie bestehen, wozu sie dienen -- NICHT über is_a: das gruppiert sie schon (der Elternteil P). Ein
@@ -215,3 +220,49 @@ def narrate(conn, kandidat: dict) -> str:
     zeilen.append("Für diese Gruppe gibt es noch keinen Namen — genau das macht sie zu einem "
                   "Begriffs-Kandidaten. Ich schreibe nichts; ich zeige nur, was ich sehe.")
     return "\n".join(zeilen)
+
+
+# --- Prägen: die eine gedeckelte, gegatete Emission (Scheibe 2) ----------------------------
+
+def _konzept_id(mitglieder: list[str]) -> str:
+    """Eine STABILE, deterministische Id für den geprägten Begriff aus seinen Mitgliedern (kein
+    Zufall, kein Zeitstempel -- replay-fest und idempotent: dieselbe Gruppe -> dieselbe Id, der
+    Sä-Helfer dedupliziert). Der Gloss trägt die Bedeutung, die Id ist nur ein eindeutiger Griff."""
+    roh = "|".join(sorted(mitglieder))
+    return "konzept:auto:" + hashlib.sha1(roh.encode("utf-8")).hexdigest()[:10]
+
+
+def _gloss(conn, kandidat: dict) -> str:
+    """Ein menschlich lesbarer inhalt für den geprägten Knoten -- so ist der Begriff ab dem ersten
+    Tick über ``genus concept`` ansprechbar und die Prägung bleibt gläsern."""
+    P = _name(conn, kandidat["elternteil"])
+    n = len(kandidat["mitglieder"])
+    return (f"Selbst gebildeter Begriff ({MODEL_QUELLE}): {n} »{P}«, die gemeinsam "
+            f"{_merkmal_liste(conn, kandidat['buendel'])} — bisher ohne eigenen Namen.")
+
+
+def praege(conn, kandidat: dict) -> dict:
+    """Prägt den Kandidaten als GEDECKELTEN Begriffs-Knoten: ``konzept is_a Elternteil``, jedes
+    Mitglied ``is_a konzept``, plus EINMALIG ein Gloss (``inhalt``). Quelle :data:`MODEL_QUELLE`
+    (Trust ≤ 0.25 -- überstimmt NIE Geerdetes), idempotent über ``reactors.sae_fehlende``.
+
+    Die Sicherheit ruht auf drei Säulen, nicht auf einem Veto im Schreibpfad: (1) der DECKEL
+    (model:abstraktion ≤ 0.25 überstimmt nie Geerdetes); (2) die FRISCHE-KNOTEN-Invariante -- ein
+    neu gehashter ``kid`` wird von nichts erreicht, kann also strukturell keinen is_a-Ring schließen;
+    (3) Proposal ≠ Change -- der Mensch bestätigt (``teach_relation``) oder verwirft
+    (``retract_relation``). ``sae_fehlende`` selbst schreibt die gedeckelte Kante UND flaggt einen
+    etwaigen Zyklus als Inquiry (record-then-flag), es hält sie nicht zurück -- bei einem frischen
+    Knoten kann der Fall aber gar nicht eintreten.
+
+    Der Gloss wird aus (veränderlichen) Anzeigenamen gebaut und daher NUR beim ersten Prägen gesät:
+    ein zweiter Tick, nachdem ein Label eingetroffen ist, würde sonst einen zweiten, abweichenden
+    inhalt anhängen (der ``kid`` ist stabil, der Text nicht). Ein Begriff hat EINEN Gloss."""
+    from genus import reactors
+
+    kid = _konzept_id(kandidat["mitglieder"])
+    kanten = [(kid, IS_A, kandidat["elternteil"])]
+    kanten += [(m, IS_A, kid) for m in kandidat["mitglieder"]]
+    if not sources.relations(conn, subject=kid, predicate=INHALT):
+        kanten.append((kid, INHALT, _gloss(conn, kandidat)))
+    gesaet = reactors.sae_fehlende(conn, kanten, MODEL_QUELLE)
+    return {"konzept": kid, "gesaet": gesaet}
