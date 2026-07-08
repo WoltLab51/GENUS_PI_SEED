@@ -13,18 +13,18 @@ def _luecken(conn, *paare):
 
 
 def test_agenda_zeigt_die_draengendste_je_quelle_und_das_selbst_moegliche(conn):
-    _luecken(conn, ("weltfrage", 4), ("tun", 2))
+    _luecken(conn, ("meinung", 4), ("tun", 2))
     ziele.seed_ziele(conn)
     a = besinnung.agenda(conn)
-    assert a["luecke"]["was"] == "weltfrage"
+    assert a["luecke"]["was"] == "meinung"
     assert a["operation"]["was"] == "generator-organ"      # höchster Fan-in
-    assert a["selbst_moeglich"]["was"] == "weltfrage"      # drängendste noch unausgesprochen
+    assert a["selbst_moeglich"]["was"] == "meinung"      # drängendste noch unausgesprochen
 
 
 def test_besinne_spricht_die_draengendste_unausgesprochene_luecke_aus(conn):
-    _luecken(conn, ("weltfrage", 4))
+    _luecken(conn, ("meinung", 4))
     s = besinnung.besinne(conn)
-    assert s["getan"] == "ausgesprochen" and s["kind"] == "weltfrage"
+    assert s["getan"] == "ausgesprochen" and s["kind"] == "meinung"
     assert s["proposal_id"]
     # danach ist die Lücke ausgesprochen -> die Besinnung sieht sie nicht mehr als selbst-möglich
     assert besinnung.agenda(conn)["selbst_moeglich"] is None
@@ -32,17 +32,17 @@ def test_besinne_spricht_die_draengendste_unausgesprochene_luecke_aus(conn):
 
 def test_der_loop_kettet_das_gefaelle_hinab(conn):
     # zwei heiße Lücken: der Gedankengang spricht sie NACH Druck geordnet aus, eine pro Schritt
-    _luecken(conn, ("weltfrage", 6), ("tun", 4))
+    _luecken(conn, ("meinung", 6), ("tun", 4))
     schritte = besinnung.lauf(conn)
     getan = [s["kind"] for s in schritte if s["getan"] == "ausgesprochen"]
-    assert getan == ["weltfrage", "tun"]                   # 6 vor 4 — das Gefälle hinab
+    assert getan == ["meinung", "tun"]                   # 6 vor 4 — das Gefälle hinab
     assert schritte[-1]["weiter"] is False                 # dann ist nichts Neues mehr auszusprechen
 
 
 def test_besinne_wartet_ehrlich_wenn_es_selbst_nichts_tun_kann(conn):
     # eine ausgesprochene, ungestillte Lücke + eine fehlende Fähigkeit -> GENUS wartet auf Ronny
-    _luecken(conn, ("weltfrage", 4))
-    besinnung.besinne(conn)                                # weltfrage jetzt ausgesprochen
+    _luecken(conn, ("meinung", 4))
+    besinnung.besinne(conn)                                # meinung jetzt ausgesprochen
     ziele.seed_ziele(conn)
     s = besinnung.besinne(conn)
     assert s["getan"] == "gewartet"
@@ -52,7 +52,7 @@ def test_besinne_wartet_ehrlich_wenn_es_selbst_nichts_tun_kann(conn):
 def test_die_besinnung_bewegt_den_geist_nie_die_hand(conn):
     # rein lesende Agenda/narrate erzeugen KEINE Events; nur besinne() mit einem echten
     # Aussprechen schreibt (ein gegatetes Proposal) -- die Reflexion selbst nicht
-    _luecken(conn, ("weltfrage", 4))
+    _luecken(conn, ("meinung", 4))
     vorher = conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"]
     besinnung.agenda(conn)
     besinnung.narrate(conn)
@@ -60,8 +60,8 @@ def test_die_besinnung_bewegt_den_geist_nie_die_hand(conn):
 
 
 def test_narrate_ist_ehrlich_ueber_die_decke(conn):
-    _luecken(conn, ("weltfrage", 4))
-    besinnung.besinne(conn)                                # weltfrage ausgesprochen
+    _luecken(conn, ("meinung", 4))
+    besinnung.besinne(conn)                                # meinung ausgesprochen
     ziele.seed_ziele(conn)
     text = besinnung.narrate(conn)
     assert "warte ich auf dich" in text                   # die ausgesprochene Lücke wartet auf Ronny
@@ -75,5 +75,5 @@ def test_ruhe_wenn_nichts_drueckt(conn):
 
 
 def test_lauf_ist_beschraenkt_gegen_endlosigkeit(conn):
-    _luecken(conn, ("weltfrage", 6), ("tun", 4))
+    _luecken(conn, ("meinung", 6), ("tun", 4))
     assert len(besinnung.lauf(conn, hoechstens=1)) == 1    # höchstens ein Schritt

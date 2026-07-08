@@ -24,7 +24,7 @@ def _fresh():
     return conn
 
 
-def _luecken_proposal(conn, blatt: str = "weltfrage") -> int:
+def _luecken_proposal(conn, blatt: str = "meinung") -> int:
     """Der echte Weg: gelebte Nachfrage auf einem handler-losen Blatt -> Scan -> Proposal."""
     verstehen.seed_raster(conn)
     for _ in range(4):
@@ -43,10 +43,10 @@ def test_luecken_proposal_traegt_seine_umsetzung_deklarativ():
     payload = json.loads(proposals.get_proposal(conn, pid)["payload"])
     assert payload["umsetzung"] == {
         "art": "faehigkeits_ziel",
-        "blatt": "weltfrage",
+        "blatt": "meinung",
         "beschreibung": payload["umsetzung"]["beschreibung"],
     }
-    assert "weltfrage" in payload["umsetzung"]["beschreibung"]
+    assert "meinung" in payload["umsetzung"]["beschreibung"]
 
 
 def test_ohne_freigabe_wird_nie_umgesetzt():
@@ -75,11 +75,11 @@ def test_freigabe_verankert_die_faehigkeit_im_ziel_graphen():
     assert ergebnis["umgesetzt"] is True and ergebnis["art"] == "faehigkeits_ziel"
     # die Lücke ist jetzt eine benannte Fähigkeit mit Status fehlt, dient ziel:verstehen
     fehlend = ziele.fehlende_faehigkeiten(conn)
-    assert any(f["id"] == "faehigkeit:weltfrage" for f in fehlend)
+    assert any(f["id"] == "faehigkeit:meinung" for f in fehlend)
     # und GENUS benennt sie selbst, wenn man fragt, was ihm fehlt
     from genus import companion
     antwort = companion.narrate_ziele(conn)
-    assert "weltfrage" in antwort
+    assert "meinung" in antwort
 
 
 def test_umsetzung_laeuft_genau_einmal():
@@ -122,7 +122,7 @@ def test_quelle_ist_ehrlich_genus_stufe1_nicht_ronny():
     pid = _luecken_proposal(conn)
     proposals.review_proposal_governed(conn, pid, "accepted")
     umsetzung.umsetzen(conn, pid)
-    kanten = sources.relations(conn, subject="faehigkeit:weltfrage")
+    kanten = sources.relations(conn, subject="faehigkeit:meinung")
     assert kanten and all(k["source"] == umsetzung.STUFE1_SOURCE for k in kanten)
 
 
@@ -148,7 +148,7 @@ def test_der_darf_ich_kommt_im_gespraech_nicht_erst_nachts():
     conn = _fresh()
     ziele.seed_ziele(conn)
     verstehen.seed_raster(conn)
-    fake = lambda q: [{"text": q, "absicht": "weltfrage", "subject": None, "object": None}]
+    fake = lambda q: [{"text": q, "absicht": "meinung", "subject": None, "object": None}]
     antworten = [
         companion.respond_with_deuter(conn, f"Wetterfrage Nummer {i}?", deuter=fake)["text"]
         for i in range(4)
@@ -162,7 +162,7 @@ def test_der_darf_ich_kommt_im_gespraech_nicht_erst_nachts():
     luecken = [r for r in proposals.list_proposals(conn)
                if json.loads(r["payload"]).get("experience_type") == "VerstehensLuecke"]
     assert len(luecken) == 1
-    assert json.loads(luecken[0]["payload"])["umsetzung"]["blatt"] == "weltfrage"
+    assert json.loads(luecken[0]["payload"])["umsetzung"]["blatt"] == "meinung"
 
 
 def test_auch_der_unklar_fall_meldet_sich_im_gespraech():
@@ -189,7 +189,7 @@ def test_der_check_kostet_nie_eine_antwort(monkeypatch):
     verstehen.seed_raster(conn)
     monkeypatch.setattr(experience, "spontane_regung",
                         lambda c: (_ for _ in ()).throw(RuntimeError("kaputt")))
-    fake = lambda q: [{"text": q, "absicht": "weltfrage", "subject": None, "object": None}]
+    fake = lambda q: [{"text": q, "absicht": "meinung", "subject": None, "object": None}]
     result = companion.respond_with_deuter(conn, "Wie wird das Wetter?", deuter=fake)
     assert "kann ich noch nicht" in result["text"]   # die ehrliche Antwort bleibt
 
@@ -208,7 +208,7 @@ def test_freigabe_legt_auch_den_werkstatt_entwurf_an():
     assert ergebnis["umgesetzt"] is True
     entwurf = ergebnis["ergebnis"]["entwurf"]
     assert entwurf["erstellt"] is True
-    handler = werkstatt.verzeichnis() / "zelle_weltfrage.py"
+    handler = werkstatt.verzeichnis() / "zelle_meinung.py"
     assert handler.exists()
     # Herkunft ehrlich: der Entwurf kam aus einer freigegebenen Umsetzung
     row = conn.execute(
@@ -223,13 +223,13 @@ def test_bestehender_entwurf_kippt_die_umsetzung_nicht():
     conn = _fresh()
     ziele.seed_ziele(conn)
     verstehen.seed_raster(conn)
-    werkstatt.entwerfe_zelle(conn, "weltfrage")   # Entwurf existiert schon
+    werkstatt.entwerfe_zelle(conn, "meinung")   # Entwurf existiert schon
     pid = _luecken_proposal(conn)
     proposals.review_proposal_governed(conn, pid, "accepted")
     ergebnis = umsetzung.umsetzen(conn, pid)
     assert ergebnis["umgesetzt"] is True          # Ziel-Wissen steht trotzdem
     assert ergebnis["ergebnis"]["entwurf"]["erstellt"] is False
-    assert any(f["id"] == "faehigkeit:weltfrage" for f in ziele.fehlende_faehigkeiten(conn))
+    assert any(f["id"] == "faehigkeit:meinung" for f in ziele.fehlende_faehigkeiten(conn))
 
 
 def test_entwurfs_fehler_kippt_die_umsetzung_nicht(monkeypatch):

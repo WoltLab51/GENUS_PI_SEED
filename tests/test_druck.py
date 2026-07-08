@@ -5,27 +5,27 @@ statt sich beim Aussprechen (dem Proposal) zu entladen. Read-time, keine Handlun
 from genus import companion, druck, experience, inquiries, verstehen
 
 
-def _heisse_luecke(conn, kind="weltfrage", n=4):
+def _heisse_luecke(conn, kind="meinung", n=4):
     verstehen.seed_raster(conn)
     for _ in range(n):
         verstehen.record_reading(conn, kind, "model:deuter")
 
 
 def test_ungestillte_luecke_drueckt_mit_ihrer_nachfrage(conn):
-    _heisse_luecke(conn, "weltfrage", 3)
+    _heisse_luecke(conn, "meinung", 3)
     d = druck.draengendste(conn)
-    assert d["was"] == "weltfrage" and d["nachfrage"] == 3
+    assert d["was"] == "meinung" and d["nachfrage"] == 3
     assert d["ausgesprochen"] is False and d["zuwachs"] is None
 
 
 def test_der_druck_persistiert_nach_dem_aussprechen_und_steigt(conn):
     # DER KERN: aussprechen entlädt den Druck NICHT -- weitere Nachfrage lässt ihn steigen
-    _heisse_luecke(conn, "weltfrage", 4)
+    _heisse_luecke(conn, "meinung", 4)
     experience.spontane_regung(conn)             # ausgesprochen bei Nachfrage 4
     for _ in range(3):                           # danach 3 weitere Lesungen
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     d = druck.draengendste(conn)
-    assert d["was"] == "weltfrage"
+    assert d["was"] == "meinung"
     assert d["nachfrage"] == 7                    # der Druck ist NICHT verschwunden
     assert d["ausgesprochen"] is True and d["ausgesprochen_bei"] == 4
     assert d["zuwachs"] == 3                      # er ist seither GEWACHSEN (Persistenz-Signal)
@@ -42,11 +42,11 @@ def test_eine_gestillte_luecke_drueckt_gar_nicht_mehr(conn):
 def test_der_druck_konkurriert_die_draengendste_zuerst(conn):
     verstehen.seed_raster(conn)
     for _ in range(6):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     for _ in range(2):
         verstehen.record_reading(conn, "tun", "model:deuter")
     rang = [d["was"] for d in druck.luecken_druck(conn)]
-    assert rang[0] == "weltfrage"                # 6 drückt stärker als 2
+    assert rang[0] == "meinung"                # 6 drückt stärker als 2
     assert "tun" in rang
 
 
@@ -56,16 +56,16 @@ def test_ohne_gelebte_nachfrage_kein_druck(conn):
 
 
 def test_druck_satz_benennt_das_persistenz_signal_nativ(conn):
-    _heisse_luecke(conn, "weltfrage", 4)
+    _heisse_luecke(conn, "meinung", 4)
     experience.spontane_regung(conn)
     for _ in range(3):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     s = druck.satz(conn)
-    assert "weltfrage" in s and "gestiegen" in s and "3" in s
+    assert "meinung" in s and "gestiegen" in s and "3" in s
 
 
 def test_druck_erzeugt_keine_events_bewegt_den_geist_nie_die_hand(conn):
-    _heisse_luecke(conn, "weltfrage", 4)
+    _heisse_luecke(conn, "meinung", 4)
     vorher = conn.execute("SELECT COUNT(*) n FROM event_log").fetchone()["n"]
     druck.luecken_druck(conn)
     druck.draengendste(conn)
@@ -75,9 +75,9 @@ def test_druck_erzeugt_keine_events_bewegt_den_geist_nie_die_hand(conn):
 
 
 def test_der_druck_taucht_in_was_beschaeftigt_dich_auf(conn):
-    _heisse_luecke(conn, "weltfrage", 5)
+    _heisse_luecke(conn, "meinung", 5)
     text = companion.narrate_inquiries(conn, companion.open_questions(conn))
-    assert "weltfrage" in text and "dringendsten" in text
+    assert "meinung" in text and "dringendsten" in text
 
 
 # --- Quelle 2: offene Inquiries, nach Wiederkehr ----------------------------------------
@@ -140,7 +140,7 @@ def test_die_landschaft_traegt_alle_registrierten_quellen(conn):
 
 def test_satz_nennt_luecke_und_fehlende_faehigkeit(conn):
     from genus import ziele
-    _heisse_luecke(conn, "weltfrage", 4)
+    _heisse_luecke(conn, "meinung", 4)
     ziele.seed_ziele(conn)
     s = druck.satz(conn)
-    assert "weltfrage" in s and "Fähigkeit" in s and "blockiert" in s
+    assert "meinung" in s and "Fähigkeit" in s and "blockiert" in s

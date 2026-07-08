@@ -36,14 +36,14 @@ def test_detector_stays_quiet_without_any_lived_demand():
 
 def test_concentrated_demand_on_a_gap_leaf_becomes_a_proposal():
     conn = _fresh()
-    # gelebter Druck auf einer ehrlichen Lücke (weltfrage hat keinen Handler, Zelle auch nicht)
+    # gelebter Druck auf einer ehrlichen Lücke (meinung hat keinen Handler, Zelle auch nicht)
     for _ in range(4):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     verstehen.record_reading(conn, "empfehlungsfrage", "model:deuter")   # Rauschen: 1 Lesung
 
     ergebnisse = _luecken_scan(conn)
     kinds = [r["pattern"]["kind"] for r in ergebnisse]
-    assert kinds == ["weltfrage"]   # 4 >= Saat 3; das 1x-Rauschen bleibt unter der Schwelle
+    assert kinds == ["meinung"]   # 4 >= Saat 3; das 1x-Rauschen bleibt unter der Schwelle
     props = [p for p in _proposals(conn)
              if p.get("payload", {}).get("experience_type") == experience.VERSTEHENS_LUECKE_TYPE
              or p.get("claim_value") == "verstehens_luecke"]
@@ -93,9 +93,9 @@ def test_threshold_is_self_calibrated_from_the_own_population_not_a_preset():
     for _ in range(2):
         verstehen.record_reading(conn, "korrektur", "model:deuter")
     for _ in range(9):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     kandidaten = experience._verstehens_luecke_candidates(conn)
-    assert [c["pattern"]["kind"] for c in kandidaten] == ["weltfrage"]
+    assert [c["pattern"]["kind"] for c in kandidaten] == ["meinung"]
     assert kandidaten[0]["pattern"]["threshold"] == 3   # 2+1: knapp über der Rausch-Gruppe
 
 
@@ -103,7 +103,7 @@ def test_seed_stays_a_validity_floor_when_all_demand_is_tiny():
     conn = _fresh()
     # zwei Blätter mit 1 und 2 Lesungen: die breiteste Lücke lieferte Schwelle 2 -- aber die
     # Saat (3) ist eine GÜLTIGKEITS-Untergrenze und wird nie unterschritten -> kein Kandidat
-    verstehen.record_reading(conn, "weltfrage", "model:deuter")
+    verstehen.record_reading(conn, "meinung", "model:deuter")
     for _ in range(2):
         verstehen.record_reading(conn, "tun", "model:deuter")
     assert experience._verstehens_luecke_candidates(conn) == []
@@ -112,7 +112,7 @@ def test_seed_stays_a_validity_floor_when_all_demand_is_tiny():
 def test_scan_is_idempotent_no_duplicate_proposals():
     conn = _fresh()
     for _ in range(4):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     experience.scan(conn)
     experience.scan(conn)   # zweiter Lauf: experience_key existiert -> kein neues Proposal
     props = [p for p in _proposals(conn) if p.get("claim_value") == "verstehens_luecke"]
@@ -126,14 +126,14 @@ def test_two_hot_gaps_are_proposed_one_per_scan_none_lost():
     # drängendste NEUE Lücke; die nächste rückt beim nächsten Scan nach.
     conn = _fresh()
     for _ in range(9):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     for _ in range(7):
         verstehen.record_reading(conn, "tun", "model:deuter")
     experience.scan(conn)
     experience.scan(conn)
     props = [p for p in _proposals(conn) if p.get("claim_value") == "verstehens_luecke"]
     beschriebene = {p["claim_key"] for p in props}
-    assert beschriebene == {"verstehen.weltfrage", "verstehen.tun"}   # beide, keins verloren
+    assert beschriebene == {"verstehen.meinung", "verstehen.tun"}   # beide, keins verloren
     assert len(props) == 2
 
 
@@ -169,17 +169,17 @@ def test_takt_registry_trennt_gespraechsnah_von_historisch():
 def test_spontane_regung_feuert_die_gelebte_luecke_sofort():
     conn = _fresh()
     for _ in range(4):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     regung = experience.spontane_regung(conn)
     assert regung is not None
-    assert regung["kind"] == "weltfrage" and regung["proposal_id"]
+    assert regung["kind"] == "meinung" and regung["proposal_id"]
     # dieselbe Lücke wird danach nicht doppelt aufgezeichnet (der Nacht-Scan holt nichts nach)
     assert _luecken_scan(conn) == []
 
 
 def test_spontane_regung_schweigt_ohne_reifes_signal():
     conn = _fresh()
-    verstehen.record_reading(conn, "weltfrage", "model:deuter")   # 1 Lesung, unter der Schwelle
+    verstehen.record_reading(conn, "meinung", "model:deuter")   # 1 Lesung, unter der Schwelle
     assert experience.spontane_regung(conn) is None
 
 
@@ -187,7 +187,7 @@ def test_spontane_regung_laesst_die_historischen_detektoren_ruhen():
     # ein gesprächsnaher Moment weckt NICHT die täglichen Historien-Betrachter
     conn = _fresh()
     for _ in range(4):
-        verstehen.record_reading(conn, "weltfrage", "model:deuter")
+        verstehen.record_reading(conn, "meinung", "model:deuter")
     experience.spontane_regung(conn)
     typen = {r["experience_type"] for r in conn.execute(
         "SELECT DISTINCT experience_type FROM experience_log").fetchall()}

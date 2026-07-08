@@ -1890,16 +1890,17 @@ def test_deuter_bare_dict_still_works_single_segment_backward_compatible():
     assert "kann ich noch nicht" not in result["text"]
 
 
-def test_weltfrage_is_an_honest_named_gap_not_a_wrong_guess():
-    # der eigentliche Auslöser der ganzen Zwicky-Box: "Wie wird das Wetter morgen?" wurde
-    # vorher als "vergleich" zwischen Wetter und Morgen fehlgedeutet -- jetzt gibt es eine
-    # eigene, ehrlich benannte Zelle dafür statt eines Fehlgriffs
+def test_weltfrage_wird_von_der_eigenen_sinnes_zelle_beantwortet():
+    # der eigentliche Auslöser der ganzen Zwicky-Box: "Wie wird das Wetter morgen?" wurde vorher
+    # als "vergleich" zwischen Wetter und Morgen fehlgedeutet -- jetzt hat weltfrage eine EIGENE
+    # Zelle, und seit P4 sogar einen SINN. Ohne Messwert (hier kein Wetter geseedet) antwortet
+    # sie ehrlich, statt zu erfinden, und benennt, was der Sinn noch nicht erreicht.
     from genus import companion
     conn = _isa_graph()
     deuter = lambda q: [{"absicht": "weltfrage"}]
     result = companion.respond_with_deuter(conn, "Wie wird das Wetter morgen?", deuter=deuter)
-    assert "Frage über die Welt draußen" in result["text"]
-    assert "kann ich noch nicht" in result["text"]
+    assert "erreicht die Welt im Moment nicht" in result["text"]
+    assert "Vorhersage" in result["text"]
 
 
 def test_tun_is_an_honest_named_gap_for_real_world_help_requests():

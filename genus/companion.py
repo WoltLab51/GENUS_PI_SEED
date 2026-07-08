@@ -1658,6 +1658,90 @@ def _zelle_einstellung(conn, guess, question, last_question, last_answer, stimme
     return _regler_stellen(conn, *deutung)
 
 
+# --- der erste SINN spricht (P4, Ronny 2026-07-08: „auf jeden fall p4" -> Wetter) ---------
+#
+# GENUS nimmt die Aussentemperatur schon stuendlich WAHR (deploy/observe_weather.sh reicht die
+# nackte Zahl durch die Membran; der Kern greift NIE selbst ins Netz), aber bis hier konnte es
+# sie nicht AUSSPRECHEN -- die Raster-Zelle „weltfrage" hatte keinen Handler. Dies ist der eine
+# fehlende Lese-Draht: er liest den Wert rein aus dem Ledger (sources.resolve, mit Herkunft +
+# Frische + Quellen-Konsens) und spricht ihn gLASERN aus. Ehrliche Teil-Antwort: was der Sinn
+# ERREICHT (aktuelle Temperatur) wird gesagt, was er NICHT erreicht (Vorhersage, Regen, andere
+# Orte) wird ehrlich benannt statt erfunden. Reines Lesen -> nicht schreibend; wortlautfest ->
+# die Stimme formt die Sensor-Zahl nie um (sie ist Fakt, kein Ausdruck).
+_TREND_DE = {
+    "rising": "Die Temperatur steigt gerade.",
+    "falling": "Die Temperatur faellt gerade.",
+    "stable": "Sie ist gerade recht konstant.",
+}
+_WETTER_FRISCH_STUNDEN = 2.0   # ~ zwei stuendliche Ticks; darueber ist der Wert nicht mehr „gerade"
+
+
+def _formatiere_grad(wert) -> str:
+    """Die Sensor-Zahl als deutscher Grad-Wert (Komma), auf eine Nachkommastelle -- lieber
+    ehrlich rund als falsche Praezision."""
+    zahl = float(wert)
+    return f"{zahl:.1f}".replace(".", ",") + " °C"
+
+
+def _wetter_alter_stunden(conn, quelle):
+    """Stunden zwischen JETZT (Wanduhr) und der neuesten Messung der gewaehlten Quelle -- gegen
+    die Wanduhr, NICHT relativ zur eigenen Reihe wie ``sources.resolve``'s ``live`` (das misst
+    Frische nur zwischen Quellen und ist bei EINER Quelle immer 1.0). Nur ein echter Wanduhr-
+    Vergleich laesst einen tage-alten Wert als „nicht mehr gerade" auffallen. Rein read-time
+    (Mundstueck, nichts gespeichert -> Replay unberuehrt, wie die Motor-Erzaehlung). ``None``,
+    wenn kein Zeitstempel lesbar ist."""
+    from datetime import datetime, timezone
+
+    from genus import sources
+
+    stempel = [r["created_at"] for r in sources.assertions(conn, "weather.temp_outside")
+               if r["source"] == quelle and r.get("created_at")]
+    if not stempel:
+        return None
+    try:
+        ts = datetime.fromisoformat(max(stempel).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0
+
+
+def _zelle_weltfrage(conn, guess, question, last_question, last_answer, stimme=None):
+    """Spricht die wahrgenommene Aussentemperatur aus -- der erste Sinn (P4), rein lesend."""
+    from genus import projection, sources
+
+    aufgeloest = sources.resolve(conn, "weather.temp_outside")
+    wert = aufgeloest.get("value")
+    rest = ("Vorhersage, Regen oder andere Orte kann ich noch nicht — dafuer fehlt meinem "
+            "Wetter-Sinn noch Material.")
+    if wert is None:
+        return ("Von der Welt draussen fuehle ich bisher nur die Aussentemperatur — und die "
+                "habe ich gerade nicht: mein Wetter-Sinn erreicht die Welt im Moment nicht. " + rest)
+    # Der Quell-NAME wird (noch) nicht ausgesprochen: die erste Quelle traegt intern nur das
+    # generische Label „weather.api" (der Provider-Name geht im Schreibpfad verloren) -- lieber
+    # gar keine Quelle in der Stimme als eine nichtssagende. Die Herkunft bleibt im Ledger
+    # abfragbar (glaesern), und das Label-Fix kommt mit dem Mehr-Wetter-Schnitt.
+    alter = _wetter_alter_stunden(conn, aufgeloest.get("chosen_source"))
+    if alter is not None and alter <= _WETTER_FRISCH_STUNDEN:
+        satz = f"Draussen sind es gerade {_formatiere_grad(wert)}."
+        trend_row = projection.active_belief(conn, "weather.trend")
+        trend = _TREND_DE.get(trend_row["claim_value"]) if trend_row else None
+        if trend:   # ein Trend gehoert nur zu einem frischen Wert (er beschreibt das JETZT)
+            satz += " " + trend
+    elif alter is not None:
+        wann = (f"von vor rund {round(alter / 24)} Tagen" if alter >= 24
+                else f"von vor rund {round(alter)} Stunden")
+        satz = (f"Mein letzter Wetter-Wert ({wann}) war {_formatiere_grad(wert)} — "
+                f"frischer habe ich gerade nichts.")
+    else:
+        satz = (f"Mein letzter Wetter-Wert war {_formatiere_grad(wert)}, aber wie frisch er "
+                f"ist, weiss ich gerade nicht.")
+    if aufgeloest.get("contradiction"):
+        satz += " Meine Wetterquellen sind sich gerade uneinig, also ohne Gewaehr."
+    return satz + " " + rest
+
+
 # Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;
 # which cells exist and how they relate lives in the ledger (genus.verstehen.RASTER_SEED +
 # ZELLEN). Die Schlüssel sind jetzt teils Feinblätter (definition, gruss, ...), teils die
@@ -1694,6 +1778,7 @@ _HANDELBAR = {
     "kritik": _zelle_kritik,
     "abschied": _zelle_abschied,
     "einstellung": _zelle_einstellung,
+    "weltfrage": _zelle_weltfrage,
 }
 
 ZELLE_PREFIX = "zelle:"
@@ -1721,6 +1806,7 @@ _ZELLEN_PRUEFBAR = {
     "tatsache": "erinnerung", "merken": "erinnerung", "erinnerungs-abruf": "erinnerung",
     "gruss": "fest", "dank": "fest", "lob": "fest", "kritik": "fest", "abschied": "fest",
     "einstellung": "graph",
+    "weltfrage": "sinn",   # der erste Sinn (P4): der Wert kommt aus einem Sensor durch die Membran
 }
 
 
