@@ -64,6 +64,7 @@ def scan(conn) -> list[dict]:
                 proposals_created += 1
             recorded.append(ergebnis)
     _raise_stability_surprises(conn)
+    _raise_abstraktion_surprises(conn)
     return recorded
 
 
@@ -539,6 +540,56 @@ def _stability_inquiry_exists(conn, source_event: int) -> bool:
         (STABILITY_INQUIRY_TYPE, source_event),
     ).fetchone()
     return row is not None
+
+
+def _abstraktion_inquiry_offen(conn, claim_key: str) -> bool:
+    # ZUSTANDS-basiertes Dedup (wie reactors._open_source_contradiction, NICHT event-basiert):
+    # die Überraschung ist ein Graph-Zustand, kein diskretes Ereignis -> eine OFFENE Inquiry je
+    # stabilem claim_key. Beantwortet/aufgelöst darf dieselbe Frage später wiederkommen.
+    row = conn.execute(
+        "SELECT 1 FROM inquiry_log WHERE inquiry_type = ? AND claim_key = ? AND state = 'open' LIMIT 1",
+        (inquiries.ABSTRAKTION_INQUIRY_TYPE, claim_key),
+    ).fetchone()
+    return row is not None
+
+
+def _raise_abstraktion_surprises(conn) -> list[int]:
+    # Die RÜCKKOPPLUNG der selbst geprägten Begriffe (faehigkeit:abstrahieren) -- damit ein Begriff
+    # MIETE zahlt: er wird zur lebenden Erwartung. Rein read-then-flag (wie _raise_stability_surprises):
+    # schreibt KEINE Graph-Kante, hebt nur Fragen. Wachstum (der Begriff sagt neue Mitglieder voraus)
+    # und Widerspruch (er trägt seine Mitglieder nicht mehr zusammen) werden je zu EINER offenen,
+    # idempotenten Inquiry -- die über die bestehenden Kanäle (Morgen-Gruß, „Was beschäftigt dich?")
+    # bei Ronny landet. Die Auflösung bleibt Proposal≠Change (menschliches teach_relation).
+    from genus import abstraktion
+
+    raised: list[int] = []
+    anker = (conn.execute("SELECT MAX(id) AS m FROM event_log").fetchone()["m"]) or 0
+    for kid, _P in abstraktion.gepraegte_begriffe(conn):
+        r = abstraktion.rueckkopplung(conn, kid)
+        if r["vorhergesagt"]:
+            art, ck, payload = "wachstum", f"{kid}|wachstum", {
+                "art": "wachstum", "konzept": kid, "elternteil": r["elternteil"],
+                "kandidaten": r["vorhergesagt"][:8], "review_recommended": True}
+        elif not r["stimmig"]:
+            art, ck, payload = "widerspruch", f"{kid}|widerspruch", {
+                "art": "widerspruch", "konzept": kid, "elternteil": r["elternteil"],
+                "review_recommended": True}
+        else:
+            continue
+        if _abstraktion_inquiry_offen(conn, ck):
+            continue
+        inquiries.record_inquiry_created_event(
+            conn,
+            inquiry_id=inquiries.next_inquiry_id(conn),
+            inquiry_type=inquiries.ABSTRAKTION_INQUIRY_TYPE,
+            claim_key=ck,
+            source_belief=None,   # ein geprägter Begriff hat keine belief-Zeile
+            source_event=int(anker),
+            question_key=inquiries.ABSTRAKTION_QUESTION,
+            payload=payload,
+        )
+        raised.append(int(anker))
+    return raised
 
 
 def _median(values: list[float]) -> float:

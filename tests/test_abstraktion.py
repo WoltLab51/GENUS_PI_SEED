@@ -170,6 +170,96 @@ def test_konzept_id_ist_stabil_und_reihenfolge_unabhaengig():
     assert abstraktion._konzept_id(["b", "a", "c"]) == abstraktion._konzept_id(["c", "b", "a"])
 
 
+def _geraet_gruppe_gepraegt(conn):
+    _geraet_gruppe(conn)
+    k = abstraktion.verdichte(conn, "geraet")[0]
+    return abstraktion.praege(conn, k)["konzept"]
+
+
+def test_gepraegte_begriffe_und_kinder_schliessen_konzept_aus():
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    assert (kid, "geraet") in abstraktion.gepraegte_begriffe(conn)
+    assert kid not in abstraktion._kinder(conn, "geraet")   # inertes konzept:auto:* ausgeschlossen
+
+
+def test_frisch_gepraegter_begriff_ist_stimmig_ohne_vorhersage():
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    r = abstraktion.rueckkopplung(conn, kid)
+    assert r["stimmig"] and r["vorhergesagt"] == []
+
+
+def test_rueckkopplung_sagt_neues_mitglied_voraus():
+    # ein neues Geraet, das dasselbe Buendel traegt, aber noch kein Mitglied ist -> Vorhersage
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    for p, o in (("made_of", "kunststoff"), ("used_for", "haushalt"), ("has_part", "motor")):
+        _rel(conn, "mixer", p, o)
+    _rel(conn, "mixer", "is_a", "geraet")
+    r = abstraktion.rueckkopplung(conn, kid)
+    assert "mixer" in r["vorhergesagt"] and r["stimmig"]
+
+
+def test_widerspruch_wenn_ein_fremdes_mitglied_dazukommt():
+    # ein Fremdling, der das Buendel NICHT teilt, wird hineingelehrt -> der Begriff haelt nicht mehr
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    _rel(conn, "buch", "is_a", kid)
+    r = abstraktion.rueckkopplung(conn, kid)
+    assert not r["stimmig"]
+
+
+def test_kein_falscher_widerspruch_wenn_begriff_alle_kinder_umfasst():
+    # Review-Fund 1: entfaellt das Kontrast-Geschwister, umfasst der Begriff ALLE Kinder von P und
+    # seine Merkmale werden "universell" -> verdichte faende nichts. Die Kohaerenz misst DIREKT an
+    # den Mitgliedern -> sie teilen ihr Buendel weiterhin -> stimmig, KEIN Fehlalarm.
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    reactors.retract_relation(conn, "buch", "is_a", "geraet", source="test", reason="weg")
+    r = abstraktion.rueckkopplung(conn, kid)
+    assert r["stimmig"] and r["vorhergesagt"] == []
+
+
+def test_kein_falscher_widerspruch_wenn_begriff_benannt_wird():
+    # Review-Fund 3: gibt ein Mensch dem Begriff einen Namen, wuerde verdichte ihn selbst-
+    # unterdruecken. Die direkte Kohaerenz-Messung ist davon unberuehrt -> stimmig.
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    _rel(conn, "Haushaltsgeraet@de", "label", kid)   # ein Mensch benennt den Begriff
+    r = abstraktion.rueckkopplung(conn, kid)
+    assert r["stimmig"]
+
+
+def test_raise_abstraktion_surprises_hebt_wachstums_inquiry_idempotent():
+    from genus import experience, inquiries
+    conn = _fresh()
+    kid = _geraet_gruppe_gepraegt(conn)
+    for p, o in (("made_of", "kunststoff"), ("used_for", "haushalt"), ("has_part", "motor")):
+        _rel(conn, "mixer", p, o)
+    _rel(conn, "mixer", "is_a", "geraet")
+
+    experience._raise_abstraktion_surprises(conn)
+    offen = [i for i in inquiries.list_inquiries(conn, include_all=False)
+             if i["inquiry_type"] == inquiries.ABSTRAKTION_INQUIRY_TYPE]
+    assert len(offen) == 1 and offen[0]["claim_key"] == f"{kid}|wachstum"
+
+    experience._raise_abstraktion_surprises(conn)   # zweiter Lauf -> keine zweite Inquiry
+    offen2 = [i for i in inquiries.list_inquiries(conn, include_all=False)
+              if i["inquiry_type"] == inquiries.ABSTRAKTION_INQUIRY_TYPE]
+    assert len(offen2) == 1
+
+
+def test_speak_inquiry_rendert_abstraktion_lesbar():
+    from genus import companion
+    conn = _fresh()
+    _rel(conn, "Geraet@de", "label", "geraet")
+    g = {"inquiry_type": "AbstraktionInquiry", "claim_key": "konzept:auto:x|wachstum", "count": 1,
+         "payload": {"art": "wachstum", "elternteil": "geraet", "kandidaten": ["mixer"]}}
+    text = companion._speak_inquiry(conn, g)
+    assert "gebildet habe" in text and "mixer" in text
+
+
 def test_gepraegter_begriff_ist_ueber_concept_meaning_ansprechbar():
     # der selbst-geschriebene Gloss (inhalt) taucht in concept_meaning auf -> `genus concept` kann
     # den selbst gebildeten Begriff erklären, nicht nur seinen is_a-Elternteil zeigen.

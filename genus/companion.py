@@ -1267,6 +1267,14 @@ def _speak_inquiry(conn, g: dict) -> str:
         return f"Mein Zustand hat sich geändert und ich kenne die Ursache nicht (»{claim}«){times}."
     if t == "ExpectationInquiry":
         return f"»{claim}« verhält sich anders, als mein gelernter Rhythmus erwartet{times}."
+    if t == "AbstraktionInquiry":
+        eltern = _label(conn, p["elternteil"]) if p.get("elternteil") else "einem Muster"
+        if p.get("art") == "wachstum":
+            kand = ", ".join(_label(conn, k) for k in (p.get("kandidaten") or [])[:5]) or "etwas"
+            return (f"Sollte auch {kand} zu dem Begriff gehören, den ich selbst unter "
+                    f"»{eltern}« gebildet habe?{times}")
+        return (f"Der Begriff, den ich selbst unter »{eltern}« gebildet habe, trägt seine "
+                f"Mitglieder nicht mehr zusammen{times}.")
     return f"»{claim}« ({t}){times}."
 
 

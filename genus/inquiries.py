@@ -9,6 +9,8 @@ INQUIRY_TYPE = "CauseInquiry"
 QUESTION_KEY = "cause.changed_state"
 SOURCE_CONTRADICTION_TYPE = "SourceContradiction"
 SOURCE_CONTRADICTION_QUESTION = "source.contradiction"
+ABSTRAKTION_INQUIRY_TYPE = "AbstraktionInquiry"   # die Rückkopplung selbst geprägter Begriffe
+ABSTRAKTION_QUESTION = "abstraktion.rueckkopplung"
 OPEN = "open"
 RESOLVED = "resolved"
 

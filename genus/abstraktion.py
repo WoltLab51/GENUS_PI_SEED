@@ -59,8 +59,12 @@ def _merkmale(conn, X: str) -> set[tuple[str, str]]:
 
 def _kinder(conn, P: str) -> list[str]:
     """Die Kinder von P (Knoten mit ``is_a P``), distinkt -- je Kind eine Stimme (der Graph ist
-    mehrfach bequellt, wie in hypothese._geschwister)."""
-    return sorted({r["subject"] for r in sources.relations(conn, predicate=IS_A, object=P)})
+    mehrfach bequellt, wie in hypothese._geschwister). SELBST geprägte Begriffe (``konzept:auto:*``)
+    werden ausgeschlossen: sie sind is_a P, tragen aber keine Merkmale und würden als inertes
+    Extra-Kind die Diskriminanz-Schwelle (``< n``) verfälschen und einen Begriff bei seiner eigenen
+    Rückkopplung maskieren."""
+    return sorted({r["subject"] for r in sources.relations(conn, predicate=IS_A, object=P)
+                   if not r["subject"].startswith("konzept:auto:")})
 
 
 def _schon_benannt(conn, mitglieder: list[str], P: str) -> str | None:
@@ -266,3 +270,57 @@ def praege(conn, kandidat: dict) -> dict:
         kanten.append((kid, INHALT, _gloss(conn, kandidat)))
     gesaet = reactors.sae_fehlende(conn, kanten, MODEL_QUELLE)
     return {"konzept": kid, "gesaet": gesaet}
+
+
+# --- Rückkopplung: der geprägte Begriff als lebende Erwartung (Scheibe 3) -------------------
+
+def gepraegte_begriffe(conn) -> list[tuple[str, str]]:
+    """Alle selbst geprägten Begriffe als ``(kid, Elternteil P)`` -- die ``konzept:auto:*``-Knoten
+    mit einer ``model:abstraktion``-``is_a``-Kante. EINE indizierte Abfrage."""
+    rows = conn.execute(
+        "SELECT DISTINCT subject, object FROM relation_projection "
+        "WHERE predicate = ? AND source = ? AND subject LIKE 'konzept:auto:%'",
+        (IS_A, MODEL_QUELLE),
+    ).fetchall()
+    return sorted((r["subject"], r["object"]) for r in rows)
+
+
+def _gemeinsames_buendel(conn, mitglieder: set[str]) -> set[tuple[str, str]]:
+    """Die Merkmale (:data:`MERKMAL_PRAEDIKATE`), die ALLE Mitglieder teilen -- der Durchschnitt
+    ihrer Profile. Die DIREKTE Kohärenz-Messung: unabhängig von P's anderen Kindern, von einer
+    etwaigen Benennung des Begriffs und von :func:`verdichte`. (Review: die Kohärenz an verdichte
+    zu hängen erzeugte Fehlalarme -- verdichte gibt aus mehreren Gründen nichts zurück, die NICHTS
+    mit Inkohärenz zu tun haben: universelle Merkmale, ein benannter Begriff, ein Naben-Elternteil.)"""
+    profile = [_merkmale(conn, m) for m in mitglieder]
+    return set.intersection(*profile) if profile else set()
+
+
+def rueckkopplung(conn, kid: str) -> dict:
+    """Die Rückkopplung EINES geprägten Begriffs gegen den aktuellen Graphen -- rein lesend,
+    modellfrei, schreibt nichts. Der Begriff wird zur lebenden ERWARTUNG:
+
+    - **Kohärenz/Widerspruch:** teilen die aktuellen Mitglieder noch ein Bündel von ≥
+      :data:`MIN_MERKMALE` gemeinsamen Merkmalen? Ein hineingelehrtes Fremd-Mitglied lässt den
+      Durchschnitt kippen -> der Begriff hält nicht mehr (``stimmig`` False). Das ist eine DIREKTE
+      Messung an den Mitgliedern -- sie gilt auch, wenn der Begriff alle Kinder umfasst oder einen
+      Namen bekommen hat.
+    - **Vorhersage/Wachstum:** trägt ein Nicht-Mitglied unter demselben Elternteil P das ganze
+      gemeinsame Bündel? Dann sagt der Begriff voraus, dass es dazugehören sollte. Über Naben-
+      Elternteile (> :data:`MAX_KINDER_JE_ELTERNTEIL` Kinder) wird die Vorhersage bewusst
+      übersprungen (Kosten, wie in :func:`entdecke`); die Kohärenz bleibt trotzdem billig geprüft."""
+    eltern = sorted(_objekte(conn, kid, IS_A))
+    mitglieder = set(_kinder(conn, kid))
+    if not eltern or len(mitglieder) < MIN_MITGLIEDER:
+        return {"kid": kid, "elternteil": eltern[0] if eltern else None,
+                "mitglieder": sorted(mitglieder), "vorhergesagt": [], "stimmig": False}
+    P = eltern[0]
+    buendel = _gemeinsames_buendel(conn, mitglieder)
+    stimmig = len(buendel) >= MIN_MERKMALE
+    vorhergesagt: list[str] = []
+    if stimmig:
+        kinder_P = _kinder(conn, P)
+        if len(kinder_P) <= MAX_KINDER_JE_ELTERNTEIL:
+            vorhergesagt = sorted(x for x in kinder_P
+                                  if x not in mitglieder and buendel <= _merkmale(conn, x))
+    return {"kid": kid, "elternteil": P, "mitglieder": sorted(mitglieder),
+            "vorhergesagt": vorhergesagt, "stimmig": stimmig}

@@ -967,7 +967,9 @@ def hypothese_command(subjekt: str, tick: bool) -> None:
               help="nur unter diesem is_a-Elternteil suchen (sonst der ganze Graph)")
 @click.option("--tick", is_flag=True,
               help="den EINEN stärksten Kandidaten als gedeckelten Knoten PRÄGEN (Proposal≠Change)")
-def abstraktion_command(limit: int, unter: str | None, tick: bool) -> None:
+@click.option("--pruefe", is_flag=True,
+              help="die schon geprägten Begriffe gegen den Graphen prüfen (Vorhersage/Widerspruch, rein lesend)")
+def abstraktion_command(limit: int, unter: str | None, tick: bool, pruefe: bool) -> None:
     """Die Operation ABSTRAHIEREN (faehigkeit:abstrahieren): GENUS findet Gruppen von Geschwistern,
     die ein noch UNBENANNTES Merkmal-Bündel teilen UND eine weitere Eigenschaft vorhersagen — der
     Keim eines eigenen Begriffs (docs/GENUS_INTELLIGENZ.md: Verdichtung, kürzer als die Fakten).
@@ -976,6 +978,23 @@ def abstraktion_command(limit: int, unter: str | None, tick: bool) -> None:
     Trust ≤ 0.25 — überstimmt nie Geerdetes); der Mensch bestätigt (teach) oder verwirft (retract)."""
     conn = get_conn()
     try:
+        if pruefe:
+            begriffe = abstraktion.gepraegte_begriffe(conn)
+            if not begriffe:
+                click.echo("[ABS] Noch kein geprägter Begriff.")
+                return
+            click.echo(f"[ABS] {len(begriffe)} geprägte(r) Begriff(e) — Rückkopplung gegen den Graphen:")
+            for kid, _p in begriffe:
+                r = abstraktion.rueckkopplung(conn, kid)
+                click.echo(f"\n[ABS] {kid} (unter {r['elternteil']}, {len(r['mitglieder'])} Mitglieder)")
+                if r["vorhergesagt"]:
+                    click.echo(f"[ABS]   VORHERSAGE: auch {', '.join(r['vorhergesagt'][:8])} tragen "
+                               f"das ganze Bündel — sollten sie dazugehören?")
+                if not r["stimmig"]:
+                    click.echo("[ABS]   WIDERSPRUCH: die Mitglieder bilden keine kohärente Gruppe mehr.")
+                if r["stimmig"] and not r["vorhergesagt"]:
+                    click.echo("[ABS]   stimmig, keine offene Vorhersage.")
+            return
         kandidaten = (abstraktion.verdichte(conn, unter) if unter
                       else abstraktion.entdecke(conn, hoechstens=limit))[:limit]
         if not kandidaten:
