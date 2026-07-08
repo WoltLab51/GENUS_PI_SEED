@@ -184,6 +184,45 @@ def test_stimme_reicht_einen_news_block_nie_ans_modell(conn):
     assert gerufen == ["Ein ganz normaler Satz."]                        # normal weiter angeboten
 
 
+# --- der Uhrzeit-Sinn (P4, Pi-eigene Uhr + NTP-Vorbehalt) --------------------------------
+
+def test_zeitfrage_nennt_uhrzeit_und_datum(conn):
+    import re
+    text = companion._zelle_weltfrage(conn, {"text": "Wie spät ist es?"},
+                                      "Wie spät ist es?", None, None)
+    assert "Uhr" in text and re.search(r"\d\d:\d\d", text)
+
+
+def test_zeitfrage_nennt_ntp_vorbehalt_wenn_uhr_unsynchron(conn):
+    from genus import operation
+    operation.record_clock_check(conn, "fail")   # -> system.clock unsynchronized
+    text = companion._zelle_weltfrage(conn, {"text": "Wie spät?"}, "Wie spät?", None, None)
+    assert "ohne Gewähr" in text
+
+
+def test_zeitfrage_verdraengt_nicht_wetter(conn):
+    # eine Wetterfrage bleibt Wetter (kein Zeit-Schluessel drin)
+    _saee_wetter(conn, 8.0)
+    text = companion._zelle_weltfrage(conn, {"text": "Wie ist das Wetter?"},
+                                      "Wie ist das Wetter?", None, None)
+    assert "8,0 °C" in text and "Uhr" not in text
+
+
+def test_zeit_dispatch_stiehlt_keine_wetter_oder_news_frage():
+    # Review-Fund: „welche zeit" war Teilstring von „Zeitung"; Zeit weicht jetzt Wetter/News
+    assert not companion._ist_zeit_frage("Welche Zeitung meldet den Sturm?")   # Sturm = Wetter
+    assert not companion._ist_zeit_frage("Was gibt es Neues?")                 # News
+    assert companion._ist_zeit_frage("Wie spät ist es?")                       # echte Zeit-Frage
+
+
+def test_news_top_verschweigt_ohne_zeitstempel(conn, tmp_path, monkeypatch):
+    # Review-Fund: fehlt der Zeitstempel, ist das Alter unbekannt -> NICHT als frisch zeigen
+    pfad = tmp_path / "ohne_ts.json"
+    pfad.write_text(json.dumps({"schlagzeilen": [{"titel": "Ohne Zeitstempel"}]}), encoding="utf-8")
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(pfad))
+    assert companion.news_top(conn) is None
+
+
 def test_weltfrage_bevorzugt_die_frischere_quelle_bei_zwei(conn):
     # zwei unabhaengige Quellen fuer denselben Claim: sources.resolve waehlt read-time nach
     # Vertrauen x Frische -- der Handler spricht den gewaehlten Wert, keine Erfindung dazwischen

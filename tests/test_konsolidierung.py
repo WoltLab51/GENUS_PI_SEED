@@ -133,6 +133,24 @@ def test_betrieb_zeile_leakt_keinen_rohen_key_und_crasht_nicht_bei_klammern():
     assert "einen weiteren Betriebs-Hinweis" in gemischt and "system.activity" not in gemischt
 
 
+def test_morgen_briefing_webt_wetter_und_schlagzeile(conn, tmp_path, monkeypatch):
+    # P4-Weave: frisches Wetter + oberste Schlagzeile beilaeufig in den Morgen-Gruss
+    import json
+    import time
+
+    from genus import sensor
+    reactors.observe_weather_reading(conn, sensor.weather_reading(16.0, "open-meteo"))
+    pfad = tmp_path / "news.json"
+    pfad.write_text(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                "quelle": "Tagesschau",
+                                "schlagzeilen": [{"titel": "Wichtige Nachricht heute"}]}),
+                    encoding="utf-8")
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(pfad))
+    text = konsolidierung.morgen_nachricht(conn, None)
+    assert "Draußen ist es" in text and "16,0 °C" in text
+    assert "In den Nachrichten:" in text and "Wichtige Nachricht heute" in text
+
+
 def test_leerer_morgen_ist_nie_leer_sondern_erzaehlt_das_gelernte(conn):
     # Ronnys Entscheidung: kein Schweigen -- wenn nichts wartet, erzaehlt GENUS,
     # was der Nacht-Lerner zuletzt gelernt hat.

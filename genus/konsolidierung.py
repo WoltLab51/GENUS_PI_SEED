@@ -183,6 +183,20 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
     teile: list[str] = ["Guten Morgen, Ronny!" if warm else "Guten Morgen, Ronny."]
     inhalt = False
 
+    # Ein kurzes Morgen-Briefing aus den Sinnen (P4): Wetter + oberste Schlagzeile, beide nur bei
+    # frischem Material (companion schweigt sonst). Der Morgen-Gruss wird wortgetreu gesendet
+    # (kein Modell), also bleibt die fremde Schlagzeile unangetastet.
+    from genus import companion
+
+    wetter = companion.wetter_kurz(conn)
+    if wetter:
+        teile.append(f"Draußen ist es {wetter}.")
+        inhalt = True
+    schlagzeile = companion.news_top(conn)
+    if schlagzeile:
+        teile.append(f"In den Nachrichten: „{schlagzeile}“.")
+        inhalt = True
+
     themen = (bericht or {}).get("themen") or []
     if themen:
         namen = " und ".join(f"„{t['label']}“" for t in themen[:2])

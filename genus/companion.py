@@ -1830,10 +1830,81 @@ def _news_bericht(conn):
     return f"{kopf}\n{liste}"
 
 
+# Der billigste Sinn: die eigene Uhr. GENUS liest die Pi-Uhr (read-time, kein Netz noetig) und
+# weiss aus dem bestehenden Uhr-Check (operation, system.clock), ob es einen NTP-Vorbehalt
+# anhaengen muss -- ein selbst-bezueglicher Sinn (die eigene Zeit + das Vertrauen darin).
+# Bewusst EINDEUTIGE Wendungen: „welche zeit" (Teilstring von „Zeitung") und das breite
+# „welcher tag" sind RAUS (Review-Fund) -- und eine Zeit-Frage weicht ohnehin Wetter/News-
+# Woertern, damit „Welcher Wochentag wird der waermste?" nicht die Uhr zieht.
+_ZEIT_SCHLUESSEL = ("wie spät", "wie spaet", "spät ist", "spaet ist", "uhrzeit",
+                    "wie viel uhr", "wieviel uhr", "welche uhrzeit", "welches datum",
+                    "welcher wochentag", "welchen wochentag", "der wievielte")
+_WOCHENTAG_DE = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
+
+
+def _ist_zeit_frage(text) -> bool:
+    t = (text or "").casefold()
+    if any(w in t for w in _WETTER_SCHLUESSEL) or any(s in t for s in _NEWS_SCHLUESSEL):
+        return False   # eine Wetter-/News-Frage bleibt Wetter/News, auch mit Zeit-Wort drin
+    return any(s in t for s in _ZEIT_SCHLUESSEL)
+
+
+def _uhrzeit_bericht(conn):
+    """Die aktuelle Uhrzeit + Datum aus der Pi-eigenen Uhr -- mit ehrlichem NTP-Vorbehalt, wenn
+    der Uhr-Check (system.clock) die Uhr als nicht synchronisiert kennt. Rein lesend."""
+    from datetime import datetime
+
+    from genus import projection
+
+    jetzt = datetime.now()
+    satz = (f"Es ist gerade {jetzt.strftime('%H:%M')} Uhr — {_WOCHENTAG_DE[jetzt.weekday()]}, "
+            f"der {jetzt.strftime('%d.%m.%Y')}.")
+    clock = projection.active_belief(conn, "system.clock")
+    if clock is not None and clock["claim_value"] == "unsynchronized":
+        satz += " (Meine Uhr ist gerade nicht mit der Netzzeit synchron — also ohne Gewähr.)"
+    return satz
+
+
+def wetter_kurz(conn):
+    """Eine kurze Wetter-Zeile fuer den Morgen-Gruss (Zustand + Temperatur) -- nur bei FRISCHEM
+    Wert; ``None`` sonst (dann schweigt der Morgen zum Wetter, statt Altes zu behaupten)."""
+    from genus import sources
+
+    temp_res = sources.resolve(conn, "weather.temp_outside")
+    wert = temp_res.get("value")
+    if wert is None:
+        return None
+    alter = _wetter_alter_stunden(conn, "weather.temp_outside", temp_res.get("chosen_source"))
+    if alter is None or alter > _WETTER_FRISCH_STUNDEN:
+        return None
+    code = _frischer_wert(conn, "weather.code")
+    zustand = _WMO_DE.get(int(code)) if code is not None else None
+    return f"{zustand}, {_formatiere_grad(wert)}" if zustand else _formatiere_grad(wert)
+
+
+def news_top(conn):
+    """Die oberste AKTUELLE Schlagzeile (wortgetreu) fuer den Morgen-Gruss -- ``None``, wenn
+    keine (frischen) da sind. Fremdtext: der Morgen-Gruss wird deterministisch und WORTGETREU
+    gesendet (kein Modell), also bleibt die Schlagzeile unangetastet wie im Chat."""
+    puffer = _lies_news_puffer() or {}
+    alter = _puffer_alter_stunden(puffer.get("ts"))
+    if alter is None or alter > _NEWS_FRISCH_STUNDEN:   # kein Alter bekannt = nicht als frisch zeigen
+        return None
+    roh = puffer.get("schlagzeilen")
+    if not isinstance(roh, list):
+        return None
+    for z in roh:
+        if isinstance(z, dict) and z.get("titel"):
+            return z["titel"]
+    return None
+
+
 def _zelle_weltfrage(conn, guess, question, last_question, last_answer, stimme=None):
-    """Der Welt-Sinn (P4): Nachrichten-Frage -> News-Sinn, sonst -> Wetter-Sinn (der Deuter
-    fasst beides als „weltfrage"). Beide rein lesend."""
+    """Der Welt-Sinn (P4): Zeit-Frage -> Uhr, Nachrichten-Frage -> News, sonst -> Wetter (der
+    Deuter fasst all das als „weltfrage"). Alle drei rein lesend."""
     text = (guess.get("text") if isinstance(guess, dict) else "") or question or ""
+    if _ist_zeit_frage(text):
+        return _uhrzeit_bericht(conn)
     if _ist_news_frage(text):
         return _news_bericht(conn)
     return _wetter_bericht(conn)
