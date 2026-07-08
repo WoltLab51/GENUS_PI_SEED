@@ -18,7 +18,7 @@ LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 PUFFER="${GENUS_NEWS_PUFFER:-$GENUS_HOME/.genus/news_puffer.json}"
 PY="$REPO_DIR/.venv/bin/python"
 SOURCE="Tagesschau"
-URL="https://www.tagesschau.de/xml/rss2/"
+URL="https://www.tagesschau.de/index~rss2.xml"
 
 mkdir -p "$LOG_DIR" "$(dirname "$PUFFER")"
 
@@ -31,7 +31,7 @@ if [ -f "$(dirname "$DB_PATH")/paused" ]; then log "paused — skipping"; exit 0
 
 # Fetch + parse at the edge: extract the top headlines' TEXT only (title + pubDate). Any
 # failure (no network, bad payload) yields an empty string and leaves the buffer unchanged.
-json="$(curl -s --max-time 15 "$URL" 2>/dev/null | "$PY" -c '
+json="$(curl -sL --max-time 15 "$URL" 2>/dev/null | "$PY" -c '
 import sys, json, time, xml.etree.ElementTree as ET
 try:
     root = ET.fromstring(sys.stdin.read())
