@@ -21,6 +21,7 @@ Der Zustand lebt rein im Ledger (Ereignis-Projektion, read-time) — kein Nebent
 """
 from __future__ import annotations
 
+import contextlib
 import json
 
 from genus import ledger
@@ -40,6 +41,23 @@ ABGELEHNT = "abgelehnt"
 # Entscheidung — sie existiert bis dahin gar nicht.
 ARTEN = frozenset({"nachricht"})
 MAX_OFFENE = 20   # Anti-Weglauf: so viele offene (vorgeschlagene+freigegebene) Hände höchstens
+
+
+@contextlib.contextmanager
+def _schreib_lock(conn):
+    """``BEGIN IMMEDIATE`` mit GARANTIERTEM Rollback bei jeder Ausnahme. Die geteilte,
+    langlebige Verbindung (Bot + Crons schreiben dasselbe Ledger) darf nie in einer offenen
+    Transaktion hängenbleiben — sonst scheitert der nächste Ledger-Schreib mit „cannot start a
+    transaction within a transaction", und ein vorübergehender Lock beim HANDELN würde das REDEN
+    mitvergiften. Die fachlichen Ablehnungen unten rollen selbst zurück und kehren normal zurück
+    (kein Fehler); dieser Wächter fängt nur das Unerwartete (Lock nach Timeout, Platten-I/O)
+    und reicht es sauber weiter — die Verbindung bleibt danach benutzbar."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        conn.rollback()
+        raise
 
 
 def _hand_ereignisse(conn) -> list[dict]:
@@ -96,44 +114,44 @@ def vorschlagen(conn, art: str, inhalt: str, faellig_um: str | None = None,
         return {"vorgeschlagen": False, "grund": f"Hand-Art „{art}“ ist nicht erlaubt."}
     if not str(inhalt).strip():
         return {"vorgeschlagen": False, "grund": "Eine Hand ohne Inhalt gibt es nicht."}
-    conn.execute("BEGIN IMMEDIATE")   # Zählen + Anhängen atomar: der Anti-Weglauf-Deckel hält
-    if len(offene(conn)) >= MAX_OFFENE:                # auch bei gleichzeitigen Vorschlägen
-        conn.rollback()
-        return {"vorgeschlagen": False,
-                "grund": f"Zu viele offene Hände (≥ {MAX_OFFENE}) — erst abarbeiten."}
-    eid = ledger.append(conn, HAND_VORGESCHLAGEN,
-                        {"art": art, "inhalt": str(inhalt), "faellig_um": faellig_um,
-                         "quelle": quelle})
-    conn.commit()
-    return {"vorgeschlagen": True, "hand_id": eid}
+    with _schreib_lock(conn):   # Zählen + Anhängen atomar: der Anti-Weglauf-Deckel hält
+        if len(offene(conn)) >= MAX_OFFENE:            # auch bei gleichzeitigen Vorschlägen
+            conn.rollback()
+            return {"vorgeschlagen": False,
+                    "grund": f"Zu viele offene Hände (≥ {MAX_OFFENE}) — erst abarbeiten."}
+        eid = ledger.append(conn, HAND_VORGESCHLAGEN,
+                            {"art": art, "inhalt": str(inhalt), "faellig_um": faellig_um,
+                             "quelle": quelle})
+        conn.commit()
+        return {"vorgeschlagen": True, "hand_id": eid}
 
 
 def bestaetigen(conn, hand_id: int) -> dict:
     """Das aktions-genaue menschliche OK: die Hand wird FREIGEGEBEN. Nur ein Vorschlag lässt sich
     bestätigen (nicht doppelt, nicht nach Ablehnung/Ausführung)."""
-    conn.execute("BEGIN IMMEDIATE")   # atomar gegen ein gleichzeitiges ablehnen derselben Hand
-    h = _zustand(conn).get(hand_id)
-    if h is None:
-        conn.rollback()
-        return {"bestaetigt": False, "grund": "Unbekannte Hand."}
-    if h["status"] != VORGESCHLAGEN:
-        conn.rollback()
-        return {"bestaetigt": False, "grund": f"Hand ist „{h['status']}“, nicht „{VORGESCHLAGEN}“."}
-    ledger.append(conn, HAND_BESTAETIGT, {"hand_id": hand_id})
-    conn.commit()
-    return {"bestaetigt": True, "hand_id": hand_id}
+    with _schreib_lock(conn):   # atomar gegen ein gleichzeitiges ablehnen derselben Hand
+        h = _zustand(conn).get(hand_id)
+        if h is None:
+            conn.rollback()
+            return {"bestaetigt": False, "grund": "Unbekannte Hand."}
+        if h["status"] != VORGESCHLAGEN:
+            conn.rollback()
+            return {"bestaetigt": False, "grund": f"Hand ist „{h['status']}“, nicht „{VORGESCHLAGEN}“."}
+        ledger.append(conn, HAND_BESTAETIGT, {"hand_id": hand_id})
+        conn.commit()
+        return {"bestaetigt": True, "hand_id": hand_id}
 
 
 def ablehnen(conn, hand_id: int) -> dict:
     """Ein Vorschlag wird verworfen — nichts wird je ausgeführt."""
-    conn.execute("BEGIN IMMEDIATE")   # atomar gegen ein gleichzeitiges bestaetigen derselben Hand
-    h = _zustand(conn).get(hand_id)
-    if h is None or h["status"] != VORGESCHLAGEN:
-        conn.rollback()
-        return {"abgelehnt": False}
-    ledger.append(conn, HAND_ABGELEHNT, {"hand_id": hand_id})
-    conn.commit()
-    return {"abgelehnt": True, "hand_id": hand_id}
+    with _schreib_lock(conn):   # atomar gegen ein gleichzeitiges bestaetigen derselben Hand
+        h = _zustand(conn).get(hand_id)
+        if h is None or h["status"] != VORGESCHLAGEN:
+            conn.rollback()
+            return {"abgelehnt": False}
+        ledger.append(conn, HAND_ABGELEHNT, {"hand_id": hand_id})
+        conn.commit()
+        return {"abgelehnt": True, "hand_id": hand_id}
 
 
 def faellige(conn, jetzt_iso: str) -> list[dict]:
@@ -161,19 +179,19 @@ def markiere_ausgefuehrt(conn, hand_id: int, ergebnis: str = "gesendet") -> dict
     (``BEGIN IMMEDIATE``), damit zwei gleichzeitige Membran-/Cron-Läufe nicht beide dieselbe Hand
     ausführen (der zweite wartet auf den Lock, liest dann den frischen Zustand AUSGEFUEHRT und
     verweigert) -- exakt-einmal auch nebenläufig."""
-    conn.execute("BEGIN IMMEDIATE")
-    h = _zustand(conn).get(hand_id)
-    if h is None:
-        conn.rollback()
-        return {"ausgefuehrt": False, "grund": "Unbekannte Hand."}
-    if h["status"] == AUSGEFUEHRT:
-        conn.rollback()
-        return {"ausgefuehrt": False, "grund": "Schon ausgeführt (genau einmal, nie doppelt)."}
-    if h["status"] != FREIGEGEBEN:
-        conn.rollback()
-        return {"ausgefuehrt": False,
-                "grund": f"NICHT freigegeben (Status „{h['status']}“) — ohne Bestätigung "
-                         f"keine Außenhandlung."}
-    ledger.append(conn, HAND_AUSGEFUEHRT, {"hand_id": hand_id, "ergebnis": str(ergebnis)})
-    conn.commit()
-    return {"ausgefuehrt": True, "hand_id": hand_id}
+    with _schreib_lock(conn):
+        h = _zustand(conn).get(hand_id)
+        if h is None:
+            conn.rollback()
+            return {"ausgefuehrt": False, "grund": "Unbekannte Hand."}
+        if h["status"] == AUSGEFUEHRT:
+            conn.rollback()
+            return {"ausgefuehrt": False, "grund": "Schon ausgeführt (genau einmal, nie doppelt)."}
+        if h["status"] != FREIGEGEBEN:
+            conn.rollback()
+            return {"ausgefuehrt": False,
+                    "grund": f"NICHT freigegeben (Status „{h['status']}“) — ohne Bestätigung "
+                             f"keine Außenhandlung."}
+        ledger.append(conn, HAND_AUSGEFUEHRT, {"hand_id": hand_id, "ergebnis": str(ergebnis)})
+        conn.commit()
+        return {"ausgefuehrt": True, "hand_id": hand_id}

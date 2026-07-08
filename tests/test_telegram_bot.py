@@ -726,6 +726,63 @@ def test_bot_installer_ist_sudo_fest_und_setzt_den_nutzer():
     assert "User=$GENUS_USER" in text
 
 
+# --- die erste HAND: Erinnerungen (P4) -------------------------------------------------
+
+def test_erinnerung_parser_um_zeit_und_inhalt():
+    import datetime as dt
+    faellig, inhalt = telegram_bot._erinnerung("erinnere mich um 18 an den Anruf",
+                                               dt.datetime(2026, 7, 8, 10, 0))
+    assert faellig == dt.datetime(2026, 7, 8, 18, 0) and inhalt == "den Anruf"
+
+
+def test_erinnerung_parser_in_delta():
+    import datetime as dt
+    faellig, inhalt = telegram_bot._erinnerung("erinner mich in 15 minuten an das Brot",
+                                               dt.datetime(2026, 7, 8, 10, 0))
+    assert faellig == dt.datetime(2026, 7, 8, 10, 15) and inhalt == "das Brot"
+
+
+def test_erinnerung_parser_vergangene_uhrzeit_wird_morgen():
+    import datetime as dt
+    faellig, _ = telegram_bot._erinnerung("erinnere mich um 8:00 daran, dass ich Milch kaufe",
+                                          dt.datetime(2026, 7, 8, 20, 0))
+    assert faellig == dt.datetime(2026, 7, 9, 8, 0)   # 8 Uhr heute vorbei -> morgen
+
+
+def test_erinnerung_parser_ohne_zeit_oder_kein_befehl_ist_keine():
+    import datetime as dt
+    jetzt = dt.datetime(2026, 7, 8, 10, 0)
+    assert telegram_bot._erinnerung("erinnere mich an den Anruf", jetzt) is None   # keine Zeit
+    assert telegram_bot._erinnerung("Was ist ein Hund?", jetzt) is None
+
+
+def test_erinnerung_ritual_legt_eine_bestaetigte_hand_an():
+    from genus import hand
+    conn = _fresh()
+    ergebnis = telegram_bot.handle_update(conn, _msg(1, 42, "erinnere mich um 23:59 an die Milch"),
+                                          allowed={42})
+    assert ergebnis is not None
+    _, antwort = ergebnis
+    assert "Mach ich" in antwort and "die Milch" in antwort
+    offen = hand.offene(conn)
+    assert len(offen) == 1
+    assert offen[0]["status"] == hand.FREIGEGEBEN and "die Milch" in offen[0]["inhalt"]
+
+
+def test_ein_absturz_im_erinnerungs_ritual_toetet_die_bruecke_nicht(monkeypatch):
+    # Review-Fund (HIGH): das Erinnerungs-Ritual SCHREIBT ins Ledger, VOR dem Kern. Reisst dieser
+    # Schreib ab (vorübergehender Lock), darf das die Brücke NICHT stürzen lassen -- sonst friert
+    # der Offset ein (er wird erst NACH handle_update gespeichert) und Telegram stellt genau diese
+    # Nachricht endlos neu zu = Neustart-Schleife. Wie ein Fehler im Antworten: graziös abfangen.
+    conn = _fresh()
+    from genus import hand
+    monkeypatch.setattr(hand, "vorschlagen",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("database is locked")))
+    chat_id, answer = telegram_bot.handle_update(conn, _msg(1, 42, "erinnere mich in 5 minuten an X"),
+                                                 allowed={42})
+    assert chat_id == 42 and "schiefgelaufen" in answer   # gefangen, nie geworfen -> Offset speichert
+
+
 # --- der Tagespuffer: Mitschreiben in der Membran (Gedaechtnis Punkt 4) ---------------
 
 

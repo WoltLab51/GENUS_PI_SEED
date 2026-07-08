@@ -118,3 +118,26 @@ def test_atomar_geschuetzt_read_check_append_unter_einem_lock():
     hand.bestaetigen(conn, hid)
     assert hand.markiere_ausgefuehrt(conn, hid)["ausgefuehrt"]
     assert conn.in_transaction is False   # sauber committet, kein haengender Lock
+
+
+def test_fehler_beim_schreiben_laesst_keine_offene_transaktion_zurueck(monkeypatch):
+    # Review-Fund (HIGH): reisst der Ledger-Schreib UNTER dem BEGIN IMMEDIATE ab (vorübergehender
+    # Lock nach Timeout, Platten-I/O), darf die geteilte, langlebige Verbindung (Bot + Crons) NIE
+    # in einer offenen Transaktion hängenbleiben -- sonst scheitert jeder nächste Schreib. Der
+    # Wächter rollt zurück und reicht den Fehler sauber weiter; die Verbindung bleibt benutzbar.
+    conn = _fresh()
+
+    def _platzt(*a, **k):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(hand.ledger, "append", _platzt)
+    try:
+        hand.vorschlagen(conn, "nachricht", "während eines Locks")
+        raised = False
+    except sqlite3.OperationalError:
+        raised = True
+    assert raised                          # der echte DB-Fehler wird nicht verschluckt
+    assert conn.in_transaction is False    # ENTSCHEIDEND: kein hängender Lock auf der Verbindung
+    monkeypatch.undo()
+    # die Verbindung ist danach voll benutzbar -- ein echter Vorschlag geht sofort durch
+    assert hand.vorschlagen(conn, "nachricht", "danach")["vorgeschlagen"]

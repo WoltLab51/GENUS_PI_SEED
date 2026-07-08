@@ -175,6 +175,81 @@ def _morgenzeit_antwort(question: str) -> str | None:
             zeit = _MORGENZEIT_STANDARD
         return f"Die Morgen-Nachricht kommt um {zeit}."
     return None
+
+
+# --- die erste HAND (P4): Erinnerungen. „erinnere mich <wann> an <was>" wird eine von Ronnys
+# Wunsch aktions-genau bestätigte Hand (genus/hand.py); der Membran-Cron hand_ausfuehren.sh
+# sendet sie fällig. Die ZEIT wird hier an der Membran aus der Wanduhr gerechnet; der Kern
+# speichert nur den fertigen Zeitpunkt und hält das harte Gate. Reine Membran-Sache.
+_ERINNERE = re.compile(r"^\s*erinner(?:e|)\s+mich\b\s*(?:bitte\s*)?", re.IGNORECASE)
+_ERINN_IN = re.compile(r"\bin\s+(\d{1,3})\s*(minut|min|stund|std)\w*", re.IGNORECASE)
+_ERINN_UM = re.compile(r"\bum\s+(\d{1,2})(?::(\d{2}))?\s*(?:uhr)?\b", re.IGNORECASE)
+
+
+def _erinnerung(text, jetzt):
+    """Parst „erinnere mich <wann> an <was>" -> ``(faellig_datetime, inhalt)`` oder ``None``.
+    Ehrlich: OHNE erkennbare Zeit keine Erinnerung (nie eine Zeit raten)."""
+    import datetime as _dt
+
+    m = _ERINNERE.match(text or "")
+    if not m:
+        return None
+    rest = text[m.end():]
+    faellig = None
+    d = _ERINN_IN.search(rest)
+    if d:
+        n = int(d.group(1))
+        schritt = _dt.timedelta(minutes=n) if d.group(2).lower().startswith("min") \
+            else _dt.timedelta(hours=n)
+        faellig = jetzt + schritt
+        rest = rest[:d.start()] + " " + rest[d.end():]
+    else:
+        u = _ERINN_UM.search(rest)
+        if u:
+            stunde, minute = int(u.group(1)), int(u.group(2) or 0)
+            if stunde > 23 or minute > 59:
+                return None
+            faellig = jetzt.replace(hour=stunde, minute=minute, second=0, microsecond=0)
+            if faellig <= jetzt:                         # heute schon vorbei -> morgen
+                faellig = faellig + _dt.timedelta(days=1)
+            rest = rest[:u.start()] + " " + rest[u.end():]
+    if faellig is None:
+        return None
+    inhalt = re.sub(r"^\s*(?:,\s*)?(?:daran,?\s*dass|dass|an)\b\s*", "", rest.strip(),
+                    flags=re.IGNORECASE).strip(" ,.")
+    if not inhalt:
+        return None
+    return faellig, inhalt
+
+
+def _wann_text(faellig, jetzt):
+    import datetime as _dt
+
+    if faellig.date() == jetzt.date():
+        return f"heute um {faellig.strftime('%H:%M')}"
+    if faellig.date() == jetzt.date() + _dt.timedelta(days=1):
+        return f"morgen um {faellig.strftime('%H:%M')}"
+    return f"am {faellig.strftime('%d.%m.')} um {faellig.strftime('%H:%M')}"
+
+
+def _erinnerung_ritual(conn, question):
+    """Membran-Ritual VOR dem Kern: eine Erinnerungs-Bitte wird zu einer bestätigten Hand.
+    ``None``, wenn es keine Erinnerung ist (dann läuft die Nachricht normal weiter)."""
+    import datetime as _dt
+
+    from genus import hand
+
+    jetzt = _dt.datetime.now()
+    geparst = _erinnerung(question, jetzt)
+    if geparst is None:
+        return None
+    faellig, inhalt = geparst
+    v = hand.vorschlagen(conn, "nachricht", f"⏰ Erinnerung: {inhalt}",
+                         faellig.strftime("%Y-%m-%dT%H:%M:%S"), quelle="ronny")
+    if not v.get("vorgeschlagen"):
+        return f"Das kann ich gerade nicht vormerken ({v.get('grund', '')})."
+    hand.bestaetigen(conn, v["hand_id"])   # Ronnys ausdrücklicher Wunsch IST die aktions-genaue Freigabe
+    return f"Mach ich — ich melde mich {_wann_text(faellig, jetzt)} wegen „{inhalt}“."
 _KORREKTUR_MAX = 50       # die Datei bleibt gedeckelt: die jüngsten 50 Korrekturen
 _HINWEIS_BEISPIELE = 3    # wie viele Beispiele der Prompt höchstens trägt (nie wachsend)
 
@@ -322,12 +397,20 @@ def handle_update(
         return None
     question = message["text"]
     _log(f"question from {sender}: {question!r}")
-    # Membran-Ritual VOR dem Kern: die Morgenzeit ist Betriebskonfiguration dieser
-    # Membran (Datei, die morgen_push.sh liest), kein Wissen -- der Kern sieht sie nie.
-    morgen = _morgenzeit_antwort(question)
-    if morgen is not None:
-        return chat_id, morgen
     try:
+        # Membran-Ritual VOR dem Kern: die Morgenzeit ist Betriebskonfiguration dieser
+        # Membran (Datei, die morgen_push.sh liest), kein Wissen -- der Kern sieht sie nie.
+        morgen = _morgenzeit_antwort(question)
+        if morgen is not None:
+            return chat_id, morgen
+        # die erste HAND: „erinnere mich …" wird eine bestätigte Hand (der Cron sendet sie fällig).
+        # Auch ein Membran-Ritual vor dem Kern; der Kern hält das Gate, die Membran sendet später.
+        # WICHTIG: INNERHALB dieses Wächters — das Ritual SCHREIBT ins Ledger; ein vorübergehender
+        # Lock beim HANDELN darf nie das REDEN töten (sonst Neustart-Schleife, weil der Offset erst
+        # nach handle_update gespeichert wird). Der Kern rollt die Transaktion sauber zurück.
+        erinnerung = _erinnerung_ritual(conn, question)
+        if erinnerung is not None:
+            return chat_id, erinnerung
         if sessions is None:
             answer = companion.respond(conn, question)
         else:
@@ -428,7 +511,15 @@ def main() -> int:
             continue
         for update in updates:
             offset = max(offset, update["update_id"] + 1)
-            result = handle_update(conn, update, allowed, sessions)
+            # Letzter Wächter: KEINE einzelne Nachricht darf die Brücke töten ODER den Offset
+            # einfrieren. handle_update fängt seine eigenen Fehler schon graziös ab; sollte
+            # dennoch je etwas durchschlagen, wird der Offset trotzdem gespeichert (unten) —
+            # kein erneutes Zustellen derselben Nachricht, keine Neustart-Schleife.
+            try:
+                result = handle_update(conn, update, allowed, sessions)
+            except Exception as exc:
+                _log(f"handle_update crashed on update {update.get('update_id')}: {exc}")
+                result = None
             if result is not None:
                 chat_id, answer = result
                 try:

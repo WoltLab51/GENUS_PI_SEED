@@ -43,6 +43,7 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] weather" in script
     assert "[TICK] weather-2" in script
     assert "[TICK] news" in script
+    assert "hand_ausfuehren.sh" in script    # die erste Hand: faellige Erinnerungen senden
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
@@ -73,6 +74,16 @@ def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():
     # rich fields (P4 Schnitt 2): everything the source gives, each its own claim (number only)
     assert "apparent_temperature" in script and "precipitation_probability_max" in script
     assert "observe-assertion" in script and "weather.rain_prob" in script
+
+
+def test_hand_ausfuehren_claims_before_send_at_the_edge():
+    script = (ROOT / "deploy" / "hand_ausfuehren.sh").read_text(encoding="utf-8")
+    # der Kern haelt das Gate; die Membran fuehrt aus
+    assert "hand.faellige" in script and "markiere_ausgefuehrt" in script
+    assert "api.telegram.org" in script and "sendMessage" in script   # senden am Rand
+    assert "paused" in script                                          # Pause-Schalter geehrt
+    # CLAIM VOR SENDEN: der atomare Anspruch steht vor dem Telegram-Aufruf (nie doppelt senden)
+    assert script.index("markiere_ausgefuehrt") < script.index("sendMessage")
 
 
 def test_news_membrane_fetches_headlines_to_a_buffer_at_the_edge():
