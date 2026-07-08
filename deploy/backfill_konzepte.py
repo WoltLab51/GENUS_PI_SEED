@@ -4,7 +4,8 @@
 Der Ernter deploy/observe_konzept.sh holt EIN Konzept je Aufruf (ein API-Call + ein Python-
 Prozess je Kante) — für die ~12k Konzepte des lebenden Graphen zu teuer. Dieser Backfill
 BÜNDELT: ``wbgetentities`` holt bis zu 50 Konzepte je Call (props=claims), extrahiert die
-verbindende dynamische Schicht (part_of/has_part/made_of/used_for/causes/caused_by), holt die
+verbindende dynamische Schicht (part_of/has_part/made_of/used_for/causes/caused_by) samt
+instance_of (P31, für die Antwort-Zutat „konkretes Beispiel", rückwärts gelesen), holt die
 Objekt-Labels gebündelt nach und sät ALLES über EINEN Prozess mit ``reactors.sae_fehlende``
 (idempotent, dieselbe Schreib-Naht wie überall). Read-only gegenüber Wikidata, höflich
 rate-limited, RESUMIERBAR über eine Fortschrittsdatei — ein Absturz bei 8k setzt bei 8k fort.
@@ -39,8 +40,12 @@ UA = "GENUS-PI/0.1 (epistemic core research; ronnywolter87@gmail.com)"
 # HINZU (PROP_MAP_TIEFUNG): eine Insel (nur als Objekt aufgetaucht, nie als Subjekt) erreicht der
 # Kletterer nicht (er klettert is_a-Objekte, keine dynamischen Objekte) -- sie braucht ihr is_a
 # hier, sonst bleibt sie ohne Platz in der Hierarchie und ohne Geschwister (kein Analogie-Anker).
+# P31 (instance_of) ist eine EIGENE, nicht-transitive Kante (die Instanz ist KEIN Unterbegriff):
+# geerntet für die Antwort-Zutat „ein konkretes Beispiel" (companion._beispiel liest sie rückwärts,
+# X -instance_of-> Konzept). Läuft NIE in die is_a-Inferenz, darum auch nicht in ZYKLUS_PRAEDIKATE.
 PROP_MAP = {"P361": "part_of", "P527": "has_part", "P186": "made_of",
-            "P366": "used_for", "P1542": "causes", "P828": "caused_by"}
+            "P366": "used_for", "P1542": "causes", "P828": "caused_by",
+            "P31": "instance_of"}
 PROP_MAP_TIEFUNG = {"P279": "is_a", **PROP_MAP}
 # die transitiven Prädikate: eine importierte Kante, die einen Ring schlösse, wird NICHT gesät
 # (Azyklizität; ein Fremd-Zyklus ist ein Quellen-Problem, kein Selbst-Widerspruch von GENUS).

@@ -259,6 +259,12 @@ def vertiefung(conn, a: dict) -> list[str]:
         if ziele:
             saetze.append(vorlage.format(w=a["word"],
                                          o=_join_de([f"»{z}«" for z in ziele])))
+    # Ein konkretes BEISPIEL macht die abstrakte Definition greifbar (Antwort-Komposition
+    # 2026-07-07, Substanz-Achse): die stärkste noch fehlende Zutat. Rückwärts gelesen -- ein
+    # benanntes X mit X -instance_of-> qid; nur wenn echt vorhanden, in »« als Stimme-Anker.
+    beispiel = _beispiel(conn, qid)
+    if beispiel:
+        saetze.append(f"Ein Beispiel dafür ist »{beispiel}«.")
     lexem = f"{a['word']}@de"
     quellen = sorted(
         {r["source"] for r in sources.relations(conn, subject=lexem, predicate="expresses")}
@@ -267,6 +273,20 @@ def vertiefung(conn, a: dict) -> list[str]:
     if len(quellen) >= 2:
         saetze.append(f"Meine Quellen zu »{a['word']}«: {', '.join(quellen)}.")
     return saetze
+
+
+def _beispiel(conn, qid: str) -> str | None:
+    """Ein konkretes Beispiel für ein Konzept -- das erste benennbare X mit
+    ``X -instance_of-> qid`` (die RÜCKWÄRTS-Richtung von Wikidata P31, geerntet von
+    observe_konzept.sh / backfill_konzepte.py). ``instance_of`` ist ein EIGENES,
+    nicht-transitives Prädikat: die Instanz ist KEIN Unterbegriff, es läuft nie in die
+    is_a-Inferenz (kein transitives Prädikat), es wird nur hier gelesen. Nur benannte
+    Instanzen, nie ein blanker Q-Knoten -- ehrlich None, wenn keine Instanz bekannt ist."""
+    for r in sources.relations(conn, predicate="instance_of", object=qid):
+        name = _konzept_name(conn, r["subject"])
+        if name:
+            return name
+    return None
 
 
 # --- relational questions ("Ist ein X ein Y?") -----------------------------------------

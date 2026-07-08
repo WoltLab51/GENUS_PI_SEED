@@ -292,6 +292,43 @@ def test_vertiefung_setzt_jeden_benannten_begriff_in_anker_guillemets(conn):
     assert not any("Katze" in s and "»Katze«" not in s for s in saetze)
 
 
+# --- das konkrete BEISPIEL (instance_of, Antwort-Komposition 2026-07-07) -----------------
+
+def test_vertiefung_nennt_ein_konkretes_beispiel(conn):
+    # die stärkste noch fehlende Substanz-Zutat: ein benanntes Beispiel, rückwärts aus einer
+    # echten instance_of-Kante gelesen (X instance_of Vulkan) -- macht die Definition greifbar
+    reactors.observe_relation(conn, "Vulkan@de", "expresses", "Q_vulkan", "wikidata")
+    reactors.observe_relation(conn, "Vulkan@de", "primary_gloss",
+                              "eine Öffnung in der Erdkruste", "dbnary")
+    reactors.observe_relation(conn, "Q_vesuv", "instance_of", "Q_vulkan", "wikidata")
+    reactors.observe_relation(conn, "Vesuv@de", "expresses", "Q_vesuv", "wikidata")
+    saetze = companion.vertiefung(conn, companion.answer(conn, "Was ist ein Vulkan?"))
+    assert "Ein Beispiel dafür ist »Vesuv«." in saetze
+
+
+def test_beispiel_wird_nie_erfunden(conn):
+    # ohne instance_of-Kante kein Beispiel; eine unbenannte Instanz bleibt stumm (kein Q-Knoten)
+    reactors.observe_relation(conn, "Fluss@de", "expresses", "Q_fluss", "wikidata")
+    reactors.observe_relation(conn, "Fluss@de", "primary_gloss", "ein Gewässer", "dbnary")
+    ohne = companion.vertiefung(conn, companion.answer(conn, "Was ist ein Fluss?"))
+    assert not any("Beispiel" in s for s in ohne)
+    reactors.observe_relation(conn, "Q999777", "instance_of", "Q_fluss", "wikidata")  # kein Label
+    stumm = companion.vertiefung(conn, companion.answer(conn, "Was ist ein Fluss?"))
+    assert not any("Beispiel" in s or "Q999777" in s for s in stumm)
+
+
+def test_instance_of_macht_die_instanz_nicht_zum_unterbegriff(conn):
+    # SICHERHEIT: instance_of ist NICHT is_a. „Ist ein Vesuv ein Berg?" darf NICHT ja ergeben,
+    # obwohl Vesuv instance_of Vulkan und Vulkan is_a Berg -- die Instanz ist kein Unterbegriff,
+    # instance_of läuft nie in die is_a-Inferenz.
+    for w, q in (("Vesuv", "Q_vesuv"), ("Vulkan", "Q_vulkan"), ("Berg", "Q_berg")):
+        reactors.observe_relation(conn, f"{w}@de", "expresses", q, "wikidata")
+    reactors.observe_relation(conn, "Q_vesuv", "instance_of", "Q_vulkan", "wikidata")
+    reactors.observe_relation(conn, "Q_vulkan", "is_a", "Q_berg", "wikidata")
+    r = companion._relate_terms(conn, "Vesuv", "Berg")
+    assert r["relational"] and r["verdict"] == "no_path"   # kein is_a-Weg über instance_of
+
+
 # --- die umgezogenen Verbraucher bleiben verhaltensgleich --------------------------------
 
 def test_gruss_und_dank_lesen_jetzt_aus_dem_wuerfel(conn):

@@ -99,7 +99,7 @@ wd_get "$API?action=wbgetclaims&entity=$QID&format=json" "$TMP/claims.json"
 
 # Wikidata-Property -> GENUS-Prädikat. is_a bleibt die Taxonomie; die übrigen sind das
 # verbindende Material. Erweiterbar -- eine Zeile pro neuer Property.
-PROP_MAP='{"P279":"is_a","P361":"part_of","P527":"has_part","P186":"made_of","P366":"used_for","P1542":"causes","P828":"caused_by"}'
+PROP_MAP='{"P279":"is_a","P361":"part_of","P527":"has_part","P186":"made_of","P366":"used_for","P1542":"causes","P828":"caused_by","P31":"instance_of"}'
 
 # Emit (subject, predicate, object): expresses/label (word@lang -> Q) + is_a + dynamische Kanten.
 facts="$(QID="$QID" LANGS="$LANGS" PROP_MAP="$PROP_MAP" "$REPO_DIR/.venv/bin/python" - "$TMP/labels.json" "$TMP/claims.json" "$TMP/objids.txt" <<'PY'

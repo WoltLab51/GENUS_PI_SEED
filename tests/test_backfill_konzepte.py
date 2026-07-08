@@ -24,6 +24,14 @@ def test_extrahiere_kanten_mappt_die_dynamischen_praedikate(conn=None):
     assert objids == {"Q2", "Q3", "Q4"}
 
 
+def test_extrahiere_kanten_mappt_instance_of_p31():
+    # P31 (instance_of) wird geerntet -- die RÜCKWÄRTS-Richtung liefert die Antwort-Zutat
+    # „konkretes Beispiel" (X instance_of Konzept). Eigene, nicht-transitive Kante.
+    ent = {"Q4750": {"claims": {**_item("P31", "Q8072")}}}   # Vesuv instance_of Vulkan
+    tripel, objids = bf.extrahiere_kanten(ent)
+    assert ("Q4750", "instance_of", "Q8072") in tripel and objids == {"Q8072"}
+
+
 def test_tiefung_erntet_is_a_hinzu():
     # Der Default lässt is_a (P279) weg (Kletter-Lerner); die Tiefung nimmt es HINZU, um die
     # Inseln zu platzieren. Dieselbe Antwort, zwei Prädikat-Maps -> unterschiedliche Ausbeute.
