@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from genus import event_router
+from genus import event_router, integrity
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,6 +59,21 @@ def test_jeder_geschriebene_event_typ_ist_entschieden():
     tote_schluessel = (projiziert | roh) - geschrieben
     assert not tote_schluessel, (
         f"Register-Schlüssel, die kein Code je schreibt (Tippfehler oder tot): {tote_schluessel}"
+    )
+
+
+def test_jeder_geschriebene_event_typ_ist_dem_integritaets_vertrag_bekannt():
+    # Die ZWEITE Registrierung, die ein neuer Event-Typ braucht: integrity.check kennzeichnet
+    # JEDEN Typ ohne Eintrag in REQUIRED_EVENT_KEYS als „unknown event_type" -> [FAIL] integrity.
+    # Router-Entscheidung UND Integritäts-Vertrag sind getrennte Register; die hand_*-Typen waren
+    # im Router entschieden, aber nicht hier -> genus doctor wäre auf dem echten Ledger rot geworden,
+    # sobald die erste Hand existiert. Dieser Wächter schließt genau diese zweite Lücke.
+    geschrieben = _geschriebene_event_typen()
+    bekannt = set(integrity.REQUIRED_EVENT_KEYS)
+    fehlend = geschrieben - bekannt
+    assert not fehlend, (
+        "Event-Typen, die geschrieben werden, aber integrity.REQUIRED_EVENT_KEYS nicht kennt "
+        f"(integrity.check wiese sie als 'unknown event_type' ab -> doctor rot): {fehlend}"
     )
 
 

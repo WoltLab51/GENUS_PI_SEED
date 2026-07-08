@@ -22,6 +22,7 @@ Der Zustand lebt rein im Ledger (Ereignis-Projektion, read-time) — kein Nebent
 from __future__ import annotations
 
 import contextlib
+import datetime
 import json
 
 from genus import ledger
@@ -41,6 +42,14 @@ ABGELEHNT = "abgelehnt"
 # Entscheidung — sie existiert bis dahin gar nicht.
 ARTEN = frozenset({"nachricht"})
 MAX_OFFENE = 20   # Anti-Weglauf: so viele offene (vorgeschlagene+freigegebene) Hände höchstens
+
+# Herzschlag-Wächter: eine freigegebene, fällige Hand, die LÄNGER als so viele Minuten
+# unversendet bleibt, heißt der Membran-Sende-Tick (hand_ausfuehren.sh, alle 2 min) steht still —
+# denn im gesunden Fall leert ihn ein Tick binnen ~2 min. FESTE Schwelle: sie leitet sich aus dem
+# bekannten Cron-Takt ab (mehrere verpasste Ticks = eindeutig kaputt), NICHT aus GENUS' eigener
+# Historie — also absolut, nicht selbst-kalibriert (self-calibration-no-presets: eine ruhige
+# eigene Verteilung würde sonst Fehlalarme erzeugen). 10 min = ~5 verpasste Ticks, kein Fehlalarm.
+UEBERFAELLIG_MIN = 10
 
 
 @contextlib.contextmanager
@@ -166,6 +175,40 @@ def faellige(conn, jetzt_iso: str) -> list[dict]:
         if fa is None or str(fa) <= str(jetzt_iso):
             faellig.append(h)
     return faellig
+
+
+def ueberfaellige(conn, jetzt_iso: str, minuten: int = UEBERFAELLIG_MIN) -> list[dict]:
+    """Die FREIGEGEBENEN Hände, die schon LÄNGER als ``minuten`` fällig sind und immer noch nicht
+    ausgeführt — ein Zeichen, dass der Membran-Sende-Tick (der die Fälligen leeren sollte) STILL
+    STEHT (der Herzschlag-Wächter). Reine read-time-Projektion; ``jetzt_iso`` reicht die Membran /
+    das Diagnose-Kommando herein (der Kern liest keine Wanduhr). Anders als :func:`faellige` lässt
+    dies das normale Sendefenster in Ruhe: eine gerade eben fällige Hand ist noch kein Stillstand.
+    Eine Hand ohne ``faellig_um`` ist hier nicht messbar (keine Fälligkeit) und zählt nicht.
+
+    Braucht — anders als der reine lexikografische Vergleich in :func:`faellige` — echte
+    Zeit-Arithmetik (``jetzt - minuten``); ein unparsbarer Zeitstempel wird still übersprungen,
+    statt den Wächter abstürzen zu lassen."""
+    try:
+        grenze = datetime.datetime.fromisoformat(str(jetzt_iso)) - datetime.timedelta(minutes=minuten)
+    except ValueError:
+        return []
+    spaet = []
+    for h in _zustand(conn).values():
+        if h["status"] != FREIGEGEBEN:
+            continue
+        fa = h.get("faellig_um")
+        if fa is None:
+            continue
+        try:
+            # Der Vergleich MUSS im Wächter liegen: ein unparsbares faellig_um (ValueError) ODER
+            # ein zeitzonen-behafteter Stempel gegen unsere naive Uhr (TypeError bei aware≠naiv)
+            # überspringt die Hand still, statt den Wächter — und damit die Morgen-Nachricht,
+            # die ihn NICHT umschließt — abstürzen zu lassen.
+            if datetime.datetime.fromisoformat(str(fa)) <= grenze:
+                spaet.append(h)
+        except (ValueError, TypeError):
+            continue
+    return spaet
 
 
 def markiere_ausgefuehrt(conn, hand_id: int, ergebnis: str = "gesendet") -> dict:

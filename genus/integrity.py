@@ -194,6 +194,13 @@ REQUIRED_EVENT_KEYS = {
         "tests_exit",
         "bestanden",
     },
+    # Die erste HAND (P4): Vorschlag → menschliches OK → genau-einmal-Ausführung. Bewusst rohe
+    # Marker (event_router.BEWUSST_ROH) — der Zustand ist eine read-time-Projektion, kein Nebentisch;
+    # hier stehen sie, weil jeder je geschriebene Typ auch dem Integritäts-Vertrag bekannt sein muss.
+    "hand_vorgeschlagen": {"art", "inhalt", "faellig_um", "quelle"},
+    "hand_bestaetigt": {"hand_id"},
+    "hand_ausgefuehrt": {"hand_id", "ergebnis"},
+    "hand_abgelehnt": {"hand_id"},
 }
 
 

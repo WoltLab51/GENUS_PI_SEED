@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from genus import cli, ledger, sealing
+from genus import cli, hand, ledger, sealing
 from genus.sensor import mock_activity, mock_cpu, mock_disk, mock_memory, mock_temperature
 
 
@@ -58,3 +58,31 @@ def test_doctor_fails_on_integrity_error(monkeypatch, cli_conn, conn):
 
     assert result.exit_code != 0
     assert "[FAIL] integrity:" in result.output
+
+
+def test_doctor_warnt_bei_ueberfaelliger_ungesendeter_hand(monkeypatch, cli_conn, conn):
+    # Herzschlag-Waechter der ersten Hand: eine freigegebene, laengst faellige, aber ungesendete
+    # Erinnerung -> [WARN] (der Sende-Tick steht offenbar still). WARN, KEIN FAIL: reparabel,
+    # doctor bleibt gruen (exit 0). Und: hand-Ereignisse brechen die Integritaet NICHT (mehr).
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    monkeypatch.delenv("GENUS_CORE_ID", raising=False)
+    _patch_sensors(monkeypatch)
+    hid = hand.vorschlagen(conn, "nachricht", "laengst faellig",
+                           faellig_um="2000-01-01T00:00:00")["hand_id"]
+    hand.bestaetigen(conn, hid)
+
+    result = CliRunner().invoke(cli.main, ["doctor"])
+
+    assert result.exit_code == 0                       # WARN, kein FAIL -> doctor bleibt gruen
+    assert "[WARN] hand-faellig:" in result.output
+    assert "[OK] integrity:" in result.output          # hand-Ereignisse sind dem Vertrag jetzt bekannt
+
+
+def test_doctor_hand_check_ok_ohne_ueberfaellige(monkeypatch, cli_conn, conn):
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    _patch_sensors(monkeypatch)
+
+    result = CliRunner().invoke(cli.main, ["doctor"])
+
+    assert result.exit_code == 0
+    assert "[OK] hand-faellig:" in result.output

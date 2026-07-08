@@ -168,7 +168,7 @@ def betrieb_zeile(betrieb: list[dict]) -> str:
             + " und ".join(stuecke) + ".")
 
 
-def morgen_nachricht(conn, bericht: dict | None) -> str:
+def morgen_nachricht(conn, bericht: dict | None, jetzt_iso: str | None = None) -> str:
     """Die EINE Morgen-Nachricht — warm, nativ, deterministisch komponiert (Ronnys
     Entscheidungen: nie leer; Zusammenfassung; nett). Reihenfolge: Gruß → gestern
     (falls konsolidiert) → Wartendes (Freigaben/Fragen) → falls sonst nichts: das
@@ -195,6 +195,22 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
     schlagzeile = companion.news_top(conn)
     if schlagzeile:
         teile.append(f"In den Nachrichten: „{schlagzeile}“.")
+        inhalt = True
+
+    # Herzschlag-Wächter der ersten Hand (P4): steht der Membran-Sende-Tick still, bleiben
+    # freigegebene, fällige Erinnerungen ungesendet liegen. Die Morgen-Nachricht läuft über EINEN
+    # ANDEREN Weg (morgen_push.sh) als der Sender — also erreicht diese Warnung Ronny selbst dann,
+    # wenn genau der Sende-Dienst kaputt ist. Der Jetzt-Zeitpunkt ist eine reine Anzeige-Entscheidung.
+    import datetime as _dt
+
+    from genus import hand
+
+    jetzt = jetzt_iso or _dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    spaet = hand.ueberfaellige(conn, jetzt)
+    if spaet:
+        was = "eine Erinnerung ist" if len(spaet) == 1 else f"{len(spaet)} Erinnerungen sind"
+        teile.append(f"Achtung: {was} überfällig und noch nicht gesendet — bitte sieh nach dem "
+                     f"Sende-Dienst (deploy/hand_ausfuehren.sh).")
         inhalt = True
 
     themen = (bericht or {}).get("themen") or []

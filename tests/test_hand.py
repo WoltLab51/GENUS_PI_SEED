@@ -141,3 +141,54 @@ def test_fehler_beim_schreiben_laesst_keine_offene_transaktion_zurueck(monkeypat
     monkeypatch.undo()
     # die Verbindung ist danach voll benutzbar -- ein echter Vorschlag geht sofort durch
     assert hand.vorschlagen(conn, "nachricht", "danach")["vorgeschlagen"]
+
+
+def test_ueberfaellige_erkennt_stillstehenden_sende_tick():
+    # der Herzschlag-Waechter: eine freigegebene, laengst faellige, nie ausgefuehrte Hand
+    # bedeutet, der Membran-Sende-Tick steht still
+    conn = _fresh()
+    hid = hand.vorschlagen(conn, "nachricht", "Feierabend",
+                           faellig_um="2020-01-01T12:00:00")["hand_id"]
+    hand.bestaetigen(conn, hid)
+    spaet = hand.ueberfaellige(conn, "2020-01-01T13:00:00")   # 60 min nach Faelligkeit
+    assert [h["hand_id"] for h in spaet] == [hid]
+
+
+def test_ueberfaellige_verschont_das_normale_sendefenster():
+    # eine GERADE eben faellige Hand ist KEIN Stillstand -- der 2-min-Tick kommt gleich
+    conn = _fresh()
+    hid = hand.vorschlagen(conn, "nachricht", "gleich",
+                           faellig_um="2020-01-01T12:00:00")["hand_id"]
+    hand.bestaetigen(conn, hid)
+    # 1 min nach Faelligkeit -> unter der 10-min-Schwelle -> nicht ueberfaellig
+    assert hand.ueberfaellige(conn, "2020-01-01T12:01:00") == []
+    # in faellige() taucht sie aber sofort auf (das ist das normale Senden, kein Alarm)
+    assert [h["hand_id"] for h in hand.faellige(conn, "2020-01-01T12:01:00")] == [hid]
+
+
+def test_ueberfaellige_ignoriert_unbestaetigte_ausgefuehrte_und_zeitlose():
+    conn = _fresh()
+    # (a) vorgeschlagen, nicht freigegeben -> wartet korrekt auf Ronnys OK, kein Stillstand
+    warte = hand.vorschlagen(conn, "nachricht", "wartet",
+                             faellig_um="2020-01-01T12:00:00")["hand_id"]
+    assert hand.ueberfaellige(conn, "2020-01-01T13:00:00") == []
+    # (b) freigegeben + ausgefuehrt -> erledigt, kein Stillstand
+    hand.bestaetigen(conn, warte)
+    hand.markiere_ausgefuehrt(conn, warte)
+    assert hand.ueberfaellige(conn, "2020-01-01T13:00:00") == []
+    # (c) ohne faellig_um -> keine messbare Faelligkeit -> nicht "ueberfaellig"
+    ohne = hand.vorschlagen(conn, "nachricht", "ohne Zeit")["hand_id"]
+    hand.bestaetigen(conn, ohne)
+    assert hand.ueberfaellige(conn, "2020-01-01T13:00:00") == []
+
+
+def test_ueberfaellige_stuerzt_nicht_an_seltsamen_zeitstempeln():
+    # Verteidigung: ein zeitzonen-behafteter (aware vs. naive Uhr -> TypeError) oder unparsbarer
+    # faellig_um darf den Waechter -- und damit die Morgen-Nachricht, die ihn NICHT umschliesst --
+    # nie abstuerzen lassen; die Hand wird still uebersprungen
+    conn = _fresh()
+    a = hand.vorschlagen(conn, "nachricht", "aware", faellig_um="2020-01-01T00:00:00+02:00")["hand_id"]
+    hand.bestaetigen(conn, a)
+    b = hand.vorschlagen(conn, "nachricht", "kaputt", faellig_um="gar-keine-zeit")["hand_id"]
+    hand.bestaetigen(conn, b)
+    assert hand.ueberfaellige(conn, "2020-06-01T12:00:00") == []   # kein Absturz, beide uebersprungen

@@ -68,6 +68,27 @@ def test_morgen_triage_stellt_dringendes_voran_mit_eigener_bitte(conn):
     assert "Fürs Protokoll" not in text   # es gibt kein Betriebs-Rauschen zu bündeln
 
 
+def test_morgen_nachricht_warnt_bei_ueberfaelliger_ungesendeter_hand(conn):
+    # Herzschlag-Waechter ueber den UNABHAENGIGEN Melde-Kanal (die Morgen-Nachricht laeuft ueber
+    # morgen_push.sh, NICHT ueber den Sende-Tick): steht der Sender still, erfaehrt Ronny es trotzdem
+    from genus import hand
+    hid = hand.vorschlagen(conn, "nachricht", "laengst faellig",
+                           faellig_um="2020-01-01T00:00:00")["hand_id"]
+    hand.bestaetigen(conn, hid)
+    text = konsolidierung.morgen_nachricht(conn, None, jetzt_iso="2020-01-01T12:00:00")
+    assert "überfällig" in text and "noch nicht gesendet" in text
+
+
+def test_morgen_nachricht_schweigt_im_normalen_sendefenster(conn):
+    # eine gerade eben faellige Hand (unter der Schwelle) ist KEIN Stillstand -> keine Warnung
+    from genus import hand
+    hid = hand.vorschlagen(conn, "nachricht", "gleich",
+                           faellig_um="2020-01-01T12:00:00")["hand_id"]
+    hand.bestaetigen(conn, hid)
+    text = konsolidierung.morgen_nachricht(conn, None, jetzt_iso="2020-01-01T12:01:00")
+    assert "überfällig" not in text
+
+
 def test_morgen_triage_buendelt_betrieb_zu_einer_gezaehlten_zeile(conn):
     # das Kern-Problem: 5 Netz-Episoden + 2 Last werden EINE FYI-Zeile (gezählt), nicht
     # „7 Vorschläge auf deine Freigabe" -- kein aufgeblähter Zähler, kein Freigabe-Druck

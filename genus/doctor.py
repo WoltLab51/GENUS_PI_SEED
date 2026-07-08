@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import datetime as _dt
 from dataclasses import dataclass
 from pathlib import Path
 
-from genus import integrity, sealing, sensor
+from genus import hand, integrity, sealing, sensor
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +29,7 @@ def run(conn, *, db_path: str, core_id: str | None) -> list[Check]:
     checks.append(_db_check(db_path))
     checks.extend(_integrity_checks(conn))
     checks.extend(_sealing_checks(conn, core_id))
+    checks.extend(_hand_checks(conn))
     checks.extend(_sensor_checks())
     checks.extend(_forbidden_import_checks())
     return checks
@@ -49,6 +51,24 @@ def _integrity_checks(conn) -> list[Check]:
     if result["ok"]:
         return [Check("OK", "integrity", f"events={result['events']}")]
     return [Check("FAIL", "integrity", "; ".join(result["issues"]))]
+
+
+def _hand_checks(conn) -> list[Check]:
+    # Herzschlag-Wächter der ersten Hand: gibt es freigegebene, LÄNGST fällige, aber immer noch
+    # ungesendete Erinnerungen, steht der Membran-Sende-Tick (hand_ausfuehren.sh) offenbar still.
+    # WARN (kein FAIL): ein liegengebliebener, aber reparabler Zustand — doctor bleibt grün. Rein
+    # lesend (keine Ledger-Ereignisse); der Jetzt-Zeitpunkt ist eine reine Anzeige-Entscheidung.
+    try:
+        jetzt = _dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        spaet = hand.ueberfaellige(conn, jetzt)
+    except Exception as exc:  # pragma: no cover - defensive boundary
+        return [Check("FAIL", "hand-faellig", str(exc))]
+    if not spaet:
+        return [Check("OK", "hand-faellig", "keine ueberfaellige, ungesendete Hand")]
+    ids = ", ".join(str(h["hand_id"]) for h in spaet)
+    return [Check("WARN", "hand-faellig",
+                  f"{len(spaet)} freigegebene, faellige, ungesendete Hand(e) (hand_id={ids}) "
+                  f"— Sende-Tick steht? (deploy/hand_ausfuehren.sh)")]
 
 
 def _sealing_checks(conn, core_id: str | None) -> list[Check]:
