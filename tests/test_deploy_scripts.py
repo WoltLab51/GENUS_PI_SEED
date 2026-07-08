@@ -42,6 +42,7 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] clock-check" in script
     assert "[TICK] weather" in script
     assert "[TICK] weather-2" in script
+    assert "[TICK] news" in script
     assert "[TICK] experience-scan" in script
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
@@ -72,6 +73,20 @@ def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():
     # rich fields (P4 Schnitt 2): everything the source gives, each its own claim (number only)
     assert "apparent_temperature" in script and "precipitation_probability_max" in script
     assert "observe-assertion" in script and "weather.rain_prob" in script
+
+
+def test_news_membrane_fetches_headlines_to_a_buffer_at_the_edge():
+    script = (ROOT / "deploy" / "observe_news.sh").read_text(encoding="utf-8")
+
+    # HTTP at the edge; a public no-auth RSS feed (Tagesschau)
+    assert "tagesschau.de" in script and "rss" in script.lower()
+    assert "curl" in script
+    # news is FOREIGN, ephemeral text -> a membrane buffer, NEVER the event-sourced ledger
+    assert "news_puffer.json" in script
+    assert "genus observe" not in script             # no ledger write path
+    assert '> "$PUFFER"' in script                    # writes the membrane buffer
+    # a failed fetch/parse leaves the old buffer untouched (it ages), and pause is honored
+    assert "buffer unchanged" in script and "paused" in script
 
 
 def test_second_weather_membrane_feeds_observe_assertion_number_only():

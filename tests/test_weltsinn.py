@@ -1,7 +1,21 @@
 """Der erste SINN (P4, Ronny 2026-07-08): die Zelle „weltfrage" spricht den wahrgenommenen
-Wetter-Bericht aus, den die Membran stuendlich hereinreicht. Rein lesend, gläsern, ehrliche
-Teil-Antwort (jedes reiche Feld nur bei echtem Material; sonst geschwiegen, nie erfunden)."""
+Wetter-Bericht aus, den die Membran stuendlich hereinreicht -- ODER (Nachrichten-Frage) die
+aktuellen Schlagzeilen aus dem Membran-Puffer. Rein lesend, gläsern, ehrliche Teil-Antwort
+(jedes Feld nur bei echtem Material; Schlagzeilen wortgetreu, nie interpretiert)."""
+import json
+import time
+
 from genus import companion, reactors, sensor
+
+
+def _saee_news(tmp_path, monkeypatch, schlagzeilen, ts=None):
+    pfad = tmp_path / "news_puffer.json"
+    pfad.write_text(json.dumps({
+        "ts": ts or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "quelle": "Tagesschau",
+        "schlagzeilen": [{"titel": t} for t in schlagzeilen],
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(pfad))
 
 
 def _saee_wetter(conn, temp, quelle="open-meteo"):
@@ -105,6 +119,69 @@ def test_weltfrage_liest_nur_und_schreibt_nicht(conn):
     companion._zelle_weltfrage(conn, {}, "wetter?", None, None)
     nachher = conn.execute("SELECT COUNT(*) AS n FROM event_log").fetchone()["n"]
     assert nachher == vorher
+
+
+# --- der News-Sinn (P4, Tagesschau-RSS -> Membran-Puffer, wortgetreu) --------------------
+
+def test_nachrichtenfrage_gibt_die_schlagzeilen_wortgetreu(conn, tmp_path, monkeypatch):
+    _saee_news(tmp_path, monkeypatch, ["Bundestag beschliesst das Gesetz", "Sturm zieht ueber Kassel"])
+    guess = {"text": "Was gibt es Neues?"}
+    text = companion._zelle_weltfrage(conn, guess, "Was gibt es Neues?", None, None)
+    assert "Schlagzeilen" in text and "Tagesschau" in text
+    assert "Bundestag beschliesst das Gesetz" in text   # wortgetreuer Fremdtext, nie umgeformt
+    assert "Sturm zieht ueber Kassel" in text
+
+
+def test_wetterfrage_bleibt_wetter_trotz_news_puffer(conn, tmp_path, monkeypatch):
+    # dieselbe „weltfrage"-Zelle, aber eine WETTER-Frage -> der Wetter-Sinn, nicht News
+    _saee_news(tmp_path, monkeypatch, ["Eine Schlagzeile"])
+    _saee_wetter(conn, 14.0)
+    text = companion._zelle_weltfrage(conn, {"text": "Wie ist das Wetter?"},
+                                      "Wie ist das Wetter?", None, None)
+    assert "14,0 °C" in text and "Schlagzeile" not in text
+
+
+def test_news_ist_ehrlich_ohne_puffer(conn, tmp_path, monkeypatch):
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(tmp_path / "fehlt.json"))
+    text = companion._zelle_weltfrage(conn, {"text": "Was gibt es Neues?"},
+                                      "Was gibt es Neues?", None, None)
+    assert "erreicht die Welt im Moment nicht" in text
+
+
+def test_news_alte_schlagzeilen_werden_als_alt_benannt(conn, tmp_path, monkeypatch):
+    _saee_news(tmp_path, monkeypatch, ["Alte Schlagzeile"], ts="2026-07-01T00:00:00Z")
+    text = companion._zelle_weltfrage(conn, {"text": "Neues?"}, "Neues?", None, None)
+    assert "Alte Schlagzeile" in text and "frischere habe ich gerade nicht" in text
+
+
+def test_aktuelles_wetter_bleibt_wetter_nicht_news(conn, tmp_path, monkeypatch):
+    # Review-Fund: „aktuell" fing frueher jede Wetterfrage als News ab -> Wetter-Wort hat Vorrang
+    _saee_news(tmp_path, monkeypatch, ["Eine Schlagzeile"])
+    _saee_wetter(conn, 11.0)
+    text = companion._zelle_weltfrage(conn, {"text": "Wie ist das aktuelle Wetter?"},
+                                      "Wie ist das aktuelle Wetter?", None, None)
+    assert "11,0 °C" in text and "Schlagzeile" not in text
+
+
+def test_news_crasht_nicht_bei_kaputtem_puffer(conn, tmp_path, monkeypatch):
+    # Review-Fund: schlagzeilen als null / Nicht-Liste darf nicht crashen -> ehrlich leer
+    pfad = tmp_path / "kaputt.json"
+    pfad.write_text('{"schlagzeilen": null}', encoding="utf-8")
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(pfad))
+    text = companion._zelle_weltfrage(conn, {"text": "Neues?"}, "Neues?", None, None)
+    assert "erreicht die Welt im Moment nicht" in text
+
+
+def test_stimme_reicht_einen_news_block_nie_ans_modell(conn):
+    # Review-Fund HIGH (Injektion): Fremdtext (Schlagzeilen) darf NIE an die Stimme -- auch nicht
+    # spaeter ueber eine Meta-Zelle, die last_answer umformulieren will
+    news = "Die aktuellen Schlagzeilen (laut Tagesschau):\n• Minister dementiert Vorwuerfe"
+    gerufen = []
+    fake_stimme = lambda t, **k: (gerufen.append(t), "UMFORMULIERT")[1]
+    assert companion._stimme_versucht(conn, news, fake_stimme) == news   # unveraendert
+    assert gerufen == []                                                  # Modell NIE gerufen
+    companion._stimme_versucht(conn, "Ein ganz normaler Satz.", fake_stimme)
+    assert gerufen == ["Ein ganz normaler Satz."]                        # normal weiter angeboten
 
 
 def test_weltfrage_bevorzugt_die_frischere_quelle_bei_zwei(conn):

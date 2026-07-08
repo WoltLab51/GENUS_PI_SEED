@@ -1750,12 +1750,100 @@ def _frischer_wert(conn, claim_key):
     return f
 
 
+# --- der WELT-Sinn: Wetter ODER Nachrichten (P4) -----------------------------------------
+#
+# Der Deuter fasst beides als „weltfrage" (Etikett: „Wetter, Nachrichten, aktuelle Ereignisse").
+# Hier wird unterschieden: Nachrichten-Schluesselwoerter -> News-Sinn, sonst -> Wetter-Sinn.
+# Beide rein lesend, gläsern. Nachrichten-Schlagzeilen sind FREMDER, ungeprueffter Text: sie
+# werden WORTGETREU angezeigt und nie interpretiert -- „weltfrage" ist wortlautfest, also formt
+# die Stimme sie nie um, und GENUS handelt nie auf eine Schlagzeile hin (beobachteter Inhalt =
+# Daten, nie Befehl). Der News-Puffer lebt an der MEMBRAN (deploy/observe_news.sh schreibt ihn,
+# Ledger != Memory -- ephemerer Fremdtext gehoert nicht ins Ereignis-Ledger); der Kern LIEST ihn
+# nur (kein HTTP im Kern).
+_NEWS_SCHLUESSEL = ("neues", "neuigkeit", "nachricht", "news", "schlagzeile")
+# Wetter-Woerter haben Vorrang: „das aktuelle WETTER" ist keine News-Frage. (Frueher fingen
+# „aktuell"/„passiert" als News-Schluessel jede Wetterfrage ab -- Review-Fund, entfernt.)
+_WETTER_SCHLUESSEL = ("wetter", "temperatur", "grad", "regen", "regnet", "warm", "kalt",
+                      "sonne", "sonnig", "schnee", "wind", "sturm", "gewitter", "frost",
+                      "bewoelkt", "bewölkt", "wolke")
+_NEWS_MAX = 5
+_NEWS_FRISCH_STUNDEN = 6.0
+_NEWS_ANTWORT_MARKER = "Schlagzeilen ("   # GENUS' EIGENER Kopf einer News-Antwort mit Fremdtext
+
+
+def _ist_news_frage(text) -> bool:
+    t = (text or "").casefold()
+    if any(w in t for w in _WETTER_SCHLUESSEL):   # eine Wetter-Frage bleibt Wetter
+        return False
+    return any(s in t for s in _NEWS_SCHLUESSEL)
+
+
+def _lies_news_puffer():
+    """Der Membran-News-Puffer (JSON) als Dict -- rein lesend, robust gegen fehlend/kaputt."""
+    import json
+    import os
+
+    pfad = os.environ.get("GENUS_NEWS_PUFFER",
+                          os.path.join(os.path.expanduser("~"), ".genus", "news_puffer.json"))
+    try:
+        with open(pfad, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _puffer_alter_stunden(ts):
+    """Stunden seit dem Puffer-Zeitstempel (Wanduhr) -- ``None``, wenn nicht lesbar."""
+    from datetime import datetime, timezone
+
+    if not ts:
+        return None
+    try:
+        t = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - t).total_seconds() / 3600.0
+
+
+def _news_bericht(conn):
+    """Die aktuellen Schlagzeilen aus dem Membran-Puffer -- WORTGETREU (Fremdtext, nie
+    interpretiert), mit Frische + Quelle, ehrlich, wenn nichts (Frisches) da ist."""
+    puffer = _lies_news_puffer() or {}
+    roh = puffer.get("schlagzeilen")
+    zeilen = ([z.get("titel") for z in roh if isinstance(z, dict) and z.get("titel")]
+              if isinstance(roh, list) else [])   # robust: schlagzeilen kein/kaputte Liste -> leer
+    if not zeilen:
+        return ("Nach Nachrichten kann ich schon greifen, aber gerade habe ich keine "
+                "Schlagzeilen — mein Nachrichten-Sinn erreicht die Welt im Moment nicht.")
+    quelle = puffer.get("quelle") or "meiner Nachrichtenquelle"
+    alter = _puffer_alter_stunden(puffer.get("ts"))
+    if alter is not None and alter > _NEWS_FRISCH_STUNDEN:
+        wann = (f"von vor rund {round(alter / 24)} Tagen" if alter >= 24
+                else f"von vor rund {round(alter)} Stunden")
+        kopf = f"Meine letzten Schlagzeilen ({wann}, laut {quelle}) — frischere habe ich gerade nicht:"
+    else:
+        kopf = f"Die aktuellen Schlagzeilen (laut {quelle}):"
+    liste = "\n".join(f"• {titel}" for titel in zeilen[:_NEWS_MAX])
+    return f"{kopf}\n{liste}"
+
+
 def _zelle_weltfrage(conn, guess, question, last_question, last_answer, stimme=None):
-    """Spricht den wahrgenommenen Wetter-Bericht aus -- der erste Sinn (P4), rein lesend.
-    Ehrliche Teil-Antwort: jedes reiche Feld (Zustand, gefuehlt, Feuchte, Wind, Vorhersage,
-    Regen) wird nur genannt, wenn es wirklich im Ledger liegt; fehlt es, wird geschwiegen,
-    nie erfunden. Die reichen Felder erscheinen nur bei einem FRISCHEN Wert (sonst waeren
-    sie so alt wie die Temperatur, aber als aktuell ausgesprochen)."""
+    """Der Welt-Sinn (P4): Nachrichten-Frage -> News-Sinn, sonst -> Wetter-Sinn (der Deuter
+    fasst beides als „weltfrage"). Beide rein lesend."""
+    text = (guess.get("text") if isinstance(guess, dict) else "") or question or ""
+    if _ist_news_frage(text):
+        return _news_bericht(conn)
+    return _wetter_bericht(conn)
+
+
+def _wetter_bericht(conn):
+    """Spricht den wahrgenommenen Wetter-Bericht aus -- rein lesend. Ehrliche Teil-Antwort:
+    jedes reiche Feld (Zustand, gefuehlt, Feuchte, Wind, Vorhersage, Regen) wird nur genannt,
+    wenn es wirklich UND frisch im Ledger liegt; fehlt/veraltet es, wird geschwiegen, nie
+    erfunden."""
     from genus import projection, sources
 
     temp_res = sources.resolve(conn, "weather.temp_outside")
@@ -1981,7 +2069,16 @@ def _stimme_versucht(conn, text: str, stimme) -> str:
     Die STIL-ANWEISUNG des Antwort-Würfels (``antwort.anweisung``, deterministisch aus der
     Belegung) reist als reine Daten mit über die Membran -- das Modell formuliert INNERHALB
     der gewählten Zelle, die Anker-Prüfung bleibt die Leine. Eine Stimme ohne
-    ``anweisung``-Parameter (ältere Membran, Test-Fakes) wird kompatibel ohne sie gerufen."""
+    ``anweisung``-Parameter (ältere Membran, Test-Fakes) wird kompatibel ohne sie gerufen.
+
+    FREMDTEXT-SCHUTZ (Prompt-Injektions-Grenze, Review-Fund 2026-07-08): ein News-Antwort-Block
+    enthält fremde, ungeprüfte Schlagzeilen. Er wird NIE ans Modell gereicht -- weder direkt
+    (weltfrage ist ohnehin wortlautfest) noch später, wenn eine Meta-Zelle (kuerzer/
+    anders-erklaeren/...) ``last_answer`` umformulieren will. Erkennbar am EIGENEN Kopf, den
+    GENUS schreibt (nicht der Fremdtext). So kann eine manipulative Schlagzeile die Stimme nie
+    steuern -- der eine Ort, an dem Antwort-Text je ein Modell erreicht."""
+    if _NEWS_ANTWORT_MARKER in text:
+        return text
     if stimme is None:
         return text
     from genus import antwort
