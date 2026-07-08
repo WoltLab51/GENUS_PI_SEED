@@ -1899,8 +1899,8 @@ def test_weltfrage_wird_von_der_eigenen_sinnes_zelle_beantwortet():
     conn = _isa_graph()
     deuter = lambda q: [{"absicht": "weltfrage"}]
     result = companion.respond_with_deuter(conn, "Wie wird das Wetter morgen?", deuter=deuter)
-    assert "erreicht die Welt im Moment nicht" in result["text"]
-    assert "Vorhersage" in result["text"]
+    assert "erreicht die Welt im Moment nicht" in result["text"]   # ehrlich, kein Fehlgriff
+    assert "spaeter noch einmal" in result["text"]
 
 
 def test_tun_is_an_honest_named_gap_for_real_world_help_requests():

@@ -1683,18 +1683,18 @@ def _formatiere_grad(wert) -> str:
     return f"{zahl:.1f}".replace(".", ",") + " °C"
 
 
-def _wetter_alter_stunden(conn, quelle):
-    """Stunden zwischen JETZT (Wanduhr) und der neuesten Messung der gewaehlten Quelle -- gegen
-    die Wanduhr, NICHT relativ zur eigenen Reihe wie ``sources.resolve``'s ``live`` (das misst
-    Frische nur zwischen Quellen und ist bei EINER Quelle immer 1.0). Nur ein echter Wanduhr-
-    Vergleich laesst einen tage-alten Wert als „nicht mehr gerade" auffallen. Rein read-time
-    (Mundstueck, nichts gespeichert -> Replay unberuehrt, wie die Motor-Erzaehlung). ``None``,
-    wenn kein Zeitstempel lesbar ist."""
+def _wetter_alter_stunden(conn, claim_key, quelle):
+    """Stunden zwischen JETZT (Wanduhr) und der neuesten Messung von ``claim_key`` aus der
+    gewaehlten Quelle -- gegen die Wanduhr, NICHT relativ zur eigenen Reihe wie
+    ``sources.resolve``'s ``live`` (das misst Frische nur zwischen Quellen und ist bei EINER
+    Quelle immer 1.0). Nur ein echter Wanduhr-Vergleich laesst einen tage-alten Wert als „nicht
+    mehr gerade" auffallen. Rein read-time (Mundstueck, nichts gespeichert -> Replay unberuehrt,
+    wie die Motor-Erzaehlung). ``None``, wenn kein Zeitstempel lesbar ist."""
     from datetime import datetime, timezone
 
     from genus import sources
 
-    stempel = [r["created_at"] for r in sources.assertions(conn, "weather.temp_outside")
+    stempel = [r["created_at"] for r in sources.assertions(conn, claim_key)
                if r["source"] == quelle and r.get("created_at")]
     if not stempel:
         return None
@@ -1707,39 +1707,117 @@ def _wetter_alter_stunden(conn, quelle):
     return (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0
 
 
+# WMO-Wetter-Codes (open-meteo) -> deutscher Zustand. Die Quelle liefert die Zahl; die
+# Uebersetzung ist eine deterministische Nachschlage-Tabelle (kein Urteil, keine Erfindung).
+_WMO_DE = {
+    0: "klar", 1: "ueberwiegend klar", 2: "teils bewoelkt", 3: "bewoelkt",
+    45: "neblig", 48: "gefrierender Nebel",
+    51: "leichter Nieselregen", 53: "Nieselregen", 55: "dichter Nieselregen",
+    56: "gefrierender Nieselregen", 57: "gefrierender Nieselregen",
+    61: "leichter Regen", 63: "Regen", 65: "starker Regen",
+    66: "gefrierender Regen", 67: "gefrierender Regen",
+    71: "leichter Schneefall", 73: "Schneefall", 75: "starker Schneefall", 77: "Schneegriesel",
+    80: "leichte Regenschauer", 81: "Regenschauer", 82: "heftige Regenschauer",
+    85: "Schneeschauer", 86: "starke Schneeschauer",
+    95: "Gewitter", 96: "Gewitter mit Hagel", 99: "schweres Gewitter mit Hagel",
+}
+
+
+def _frischer_wert(conn, claim_key):
+    """Ein zahlenwertiges Wetter-Feld aus dem Ledger -- aber NUR, wenn seine EIGENE neueste
+    Messung frisch ist (absolutes Wanduhr-Alter <= :data:`_WETTER_FRISCH_STUNDEN`). Ein altes
+    Feld (der letzte Fetch hat es ausgelassen, oder eine Zweitquelle hielt nur die Temperatur
+    frisch) wird verschwiegen statt als aktuell ausgegeben -- jedes Feld traegt seine eigene
+    Frische, nicht die der Temperatur. ``None`` auch bei keinem Wert, nicht-Zahl oder nan/inf
+    (``int()``/``round()`` wuerden sonst krachen). Rein lesend."""
+    import math
+
+    from genus import sources
+
+    res = sources.resolve(conn, claim_key)
+    v = res.get("value")
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(f):
+        return None
+    alter = _wetter_alter_stunden(conn, claim_key, res.get("chosen_source"))
+    if alter is None or alter > _WETTER_FRISCH_STUNDEN:
+        return None
+    return f
+
+
 def _zelle_weltfrage(conn, guess, question, last_question, last_answer, stimme=None):
-    """Spricht die wahrgenommene Aussentemperatur aus -- der erste Sinn (P4), rein lesend."""
+    """Spricht den wahrgenommenen Wetter-Bericht aus -- der erste Sinn (P4), rein lesend.
+    Ehrliche Teil-Antwort: jedes reiche Feld (Zustand, gefuehlt, Feuchte, Wind, Vorhersage,
+    Regen) wird nur genannt, wenn es wirklich im Ledger liegt; fehlt es, wird geschwiegen,
+    nie erfunden. Die reichen Felder erscheinen nur bei einem FRISCHEN Wert (sonst waeren
+    sie so alt wie die Temperatur, aber als aktuell ausgesprochen)."""
     from genus import projection, sources
 
-    aufgeloest = sources.resolve(conn, "weather.temp_outside")
-    wert = aufgeloest.get("value")
-    rest = ("Vorhersage, Regen oder andere Orte kann ich noch nicht — dafuer fehlt meinem "
-            "Wetter-Sinn noch Material.")
+    temp_res = sources.resolve(conn, "weather.temp_outside")
+    wert = temp_res.get("value")
     if wert is None:
-        return ("Von der Welt draussen fuehle ich bisher nur die Aussentemperatur — und die "
-                "habe ich gerade nicht: mein Wetter-Sinn erreicht die Welt im Moment nicht. " + rest)
-    # Der Quell-NAME wird (noch) nicht ausgesprochen: die erste Quelle traegt intern nur das
-    # generische Label „weather.api" (der Provider-Name geht im Schreibpfad verloren) -- lieber
-    # gar keine Quelle in der Stimme als eine nichtssagende. Die Herkunft bleibt im Ledger
-    # abfragbar (glaesern), und das Label-Fix kommt mit dem Mehr-Wetter-Schnitt.
-    alter = _wetter_alter_stunden(conn, aufgeloest.get("chosen_source"))
-    if alter is not None and alter <= _WETTER_FRISCH_STUNDEN:
-        satz = f"Draussen sind es gerade {_formatiere_grad(wert)}."
-        trend_row = projection.active_belief(conn, "weather.trend")
-        trend = _TREND_DE.get(trend_row["claim_value"]) if trend_row else None
-        if trend:   # ein Trend gehoert nur zu einem frischen Wert (er beschreibt das JETZT)
-            satz += " " + trend
-    elif alter is not None:
-        wann = (f"von vor rund {round(alter / 24)} Tagen" if alter >= 24
-                else f"von vor rund {round(alter)} Stunden")
-        satz = (f"Mein letzter Wetter-Wert ({wann}) war {_formatiere_grad(wert)} — "
-                f"frischer habe ich gerade nichts.")
+        return ("Von der Welt draussen fuehle ich das Wetter — aber gerade habe ich keinen "
+                "Wert: mein Wetter-Sinn erreicht die Welt im Moment nicht. Frag gern spaeter "
+                "noch einmal.")
+    quelle = temp_res.get("chosen_source")
+    alter = _wetter_alter_stunden(conn, "weather.temp_outside", quelle)
+    if not (alter is not None and alter <= _WETTER_FRISCH_STUNDEN):
+        # nicht frisch: nur der letzte Temperatur-Wert, ehrlich als alt benannt -- keine alten
+        # Detailfelder als aktuell ausgeben
+        if alter is None:
+            return (f"Mein letzter Wetter-Wert war {_formatiere_grad(wert)}, aber wie frisch er "
+                    f"ist, weiss ich gerade nicht. Mehr sage ich dir mit einem frischen Wert.")
+        wann = (f"vor rund {round(alter / 24)} Tagen" if alter >= 24
+                else f"vor rund {round(alter)} Stunden")
+        return (f"Mein letzter Wetter-Wert ({wann}) war {_formatiere_grad(wert)} — frischer habe "
+                f"ich gerade nichts. Sobald mein Sinn wieder etwas empfaengt, sage ich dir mehr.")
+
+    # frisch -> der reiche Bericht, jede Zutat nur bei echtem UND frischem Material (jedes Feld
+    # traegt seine eigene Frische -- ein altes Feld wird verschwiegen, nie als aktuell gesprochen)
+    code = _frischer_wert(conn, "weather.code")
+    zustand = _WMO_DE.get(int(code)) if code is not None else None
+    gefuehlt = _frischer_wert(conn, "weather.apparent")
+    feuchte = _frischer_wert(conn, "weather.humidity")
+    wind = _frischer_wert(conn, "weather.wind")
+    tmax = _frischer_wert(conn, "weather.temp_max")
+    tmin = _frischer_wert(conn, "weather.temp_min")
+    regen = _frischer_wert(conn, "weather.rain_prob")
+
+    kern = f"{zustand} bei {_formatiere_grad(wert)}" if zustand else _formatiere_grad(wert)
+    if gefuehlt is not None and abs(gefuehlt - float(wert)) >= 1.0:
+        kern += f" (gefuehlt {_formatiere_grad(gefuehlt)})"
+    satz = f"Gerade draussen: {kern}."
+    trend_row = projection.active_belief(conn, "weather.trend")
+    trend = _TREND_DE.get(trend_row["claim_value"]) if trend_row else None
+    if trend:
+        satz += " " + trend
+    detail = []
+    if feuchte is not None:
+        detail.append(f"Luftfeuchte {round(feuchte)} %")
+    if wind is not None:
+        detail.append(f"Wind {round(wind)} km/h")
+    if detail:
+        satz += " " + ", ".join(detail) + "."
+    if tmin is not None and tmax is not None:
+        satz += f" Heute {_formatiere_grad(tmin)} bis {_formatiere_grad(tmax)}"
+        satz += (f", Regenwahrscheinlichkeit {round(regen)} %." if regen is not None else ".")
+    elif regen is not None:
+        satz += f" Regenwahrscheinlichkeit heute {round(regen)} %."
+    if quelle and quelle != "weather.api":   # ein echter Provider-Name, kein internes Alt-Label
+        satz += f" Diese Werte kommen von {quelle}."
+    if temp_res.get("contradiction"):
+        satz += " Meine Wetterquellen sind sich bei der Temperatur uneinig, also ohne Gewaehr."
+    if tmax is not None:
+        satz += " Fuer andere Orte oder weiter als heute reicht mein Wetter-Sinn noch nicht."
     else:
-        satz = (f"Mein letzter Wetter-Wert war {_formatiere_grad(wert)}, aber wie frisch er "
-                f"ist, weiss ich gerade nicht.")
-    if aufgeloest.get("contradiction"):
-        satz += " Meine Wetterquellen sind sich gerade uneinig, also ohne Gewaehr."
-    return satz + " " + rest
+        satz += (" Vorhersage, Regen oder andere Orte kann ich noch nicht — dafuer fehlt meinem "
+                 "Wetter-Sinn noch Material.")
+    return satz
 
 
 # Können ist Code, Wissen über Absichten ist Graph: a cell acts iff a handler exists HERE;

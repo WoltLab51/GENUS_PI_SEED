@@ -69,6 +69,9 @@ def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():
     assert "no observation recorded" in script
     assert 'if [ -z "$temp" ]' in script
     assert "paused" in script  # honors the global pause switch
+    # rich fields (P4 Schnitt 2): everything the source gives, each its own claim (number only)
+    assert "apparent_temperature" in script and "precipitation_probability_max" in script
+    assert "observe-assertion" in script and "weather.rain_prob" in script
 
 
 def test_second_weather_membrane_feeds_observe_assertion_number_only():

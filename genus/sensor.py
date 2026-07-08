@@ -120,12 +120,17 @@ def weather_reading(temp_outside: float, source: str = "unknown") -> dict:
     location stays in the membrane's configuration and never enters the ledger;
     only the temperature and its ``source`` provenance travel.
     """
+    # Der PROVIDER ist die Quelle (open-meteo/wttr.in) -- gläserne Herkunft. Frueher trug der
+    # Wert das generische Label „weather.api", das den Provider-Namen verschluckte (und den
+    # Mehr-Quellen-Konsens verhinderte, weil beide Quellen gleich hiessen); jetzt queren
+    # Provider-Name + Zahl, sonst nichts (der Ort bleibt in der Membran).
+    quelle = source or "unknown"
     return {
-        "source": "weather.api",
+        "source": quelle,
         "raw_value": float(temp_outside),
         "unit": "celsius",
         "interval": 0.0,
-        "provider": source or "unknown",
+        "provider": quelle,
     }
 
 

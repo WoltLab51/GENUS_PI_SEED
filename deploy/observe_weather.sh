@@ -22,7 +22,13 @@ LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 LAT="${GENUS_WEATHER_LAT:-51.31}"
 LON="${GENUS_WEATHER_LON:-9.50}"
 SOURCE="open-meteo"
-URL="https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m"
+PY="$REPO_DIR/.venv/bin/python"
+# alles, was die Quelle hergibt: aktuelle Werte + heutige Vorhersage (nur Zahlen queren, der
+# Ort bleibt in dieser Membran). Die Temperatur bleibt der Anker (Beobachtungs-Pfad -> Trend);
+# die uebrigen Felder kommen als eigene Claims ueber den allgemeinen Assertions-Eingang herein.
+CURRENT="temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,precipitation"
+DAILY="temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+URL="https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=${CURRENT}&daily=${DAILY}&timezone=auto&forecast_days=1"
 
 mkdir -p "$LOG_DIR"
 
@@ -47,10 +53,13 @@ run_genus() {
     fi
 }
 
-# Fetch the raw JSON and extract just the temperature. Any failure (no network,
-# bad payload, missing field) yields an empty string and records nothing.
-temp="$(curl -s --max-time 15 "$URL" 2>/dev/null \
-    | "$REPO_DIR/.venv/bin/python" -c 'import sys, json
+# Fetch the raw JSON ONCE, then extract fields locally. Any failure (no network, bad
+# payload, missing field) yields an empty string and records nothing.
+roh="$(curl -s --max-time 15 "$URL" 2>/dev/null || true)"
+
+# The temperature is the anchor: it alone gates recording (absence of a reading is not a
+# reading), and it keeps the observation path (-> weather.trend belief).
+temp="$(printf '%s' "$roh" | "$PY" -c 'import sys, json
 try:
     print(json.load(sys.stdin)["current"]["temperature_2m"])
 except Exception:
@@ -63,3 +72,31 @@ fi
 
 log "outside temperature=${temp}C (source=$SOURCE)"
 run_genus observe-weather --temp-outside "$temp" --source "$SOURCE" >/dev/null
+
+# The rich fields — everything the source gives, each handed in as its OWN claim (number only,
+# through the general assertion entry point). A missing field prints nothing and is silently
+# left out; the core never sees a placeholder.
+extra="$(printf '%s' "$roh" | "$PY" -c 'import sys, json
+try:
+    d = json.load(sys.stdin)
+    cur = d.get("current", {}) or {}
+    day = d.get("daily", {}) or {}
+    first = lambda x: x[0] if isinstance(x, list) and x else None
+    for claim, value in (
+        ("weather.apparent", cur.get("apparent_temperature")),
+        ("weather.humidity", cur.get("relative_humidity_2m")),
+        ("weather.wind", cur.get("wind_speed_10m")),
+        ("weather.code", cur.get("weather_code")),
+        ("weather.temp_max", first(day.get("temperature_2m_max"))),
+        ("weather.temp_min", first(day.get("temperature_2m_min"))),
+        ("weather.rain_prob", first(day.get("precipitation_probability_max"))),
+    ):
+        if value is not None:
+            print(claim, value)
+except Exception:
+    pass' 2>/dev/null || true)"
+
+while read -r claim value; do
+    [ -z "$claim" ] && continue
+    run_genus observe-assertion --claim-key "$claim" --value "$value" --source "$SOURCE" >/dev/null
+done <<< "$extra"
