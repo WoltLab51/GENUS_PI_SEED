@@ -14,6 +14,7 @@ gemerkten Episoden tragen die Quelle ``model:nacht`` und sind damit automatisch 
 wie alles Modellhafte — korrigierbar am Morgen mit einem Wort."""
 from __future__ import annotations
 
+import json
 import re
 
 from genus import sources
@@ -95,6 +96,78 @@ def _neustes_gelerntes_wort(conn) -> dict | None:
     return {"wort": wort, "bedeutung": gloss_row["object"] if gloss_row else None}
 
 
+# --- Morgen-Triage der Proposals (Ronny 2026-07-08: „mach die Morgen-Triage") ------------
+#
+# Die Morgen-Nachricht zählte bisher ALLE offenen Vorschläge flach („Es warten 8 Vorschläge,
+# ältester #6") und zeigte damit auf einen abgestandenen Betriebs-Hinweis, während der EINE,
+# der Ronny wirklich braucht (ein Selbst-Codier-Vorschlag mit ``action_required``), im
+# Monitoring-Rauschen unterging. Ein guter „digitaler Mitarbeiter" triagiert: was dein OK
+# braucht ZUERST und einzeln, wiederkehrende Betriebs-Meldungen zu EINER FYI-Zeile gebündelt.
+# Die Unterscheidung ist keine Heuristik, sondern liegt schon im Proposal-Payload: der
+# Erzeuger setzt ``action_required`` (True nur beim ExperienceProposal/Selbst-Codieren; die
+# Operation/Resource-Wächter setzen es bewusst False -- reines Monitoring).
+_BETRIEB_PHRASE = {
+    "system.network": "das Netzwerk war {mal} instabil",
+    "system.load": "die Systemlast war {mal} hoch",
+    "system.clock": "die Uhr war {mal} nicht synchron",
+}
+_MAL = {1: "einmal", 2: "zweimal", 3: "dreimal"}
+
+
+def _mal(n: int) -> str:
+    return _MAL.get(n, f"{n}-mal")
+
+
+def _proposal_payload(p: dict) -> dict:
+    """Der Inhalts-Payload eines Proposals als Dict -- robust gegen kaputtes JSON UND gegen
+    gültiges Nicht-Objekt-JSON (``null``/``5``/``[...]`` decodieren fehlerfrei, sind aber kein
+    Dict): beides wird zu ``{}`` (also automatisch Betrieb/nicht-dringend), nie ein Absturz der
+    Morgen-Nachricht."""
+    roh = p.get("payload")
+    if isinstance(roh, dict):
+        return roh
+    try:
+        wert = json.loads(roh) if roh else {}
+    except (ValueError, TypeError):
+        return {}
+    return wert if isinstance(wert, dict) else {}
+
+
+def triagiere_proposals(offene: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Teilt offene Vorschläge in DRINGEND (``action_required`` -- braucht Ronnys Entscheidung)
+    und BETRIEB (Monitoring, gebündelt gemeldet). Reine Lese-Sicht, kein Schreiben."""
+    dringend, betrieb = [], []
+    for p in offene:
+        (dringend if _proposal_payload(p).get("action_required") else betrieb).append(p)
+    return dringend, betrieb
+
+
+def betrieb_zeile(betrieb: list[dict]) -> str:
+    """Die EINE FYI-Zeile für die wiederkehrenden Betriebs-Meldungen, nach Claim gebündelt und
+    gezählt (5 Netz-Episoden werden „das Netzwerk war 5-mal instabil", nicht fünf Vorschläge).
+    Ein unbekannter Claim wird NICHT als roher Knoten-Name ausgegeben (nie kryptisch) und nie
+    durch ``.format`` geschickt (Format-String-Injektion aus daten-kontrolliertem Key) -- er
+    zählt generisch als „weiterer Betriebs-Hinweis". ``.format`` trifft so nur die eigenen,
+    festen Vorlagen."""
+    anzahl: dict[str, int] = {}
+    for p in betrieb:
+        schluessel = p.get("claim_key") or ""
+        anzahl[schluessel] = anzahl.get(schluessel, 0) + 1
+    stuecke: list[str] = []
+    sonstige = 0
+    for k, n in anzahl.items():
+        if k in _BETRIEB_PHRASE:
+            stuecke.append(_BETRIEB_PHRASE[k].format(mal=_mal(n)))
+        else:
+            sonstige += n
+    if sonstige == 1:
+        stuecke.append("es gab einen weiteren Betriebs-Hinweis")
+    elif sonstige:
+        stuecke.append(f"es gab {sonstige} weitere Betriebs-Hinweise")
+    return ("Fürs Protokoll (nichts, was du tun musst): "
+            + " und ".join(stuecke) + ".")
+
+
 def morgen_nachricht(conn, bericht: dict | None) -> str:
     """Die EINE Morgen-Nachricht — warm, nativ, deterministisch komponiert (Ronnys
     Entscheidungen: nie leer; Zusammenfassung; nett). Reihenfolge: Gruß → gestern
@@ -120,15 +193,25 @@ def morgen_nachricht(conn, bericht: dict | None) -> str:
             teile.append("Magst du mir heute mehr davon erzählen?")
         inhalt = True
 
-    offene_proposals = [p for p in proposals.list_proposals(conn)]
-    if offene_proposals:
-        erster = offene_proposals[0]
-        teile.append(f"Es warten {len(offene_proposals)} Vorschläge auf deine Freigabe — "
-                     f"der älteste: Proposal #{erster['id']}.")
+    offene_proposals = proposals.list_proposals(conn)
+    dringend, betrieb = triagiere_proposals(offene_proposals)
+    # 1) Was Ronnys Entscheidung braucht: einzeln, ZUERST, mit der eigenen Bitte (GENUS-Stimme)
+    for p in dringend:
+        beschreibung = (_proposal_payload(p).get("description") or "").strip()
+        if beschreibung:
+            teile.append(f"Etwas möchte ich mit dir klären (Vorschlag #{p['id']}): {beschreibung}")
+        else:
+            teile.append(f"Vorschlag #{p['id']} wartet auf deine Freigabe (über „genus governance“).")
+        inhalt = True
+    # 2) Wiederkehrende Betriebs-Meldungen: EINE gebündelte FYI-Zeile, kein Freigabe-Druck
+    if betrieb:
+        teile.append(betrieb_zeile(betrieb))
         inhalt = True
 
+    # offene Fragen zeigen, solange nichts DRINGENDES schon um Aufmerksamkeit bittet -- das
+    # Betriebs-Rauschen (nicht dringend) verdrängt das Nachdenken-Signal nicht mehr
     offene_fragen = inquiries.list_inquiries(conn, include_all=False)
-    if offene_fragen and not offene_proposals:
+    if offene_fragen and not dringend:
         teile.append(f"Mich beschäftigen gerade {len(offene_fragen)} offene Fragen — "
                      f"frag mich im Chat „Was beschäftigt dich?“, wenn du magst.")
         inhalt = True

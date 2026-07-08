@@ -1,7 +1,7 @@
 """Nacht-Konsolidierung + Morgen-Nachricht (docs/GENUS_GEDAECHTNIS.md Punkt ④, Ronnys
 Entscheidungen 2026-07-04): Themen deterministisch, Episoden gedeckelt (model:nacht),
 die eine Nachricht warm und nativ — nie kryptisch, nie leer."""
-from genus import konsolidierung, proposals, reactors, sources, ziele
+from genus import inquiries, konsolidierung, proposals, reactors, sources, ziele
 
 
 def _zug(frage: str) -> dict:
@@ -46,15 +46,91 @@ def test_morgen_nachricht_ist_warm_und_nennt_themen(conn):
     assert "Q144" not in text and "faehigkeit:" not in text
 
 
-def test_morgen_nachricht_nennt_wartende_freigaben(conn):
+def _op_proposal(conn, claim_key, claim_value="unstable"):
     proposals.record_proposal_created_event(
         conn, proposal_id=proposals.next_proposal_id(conn),
-        proposal_type="ResourceProposal", claim_key="test", claim_value="x",
+        proposal_type="OperationProposal", claim_key=claim_key, claim_value=claim_value,
         source_belief=None, source_event=1,
-        payload={"description": "t", "action_required": True, "review_recommended": True},
-    )
+        payload={"description": "op", "action_required": False, "review_recommended": True})
+
+
+def test_morgen_triage_stellt_dringendes_voran_mit_eigener_bitte(conn):
+    # Ronny 2026-07-08: ein action_required-Vorschlag (Selbst-Codieren) kommt EINZELN und mit
+    # seiner eigenen Bitte zuerst -- das ist, was seine Entscheidung braucht
+    proposals.record_proposal_created_event(
+        conn, proposal_id=proposals.next_proposal_id(conn),
+        proposal_type="ExperienceProposal", claim_key="verstehen.weltfrage",
+        claim_value="verstehens_luecke", source_belief=None, source_event=1,
+        payload={"description": "Ich spüre eine Lücke beim Blatt weltfrage. Darf ich das priorisieren?",
+                 "action_required": True, "review_recommended": True})
     text = konsolidierung.morgen_nachricht(conn, None)
-    assert "Freigabe" in text and "Proposal #" in text
+    assert "Vorschlag #" in text and "weltfrage" in text
+    assert "Fürs Protokoll" not in text   # es gibt kein Betriebs-Rauschen zu bündeln
+
+
+def test_morgen_triage_buendelt_betrieb_zu_einer_gezaehlten_zeile(conn):
+    # das Kern-Problem: 5 Netz-Episoden + 2 Last werden EINE FYI-Zeile (gezählt), nicht
+    # „7 Vorschläge auf deine Freigabe" -- kein aufgeblähter Zähler, kein Freigabe-Druck
+    for _ in range(5):
+        _op_proposal(conn, "system.network")
+    for _ in range(2):
+        proposals.record_proposal_created_event(
+            conn, proposal_id=proposals.next_proposal_id(conn),
+            proposal_type="ResourceProposal", claim_key="system.load", claim_value="high",
+            source_belief=None, source_event=1,
+            payload={"description": "load", "action_required": False, "review_recommended": True})
+    text = konsolidierung.morgen_nachricht(conn, None)
+    assert "Fürs Protokoll" in text
+    assert "das Netzwerk war 5-mal instabil" in text
+    assert "die Systemlast war zweimal hoch" in text
+    assert "Vorschlag #" not in text and "Freigabe" not in text
+
+
+def test_morgen_triage_betrieb_verdraengt_offene_fragen_nicht(conn):
+    # nicht-dringendes Betriebs-Rauschen darf das Nachdenken-Signal (offene Fragen) nicht mehr
+    # unterdrücken -- vorher tat es das (Bedingung „not offene_proposals")
+    _op_proposal(conn, "system.network")
+    inquiries.record_inquiry_created_event(
+        conn, inquiry_id=1, inquiry_type="StabilityInquiry", claim_key="verstehen.leben",
+        source_belief=None, source_event=1, question_key="stability.unexpected_flip",
+        payload={"expected": "stable", "observed": "flipped"})
+    text = konsolidierung.morgen_nachricht(conn, None)
+    assert "Fürs Protokoll" in text and "offene Fragen" in text
+
+
+def test_triagiere_proposals_trennt_nach_action_required():
+    dringend, betrieb = konsolidierung.triagiere_proposals([
+        {"claim_key": "a", "payload": '{"action_required": true}'},
+        {"claim_key": "system.network", "payload": '{"action_required": false}'},
+        {"claim_key": "system.network", "payload": "kaputtes json"},   # robust -> Betrieb
+    ])
+    assert len(dringend) == 1 and len(betrieb) == 2
+    assert konsolidierung.betrieb_zeile(betrieb) == (
+        "Fürs Protokoll (nichts, was du tun musst): das Netzwerk war zweimal instabil.")
+
+
+def test_proposal_payload_robust_gegen_nicht_dict_json():
+    # Review-Fund: gültiges, aber NICHT-Objekt-JSON (null/Zahl/Liste) darf nicht crashen ->
+    # als leeres Dict behandelt, also automatisch Betrieb/nicht-dringend
+    for roh in ("null", "5", "[1,2]", '"x"', "true", "kaputt", None, ""):
+        assert konsolidierung._proposal_payload({"payload": roh}) == {}
+    dringend, betrieb = konsolidierung.triagiere_proposals(
+        [{"claim_key": "system.network", "payload": "null"}])   # kein AttributeError
+    assert not dringend and len(betrieb) == 1
+
+
+def test_betrieb_zeile_leakt_keinen_rohen_key_und_crasht_nicht_bei_klammern():
+    # Review-Fund 2+3: ein unbekannter Claim wird generisch gezählt (kein roher Knoten-Name im
+    # Klartext) UND ein Key mit Format-Klammern crasht nicht (kein .format auf Daten)
+    zeile = konsolidierung.betrieb_zeile([
+        {"claim_key": "system.activity"}, {"claim_key": "metric{0}"}])
+    assert "system.activity" not in zeile and "metric{0}" not in zeile
+    assert "es gab 2 weitere Betriebs-Hinweise" in zeile
+    # bekannt + unbekannt gemischt: bekannt benannt, unbekannt generisch angehängt
+    gemischt = konsolidierung.betrieb_zeile([
+        {"claim_key": "system.network"}, {"claim_key": "system.activity"}])
+    assert "das Netzwerk war einmal instabil" in gemischt
+    assert "einen weiteren Betriebs-Hinweis" in gemischt and "system.activity" not in gemischt
 
 
 def test_leerer_morgen_ist_nie_leer_sondern_erzaehlt_das_gelernte(conn):
