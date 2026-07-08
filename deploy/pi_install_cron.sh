@@ -57,6 +57,7 @@ fi
     echo '7 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] weather $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_weather.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '12 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] weather-2 $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_weather_second.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/20 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] news $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_news.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    echo '*/3 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] gedanken-push $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus gedanken-push >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/2 * * * * cd "$GENUS_REPO_DIR" && ./deploy/hand_ausfuehren.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '57 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] nacht-konsolidierung $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && bash ./deploy/nacht_konsolidierung.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'

@@ -114,6 +114,12 @@ def offene(conn) -> list[dict]:
             if h["status"] in (VORGESCHLAGEN, FREIGEGEBEN)]
 
 
+def quellen(conn) -> set[str]:
+    """Alle je vergebenen Hand-Quellen über ALLE Zustände (auch ausgeführte) -- der Dedup-Griff für
+    eine proaktive Nachricht: ein Gedanke wird nur EINMAL zur Hand, auch nachdem sie längst gesendet ist."""
+    return {h.get("quelle") for h in _zustand(conn).values()}
+
+
 def vorschlagen(conn, art: str, inhalt: str, faellig_um: str | None = None,
                 quelle: str = "genus") -> dict:
     """Eine Außenhandlung VORSCHLAGEN — sie wird noch NICHT ausgeführt, sondern wartet auf ein

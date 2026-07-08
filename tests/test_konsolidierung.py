@@ -54,18 +54,18 @@ def _op_proposal(conn, claim_key, claim_value="unstable"):
         payload={"description": "op", "action_required": False, "review_recommended": True})
 
 
-def test_morgen_triage_stellt_dringendes_voran_mit_eigener_bitte(conn):
-    # Ronny 2026-07-08: ein action_required-Vorschlag (Selbst-Codieren) kommt EINZELN und mit
-    # seiner eigenen Bitte zuerst -- das ist, was seine Entscheidung braucht
+def test_morgen_bleibt_warm_ohne_vorschlaege(conn):
+    # Ronny 2026-07-08: „der Morgengruß soll ein schöner Gruß sein" -- Vorschläge und offene Fragen
+    # wandern NICHT mehr in den Gruß, sie kommen proaktiv (genus/gedanke.py). Der Gruß bleibt warm.
     proposals.record_proposal_created_event(
         conn, proposal_id=proposals.next_proposal_id(conn),
         proposal_type="ExperienceProposal", claim_key="verstehen.weltfrage",
         claim_value="verstehens_luecke", source_belief=None, source_event=1,
-        payload={"description": "Ich spüre eine Lücke beim Blatt weltfrage. Darf ich das priorisieren?",
+        payload={"description": "Darf ich das priorisieren?",
                  "action_required": True, "review_recommended": True})
     text = konsolidierung.morgen_nachricht(conn, None)
-    assert "Vorschlag #" in text and "weltfrage" in text
-    assert "Fürs Protokoll" not in text   # es gibt kein Betriebs-Rauschen zu bündeln
+    assert text.startswith("Guten Morgen, Ronny")
+    assert "Vorschlag #" not in text and "offene Fragen" not in text
 
 
 def test_morgen_nachricht_warnt_bei_ueberfaelliger_ungesendeter_hand(conn):
@@ -87,36 +87,6 @@ def test_morgen_nachricht_schweigt_im_normalen_sendefenster(conn):
     hand.bestaetigen(conn, hid)
     text = konsolidierung.morgen_nachricht(conn, None, jetzt_iso="2020-01-01T12:01:00")
     assert "überfällig" not in text
-
-
-def test_morgen_triage_buendelt_betrieb_zu_einer_gezaehlten_zeile(conn):
-    # das Kern-Problem: 5 Netz-Episoden + 2 Last werden EINE FYI-Zeile (gezählt), nicht
-    # „7 Vorschläge auf deine Freigabe" -- kein aufgeblähter Zähler, kein Freigabe-Druck
-    for _ in range(5):
-        _op_proposal(conn, "system.network")
-    for _ in range(2):
-        proposals.record_proposal_created_event(
-            conn, proposal_id=proposals.next_proposal_id(conn),
-            proposal_type="ResourceProposal", claim_key="system.load", claim_value="high",
-            source_belief=None, source_event=1,
-            payload={"description": "load", "action_required": False, "review_recommended": True})
-    text = konsolidierung.morgen_nachricht(conn, None)
-    assert "Fürs Protokoll" in text
-    assert "das Netzwerk war 5-mal instabil" in text
-    assert "die Systemlast war zweimal hoch" in text
-    assert "Vorschlag #" not in text and "Freigabe" not in text
-
-
-def test_morgen_triage_betrieb_verdraengt_offene_fragen_nicht(conn):
-    # nicht-dringendes Betriebs-Rauschen darf das Nachdenken-Signal (offene Fragen) nicht mehr
-    # unterdrücken -- vorher tat es das (Bedingung „not offene_proposals")
-    _op_proposal(conn, "system.network")
-    inquiries.record_inquiry_created_event(
-        conn, inquiry_id=1, inquiry_type="StabilityInquiry", claim_key="verstehen.leben",
-        source_belief=None, source_event=1, question_key="stability.unexpected_flip",
-        payload={"expected": "stable", "observed": "flipped"})
-    text = konsolidierung.morgen_nachricht(conn, None)
-    assert "Fürs Protokoll" in text and "offene Fragen" in text
 
 
 def test_triagiere_proposals_trennt_nach_action_required():

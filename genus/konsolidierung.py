@@ -176,7 +176,7 @@ def morgen_nachricht(conn, bericht: dict | None, jetzt_iso: str | None = None) -
     (Belegung der Rolle „morgen": hebt die Wärme um eine Stufe; Kreuz-Konsistenz zentral,
     z.B. entfällt die Rückfrage bei „knapp") — die Persönlichkeit wählt Formulierungen,
     nie Inhalte."""
-    from genus import antwort, inquiries, proposals
+    from genus import antwort
 
     reg = antwort.belegung(conn, "morgen")
     warm = reg["waerme"] in ("warm", "herzlich")
@@ -223,29 +223,11 @@ def morgen_nachricht(conn, bericht: dict | None, jetzt_iso: str | None = None) -
             teile.append("Magst du mir heute mehr davon erzählen?")
         inhalt = True
 
-    offene_proposals = proposals.list_proposals(conn)
-    dringend, betrieb = triagiere_proposals(offene_proposals)
-    # 1) Was Ronnys Entscheidung braucht: einzeln, ZUERST, mit der eigenen Bitte (GENUS-Stimme)
-    for p in dringend:
-        beschreibung = (_proposal_payload(p).get("description") or "").strip()
-        if beschreibung:
-            teile.append(f"Etwas möchte ich mit dir klären (Vorschlag #{p['id']}): {beschreibung}")
-        else:
-            teile.append(f"Vorschlag #{p['id']} wartet auf deine Freigabe (über „genus governance“).")
-        inhalt = True
-    # 2) Wiederkehrende Betriebs-Meldungen: EINE gebündelte FYI-Zeile, kein Freigabe-Druck
-    if betrieb:
-        teile.append(betrieb_zeile(betrieb))
-        inhalt = True
-
-    # offene Fragen zeigen, solange nichts DRINGENDES schon um Aufmerksamkeit bittet -- das
-    # Betriebs-Rauschen (nicht dringend) verdrängt das Nachdenken-Signal nicht mehr
-    offene_fragen = inquiries.list_inquiries(conn, include_all=False)
-    if offene_fragen and not dringend:
-        teile.append(f"Mich beschäftigen gerade {len(offene_fragen)} offene Fragen — "
-                     f"frag mich im Chat „Was beschäftigt dich?“, wenn du magst.")
-        inhalt = True
-
+    # Vorschläge und offene Fragen wandern NICHT mehr in den Morgengruß (Ronny 2026-07-08: „der
+    # Morgengruß soll ein schöner Gruß sein"): das WICHTIGE (Entscheidungs-Vorschläge + selbst
+    # gebildete Begriffs-Fragen) schickt GENUS proaktiv, sobald es das hat (genus/gedanke.py),
+    # nicht aufgestaut bis zum nächsten Morgen. Der Gruß bleibt warm. (Die Überfälligkeits-Warnung
+    # oben BLEIBT hier: sie meldet gerade, wenn der proaktive Sende-Weg selbst steht.)
     if not inhalt:
         gelernt = _neustes_gelerntes_wort(conn)
         if gelernt and gelernt["bedeutung"]:

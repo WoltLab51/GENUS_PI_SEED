@@ -20,6 +20,7 @@ from genus import (
     doctor as doctor_checks,
     event_router,
     experience,
+    gedanke,
     gender_rule,
     governance,
     hypothese,
@@ -1019,6 +1020,26 @@ def abstraktion_command(limit: int, unter: str | None, tick: bool, pruefe: bool)
                        f"{ergebnis['konzept']}. Bestätigen/verwerfen wie jede model:*-Kante.")
         else:
             click.echo(f"\n[ABS] {ergebnis['konzept']} war schon geprägt — kein Duplikat.")
+    finally:
+        conn.close()
+
+
+@main.command("gedanken-push")
+def gedanken_push_command() -> None:
+    """Der proaktive GEDANKE (Ronny 2026-07-08): das WICHTIGE — Entscheidungs-Vorschläge + selbst
+    gebildete Begriffs-Fragen — wird SOFORT eine bestätigte Nachricht-Hand (fällig jetzt), statt bis
+    zum Morgen aufgestaut zu werden. Idempotent (ein Gedanke → einmal), gedeckelt durch den Anti-
+    Weglauf der Hand. Der Membran-Cron (hand_ausfuehren.sh) sendet die fälligen Hände."""
+    if control.is_paused():
+        click.echo("[GEDANKE] paused — skipping (genus resume to continue)")
+        return
+    conn = get_conn()
+    try:
+        neu = gedanke.push(conn)
+        if neu:
+            conn.commit()
+        click.echo(f"[GEDANKE] {len(neu)} neue(r) proaktive(r) Gedanke(n) als Nachricht angelegt "
+                   f"(der Sende-Cron schickt sie).")
     finally:
         conn.close()
 
