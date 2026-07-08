@@ -91,6 +91,10 @@ BEWUSST_ROH: frozenset[str] = frozenset({
                                # WIRKUNG sind normale, projizierte relation_asserted-Events
     "code_entwurf_erstellt",   # Werkstatt-Spur (Stufe 2): der Code selbst ist Randmaterial,
     "code_entwurf_geprueft",   # nur die Entscheidung/Prüfung wird Geschichte
+    "hand_vorgeschlagen",      # die HÄNDE (genus/hand.py): der Zustand einer Außenhandlung lebt
+    "hand_bestaetigt",         # rein als Ereignis-Projektion (read-time, kein Nebentisch) --
+    "hand_ausgefuehrt",        # Vorschlag -> menschliches OK -> genau-einmal-Ausführung, jede
+    "hand_abgelehnt",          # Stufe ein Ledger-Ereignis (harter §8-Gate + volle Prüf-Spur)
 })
 
 
