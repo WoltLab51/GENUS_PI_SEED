@@ -102,7 +102,12 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
      "HYPOTHESE (genus/hypothese.py, Vermuten+Prüfen) leben. Weitere Domänen folgen.", "teilweise"),
     ("faehigkeit:abstrahieren",
      "Aus Mustern im eigenen Graphen eigene Begriffe bilden und gegen die Welt prüfen "
-     "(Überraschungs-Schleife) — der Sprung vom Importieren zum Denken.", "fehlt"),
+     "(Überraschungs-Schleife) — der Sprung vom Importieren zum Denken. ERSTER Keim LIVE: "
+     "genus/abstraktion.py findet Geschwister-Gruppen, die ein noch UNBENANNTES Bündel "
+     "unterscheidender Merkmale teilen UND eine weitere Eigenschaft vorhersagen (Verdichtung, "
+     "nicht-tautologisch; formale Begriffshülle, benannte Obergruppen ausgeschlossen). Rein "
+     "lesend, modellfrei (`genus abstraktion`). Das PRÄGEN eines echten Knotens (gedeckelt, "
+     "--tick, Mensch bestätigt) fehlt noch.", "teilweise"),
     ("faehigkeit:analogie",
      "Übertragen: eine Struktur aus einem Feld in einem anderen wiedererkennen — die "
      "generative Kern-Operation, die in jeder tiefen Betrachtung wieder auftaucht "

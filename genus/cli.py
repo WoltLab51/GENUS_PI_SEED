@@ -8,6 +8,7 @@ import click
 
 from genus import (
     abnahme,
+    abstraktion,
     anchor,
     bauplan,
     besinnung,
@@ -955,6 +956,35 @@ def hypothese_command(subjekt: str, tick: bool) -> None:
             click.echo("[HYP] ausgesprochen als Vermutung (model:hypothese, Trust ≤ 0.25).")
         else:
             click.echo("[HYP] war schon ausgesprochen — kein Duplikat.")
+    finally:
+        conn.close()
+
+
+@main.command("abstraktion")
+@click.option("--limit", "limit", default=10, show_default=True,
+              help="wie viele Begriffs-Kandidaten höchstens zeigen")
+@click.option("--unter", "unter", default=None, metavar="KNOTEN",
+              help="nur unter diesem is_a-Elternteil suchen (sonst der ganze Graph)")
+def abstraktion_command(limit: int, unter: str | None) -> None:
+    """Die Operation ABSTRAHIEREN (faehigkeit:abstrahieren, Scheibe 1): GENUS findet Gruppen von
+    Geschwistern, die ein noch UNBENANNTES Merkmal-Bündel teilen UND eine weitere Eigenschaft
+    vorhersagen — der Keim eines eigenen Begriffs (docs/GENUS_INTELLIGENZ.md: Verdichtung, kürzer
+    als die Fakten). REIN LESEND: zeigt nur, was GENUS abstrahieren würde; schreibt nichts, ruft
+    kein Modell. Das Prägen (gedeckelt, --tick, Mensch bestätigt) ist eine spätere Scheibe."""
+    conn = get_conn()
+    try:
+        kandidaten = (abstraktion.verdichte(conn, unter) if unter
+                      else abstraktion.entdecke(conn, hoechstens=limit))[:limit]
+        if not kandidaten:
+            click.echo("[ABS] Kein Begriffs-Kandidat gefunden — noch kein ungenanntes Muster, "
+                       "das eine Überraschung vorhersagt.")
+            return
+        click.echo(f"[ABS] {len(kandidaten)} Begriffs-Kandidat(en) — noch unbenannte Muster im "
+                   f"eigenen Graphen:")
+        for k in kandidaten:
+            click.echo("")
+            for z in abstraktion.narrate(conn, k).splitlines():
+                click.echo(f"[ABS] {z}")
     finally:
         conn.close()
 
