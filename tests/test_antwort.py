@@ -329,6 +329,94 @@ def test_instance_of_macht_die_instanz_nicht_zum_unterbegriff(conn):
     assert r["relational"] and r["verdict"] == "no_path"   # kein is_a-Weg über instance_of
 
 
+# --- die ANTIZIPATION: das proaktive Anschluss-Angebot (2026-07-08) ----------------------
+
+def _saee_vulkan(conn, ausbruch_beantwortbar: bool):
+    """Vulkan (ein beantwortbares Konzept) verursacht einen Ausbruch (benannt); der Ausbruch
+    ist NUR dann selbst erklärbar, wenn ``ausbruch_beantwortbar`` -- das prüft die Treue-Leine."""
+    reactors.observe_relation(conn, "Vulkan@de", "expresses", "Q_vulkan", "wikidata")
+    reactors.observe_relation(conn, "Vulkan@de", "primary_gloss",
+                              "eine Öffnung in der Erdkruste", "dbnary")
+    reactors.observe_relation(conn, "Q_vulkan", "causes", "Q_ausbruch", "wikidata")
+    reactors.observe_relation(conn, "Ausbruch@de", "expresses", "Q_ausbruch", "wikidata")
+    if ausbruch_beantwortbar:
+        reactors.observe_relation(conn, "Ausbruch@de", "primary_gloss",
+                                  "eine Entladung von Magma", "dbnary")
+
+
+def test_antizipation_bietet_die_verifizierte_anschlussfrage(conn):
+    # nach einer Konzept-Antwort EIN graph-verifiziertes Angebot; die Anschlussfrage wandert
+    # als result["anschluss"] mit (der Aufrufer fädelt sie für das nächste „ja")
+    _saee_vulkan(conn, ausbruch_beantwortbar=True)
+    result = companion.respond_with_deuter(conn, "Was ist ein Vulkan?", deuter=lambda q: None)
+    assert "Wenn du magst, erkläre ich dir noch, was »Ausbruch« ist." in result["text"]
+    assert result["anschluss"] == "Was ist Ausbruch?"
+
+
+def test_antizipation_bietet_nichts_unbeantwortbares(conn):
+    # TREUE vor Freundlichkeit: der Ausbruch ist benannt, aber GENUS kann ihn nicht erklären
+    # (keine Bedeutung, kein is_a) -> kein Angebot, das ins Leere liefe
+    _saee_vulkan(conn, ausbruch_beantwortbar=False)
+    result = companion.respond_with_deuter(conn, "Was ist ein Vulkan?", deuter=lambda q: None)
+    assert "Wenn du magst" not in result["text"] and result.get("anschluss") is None
+
+
+def test_antizipation_ja_loest_genau_das_angebot_ein(conn):
+    # ein knappes „ja" im nächsten Zug beantwortet die verifizierte Anschlussfrage -- VOR jeder
+    # Deutung (nie durch den Klassifikator), und ohne eine neue Angebots-Kette zu öffnen
+    _saee_vulkan(conn, ausbruch_beantwortbar=True)
+    result = companion.respond_with_deuter(conn, "ja", deuter=lambda q: None,
+                                           letzter_anschluss="Was ist Ausbruch?")
+    assert "Ausbruch" in result["text"] and "Entladung von Magma" in result["text"]
+    assert result["question"] == "Was ist Ausbruch?"
+    assert result.get("anschluss") is None   # ein Blick, kein Sog: keine Kette
+
+
+def test_antizipation_echte_frage_ist_kein_ja(conn):
+    # eine echte neue Frage darf NIE als Zustimmung durchgehen, auch wenn ein Angebot aussteht
+    _saee_vulkan(conn, ausbruch_beantwortbar=True)
+    assert not companion._ist_zustimmung("Was ist ein Berg?")
+    assert companion._ist_zustimmung("ja") and companion._ist_zustimmung("Gerne!")
+
+
+def test_antizipation_schweigt_bei_knappheit(conn):
+    # Kreuz-Konsistenz (Rollen-Pin/Regler): knapp ⇒ kein Beiwerk, obwohl das Material da wäre
+    _saee_vulkan(conn, ausbruch_beantwortbar=True)
+    persoenlichkeit.stelle(conn, "knappheit", -1)   # mittel -> knapp
+    result = companion.respond_with_deuter(conn, "Was ist ein Vulkan?", deuter=lambda q: None)
+    assert "Wenn du magst" not in result["text"] and result.get("anschluss") is None
+
+
+def test_antizipation_nur_auf_dem_gespraechspfad(conn):
+    # ohne Deuter (CLI-Stimme, nüchtern) kein Angebot -- die Antizipation ist eine Gesprächs-Geste
+    _saee_vulkan(conn, ausbruch_beantwortbar=True)
+    result = companion.respond_with_deuter(conn, "Was ist ein Vulkan?")
+    assert "Wenn du magst" not in result["text"] and result.get("anschluss") is None
+
+
+def test_antizipation_verifiziert_gegen_das_gemeinte_konzept(conn):
+    # Review-Fund: die Frage muss sich GENAU aufs Kanten-Ziel-Konzept zurückführen. Löst das
+    # nachgeparste Label auf ein ANDERES Konzept auf (Mehrwort-Zerfall / Homonym), gibt es kein
+    # Angebot -- sonst beantwortete das spätere „ja" ein anderes Konzept als angeboten.
+    reactors.observe_relation(conn, "Ausbruch@de", "expresses", "Q_ausbruch", "wikidata")
+    reactors.observe_relation(conn, "Ausbruch@de", "primary_gloss", "eine Entladung", "dbnary")
+    assert companion._erklaerbar_und_eindeutig(conn, "Was ist Ausbruch?", "Q_ausbruch")
+    assert not companion._erklaerbar_und_eindeutig(conn, "Was ist Ausbruch?", "Q_ein_anderes")
+
+
+def test_antizipation_bietet_nichts_mit_nur_blankem_elternknoten(conn):
+    # Review-Fund (Treue): is_a existiert, aber der einzige Elternteil ist ein blanker Q-Knoten,
+    # den narrate() gar nicht ausspricht -> die Leine muss das als „nicht erklärbar" werten (sonst
+    # liefe das Angebot in „eine Bedeutung ist noch nicht erschlossen")
+    reactors.observe_relation(conn, "Vulkan@de", "expresses", "Q_vulkan", "wikidata")
+    reactors.observe_relation(conn, "Vulkan@de", "primary_gloss", "eine Öffnung", "dbnary")
+    reactors.observe_relation(conn, "Q_vulkan", "causes", "Q_ausbruch", "wikidata")
+    reactors.observe_relation(conn, "Ausbruch@de", "expresses", "Q_ausbruch", "wikidata")
+    reactors.observe_relation(conn, "Q_ausbruch", "is_a", "Q999999", "wikidata")  # blank, kein Label
+    result = companion.respond_with_deuter(conn, "Was ist ein Vulkan?", deuter=lambda q: None)
+    assert "Wenn du magst" not in result["text"] and result.get("anschluss") is None
+
+
 # --- die umgezogenen Verbraucher bleiben verhaltensgleich --------------------------------
 
 def test_gruss_und_dank_lesen_jetzt_aus_dem_wuerfel(conn):

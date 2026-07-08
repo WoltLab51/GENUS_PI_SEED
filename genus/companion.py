@@ -289,6 +289,74 @@ def _beispiel(conn, qid: str) -> str | None:
     return None
 
 
+# --- die ANTIZIPATION: das proaktive Anschluss-Angebot ---------------------------------
+#
+# Die zuvorkommende Zutat der Antwort-Komposition (Ronny 2026-07-08, „mach die Antizipation"):
+# nach einer Konzept-Antwort bietet GENUS die WAHRSCHEINLICHE Anschlussfrage an -- aber die
+# eiserne Disziplin ist Treue VOR Freundlichkeit: es wird NUR angeboten, was GENUS auch
+# wirklich beantworten kann. Das Angebot entsteht aus einer echten dynamischen Kante (nichts
+# erfunden) UND wird vor dem Anbieten verifiziert (:func:`_erklaerbar_und_eindeutig` löst die
+# Anschlussfrage probehalber auf -- gegen die exakte Kanten-Ziel-Qid, damit das spätere „ja"
+# genau das angebotene Konzept trifft). Genau EIN Angebot, das schwächste-relevanteste zuerst.
+# Sagt der Nutzer im nächsten Zug „ja", löst :func:`respond_with_deuter` es ein -- sonst
+# bricht das Service-Gefühl (ein „ja" ins Leere wäre schlimmer als kein Angebot).
+_ANTIZIPATION_KANTEN = ("causes", "used_for", "has_part", "part_of", "made_of", "caused_by")
+
+
+def _erklaerbar_und_eindeutig(conn, frage: str, ziel_qid: str) -> bool:
+    """Kann GENUS diese Anschlussfrage substantiell UND eindeutig beantworten? -- zwei Leinen
+    in einer: (1) EINDEUTIG: die Frage muss sich beim Auflösen GENAU auf das gemeinte Konzept
+    ``ziel_qid`` zurückführen; sonst zerfiele ein Mehrwort-Label auf sein letztes Wort oder ein
+    Homonym wechselte die Bedeutung -- und das spätere „ja" beantwortete ein ANDERES Konzept als
+    angeboten. (2) SUBSTANTIELL: es muss eine echte Definition herauskommen -- eine Bedeutung
+    ODER ein BENANNTER is_a-Platz; ein bloßer Q-Eltern-Knoten zählt NICHT, denn ``narrate``
+    spricht ihn gar nicht aus (sonst liefe das Angebot in „eine Bedeutung ist noch nicht
+    erschlossen"). Geprüft wird genau der String, den das spätere ``respond(frage)`` bekommt --
+    dieselbe Auflösung, also hier schon die Wahrheit von dort. Treue vor Freundlichkeit."""
+    a = answer(conn, frage)
+    if a.get("concept") != ziel_qid:
+        return False
+    return bool(a.get("meaning") or any(not _BARE_QID.match(x) for x in a.get("is_a") or []))
+
+
+def antizipation(conn, a: dict) -> dict | None:
+    """Die wahrscheinliche Anschlussfrage zu einer schon gegebenen Konzept-Antwort ``a`` --
+    das erste über eine dynamische Kante verbundene, benannte Konzept, das GENUS auch
+    ERKLÄREN kann (verifiziert gegen die exakte Kanten-Ziel-Qid, nicht gegen das nachgeparste
+    Label). Rückgabe ``{"text", "frage"}`` (das Angebot + die konkrete Frage, die ein „ja"
+    einlöst) oder ``None`` -- nichts Anknüpfbares, nichts erfunden."""
+    qid = a.get("concept")
+    wort = a.get("word")
+    if not qid:
+        return None
+    for praedikat in _ANTIZIPATION_KANTEN:
+        for r in sources.relations(conn, subject=qid, predicate=praedikat):
+            y_name = _konzept_name(conn, r["object"])
+            if not y_name or y_name == wort:
+                continue
+            frage = f"Was ist {y_name}?"
+            if _erklaerbar_und_eindeutig(conn, frage, r["object"]):
+                return {"text": f"Wenn du magst, erkläre ich dir noch, was »{y_name}« ist.",
+                        "frage": frage}
+    return None
+
+
+# knappe Zustimmung auf ein Anschluss-Angebot -- bewusst ein EXAKT-Satz aus sehr kurzen
+# Wendungen (nie eine echte neue Frage als „ja" durchgehen lassen; nur wirksam, wenn ein
+# Angebot aussteht, deshalb sind Fehlklassifikationen ohnehin billig)
+_ZUSTIMMUNG = frozenset({
+    "ja", "jo", "jap", "joa", "ja bitte", "ja gerne", "ja gern", "gerne", "gern",
+    "klar", "na klar", "ja klar", "sicher", "unbedingt", "ok", "okay", "mach",
+    "mach das", "ja mach", "ja mach das", "erzähl", "erzähl mehr", "erzähl mir mehr",
+})
+
+
+def _ist_zustimmung(text: str) -> bool:
+    """Eine knappe Zustimmung auf ein Anschluss-Angebot -- reiner Exakt-Abgleich kurzer
+    Wendungen, damit eine echte neue Frage nie als „ja" gilt."""
+    return text.strip().casefold().rstrip(" !.") in _ZUSTIMMUNG
+
+
 # --- relational questions ("Ist ein X ein Y?") -----------------------------------------
 #
 # A yes/no is_a question, answered by the *existing* inference primitive: map X to its
@@ -1872,6 +1940,28 @@ def _komponiere(teile: list[str]) -> str:
     return text
 
 
+def _anschluss_beiwerk(conn, question: str, aktiv: bool) -> tuple[str, str | None]:
+    """Die Antizipation als Beiwerk der Antwort (Antwort-Komposition, Achse Nutzer&Service):
+    nach einer beantwortbaren Konzept-Antwort EIN graph-verifiziertes Anschluss-Angebot.
+    Kreuz-Konsistenz an EINER Stelle (``antwort.belegung``): nur auf dem Gesprächspfad
+    (``aktiv``) und nur, wenn die Belegung Rückfragen zulässt (neugier · nicht knapp,
+    Rollen-gepinnt -- Wache/knapp ⇒ keins). Gibt ``(" " + Angebot, Anschluss-Frage)`` oder
+    ``("", None)``, wenn nichts Anknüpfbares vorliegt (nichts erfunden)."""
+    if not aktiv:
+        return "", None
+    from genus import antwort as _antwort
+
+    if not _antwort.belegung(conn, "plausch")["beiwerk_rueckfrage"]:
+        return "", None
+    a = answer(conn, question)
+    if not a.get("found") or not a.get("concept"):
+        return "", None
+    ang = antizipation(conn, a)
+    if ang is None:
+        return "", None
+    return " " + ang["text"], ang["frage"]
+
+
 _KORREKTUR_CUE = re.compile(
     r"^\s*falsch\s+(?:verstanden|gedeutet)\s*(?::\s*([\wäöüß-]+))?\s*[.!?]*\s*$",
     re.IGNORECASE | re.UNICODE,
@@ -1915,7 +2005,8 @@ def _korrektur_antwort(conn, letzte_lesarten: list[str], richtig: str | None) ->
 def respond_with_deuter(conn, question: str, last_question: str | None = None,
                          deuter=None, stimme=None, last_answer: str | None = None,
                          verlauf: list[dict] | None = None,
-                         letzte_lesarten: list[str] | None = None) -> dict:
+                         letzte_lesarten: list[str] | None = None,
+                         letzter_anschluss: str | None = None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
     offene Deuter-SEGMENTIERUNG (eine Nachricht kann mehrere Sprechhandlungen enthalten, ISO
     24617-2 -- jedes Segment aufs Raster abgebildet, is_a-Fallback GENAU einen Schritt,
@@ -1958,7 +2049,14 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     LETZTE Zug gehandelt hat (der Aufrufer fädelt ``result["gelesen"]`` genauso weiter wie
     question/answer). Ein exaktes „falsch verstanden" hält sie als Fehlgriff fest --
     deterministisch, VOR jeder Deutung, damit die Korrektur nie selbst durch den
-    Klassifikator muss, der eben danebengriff (Naht 1)."""
+    Klassifikator muss, der eben danebengriff (Naht 1).
+
+    ``letzter_anschluss`` (optional, die Antizipation): die im LETZTEN Zug angebotene, schon
+    verifizierte Anschlussfrage (der Aufrufer fädelt ``result["anschluss"]`` genauso weiter
+    wie question/gelesen). Kommt jetzt eine knappe Zustimmung (:func:`_ist_zustimmung`), wird
+    genau diese Frage beantwortet -- VOR jeder Deutung, damit ein „ja" nie durch den
+    Klassifikator muss. Eine Konzept-Antwort trägt umgekehrt ihr eigenes Angebot in
+    ``result["anschluss"]`` (:func:`_anschluss_beiwerk`, kalibriert über ``antwort.belegung``)."""
     from genus import verstehen
 
     ist_korrektur, richtig = korrektur_cue(question)
@@ -1970,6 +2068,13 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         return {"text": "Da war keine letzte Deutung, die ich korrigieren könnte — "
                         "die Korrektur bezieht sich immer auf meine vorige Antwort.",
                 "question": question, "gelesen": []}
+    # Die ANTIZIPATION eingelöst: stand im letzten Zug ein Anschluss-Angebot aus und kommt
+    # jetzt eine knappe Zustimmung, wird GENAU diese verifizierte Frage beantwortet -- vor
+    # jeder Deutung, damit ein „ja" nie durch den Klassifikator muss (und nie ins Leere läuft).
+    # Kein neues Angebot aus der Einlösung (keine endlose Angebots-Kette; ein Blick, kein Sog).
+    if letzter_anschluss and _ist_zustimmung(question):
+        text = _stimme_versucht(conn, respond(conn, letzter_anschluss), stimme)
+        return {"text": text, "question": letzter_anschluss, "gelesen": []}
     if last_question and is_why_followup(question):
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
         return {"text": text, "question": last_question}
@@ -2014,7 +2119,11 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                     if gedeutet.get("kind"):
                         gelesen.append(gedeutet["kind"])
             if teile:
-                return {"text": _komponiere(teile), "question": anchor, "gelesen": gelesen}
+                bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
+                res = {"text": _komponiere(teile) + bei, "question": anchor, "gelesen": gelesen}
+                if anschluss:   # der Schlüssel erscheint nur, wenn es wirklich ein Angebot gibt
+                    res["anschluss"] = anschluss
+                return res
             # der Deuter lief und fand ehrlich nichts -- kein Rückfall auf den gierigen
             # Wort-Lookup mehr (siehe _NICHT_VERSTANDEN-Kommentar oben). Gezählt wird der
             # Fall trotzdem (Struktur, nie Text): auch ein leerer Lauf ist ein blinder Fleck
@@ -2027,7 +2136,11 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         text = _stimme_versucht(conn, text, stimme)
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
-        return {"text": text, "question": question}
+        bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
+        res = {"text": text + bei, "question": question}
+        if anschluss:
+            res["anschluss"] = anschluss
+        return res
     return {"text": _UNKNOWN_FALLBACK, "question": question}
 
 

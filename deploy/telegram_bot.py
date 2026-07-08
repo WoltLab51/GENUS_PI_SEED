@@ -356,6 +356,7 @@ def handle_update(
                 last_answer=vorher.get("answer"),
                 verlauf=zuege[:-1],
                 letzte_lesarten=vorher.get("gelesen"),
+                letzter_anschluss=vorher.get("anschluss"),
             )
             answer = result["text"]
             # Lernkreis v1: eine angenommene Korrektur wird als Beispiel-Paar in der
@@ -366,8 +367,11 @@ def handle_update(
             # "gelesen" wandert mit durch die Session (Korrektur-Kanal, Naht 1): ein
             # exaktes "falsch verstanden" im nächsten Zug weiß dann, WELCHE Lesart(en)
             # es korrigiert -- Struktur, nie der Nutzer-Text
+            # "anschluss" wandert mit durch die Session (Antizipation): ein "ja" im nächsten
+            # Zug löst das im letzten Zug gemachte, verifizierte Anschluss-Angebot ein
             neuer_zug = {"question": result["question"], "answer": answer,
-                         "gelesen": result.get("gelesen") or []}
+                         "gelesen": result.get("gelesen") or [],
+                         "anschluss": result.get("anschluss")}
             sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
             _schreibe_tagespuffer(question, answer, result.get("gelesen") or [])
     except Exception as exc:  # a bug in answering must never take the bridge down
