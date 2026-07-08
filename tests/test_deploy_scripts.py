@@ -86,6 +86,35 @@ def test_hand_ausfuehren_claims_before_send_at_the_edge():
     assert script.index("markiere_ausgefuehrt") < script.index("sendMessage")
 
 
+def test_cron_directly_invoked_scripts_are_executable_in_git():
+    # Klassen-Waechter (Live-Fund 2026-07-08): eine per Windows-Editor neu angelegte .sh wird
+    # ohne Unix-Ausfuehrungs-Bit committet (git-Modus 100644). Der Cron ruft manche Skripte
+    # DIREKT via ./deploy/x.sh auf (ohne vorangestelltes `bash`) -- die scheitern dann STILL
+    # mit „Permission denied" (hand_ausfuehren.sh feuerte nie, observe_news.sh holte nie). Jedes
+    # so aufgerufene Skript MUSS im git-Baum ausfuehrbar sein (100755). Ein stiller Fehler wird
+    # damit zu einem lauten CI-Fehler.
+    cron = (ROOT / "deploy" / "pi_install_cron.sh").read_text(encoding="utf-8")
+    # jede Cron-Zeile, die ein Skript DIREKT (ohne fuehrendes `bash `) via ./deploy/... aufruft
+    direkt = set(re.findall(r"(?<!bash )\./deploy/(\S+\.sh)", cron))
+    assert {"hand_ausfuehren.sh", "observe_news.sh"} <= direkt   # das Muster greift wirklich
+
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git nicht verfuegbar")
+    out = subprocess.run([git, "ls-files", "-s", "--", "deploy"],
+                         cwd=ROOT, capture_output=True, text=True)
+    if out.returncode != 0:
+        pytest.skip("kein git-Checkout")
+    modus = {}
+    for zeile in out.stdout.splitlines():
+        teil, _, pfad = zeile.partition("\t")   # "<mode> <sha> <stage>\t<path>"
+        modus[Path(pfad).name] = teil.split()[0]
+    for skript in sorted(direkt):
+        assert modus.get(skript) == "100755", (
+            f"{skript} wird im Cron direkt aufgerufen, ist im git aber {modus.get(skript)} "
+            f"(nicht ausfuehrbar) -> der Tick scheitert still mit Permission denied")
+
+
 def test_news_membrane_fetches_headlines_to_a_buffer_at_the_edge():
     script = (ROOT / "deploy" / "observe_news.sh").read_text(encoding="utf-8")
 
