@@ -145,3 +145,92 @@ def test_ausfuehrer_verweigert_malformten_plan(conn):
         assert False, "malformter Plan haette abgelehnt werden muessen"
     except ValueError as e:
         assert "Grammatik" in str(e)
+
+
+# --- Scheibe B: die RÜCKWÄRTS-PLAN-SUCHE (GENUS schließt sich den Plan selbst) ------------
+
+_FALL_GRAPH = (
+    ("Hund@de", "expresses", "Q144", "wikidata"),
+    ("Q144", "is_a", "Q_haustier", "wikidata"),
+    ("Haustier@de", "expresses", "Q_haustier", "wikidata"),
+    ("Q_haustier", "is_a", "Q_tier", "wikidata"),
+    ("Tier@de", "expresses", "Q_tier", "wikidata"),
+)
+# ZWEI Fälle: der positive erdet die Kette, der RICHTUNGS-Fall (Tier->Hund = no_path) tötet
+# den vertauschten Kandidaten -- Typen allein könnten x/y nicht unterscheiden.
+_FAELLE = (
+    werkplan.Planfall(graph=_FALL_GRAPH,
+                      eingaben={"x_tok": "Hund", "y_tok": "Tier"},
+                      erwartet={"verdict": "yes", "subject": "Hund", "object": "Tier",
+                                "target": "Q_tier"}),
+    werkplan.Planfall(graph=_FALL_GRAPH,
+                      eingaben={"x_tok": "Tier", "y_tok": "Hund"},
+                      erwartet={"verdict": "no_path"}),
+)
+
+
+def _volle_registry():
+    # BEIDE Familien registriert: die Mathe-Werkzeuge sind bewusste KÖDER (nullstellen/
+    # extremstellen liefern auch "Liste") -- die Fall-Verifikation muss sie aussortieren.
+    from genus import werkzeuge_seed
+    werkzeuge_seed.registriere_mathe_werkzeuge()
+    werkzeuge_auskunft.registriere_auskunft_werkzeuge()
+
+
+def test_suche_schliesst_den_beziehungsplan_selbst(conn):
+    # DER Beweis der Scheibe: aus Ziel + Eingaben + zwei Fällen deduziert die Suche einen
+    # Plan, der sich auf UNGESEHENEN Fragen exakt wie das handgebaute Original verhält.
+    _volle_registry()
+    fund = werkplan.finde_werkplan("verbindung", {"x_tok": "Text", "y_tok": "Text"}, _FAELLE)
+    plan = fund["plan"]
+    assert plan is not None
+    # Generalisierung: Katze/Tier war in KEINEM Fall -- der geschlossene Plan muss es können
+    from genus import reactors
+    for kante in _FALL_GRAPH:
+        reactors.observe_relation(conn, *kante)
+    reactors.observe_relation(conn, "Q_katze", "is_a", "Q_haustier", "wikidata")
+    reactors.observe_relation(conn, "Katze@de", "expresses", "Q_katze", "wikidata")
+    for x, y in (("Katze", "Tier"), ("Katze", "Haustier"), ("Katze", "Hund"), ("Xyz", "Tier")):
+        komponiert = werkplan.fuehre_aus(conn, plan, x_tok=x, y_tok=y)[plan.ergebnis]
+        assert komponiert == auskunft._relate_terms(conn, x, y), (x, y)
+
+
+def test_suche_ehrt_die_richtung(conn):
+    # ohne den Richtungs-Fall wäre der vertauschte Plan typ-gültig -- mit ihm stirbt er
+    _volle_registry()
+    plan = werkplan.finde_werkplan("verbindung", {"x_tok": "Text", "y_tok": "Text"}, _FAELLE)["plan"]
+    from genus import reactors
+    for kante in _FALL_GRAPH:
+        reactors.observe_relation(conn, *kante)
+    erg = werkplan.fuehre_aus(conn, plan, x_tok="Tier", y_tok="Hund")[plan.ergebnis]
+    assert erg["verdict"] == "no_path"   # nie die Richtung umgedreht
+
+
+def test_gefundener_plan_ist_wohlgeformt_und_werkzeug_einmal():
+    _volle_registry()
+    plan = werkplan.finde_werkplan("verbindung", {"x_tok": "Text", "y_tok": "Text"}, _FAELLE)["plan"]
+    assert werkplan.pruefe_plan(plan) == []
+    benutzte = [s.werkzeug for s in plan.schritte]
+    assert len(benutzte) == len(set(benutzte))   # jedes Werkzeug höchstens einmal
+
+
+def test_suche_ist_deterministisch():
+    _volle_registry()
+    a = werkplan.finde_werkplan("verbindung", {"x_tok": "Text", "y_tok": "Text"}, _FAELLE)["plan"]
+    b = werkplan.finde_werkplan("verbindung", {"x_tok": "Text", "y_tok": "Text"}, _FAELLE)["plan"]
+    assert a == b   # Replay-stabil: dieselbe Frage -> derselbe Plan, für immer
+
+
+def test_suche_gibt_ehrlich_none_ohne_erdbare_kette():
+    # ohne Plan-Eingaben ist kein "Text"-Bedarf erdbar -> keine Kette -> ehrliches None
+    _volle_registry()
+    fund = werkplan.finde_werkplan("verbindung", {}, _FAELLE)
+    assert fund["plan"] is None
+
+
+def test_suche_verlangt_ground_truth():
+    # ohne Fälle wäre der einfachste typ-gültige Kandidat ein Würfelwurf -- Vertrag ist Pflicht
+    _volle_registry()
+    import pytest
+    with pytest.raises(ValueError):
+        werkplan.finde_werkplan("verbindung", {"x_tok": "Text"}, ())
