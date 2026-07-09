@@ -167,16 +167,21 @@ class Planfall:
 def _quellen_fuer(typ: str, eingaben: dict, eigner: str) -> list[tuple]:
     """Alle Quellen, die ``typ`` liefern können -- Plan-Eingaben zuerst (Occam: geerdet ist
     einfacher als gerechnet), dann liefert-Felder aller Werkzeuge außer dem Eigner selbst
-    (nichts konsumiert die eigene Ausgabe). Deterministisch sortiert; Zellen (liefert={})
-    tauchen strukturell nie auf."""
+    (nichts konsumiert die eigene Ausgabe). Werkzeug-Quellen nach EINFACHHEIT geordnet
+    (wenigste Parameter zuerst, dann Name): ein Auflöser (1 Parameter) ist billiger zu erden
+    als ein Urteils-/Echo-Werkzeug (2+) -- die alphabetische Ordnung hungerte die Suche aus,
+    sobald ein früh-alphabetisches Mehr-Parameter-Werkzeug riesige Unterbäume aufspannte
+    (live so gefunden, als gemeinsame_kategorien dazukam). Deterministisch; Zellen
+    (liefert={}) tauchen strukturell nie auf."""
     quellen: list[tuple] = [("in", n) for n in sorted(eingaben) if eingaben[n] == typ]
+    werkzeug_quellen: list[tuple] = []
     for w in werkzeug.alle():
         if w.name == eigner:
             continue
         for feld in sorted(w.liefert):
             if w.liefert[feld] == typ:
-                quellen.append(("aus", w.name, feld))
-    return quellen
+                werkzeug_quellen.append((len(w.parameter), w.name, feld))
+    return quellen + [("aus", name, feld) for _, name, feld in sorted(werkzeug_quellen)]
 
 
 def _erreicht(start: str, ziel: str, kanten: dict) -> bool:

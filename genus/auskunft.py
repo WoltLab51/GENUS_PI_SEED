@@ -368,12 +368,15 @@ def _common_terms(conn, x_tok: str, y_tok: str) -> dict:
 
 
 def common(conn, question: str) -> dict:
-    """The shared is_a ancestors of two words, closest first; ``{common: False}`` if not asked."""
+    """The shared is_a ancestors of two words, closest first; ``{common: False}`` if not asked.
+    Seit ③ Scheibe C Planer zuerst (die Regex erkennt nur noch, rechnet nicht mehr)."""
+    from genus import werkzeuge_auskunft
+
     for pattern in _COMMON_PATTERNS:
         m = pattern.search(question)
         if not m:
             continue
-        r = _common_terms(conn, m.group(1), m.group(2))
+        r = werkzeuge_auskunft.vergleich_geplant(conn, m.group(1), m.group(2))
         if r["common"]:
             return r
     return {"common": False}
@@ -504,10 +507,14 @@ def relate_kausal(conn, question: str) -> dict:
     """Eine Kausal-Frage aus dem Graphen: „Was verursacht X?" (die Ursachen) oder „Verursacht X Y?"
     (ja/nein, mit Kausal-Weg). ``{kausal_q: False}``, wenn keine Kausal-Frage oder unauflösbar
     (dann versucht der Wort-Pfad weiter — dieselbe Selbst-Prüfung wie bei relate)."""
+    from genus import werkzeuge_auskunft
+
     for pat in _KAUSAL_URSACHE:
         m = pat.search(question)
         if m:
-            r = _ursachen_von(conn, m.group(1))
+            # der Ursachen-Zweig läuft Planer zuerst (③ Scheibe C); der Ja/Nein-Zweig
+            # (_kausal_zwischen) bleibt handverdrahtet -- eigene Absicht, eigener Schnitt später
+            r = werkzeuge_auskunft.ursachen_geplant(conn, m.group(1))
             if r["kausal_q"]:
                 return r
     m = _KAUSAL_JA_NEIN.search(question)

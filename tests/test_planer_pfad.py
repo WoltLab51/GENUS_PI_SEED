@@ -42,7 +42,7 @@ def test_regex_erkenner_laeuft_planer_zuerst(conn, tmp_path, monkeypatch):
 def test_netz_faengt_wenn_kein_plan_da_ist(conn, tmp_path, monkeypatch):
     _zaehlwerk_datei(tmp_path, monkeypatch)
     _hierarchie(conn)
-    monkeypatch.setattr(werkzeuge_auskunft, "beziehungs_plan", lambda: None)
+    monkeypatch.setattr(werkzeuge_auskunft, "plan_fuer", lambda absicht: None)
     r = werkzeuge_auskunft.relate_geplant(conn, "Hund", "Tier")
     assert r == auskunft._relate_terms(conn, "Hund", "Tier")   # Antwort unverändert richtig
     assert zaehlwerk.stand().get("beziehung:rueckfall", 0) >= 1
@@ -84,6 +84,92 @@ def test_anker_sensor_schweigt_bei_verankerten_begriffen(conn, tmp_path, monkeyp
     antwort2 = companion._zelle_beziehung(conn, guess, "ist ein hund ein tier?", None, None)
     assert antwort2 and "Ja" in antwort2
     assert "beziehung:anker_frei" not in zaehlwerk.stand()
+
+
+# --- die zwei weiteren Absichten aufs selbe Muster: vergleich + ursache ------------------
+
+def _obst(conn):
+    reactors.observe_relation(conn, "Apfel@de", "expresses", "Q89", "wikidata")
+    reactors.observe_relation(conn, "Birne@de", "expresses", "Q434", "wikidata")
+    reactors.observe_relation(conn, "Q89", "is_a", "Q13184", "wikidata")
+    reactors.observe_relation(conn, "Q434", "is_a", "Q13184", "wikidata")
+    reactors.observe_relation(conn, "Kernobst@de", "expresses", "Q13184", "wikidata")
+
+
+def test_vergleich_geplant_ist_drop_in_gleich_und_zaehlt(conn, tmp_path, monkeypatch):
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _obst(conn)
+    geplant = werkzeuge_auskunft.vergleich_geplant(conn, "Apfel", "Birne")
+    assert geplant == auskunft._common_terms(conn, "Apfel", "Birne")
+    assert geplant["found"] and geplant["shared"][0] == "Q13184"
+    assert zaehlwerk.stand().get("vergleich:treffer", 0) >= 1
+
+
+def test_vergleich_regex_erkenner_laeuft_planer_zuerst(conn, tmp_path, monkeypatch):
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _obst(conn)
+    r = auskunft.common(conn, "Was haben Apfel und Birne gemeinsam?")
+    assert r["found"] and r["x"] == "Apfel" and r["y"] == "Birne"
+    assert zaehlwerk.stand().get("vergleich:treffer", 0) >= 1
+
+
+def test_zelle_vergleich_antwortet_ueber_den_plan(conn, tmp_path, monkeypatch):
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _obst(conn)
+    guess = {"subject": "Apfel", "object": "Birne"}
+    antwort = companion._zelle_vergleich(conn, guess, "Was haben Apfel und Birne gemeinsam?",
+                                         None, None)
+    assert antwort and "»Kernobst«" in antwort
+    assert zaehlwerk.stand().get("vergleich:treffer", 0) >= 1
+
+
+def _kausal(conn):
+    reactors.observe_relation(conn, "Bakterie@de", "expresses", "Q901", "wikidata")
+    reactors.observe_relation(conn, "Infektion@de", "expresses", "Q902", "wikidata")
+    reactors.observe_relation(conn, "Q901", "causes", "Q902", "wikidata")
+
+
+def test_ursachen_geplant_ist_drop_in_gleich_und_ehrt_die_richtung(conn, tmp_path, monkeypatch):
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _kausal(conn)
+    geplant = werkzeuge_auskunft.ursachen_geplant(conn, "Infektion")
+    assert geplant == auskunft._ursachen_von(conn, "Infektion")
+    assert geplant["ursachen"] == ["Bakterie"]
+    # die Richtung: nichts verursacht die Bakterie -- nie die Kante umgedreht
+    rueckwaerts = werkzeuge_auskunft.ursachen_geplant(conn, "Bakterie")
+    assert rueckwaerts["kausal_q"] and rueckwaerts["ursachen"] == []
+    assert zaehlwerk.stand().get("ursache:treffer", 0) >= 2
+
+
+def test_ursache_regex_erkenner_laeuft_planer_zuerst(conn, tmp_path, monkeypatch):
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _kausal(conn)
+    r = auskunft.relate_kausal(conn, "Was verursacht eine Infektion?")
+    assert r["kausal_q"] and r["ursachen"] == ["Bakterie"]
+    assert zaehlwerk.stand().get("ursache:treffer", 0) >= 1
+
+
+def test_zelle_ursache_antwortet_ueber_den_plan(conn, tmp_path, monkeypatch):
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _kausal(conn)
+    guess = {"subject": "Infektion"}
+    antwort = companion._zelle_ursache(conn, guess, "Was verursacht eine Infektion?", None, None)
+    assert antwort and "»Bakterie«" in antwort
+    assert zaehlwerk.stand().get("ursache:treffer", 0) >= 1
+
+
+def test_netz_faengt_je_absicht(conn, tmp_path, monkeypatch):
+    # die EINE Mechanik: plan_fuer -> None laesst JEDE Absicht gezaehlt aufs Netz fallen
+    _zaehlwerk_datei(tmp_path, monkeypatch)
+    _obst(conn)
+    _kausal(conn)
+    monkeypatch.setattr(werkzeuge_auskunft, "plan_fuer", lambda absicht: None)
+    v = werkzeuge_auskunft.vergleich_geplant(conn, "Apfel", "Birne")
+    u = werkzeuge_auskunft.ursachen_geplant(conn, "Infektion")
+    assert v == auskunft._common_terms(conn, "Apfel", "Birne")
+    assert u == auskunft._ursachen_von(conn, "Infektion")
+    stand = zaehlwerk.stand()
+    assert stand.get("vergleich:rueckfall", 0) >= 1 and stand.get("ursache:rueckfall", 0) >= 1
 
 
 def test_zaehlwerk_ist_fail_silent_die_antwort_leidet_nie(conn, tmp_path, monkeypatch):

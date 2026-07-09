@@ -752,18 +752,27 @@ def _zelle_ursache(conn, guess, question, last_question, last_answer, stimme=Non
     # „Was verursacht X?" / „Wodurch entsteht X?" -- das eigene Blatt der Kausal-FRAGE nach
     # Ursachen (früher ohne Handler: es kletterte zur Zelle frage-begriff und bekam die
     # DEFINITION von X statt seiner Ursachen -- eine andere Frage beantwortet, P3.1). Jetzt
-    # führt es zur gebauten Kausal-Fähigkeit; unauflösbar -> None (klettert ehrlich weiter).
+    # führt es zur gebauten Kausal-Fähigkeit -- seit ③ Scheibe C Planer zuerst;
+    # unauflösbar -> None (klettert ehrlich weiter).
     subject = guess.get("subject")
     if not subject:
         return None
-    r = _ursachen_von(conn, subject)
+    if not _anker_ok(question, subject):
+        from genus import zaehlwerk
+        zaehlwerk.zaehle("ursache", "anker_frei")
+    from genus import werkzeuge_auskunft
+    r = werkzeuge_auskunft.ursachen_geplant(conn, subject)
     return narrate_kausal(conn, r) if r["kausal_q"] else None
 
 
 def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=None):
     if not (guess.get("subject") and guess.get("object")):
         return None
-    r = _common_terms(conn, guess["subject"], guess["object"])
+    if not _anker_ok(question, guess["subject"], guess["object"]):
+        from genus import zaehlwerk
+        zaehlwerk.zaehle("vergleich", "anker_frei")
+    from genus import werkzeuge_auskunft
+    r = werkzeuge_auskunft.vergleich_geplant(conn, guess["subject"], guess["object"])
     return narrate_common(conn, r) if r["common"] else None
 
 

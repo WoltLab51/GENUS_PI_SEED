@@ -16,7 +16,9 @@ Prüfung ``verbindung`` bekommt es nicht).
 """
 from __future__ import annotations
 
-from genus import inference, werkplan, werkzeug, wortgraph
+from genus import auskunft, inference, werkplan, werkzeug, wortgraph
+# (auskunft auf Modul-Ebene ist zyklusfrei: auskunft importiert werkzeuge_auskunft
+# seinerseits nur funktions-lokal -- die Richtung Werkzeuge -> Netz ist die stabile.)
 
 
 # --- die Primitive (dünne, geprüfte Hüllen über wortgraph/inference) ----------------------
@@ -38,6 +40,38 @@ def oberbegriffe(conn, form):
     if form is None:
         return {"oberbegriffe": []}
     return {"oberbegriffe": inference.infer_lexeme(conn, form, "is_a", "de")}
+
+
+def gemeinsame_kategorien(conn, x_form, y_form):
+    """Wo treffen sich die is_a-Linien zweier Formen -- die nächste gemeinsame, BENENNBARE
+    Oberkategorie zuerst (die klassische LCA-Frage als EIN kohärenter Graph-Schritt).
+    Das Urteil einer Vergleichsfrage; spiegelt das Herz von ``auskunft._common_terms``."""
+    if x_form is None or y_form is None:
+        return {"common": False}
+    dx = auskunft._ancestor_depths(conn, x_form)
+    dy = auskunft._ancestor_depths(conn, y_form)
+    ordered = sorted(set(dx) & set(dy), key=lambda c: dx[c] + dy[c])
+    shared = [c for c in ordered if wortgraph._label(conn, c) != c]
+    return {"common": True, "found": bool(shared), "x": x_form, "y": y_form, "shared": shared}
+
+
+def ursachen_im_graph(conn, form, konzepte):
+    """Die bekannten Ursachen der Konzepte einer Form (``s causes X`` ∪ ``X caused_by o``),
+    benannt und sortiert -- das Urteil der Ursachen-Frage; spiegelt das Herz von
+    ``auskunft._ursachen_von``. Leere Ursachen bleiben ehrlich ``kausal_q=True`` (die
+    Kausal-FRAGE wurde gestellt; „kenne keine Ursache" ist die responsive Antwort)."""
+    from genus import sources
+
+    if form is None:
+        return {"kausal_q": False}
+    ursachen: set[str] = set()
+    for q in sorted(konzepte):
+        for r in sources.relations(conn, predicate="causes", object=q):
+            ursachen.add(r["subject"])
+        for r in sources.relations(conn, subject=q, predicate="caused_by"):
+            ursachen.add(r["object"])
+    return {"kausal_q": True, "art": "ursachen", "subjekt": form,
+            "ursachen": sorted({wortgraph._label(conn, u) for u in ursachen})}
 
 
 def verbindung(subjekt_form, objekt_form, oberbegriffe, ziel_konzepte):
@@ -84,6 +118,31 @@ def registriere_auskunft_werkzeuge() -> None:
         schreibt=False, wortlautfest=False, pruefbar_als="graph",
         liefert={"oberbegriffe": "Liste"},
         implementierung=oberbegriffe,
+    ))
+    werkzeug.verdrahten(werkzeug.Werkzeug(
+        name="gemeinsame_kategorien",
+        beschreibung=("Wo treffen sich die is_a-Linien zweier Formen -- nächste gemeinsame, "
+                      "benennbare Oberkategorie zuerst (das Urteil einer Vergleichsfrage)."),
+        parameter={
+            "x_form": werkzeug.Parameter("Wort"),
+            "y_form": werkzeug.Parameter("Wort"),
+        },
+        schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"common": "Wahrheit", "found": "Wahrheit", "x": "Wort", "y": "Wort",
+                 "shared": "Liste"},
+        implementierung=gemeinsame_kategorien,
+    ))
+    werkzeug.verdrahten(werkzeug.Werkzeug(
+        name="ursachen_im_graph",
+        beschreibung=("Die bekannten Ursachen der Konzepte einer Form (causes/caused_by), "
+                      "benannt und sortiert (das Urteil der Ursachen-Frage)."),
+        parameter={
+            "form": werkzeug.Parameter("Wort"),
+            "konzepte": werkzeug.Parameter("Menge"),
+        },
+        schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"kausal_q": "Wahrheit", "art": "Text", "subjekt": "Wort", "ursachen": "Liste"},
+        implementierung=ursachen_im_graph,
     ))
     werkzeug.verdrahten(werkzeug.Werkzeug(
         name="verbindung",
@@ -133,64 +192,117 @@ def relate_komponiert(conn, x_tok: str, y_tok: str) -> dict:
 
 # --- Scheibe C: der Planer wird PRIMÄRPFAD (Absicht -> Ziel + Fälle als DATEN) ------------
 #
-# Die Absicht „beziehung" trägt ihr Ziel-Werkzeug und ihre Planfälle als Saat-Daten (wie
+# Jede verdrahtete Absicht trägt ihr Ziel-Werkzeug und ihre Planfälle als Saat-Daten (wie
 # RASTER_SEED/ZIEL_SEED); der Plan wird daraus EINMAL pro Prozess DEDUZIERT (deterministisch,
 # ~0,4 s) und dann gecacht -- jede Nachricht zahlt nur die ms der Ausführung. Scheitert
 # irgendetwas (keine Kette, Ausführungsfehler), fällt es GEZÄHLT auf das alte, handgebaute
-# Netz (auskunft._relate_terms) zurück -- der Nutzer merkt nichts, das Zählwerk alles.
-# Der Richtungs-Fall ist Pflichtteil der Saat: er tötet den vertauschten Kandidaten.
-BEZIEHUNG_FAELLE = (
-    werkplan.Planfall(
-        graph=(("Hund@de", "expresses", "Q144", "wikidata"),
-               ("Q144", "is_a", "Q_haustier", "wikidata"),
-               ("Haustier@de", "expresses", "Q_haustier", "wikidata"),
-               ("Q_haustier", "is_a", "Q_tier", "wikidata"),
-               ("Tier@de", "expresses", "Q_tier", "wikidata")),
-        eingaben={"x_tok": "Hund", "y_tok": "Tier"},
-        erwartet={"verdict": "yes", "subject": "Hund", "object": "Tier", "target": "Q_tier"},
-    ),
-    werkplan.Planfall(
-        graph=(("Hund@de", "expresses", "Q144", "wikidata"),
-               ("Q144", "is_a", "Q_haustier", "wikidata"),
-               ("Haustier@de", "expresses", "Q_haustier", "wikidata"),
-               ("Q_haustier", "is_a", "Q_tier", "wikidata"),
-               ("Tier@de", "expresses", "Q_tier", "wikidata")),
-        eingaben={"x_tok": "Tier", "y_tok": "Hund"},
-        erwartet={"verdict": "no_path"},
-    ),
+# Netz zurück -- der Nutzer merkt nichts, das Zählwerk alles. Der Richtungs-/Vertauschungs-
+# Fall ist Pflichtteil jeder Saat: Typen allein können x/y nicht unterscheiden.
+_HUND_TIER_GRAPH = (
+    ("Hund@de", "expresses", "Q144", "wikidata"),
+    ("Q144", "is_a", "Q_haustier", "wikidata"),
+    ("Haustier@de", "expresses", "Q_haustier", "wikidata"),
+    ("Q_haustier", "is_a", "Q_tier", "wikidata"),
+    ("Tier@de", "expresses", "Q_tier", "wikidata"),
 )
+_OBST_GRAPH = (
+    ("Apfel@de", "expresses", "Q89", "wikidata"),
+    ("Birne@de", "expresses", "Q434", "wikidata"),
+    ("Q89", "is_a", "Q13184", "wikidata"),
+    ("Q434", "is_a", "Q13184", "wikidata"),
+    ("Kernobst@de", "expresses", "Q13184", "wikidata"),
+    ("Q13184", "is_a", "Q1364", "wikidata"),
+    ("Obst@de", "expresses", "Q1364", "wikidata"),
+)
+_KAUSAL_GRAPH = (
+    ("Bakterie@de", "expresses", "Q901", "wikidata"),
+    ("Infektion@de", "expresses", "Q902", "wikidata"),
+    ("Q901", "causes", "Q902", "wikidata"),
+)
+
+BEZIEHUNG_FAELLE = (
+    werkplan.Planfall(graph=_HUND_TIER_GRAPH,
+                      eingaben={"x_tok": "Hund", "y_tok": "Tier"},
+                      erwartet={"verdict": "yes", "subject": "Hund", "object": "Tier",
+                                "target": "Q_tier"}),
+    werkplan.Planfall(graph=_HUND_TIER_GRAPH,
+                      eingaben={"x_tok": "Tier", "y_tok": "Hund"},
+                      erwartet={"verdict": "no_path"}),
+)
+VERGLEICH_FAELLE = (
+    # x/y stehen EXAKT im erwartet -> der vertauschte Kandidat stirbt an diesem Fall
+    werkplan.Planfall(graph=_OBST_GRAPH,
+                      eingaben={"x_tok": "Apfel", "y_tok": "Birne"},
+                      erwartet={"common": True, "found": True, "x": "Apfel", "y": "Birne",
+                                "shared": ["Q13184", "Q1364"]}),
+    werkplan.Planfall(graph=_OBST_GRAPH,
+                      eingaben={"x_tok": "Apfel", "y_tok": "Xyzzy"},
+                      erwartet={"common": False}),
+)
+URSACHE_FAELLE = (
+    werkplan.Planfall(graph=_KAUSAL_GRAPH,
+                      eingaben={"x_tok": "Infektion"},
+                      erwartet={"kausal_q": True, "art": "ursachen", "subjekt": "Infektion",
+                                "ursachen": ["Bakterie"]}),
+    # der RICHTUNGS-Fall: nichts verursacht die Bakterie -- eine umgedrehte Lesung stirbt hier
+    werkplan.Planfall(graph=_KAUSAL_GRAPH,
+                      eingaben={"x_tok": "Bakterie"},
+                      erwartet={"kausal_q": True, "ursachen": []}),
+)
+
+# Absicht -> (Ziel-Werkzeug, Plan-Eingaben, Fälle): die EINE Saat-Tabelle des Primärpfads.
+ABSICHT_SAAT = {
+    "beziehung": ("verbindung", {"x_tok": "Text", "y_tok": "Text"}, BEZIEHUNG_FAELLE),
+    "vergleich": ("gemeinsame_kategorien", {"x_tok": "Text", "y_tok": "Text"}, VERGLEICH_FAELLE),
+    "ursache": ("ursachen_im_graph", {"x_tok": "Text"}, URSACHE_FAELLE),
+}
 
 _PLAN_CACHE: dict[str, object] = {}
 
 
-def beziehungs_plan():
-    """Der DEDUZIERTE Beziehungs-Plan -- einmal pro Prozess geschlossen (Suche über die
-    Registry, verifiziert gegen BEZIEHUNG_FAELLE), dann gecacht. ``None``, wenn die Suche
+def plan_fuer(absicht: str):
+    """Der DEDUZIERTE Plan einer Absicht -- einmal pro Prozess geschlossen (Suche über die
+    Registry, verifiziert gegen die Saat-Fälle), dann gecacht. ``None``, wenn die Suche
     ehrlich keine Kette findet (dann trägt das Netz allein)."""
-    if "beziehung" not in _PLAN_CACHE:
+    if absicht not in _PLAN_CACHE:
         registriere_auskunft_werkzeuge()
-        fund = werkplan.finde_werkplan(
-            "verbindung", {"x_tok": "Text", "y_tok": "Text"}, BEZIEHUNG_FAELLE)
-        _PLAN_CACHE["beziehung"] = fund["plan"]
-    return _PLAN_CACHE["beziehung"]
+        ziel, eingaben, faelle = ABSICHT_SAAT[absicht]
+        _PLAN_CACHE[absicht] = werkplan.finde_werkplan(ziel, eingaben, faelle)["plan"]
+    return _PLAN_CACHE[absicht]
 
 
-def relate_geplant(conn, x_tok: str, y_tok: str) -> dict:
-    """Die Beziehungsfrage, PLANER ZUERST: der selbst-deduzierte Plan antwortet; scheitert
-    er (keine Kette gefunden, Ausführungsfehler), fällt es GEZÄHLT auf das handgebaute Netz
-    (:func:`auskunft._relate_terms`) zurück. Drop-in-gleich zum Netz (die Gleichheit ist
-    testbewiesen); beide Wege rein lesend."""
+def _geplant(absicht: str, netz, conn, **eingaben) -> dict:
+    """Die EINE Primärpfad-Mechanik: der selbst-deduzierte Plan antwortet; JEDES Scheitern
+    (keine Kette, Ausführungsfehler) fällt gezählt auf das handgebaute ``netz`` zurück.
+    Drop-in-gleich zum Netz (testbewiesen je Absicht); beide Wege rein lesend."""
     from genus import zaehlwerk
 
     try:
-        plan = beziehungs_plan()
+        plan = plan_fuer(absicht)
         if plan is not None:
             registriere_auskunft_werkzeuge()   # Registry kann geleert worden sein (Tests/Neustart)
-            ergebnis = werkplan.fuehre_aus(conn, plan, x_tok=x_tok, y_tok=y_tok)[plan.ergebnis]
-            zaehlwerk.zaehle("beziehung", "treffer")
+            ergebnis = werkplan.fuehre_aus(conn, plan, **eingaben)[plan.ergebnis]
+            zaehlwerk.zaehle(absicht, "treffer")
             return ergebnis
     except Exception:
         pass   # jedes Scheitern fällt ehrlich (und gezählt) auf das Netz
-    zaehlwerk.zaehle("beziehung", "rueckfall")
-    from genus import auskunft
-    return auskunft._relate_terms(conn, x_tok, y_tok)
+    zaehlwerk.zaehle(absicht, "rueckfall")
+    return netz()
+
+
+def relate_geplant(conn, x_tok: str, y_tok: str) -> dict:
+    """Die Beziehungsfrage, Planer zuerst (Netz: :func:`auskunft._relate_terms`)."""
+    return _geplant("beziehung", lambda: auskunft._relate_terms(conn, x_tok, y_tok),
+                    conn, x_tok=x_tok, y_tok=y_tok)
+
+
+def vergleich_geplant(conn, x_tok: str, y_tok: str) -> dict:
+    """Die Vergleichsfrage, Planer zuerst (Netz: :func:`auskunft._common_terms`)."""
+    return _geplant("vergleich", lambda: auskunft._common_terms(conn, x_tok, y_tok),
+                    conn, x_tok=x_tok, y_tok=y_tok)
+
+
+def ursachen_geplant(conn, x_tok: str) -> dict:
+    """Die Ursachen-Frage, Planer zuerst (Netz: :func:`auskunft._ursachen_von`)."""
+    return _geplant("ursache", lambda: auskunft._ursachen_von(conn, x_tok),
+                    conn, x_tok=x_tok)
