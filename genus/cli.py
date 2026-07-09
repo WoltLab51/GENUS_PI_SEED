@@ -310,7 +310,7 @@ def _atlas_facts() -> str:
     can be regenerated and a test can enforce currency.
     """
     import genus
-    from genus import companion, constants, experience, maturation, rechnen, rules, verstehen, werkzeug, werkzeuge_seed, ziele
+    from genus import auskunft, companion, constants, experience, maturation, rechnen, rules, verstehen, werkzeug, werkzeuge_seed, ziele
 
     metric_keys = sorted({getattr(rules, n) for n in dir(rules) if n.endswith("_METRIC_KEY")})
     reactors = [reactor.__name__ for reactor in rules.REACTORS]
@@ -329,7 +329,7 @@ def _atlas_facts() -> str:
     # Die deterministischen Dispatch-Muster leben teils in companion, teils in den seit Schritt ②
     # herausgelösten Werkzeug-Modulen (rechnen). Der Fakt zählt die FÄHIGKEIT, nicht die Datei --
     # also über alle Dispatch-tragenden Module, damit ein reiner Umzug die Zahl nicht driften lässt.
-    _MUSTER_MODULE = (companion, rechnen)
+    _MUSTER_MODULE = (companion, rechnen, auskunft)
     pattern_listen = [(m, n) for m in _MUSTER_MODULE for n in dir(m)
                       if n.isupper() and n.endswith("_PATTERNS")]
     muster_gesamt = sum(len(getattr(m, n)) for m, n in pattern_listen)

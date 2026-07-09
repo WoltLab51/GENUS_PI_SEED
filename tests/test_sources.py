@@ -2102,15 +2102,16 @@ def test_phase0_wort_mit_nur_glosse_ist_bekannt_aber_ohne_konzept():
     conn.close()
 
 
-def test_phase0_companion_delegiert_an_sources():
-    # Strangler: die alten privaten Companion-Helfer bleiben fuer interne Aufrufer,
-    # sind aber nur noch duenne Delegation -- eine Logik, ein Zuhause.
-    from genus import companion
+def test_phase0_wortgraph_delegiert_an_sources():
+    # Strangler: die alten privaten Companion-Helfer bleiben duenne Delegation -- eine Logik,
+    # ein Zuhause. Seit der Modularisierung (Schritt ③) wohnen sie in der Lese-Grundlage
+    # genus.wortgraph (companion re-exportiert nur, was externe Aufrufer brauchen).
+    from genus import wortgraph
 
     conn = _fresh()
     reactors.observe_relation(conn, "Tisch@de", "expresses", "Q14748", "wikidata")
-    assert companion._known(conn, "Tisch") == sources.bekanntes_wort(conn, "Tisch")
-    assert companion._prominent_concept(conn, "Tisch") == sources.prominentes_konzept(
+    assert wortgraph._known(conn, "Tisch") == sources.bekanntes_wort(conn, "Tisch")
+    assert wortgraph._prominent_concept(conn, "Tisch") == sources.prominentes_konzept(
         conn, "Tisch"
     )
     conn.close()
