@@ -714,10 +714,26 @@ def _zelle_definition(conn, guess, question, last_question, last_answer, stimme=
     return respond(conn, f"Was ist {found}?")
 
 
+def _anker_ok(question: str, *begriffe: str) -> bool:
+    """Der ANKER-SENSOR des Planer-Pfads (③ Scheibe C): kommt jeder MODELL-extrahierte
+    Begriff wortwörtlich (case-lenient, als ganzes Wort) in der Nachricht vor? Bewusst
+    SENSOR, nicht Tor: die Deuter-Kernfähigkeit ist gerade, eine Paraphrase aufzulösen
+    („wuffwuff" -> Hund -- testbewiesen), und die Beziehungs-Antwort ist selbst-offenlegend
+    (sie NENNT beide Begriffe in »«, ein fremder wäre sichtbar, nicht still wie eine
+    Stimme-Korruption). Nicht verankert wird also GEZÄHLT (Rohdaten fürs Thermometer ④),
+    nie blockiert. Wo eine Antwort ihre Eingaben NICHT nennt, darf daraus ein Tor werden."""
+    woerter = {w.casefold() for w in _WORD.findall(question or "")}
+    return all((b or "").casefold() in woerter for b in begriffe)
+
+
 def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=None):
     if not (guess.get("subject") and guess.get("object")):
         return None
-    r = _relate_terms(conn, guess["subject"], guess["object"])
+    if not _anker_ok(question, guess["subject"], guess["object"]):
+        from genus import zaehlwerk
+        zaehlwerk.zaehle("beziehung", "anker_frei")   # gedeutet statt zitiert -- messen, nicht blocken
+    from genus import werkzeuge_auskunft
+    r = werkzeuge_auskunft.relate_geplant(conn, guess["subject"], guess["object"])
     if r["relational"] and r["verdict"] == "yes":
         return narrate_relation(conn, r)      # eine echte is_a-Einordnung -- die stärkste Antwort
     # keine POSITIVE is_a-Beziehung? -> dieselbe Zelle trägt auch die GERICHTETE Kausal-Beziehung

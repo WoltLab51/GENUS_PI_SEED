@@ -157,16 +157,10 @@ _FALL_GRAPH = (
     ("Tier@de", "expresses", "Q_tier", "wikidata"),
 )
 # ZWEI Fälle: der positive erdet die Kette, der RICHTUNGS-Fall (Tier->Hund = no_path) tötet
-# den vertauschten Kandidaten -- Typen allein könnten x/y nicht unterscheiden.
-_FAELLE = (
-    werkplan.Planfall(graph=_FALL_GRAPH,
-                      eingaben={"x_tok": "Hund", "y_tok": "Tier"},
-                      erwartet={"verdict": "yes", "subject": "Hund", "object": "Tier",
-                                "target": "Q_tier"}),
-    werkplan.Planfall(graph=_FALL_GRAPH,
-                      eingaben={"x_tok": "Tier", "y_tok": "Hund"},
-                      erwartet={"verdict": "no_path"}),
-)
+# den vertauschten Kandidaten -- Typen allein könnten x/y nicht unterscheiden. Seit Scheibe C
+# ist die Saat die EINE Quelle (werkzeuge_auskunft.BEZIEHUNG_FAELLE, auch der Live-Pfad
+# deduziert daraus).
+_FAELLE = werkzeuge_auskunft.BEZIEHUNG_FAELLE
 
 
 def _volle_registry():

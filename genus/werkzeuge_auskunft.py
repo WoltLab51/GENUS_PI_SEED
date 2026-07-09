@@ -129,3 +129,68 @@ def relate_komponiert(conn, x_tok: str, y_tok: str) -> dict:
     führt den Plan aus."""
     registriere_auskunft_werkzeuge()
     return werkplan.fuehre_aus(conn, BEZIEHUNG_PLAN, x_tok=x_tok, y_tok=y_tok)[BEZIEHUNG_PLAN.ergebnis]
+
+
+# --- Scheibe C: der Planer wird PRIMÄRPFAD (Absicht -> Ziel + Fälle als DATEN) ------------
+#
+# Die Absicht „beziehung" trägt ihr Ziel-Werkzeug und ihre Planfälle als Saat-Daten (wie
+# RASTER_SEED/ZIEL_SEED); der Plan wird daraus EINMAL pro Prozess DEDUZIERT (deterministisch,
+# ~0,4 s) und dann gecacht -- jede Nachricht zahlt nur die ms der Ausführung. Scheitert
+# irgendetwas (keine Kette, Ausführungsfehler), fällt es GEZÄHLT auf das alte, handgebaute
+# Netz (auskunft._relate_terms) zurück -- der Nutzer merkt nichts, das Zählwerk alles.
+# Der Richtungs-Fall ist Pflichtteil der Saat: er tötet den vertauschten Kandidaten.
+BEZIEHUNG_FAELLE = (
+    werkplan.Planfall(
+        graph=(("Hund@de", "expresses", "Q144", "wikidata"),
+               ("Q144", "is_a", "Q_haustier", "wikidata"),
+               ("Haustier@de", "expresses", "Q_haustier", "wikidata"),
+               ("Q_haustier", "is_a", "Q_tier", "wikidata"),
+               ("Tier@de", "expresses", "Q_tier", "wikidata")),
+        eingaben={"x_tok": "Hund", "y_tok": "Tier"},
+        erwartet={"verdict": "yes", "subject": "Hund", "object": "Tier", "target": "Q_tier"},
+    ),
+    werkplan.Planfall(
+        graph=(("Hund@de", "expresses", "Q144", "wikidata"),
+               ("Q144", "is_a", "Q_haustier", "wikidata"),
+               ("Haustier@de", "expresses", "Q_haustier", "wikidata"),
+               ("Q_haustier", "is_a", "Q_tier", "wikidata"),
+               ("Tier@de", "expresses", "Q_tier", "wikidata")),
+        eingaben={"x_tok": "Tier", "y_tok": "Hund"},
+        erwartet={"verdict": "no_path"},
+    ),
+)
+
+_PLAN_CACHE: dict[str, object] = {}
+
+
+def beziehungs_plan():
+    """Der DEDUZIERTE Beziehungs-Plan -- einmal pro Prozess geschlossen (Suche über die
+    Registry, verifiziert gegen BEZIEHUNG_FAELLE), dann gecacht. ``None``, wenn die Suche
+    ehrlich keine Kette findet (dann trägt das Netz allein)."""
+    if "beziehung" not in _PLAN_CACHE:
+        registriere_auskunft_werkzeuge()
+        fund = werkplan.finde_werkplan(
+            "verbindung", {"x_tok": "Text", "y_tok": "Text"}, BEZIEHUNG_FAELLE)
+        _PLAN_CACHE["beziehung"] = fund["plan"]
+    return _PLAN_CACHE["beziehung"]
+
+
+def relate_geplant(conn, x_tok: str, y_tok: str) -> dict:
+    """Die Beziehungsfrage, PLANER ZUERST: der selbst-deduzierte Plan antwortet; scheitert
+    er (keine Kette gefunden, Ausführungsfehler), fällt es GEZÄHLT auf das handgebaute Netz
+    (:func:`auskunft._relate_terms`) zurück. Drop-in-gleich zum Netz (die Gleichheit ist
+    testbewiesen); beide Wege rein lesend."""
+    from genus import zaehlwerk
+
+    try:
+        plan = beziehungs_plan()
+        if plan is not None:
+            registriere_auskunft_werkzeuge()   # Registry kann geleert worden sein (Tests/Neustart)
+            ergebnis = werkplan.fuehre_aus(conn, plan, x_tok=x_tok, y_tok=y_tok)[plan.ergebnis]
+            zaehlwerk.zaehle("beziehung", "treffer")
+            return ergebnis
+    except Exception:
+        pass   # jedes Scheitern fällt ehrlich (und gezählt) auf das Netz
+    zaehlwerk.zaehle("beziehung", "rueckfall")
+    from genus import auskunft
+    return auskunft._relate_terms(conn, x_tok, y_tok)

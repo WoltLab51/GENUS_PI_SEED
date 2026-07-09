@@ -297,12 +297,17 @@ def _relate_terms(conn, x_tok: str, y_tok: str) -> dict:
 def relate(conn, question: str) -> dict:
     """Answer a yes/no is_a question from the graph via a fixed German phrasing;
     ``{relational: False}`` if the text doesn't match one (or names something GENUS can't
-    resolve, so a plain word-lookup should try instead)."""
+    resolve, so a plain word-lookup should try instead). Seit ③ Scheibe C läuft die Auflösung
+    PLANER ZUERST (der selbst-deduzierte Plan; ``_relate_terms`` bleibt das gezählte Netz) --
+    die Regex ist nur noch der Erkenner, nicht mehr der Rechenweg. Lazy-Import, kein Zyklus:
+    werkzeuge_auskunft importiert auskunft seinerseits nur funktions-lokal."""
+    from genus import werkzeuge_auskunft
+
     for pattern in _REL_PATTERNS:
         m = pattern.search(question)
         if not m:
             continue
-        r = _relate_terms(conn, m.group(1), m.group(2))
+        r = werkzeuge_auskunft.relate_geplant(conn, m.group(1), m.group(2))
         if r["relational"]:
             return r
     return {"relational": False}
