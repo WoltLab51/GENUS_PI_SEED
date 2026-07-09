@@ -61,13 +61,22 @@ class Werkzeug:
     CODE-Teil (implementierung, formulierung, muster). ``rezept`` bleibt hier bewusst als
     Feld vorgesehen, aber ungenutzt -- der erste echte Anwendungsfall (Kurvendiskussion, eine
     Komposition aus Nullstellen+Extremstellen+Verhalten im Unendlichen) ist noch nicht gebaut;
-    es jetzt schon zu befüllen wäre Merkmal auf Vorrat."""
+    es jetzt schon zu befüllen wäre Merkmal auf Vorrat.
+
+    ``liefert`` (2026-07-09, Tool-Planer ③ Scheibe A -- Merkmal ERKANNT + NOTWENDIG: ohne
+    Ausgabe-Deklaration kann keine Rückwärts-Plan-Suche existieren): die NUTZLAST-Felder,
+    die ein erfolgreiches Ergebnis trägt (feldname -> typ, dieselben freien Typ-Namen wie
+    ``Parameter.typ``). ok/fehler sind das Fehler-Protokoll, keine Lieferung -- sie werden
+    nicht deklariert. Ein LEERES dict ist eine bewusste Entscheidung: „terminal, nicht
+    komponierbar" (z.B. eine Gesprächszelle, die einen fertigen Satz statt einer dict
+    liefert). KEIN Default -- wie bei wortlautfest ist die Entscheidung Pflicht."""
     name: str
     beschreibung: str
     parameter: dict[str, Parameter]
     schreibt: bool
     wortlautfest: bool                          # KEIN Default -- die Entscheidung ist Pflicht
     pruefbar_als: str                           # z.B. "sympy" | "graph" | "mensch"
+    liefert: dict[str, str]                     # KEIN Default -- Nutzlast-Felder eines Erfolgs
     implementierung: Callable[..., dict]
     formulierung: Callable[[dict], str] | None = None
     muster: tuple = field(default_factory=tuple)
@@ -85,6 +94,13 @@ def pruefen(werkzeug: Werkzeug) -> list[str]:
         fehler.append(f"«{werkzeug.name}»: Beschreibung fehlt.")
     if not werkzeug.pruefbar_als.strip():
         fehler.append(f"«{werkzeug.name}»: pruefbar_als fehlt -- welche Vertrauensstufe trägt das Ergebnis?")
+    if not isinstance(werkzeug.liefert, dict):
+        fehler.append(f"«{werkzeug.name}»: liefert muss ein dict (feldname -> typ) sein.")
+    else:
+        for feld, typ in werkzeug.liefert.items():
+            if not (isinstance(feld, str) and feld.strip() and isinstance(typ, str) and typ.strip()):
+                fehler.append(f"«{werkzeug.name}»: liefert-Eintrag {feld!r}: {typ!r} ist kein "
+                              f"benannter Feldname mit Typ.")
     if not callable(werkzeug.implementierung):
         fehler.append(f"«{werkzeug.name}»: implementierung ist nicht aufrufbar.")
         return fehler   # ohne aufrufbare Implementierung ist der Signatur-Abgleich sinnlos
@@ -187,6 +203,7 @@ def _vertrags_fingerabdruck(w: Werkzeug) -> dict:
         "schreibt": w.schreibt,
         "wortlautfest": w.wortlautfest,
         "pruefbar_als": w.pruefbar_als,
+        "liefert": {f: w.liefert[f] for f in sorted(w.liefert)},   # Vertrags-Daten wie parameter
     }
 
 

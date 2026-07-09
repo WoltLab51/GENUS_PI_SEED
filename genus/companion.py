@@ -1051,6 +1051,10 @@ def registriere_zellen() -> None:
             schreibt=name in _ZELLEN_SCHREIBEND,
             wortlautfest=name not in _ZELLEN_FREI_FORMULIERBAR,
             pruefbar_als=_ZELLEN_PRUEFBAR[name],
+            # bewusst leer = TERMINAL: eine Zelle liefert einen fertigen Satz (str), keine
+            # Nutzlast-Felder -- sie ist Antwort-Endpunkt, kein komponierbarer Zwischenschritt
+            # (und als sterbliches Netz ohnehin auf dem Weg, sich in Pläne aufzulösen).
+            liefert={},
             implementierung=handler,
         ))
 

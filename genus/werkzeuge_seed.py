@@ -30,6 +30,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"ableitung": "Text", "term": "Text", "variable": "Text", "ordnung": "Zahl"},
         implementierung=mathematik.ableitung,
         formulierung=companion.narrate_ableitung,
     ))
@@ -46,6 +47,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"punkte": "Liste", "term": "Text", "variable": "Text"},
         implementierung=mathematik.extremstellen,
         formulierung=companion.narrate_extremstellen,
     ))
@@ -59,6 +61,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"stammfunktion": "Text", "term": "Text", "variable": "Text"},
         implementierung=mathematik.stammfunktion,
         formulierung=companion.narrate_stammfunktion,
     ))
@@ -74,6 +77,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"integral": "Text", "term": "Text", "variable": "Text", "untere_grenze": "Text", "obere_grenze": "Text"},
         implementierung=mathematik.integral,
         formulierung=companion.narrate_integral,
     ))
@@ -90,6 +94,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"nullstellen": "Liste", "term": "Text", "variable": "Text"},
         implementierung=mathematik.nullstellen,
     ))
     werkzeug.verdrahten(werkzeug.Werkzeug(
@@ -102,6 +107,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"plus_unendlich": "Text", "minus_unendlich": "Text", "term": "Text", "variable": "Text"},
         implementierung=mathematik.verhalten_unendlich,
     ))
     # DAS ERSTE ECHTE REZEPT (das rezept-Feld war seit dem Werkzeugbauer vorgesehen, aber
@@ -128,6 +134,7 @@ def registriere_mathe_werkzeuge() -> None:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"schritte": "Liste", "term": "Text", "variable": "Text"},
         implementierung=werkzeug.rezept_implementierung(kurvendiskussion_rezept),
         formulierung=companion.narrate_kurvendiskussion,
         rezept=kurvendiskussion_rezept,

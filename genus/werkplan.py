@@ -58,13 +58,18 @@ def _aufloesen(quelle: tuple, eingaben: dict, umgebung: dict):
 
 
 def pruefe_plan(plan: Werkplan) -> list[str]:
-    """Die GRAMMATIK-Prüfung: nennt jeder Schritt ein registriertes Werkzeug, und verweist jede
-    Eingabe nur auf eine Plan-Eingabe oder einen SCHON gesehenen (früheren) Schritt? Rückwärts-
-    only -> azyklisch. Leere Liste = wohlgeformt. (Kein Aufruf, keine DB nötig -- reine Form.)"""
+    """Die GRAMMATIK-Prüfung: nennt jeder Schritt ein registriertes Werkzeug, verweist jede
+    Eingabe nur auf eine Plan-Eingabe oder einen SCHON gesehenen (früheren) Schritt (Rückwärts-
+    only -> azyklisch), und -- seit ``Werkzeug.liefert`` (Scheibe A) -- greift jeder
+    ``("aus", schritt, feld)``-Verweis ein Feld, das der Quell-Schritt auch WIRKLICH liefert,
+    mit passendem Typ zum konsumierenden Parameter? Leere Liste = wohlgeformt. (Kein Aufruf,
+    keine DB nötig -- reine Form; genau die Prüfung, auf der die Rückwärts-Plan-Suche und der
+    spätere Verifikations-Trichter aufsetzen.)"""
     fehler: list[str] = []
-    gesehen: set[str] = set()
+    gesehen: dict[str, str] = {}   # Schritt-Ausgabe -> Werkzeug-Name (für die liefert-Prüfung)
     for s in plan.schritte:
-        if werkzeug.registriert(s.werkzeug) is None:
+        w = werkzeug.registriert(s.werkzeug)
+        if w is None:
             fehler.append(f"Schritt «{s.ausgabe}»: Werkzeug «{s.werkzeug}» ist nicht registriert.")
         for param, quelle in s.eingaben:
             if not isinstance(quelle, tuple) or not quelle:
@@ -77,10 +82,26 @@ def pruefe_plan(plan: Werkplan) -> list[str]:
                 if quelle[1] not in gesehen:
                     fehler.append(f"Schritt «{s.ausgabe}»: Eingabe «{param}» verweist auf den "
                                   f"Schritt «{quelle[1]}», der (noch) nicht berechnet ist.")
+                else:
+                    quell_werkzeug = werkzeug.registriert(gesehen[quelle[1]])
+                    if quell_werkzeug is not None:
+                        geliefert = quell_werkzeug.liefert
+                        if quelle[2] not in geliefert:
+                            fehler.append(
+                                f"Schritt «{s.ausgabe}»: Eingabe «{param}» greift Feld "
+                                f"«{quelle[2]}» aus «{quelle[1]}», aber "
+                                f"«{quell_werkzeug.name}» liefert nur "
+                                f"{sorted(geliefert) or '(nichts -- terminal)'}.")
+                        elif (w is not None and param in w.parameter
+                              and w.parameter[param].typ != geliefert[quelle[2]]):
+                            fehler.append(
+                                f"Schritt «{s.ausgabe}»: Eingabe «{param}» erwartet Typ "
+                                f"«{w.parameter[param].typ}», aber «{quell_werkzeug.name}»."
+                                f"{quelle[2]} liefert «{geliefert[quelle[2]]}».")
             else:
                 fehler.append(f"Schritt «{s.ausgabe}»: Eingabe «{param}» hat unbekannte "
                               f"Quellen-Art «{quelle[0]}».")
-        gesehen.add(s.ausgabe)
+        gesehen[s.ausgabe] = s.werkzeug
     if plan.ergebnis not in gesehen:
         fehler.append(f"Der Ergebnis-Schritt «{plan.ergebnis}» kommt im Plan nicht vor.")
     return fehler

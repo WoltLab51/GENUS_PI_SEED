@@ -16,6 +16,7 @@ def _leeres_werkzeug(**overrides) -> werkzeug.Werkzeug:
         schreibt=False,
         wortlautfest=True,
         pruefbar_als="sympy",
+        liefert={"term": "Text"},
         implementierung=lambda term: {"ok": True, "term": term},
     )
     basis.update(overrides)
@@ -28,8 +29,27 @@ def test_wortlautfest_has_no_default_it_must_be_decided():
     with pytest.raises(TypeError):
         werkzeug.Werkzeug(
             name="x", beschreibung="x", parameter={}, schreibt=False,
+            pruefbar_als="sympy", liefert={},
+            implementierung=lambda: {"ok": True},
+        )
+
+
+def test_liefert_has_no_default_it_must_be_decided():
+    # dasselbe Muster wie wortlautfest (Scheibe A des Plan-Finders): ohne die Entscheidung,
+    # WAS ein Erfolg liefert, kann keine Rückwärts-Plan-Suche existieren -- eine Spec lässt
+    # sich ohne sie gar nicht erst konstruieren. Leeres dict = bewusst „terminal".
+    with pytest.raises(TypeError):
+        werkzeug.Werkzeug(
+            name="x", beschreibung="x", parameter={}, schreibt=False, wortlautfest=True,
             pruefbar_als="sympy", implementierung=lambda: {"ok": True},
         )
+
+
+def test_pruefen_rejects_a_malformed_liefert():
+    w = _leeres_werkzeug(liefert={"feld": ""})   # Typ fehlt
+    assert any("liefert" in f for f in werkzeug.pruefen(w))
+    w2 = _leeres_werkzeug(liefert="kein dict")
+    assert any("liefert" in f for f in werkzeug.pruefen(w2))
 
 
 def test_pruefen_accepts_a_well_formed_werkzeug():

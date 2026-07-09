@@ -66,6 +66,7 @@ def registriere_auskunft_werkzeuge() -> None:
         beschreibung="Ein Wort zu der Form auflösen, die GENUS als Konzept kennt (Subjekt-Seite).",
         parameter={"wort": werkzeug.Parameter("Text", pflicht=True)},
         schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"form": "Wort"},
         implementierung=konzept_form,
     ))
     werkzeug.verdrahten(werkzeug.Werkzeug(
@@ -73,6 +74,7 @@ def registriere_auskunft_werkzeuge() -> None:
         beschreibung="Alle Konzepte, die ein Wort ausdrückt, plus die bekannte Form (Objekt-Seite).",
         parameter={"wort": werkzeug.Parameter("Text", pflicht=True)},
         schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"konzepte": "Menge", "form": "Wort"},
         implementierung=konzepte_von,
     ))
     werkzeug.verdrahten(werkzeug.Werkzeug(
@@ -80,6 +82,7 @@ def registriere_auskunft_werkzeuge() -> None:
         beschreibung="Die transitiven is_a-Oberbegriffe einer Form, mit Kette und Vertrauen.",
         parameter={"form": werkzeug.Parameter("Wort", pflicht=True)},
         schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"oberbegriffe": "Liste"},
         implementierung=oberbegriffe,
     ))
     werkzeug.verdrahten(werkzeug.Werkzeug(
@@ -93,6 +96,7 @@ def registriere_auskunft_werkzeuge() -> None:
             "ziel_konzepte": werkzeug.Parameter("Menge"),
         },
         schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"relational": "Wahrheit", "verdict": "Text", "subject": "Wort", "object": "Wort", "target": "Text", "trust": "Zahl", "chain": "Liste"},
         implementierung=verbindung,
     ))
 

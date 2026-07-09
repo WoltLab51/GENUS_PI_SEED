@@ -82,6 +82,58 @@ def test_pruefer_faengt_vorwaerts_verweis():
     assert any("noch) nicht berechnet" in f for f in fehler)
 
 
+def test_pruefer_faengt_griff_in_nicht_geliefertes_feld():
+    # Scheibe A: seit Werkzeug.liefert prüft die Grammatik auch, ob ein ("aus",...)-Verweis
+    # ein Feld greift, das der Quell-Schritt WIRKLICH liefert -- ein Tippfehler im Feldnamen
+    # ist jetzt ein Grammatik-Fehler, kein Laufzeit-KeyError mehr.
+    werkzeuge_auskunft.registriere_auskunft_werkzeuge()
+    plan = werkplan.Werkplan(
+        eingaben=("x_tok",),
+        schritte=(
+            werkplan.Schritt("xf", "konzept_form", (("wort", ("in", "x_tok")),)),
+            werkplan.Schritt("vf", "oberbegriffe", (("form", ("aus", "xf", "vorm")),)),  # Tippfehler
+        ),
+        ergebnis="vf",
+    )
+    fehler = werkplan.pruefe_plan(plan)
+    assert any("vorm" in f and "liefert nur" in f for f in fehler)
+
+
+def test_pruefer_faengt_typ_bruch():
+    # ...und ob der Typ des gelieferten Felds zum konsumierenden Parameter passt: oberbegriffe
+    # erwartet form: "Wort", konzepte_von.konzepte liefert "Menge" -> Grammatik-Fehler.
+    werkzeuge_auskunft.registriere_auskunft_werkzeuge()
+    plan = werkplan.Werkplan(
+        eingaben=("x_tok",),
+        schritte=(
+            werkplan.Schritt("yk", "konzepte_von", (("wort", ("in", "x_tok")),)),
+            werkplan.Schritt("vf", "oberbegriffe", (("form", ("aus", "yk", "konzepte")),)),
+        ),
+        ergebnis="vf",
+    )
+    fehler = werkplan.pruefe_plan(plan)
+    assert any("erwartet Typ" in f and "Wort" in f and "Menge" in f for f in fehler)
+
+
+def test_zellen_sind_ausdruecklich_terminal():
+    # eine Gesprächszelle liefert einen fertigen Satz (str), keine Nutzlast-Felder -- die
+    # bewusst leere liefert-Deklaration macht den Griff in ihre "Felder" zum Grammatik-Fehler.
+    from genus import companion
+    companion.registriere_zellen()
+    zelle = f"{companion.ZELLE_PREFIX}definition"
+    plan = werkplan.Werkplan(
+        eingaben=("frage",),
+        schritte=(
+            werkplan.Schritt("z", zelle, (("question", ("in", "frage")),)),
+            werkplan.Schritt("vf", "oberbegriffe", (("form", ("aus", "z", "text")),)),
+        ),
+        ergebnis="vf",
+    )
+    werkzeuge_auskunft.registriere_auskunft_werkzeuge()
+    fehler = werkplan.pruefe_plan(plan)
+    assert any("terminal" in f for f in fehler)
+
+
 def test_ausfuehrer_verweigert_malformten_plan(conn):
     plan = werkplan.Werkplan(
         eingaben=("a",),
