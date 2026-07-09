@@ -353,6 +353,53 @@ def _send_message(token: str, chat_id: int, text: str) -> None:
     _api(token, "sendMessage", {"chat_id": chat_id, "text": text[:4000]}, timeout=15)
 
 
+class _AntwortMelder:
+    """Die „GENUS denkt …"-Statuszeile (Ronny 2026-07-09: „machts irgendwie spannender"):
+    die erste Meldung wird als echte Nachricht gesendet, jede weitere Meldung und die fertige
+    Antwort EDITIEREN sie (editMessageText) -- eine einzige, sich verwandelnde Nachricht statt
+    Flacker-Zeilen. Ehrlich: gemeldet wird nur, was wirklich Zeit kostet (das Modell -- Deuten,
+    Formulieren); die Graph-Arbeit ist Millisekunden und bekommt keine Show. FAIL-SILENT
+    durchgehend: Status ist Zucker, nie Pflicht -- scheitert das Editieren, wird schlicht
+    neu gesendet; scheitert die Meldung, läuft die Antwort unberührt weiter."""
+
+    def __init__(self, token: str):
+        self._token = token
+        self._nachricht: dict[int, int] = {}   # chat_id -> message_id der Status-Nachricht
+
+    def melde(self, chat_id: int, text: str) -> None:
+        try:
+            mid = self._nachricht.get(chat_id)
+            if mid is None:
+                body = _api(self._token, "sendMessage",
+                            {"chat_id": chat_id, "text": text}, timeout=15)
+                if body.get("ok"):
+                    self._nachricht[chat_id] = body["result"]["message_id"]
+            else:
+                _api(self._token, "editMessageText",
+                     {"chat_id": chat_id, "message_id": mid, "text": text}, timeout=15)
+        except Exception:
+            pass   # Status bricht nie eine Antwort
+
+    def abschliessen(self, chat_id: int, antwort: str) -> None:
+        """Die Status-Nachricht wird zur Antwort -- ohne Status: normal senden."""
+        mid = self._nachricht.pop(chat_id, None)
+        if mid is not None:
+            try:
+                _api(self._token, "editMessageText",
+                     {"chat_id": chat_id, "message_id": mid, "text": antwort[:4000]},
+                     timeout=15)
+                return
+            except Exception:
+                pass   # Editieren gescheitert -> ehrlich neu senden
+        _send_message(self._token, chat_id, antwort)
+
+    def raeume_auf(self, text: str) -> None:
+        """Hängengebliebene Status-Nachrichten (Absturz NACH der Meldung) ehrlich auflösen --
+        nie ein ewiges „Ich denke nach …" stehen lassen."""
+        for chat_id in list(self._nachricht):
+            self.abschliessen(chat_id, text)
+
+
 def _load_offset() -> int:
     try:
         with open(OFFSET_FILE, encoding="utf-8") as f:
@@ -367,7 +414,8 @@ def _save_offset(offset: int) -> None:
 
 
 def handle_update(
-    conn, update: dict, allowed: set[int], sessions: dict[int, list[dict]] | None = None
+    conn, update: dict, allowed: set[int], sessions: dict[int, list[dict]] | None = None,
+    status=None,
 ) -> tuple[int, str] | None:
     """Pure logic, no network: given one Telegram update + the allow-list, decide whether to
     answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer.
@@ -380,7 +428,12 @@ def handle_update(
     (``companion.is_backreference``). In-process only, forgotten on a restart -- an honest,
     small limitation: this is UX-session plumbing, not knowledge, so it deliberately doesn't
     touch the ledger (Ledger != Memory). Omit ``sessions`` for the plain, stateless behaviour
-    (unchanged)."""
+    (unchanged).
+
+    ``status`` (optional): ein injizierter Callback ``status(chat_id, text)`` -- dasselbe
+    Muster wie ``deuter``/``stimme``: OHNE ihn bleibt diese Funktion pur (kein Netz, testbar
+    wie bisher); MIT ihm meldet sie ehrlich die zwei Phasen, die wirklich Zeit kosten
+    (Deuten, Formulieren -- beides Modell; die Graph-Arbeit ist ms und bekommt keine Show)."""
     from genus import companion, verstehen
     import deuter
     import stimme
@@ -431,11 +484,18 @@ def handle_update(
             zuege = sessions.get(chat_id) or []
             vorher = zuege[-1] if zuege else {}
             hinweise = _korrektur_hinweise(conn)   # Lernkreis-Rückfluss, frisch berechnet
+            sprich = stimme.formuliere
+            if status is not None:
+                status(chat_id, "🤔 Ich denke nach …")   # gleich ruft der Deuter (Sekunden)
+
+                def sprich(text, **kw):   # die zweite ehrliche Modell-Phase: das Formulieren
+                    status(chat_id, "✍️ Ich formuliere …")
+                    return stimme.formuliere(text, **kw)
             result = companion.respond_with_deuter(
                 conn, question, vorher.get("question"),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze,
                                                   korrekturen=hinweise),
-                stimme=stimme.formuliere,
+                stimme=sprich,
                 last_answer=vorher.get("answer"),
                 verlauf=zuege[:-1],
                 letzte_lesarten=vorher.get("gelesen"),
@@ -494,6 +554,7 @@ def main() -> int:
     offset = _load_offset()
     start_zeit = time.time()
     sessions: dict[int, list[dict]] = {}   # chat_id -> turn list; in-process only, see handle_update
+    melder = _AntwortMelder(token)          # die „GENUS denkt …"-Statuszeile (fail-silent)
     while True:
         if _neustart_angefordert(start_zeit):
             _log("Neustart angefordert (Deploy-Flag) — beende mich sauber; "
@@ -516,14 +577,16 @@ def main() -> int:
             # dennoch je etwas durchschlagen, wird der Offset trotzdem gespeichert (unten) —
             # kein erneutes Zustellen derselben Nachricht, keine Neustart-Schleife.
             try:
-                result = handle_update(conn, update, allowed, sessions)
+                result = handle_update(conn, update, allowed, sessions, status=melder.melde)
             except Exception as exc:
                 _log(f"handle_update crashed on update {update.get('update_id')}: {exc}")
                 result = None
+                # nie ein ewiges „Ich denke nach …" stehen lassen
+                melder.raeume_auf("Da ist etwas schiefgelaufen — magst du es nochmal versuchen?")
             if result is not None:
                 chat_id, answer = result
                 try:
-                    _send_message(token, chat_id, answer)
+                    melder.abschliessen(chat_id, answer)   # Status-Nachricht WIRD die Antwort
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
                     _log(f"sendMessage failed ({exc})")
             _save_offset(offset)

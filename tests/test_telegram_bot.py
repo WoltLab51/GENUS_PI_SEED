@@ -918,3 +918,72 @@ def test_morgenzeit_kommando_laeuft_als_membran_ritual_vor_dem_kern():
                                         allowed={42}, sessions=sessions)
     assert result is not None and "06:45" in result[1]
     assert sessions == {}   # kein Zug, kein Verlauf -- Konfiguration ist kein Gespräch
+
+
+# --- die „GENUS denkt …"-Statuszeile (Ronny 2026-07-09: „machts irgendwie spannender") ----
+# Status als INJIZIERTER Callback (dasselbe Muster wie deuter/stimme): ohne ihn bleibt
+# handle_update pur (alle bestehenden Tests beweisen das mit); der Melder verwandelt die
+# Status-Nachricht per editMessageText in die fertige Antwort.
+
+def test_status_meldet_denken_vor_dem_deuter(monkeypatch):
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
+    monkeypatch.setattr(
+        deuter, "interpret",
+        lambda q, absichten=None, grammatik=None, korrekturen=None:
+            {"absicht": "definition", "subject": "Hund"})
+    gemeldet: list = []
+    telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42},
+                               sessions={}, status=lambda cid, t: gemeldet.append((cid, t)))
+    assert gemeldet and gemeldet[0][0] == 42 and "denke" in gemeldet[0][1]
+
+
+def test_antwortmelder_sendet_dann_editiert(monkeypatch):
+    rufe: list = []
+
+    def fake_api(token, method, params, timeout):
+        rufe.append((method, dict(params)))
+        return {"ok": True, "result": {"message_id": 77}}
+
+    monkeypatch.setattr(telegram_bot, "_api", fake_api)
+    m = telegram_bot._AntwortMelder("tok")
+    m.melde(42, "🤔 Ich denke nach …")
+    m.melde(42, "✍️ Ich formuliere …")
+    m.abschliessen(42, "Die Antwort.")
+    assert [r[0] for r in rufe] == ["sendMessage", "editMessageText", "editMessageText"]
+    assert rufe[1][1]["message_id"] == 77 and rufe[2][1]["text"] == "Die Antwort."
+    assert 42 not in m._nachricht   # abgeschlossen -> vergessen (kein Geister-Edit spaeter)
+
+
+def test_antwortmelder_ohne_meldung_sendet_schlicht(monkeypatch):
+    rufe: list = []
+    monkeypatch.setattr(
+        telegram_bot, "_api",
+        lambda t, meth, p, timeout: (rufe.append(meth), {"ok": True, "result": {"message_id": 1}})[1])
+    m = telegram_bot._AntwortMelder("tok")
+    m.abschliessen(42, "Direkte Antwort.")   # schneller Pfad hatte nie einen Status
+    assert rufe == ["sendMessage"]
+
+
+def test_antwortmelder_meldung_ist_fail_silent(monkeypatch):
+    def kracht(*a, **k):
+        raise OSError("Netz weg")
+    monkeypatch.setattr(telegram_bot, "_api", kracht)
+    m = telegram_bot._AntwortMelder("tok")
+    m.melde(42, "🤔 …")   # darf NIE werfen -- Status ist Zucker, keine Pflicht
+    assert 42 not in m._nachricht
+
+
+def test_antwortmelder_raeumt_haengende_meldungen_auf(monkeypatch):
+    rufe: list = []
+
+    def fake_api(token, method, params, timeout):
+        rufe.append(method)
+        return {"ok": True, "result": {"message_id": 9}}
+
+    monkeypatch.setattr(telegram_bot, "_api", fake_api)
+    m = telegram_bot._AntwortMelder("tok")
+    m.melde(42, "🤔 Ich denke nach …")
+    m.raeume_auf("Da ist etwas schiefgelaufen.")   # nie ein ewiges „denke nach" stehen lassen
+    assert rufe == ["sendMessage", "editMessageText"] and not m._nachricht

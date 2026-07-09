@@ -399,7 +399,9 @@ def test_deuter_and_stimme_each_get_their_own_model_not_shared():
     # ihr eigenes warmes Modell
     bot = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
     assert "deuter.get_model" not in bot
-    assert "stimme=stimme.formuliere" in bot
+    # die Stimme spricht ueber IHR Modul (stimme.formuliere) -- seit der Statuszeile ggf.
+    # durch die sprich-Huelle gereicht, aber nie ueber ein geteiltes Deuter-Modell
+    assert "stimme.formuliere" in bot
     deuter_script = (ROOT / "deploy" / "deuter.py").read_text(encoding="utf-8")
     assert "def get_model" not in deuter_script
 
