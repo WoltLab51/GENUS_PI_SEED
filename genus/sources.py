@@ -34,16 +34,19 @@ SOURCE_TRUST_SEED = 0.5
 MODEL_SOURCE_PREFIX = "model:"
 MODEL_TRUST_SEED = SOURCE_TRUST_SEED / 2
 
-# Der SPIEGEL der Modell-Kappe: eine handkuratierte, menschlich-verifizierte Quelle ist der
-# VERTRAUENSWÜRDIGSTE Zeuge (ein Mensch hat sie bewusst gesetzt, sie ist keine Übereinstimmungs-
-# Statistik einer offenen Quelle). Solche Quellen bekommen einen hohen BODEN -- symmetrisch zur
-# tiefen Kappe des Modells; die zwei Pole der Zeugen-Güte: model < unbewiesen < … < geerdet. Ein
-# Boden (max), keine feste Zahl: eine Quelle, die sich MEHR verdient, behält den höheren Wert.
-# „Geerdet" heißt handverlesen + gegen die Quelle geprüft (genus.orte: Q-IDs gegen Wikidata),
-# nicht bloß behauptet. (Bewusst NICHT „ronny": dessen Vertrauen berührt Ziele/Gedächtnis --
-# eine breitere Entscheidung, hier nicht mitgetroffen.)
-GROUNDED_SOURCES = frozenset({"kuratiert"})
-GROUNDED_TRUST = 0.9
+# Der SPIEGEL der Modell-Kappe: eine menschlich-verantwortete Quelle ist der VERTRAUENS-
+# WÜRDIGSTE Zeuge (ein Mensch hat sie bewusst gesetzt, sie ist keine Übereinstimmungs-Statistik
+# einer offenen Quelle). Solche Quellen bekommen einen hohen BODEN (max -- eine Quelle, die
+# sich MEHR verdient, behält den höheren Wert). Der Wert ist STRUKTURELL abgeleitet, dieselbe
+# Konstruktion wie die Modell-Kappe, keine zweite Konstante: das Modell halbiert das VERTRAUEN
+# des Unbewiesenen (SEED/2), das Geerdete halbiert dessen MISSTRAUEN (1 - (1-SEED)/2). Die zwei
+# Pole der Zeugen-Güte: model < unbewiesen < … < geerdet.
+# „Geerdet" heißt menschlich verantwortet: handverlesen + gegen die Quelle geprüft („kuratiert",
+# genus.orte: Q-IDs gegen Wikidata) oder direkt vom Menschen gesagt („ronny" -- erinnerung/
+# ziele/verstehen nannten diese Quelle schon immer „voll vertraut", aber strukturell fiel sie
+# wie jede unbewiesene Quelle auf den Seed; das hier löst das dokumentierte Versprechen ein).
+GROUNDED_SOURCES = frozenset({"kuratiert", "ronny"})
+GROUNDED_TRUST = 1 - (1 - SOURCE_TRUST_SEED) / 2
 
 # A candidate counts as a *current* claimant only while it is at least this fresh
 # relative to the freshest source -- i.e. within one cadence (one freshness

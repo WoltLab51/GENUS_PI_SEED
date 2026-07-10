@@ -117,13 +117,19 @@ def test_deuter_ort_guess_wird_graph_verifiziert():
     assert "Sprachmodell gedeutet" in res["text"]
 
 
-def test_kuratierte_geo_fakten_sind_hoch_vertraut():
-    # handverlesen + gegen Wikidata geprüft -> geerdeter Boden (nicht der 0.5-Seed einer
-    # unbewiesenen Quelle); schlägt sich im Vertrauen der Antwort nieder
+def test_geerdete_quellen_sind_hoch_vertraut_strukturell_nicht_preset():
+    # menschlich verantwortet -> geerdeter Boden. Der Wert ist STRUKTURELL der Spiegel der
+    # Modell-Kappe (Modell halbiert das Vertrauen des Unbewiesenen, geerdet halbiert dessen
+    # Misstrauen) -- keine zweite Konstante, kein Preset (Ronnys Ausreißer-Frage 2026-07-10).
     from genus import companion, sources
     conn = _geseedet()
-    assert sources.source_trust(conn, "kuratiert") >= 0.9
-    assert companion.ort(conn, "Ist Kassel in Hessen?")["trust"] >= 0.9
+    erwartet = 1 - (1 - sources.SOURCE_TRUST_SEED) / 2
+    assert sources.source_trust(conn, "kuratiert") == erwartet
+    assert sources.source_trust(conn, "ronny") == erwartet     # GENUS kennt Ronny
+    assert sources.source_trust(conn, "unbekannt-xyz") == sources.SOURCE_TRUST_SEED
+    assert companion.ort(conn, "Ist Kassel in Hessen?")["trust"] >= erwartet
+    # die Ordnung der Zeugen-Güte: model < unbewiesen < geerdet
+    assert (sources.MODEL_TRUST_SEED < sources.SOURCE_TRUST_SEED < sources.GROUNDED_TRUST)
 
 
 def test_narrate_ort_richtung_kann_nicht_kippen():
