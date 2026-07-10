@@ -18,7 +18,10 @@ from genus import self_calibration, sources
 # behave transitively/symmetrically (see transitivity_evidence / is_transitive below) and treats
 # the seed as a fallback only where evidence is thin -- self-calibration applied to the rules of
 # its OWN reasoning. The engine (traversal + justification) stays fixed; the rule-spec is learned.
-TRANSITIVE_PREDICATES = {"is_a", "part_of"}
+# located_in ist echt transitiv: Kassel ⊂ Hessen ⊂ Deutschland ⇒ Kassel ⊂ Deutschland (die
+# Verwaltungsgeografie des Orte-Seeds, genus.orte). Seed-Hypothese wie is_a/part_of; die
+# Selbst-Kalibrierung darf sie später bestätigen, sobald genug geschlossene Dreiecke da sind.
+TRANSITIVE_PREDICATES = {"is_a", "part_of", "located_in"}
 SYMMETRIC_PREDICATES = {"synonym", "antonym"}
 
 # Enough closed triangles / mirrored pairs to trust a rule as *learned* from the data rather than
