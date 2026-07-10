@@ -50,6 +50,14 @@ esac
 if lsblk -no MOUNTPOINT "$SSD" | grep -q .; then
     fehler "$SSD hat gemountete Partitionen -- bitte erst aushaengen"
 fi
+# UAS-Wache: laeuft die Bridge noch auf UAS, wuerde schon der grosse Klon-Read/Write unter
+# Last wegbrechen (Fund 2026-07-10: JMicron 152d:2320 + UAS stirbt unter Schreiblast). Erst
+# den Quirk + Reboot (deploy/pi_ssd_uas_quirk.sh), dann diese Migration.
+SSD_TREIBER="$(lsusb -t 2>/dev/null | grep -iE "Mass Storage|152d" | grep -oE "Driver=[a-z-]+" | head -1)"
+case "$SSD_TREIBER" in
+    *uas*) fehler "SSD laeuft noch auf UAS ($SSD_TREIBER) -- erst 'sudo bash deploy/pi_ssd_uas_quirk.sh' + reboot, dann hier weiter" ;;
+    *) log "SSD-Treiber: ${SSD_TREIBER:-unbekannt} (kein UAS -- gut)" ;;
+esac
 SD_BOOT_PARTUUID="$(lsblk -no PARTUUID "$(findmnt -no SOURCE /boot/firmware)")"
 SD_ROOT_PARTUUID="$(lsblk -no PARTUUID "$ROOT_QUELLE")"
 log "Preflight OK: $SSD ($MODELL, $(lsblk -ndo SIZE "$SSD")), System auf SD ($SD_ROOT_PARTUUID)"
@@ -140,6 +148,12 @@ runuser -u "$GENUS_USER" -- env GENUS_DB_PATH="$SSD_DB" "$REPO_DIR/.venv/bin/gen
 log "PARTUUIDs eintragen (cmdline.txt + fstab)"
 sed -i "s/root=PARTUUID=[^ ]*/root=PARTUUID=${DISK_ID}-02/" "$BOOT_MNT/cmdline.txt"
 grep -q "PARTUUID=${DISK_ID}-02" "$BOOT_MNT/cmdline.txt" || fehler "cmdline.txt nicht angepasst"
+# Der UAS-Quirk MUSS in die SSD-cmdline: der Pi bootet gleich VON dieser JMicron-Bridge --
+# ohne den Quirk liefe sie wieder auf UAS und braeche unter Last weg (dann boetet nichts sauber).
+if ! grep -q "152d:2320:u" "$BOOT_MNT/cmdline.txt"; then
+    sed -i "1 s|\$| usb-storage.quirks=152d:2320:u|" "$BOOT_MNT/cmdline.txt"
+    log "UAS-Quirk in die SSD-cmdline gebacken (BOT auch nach dem Umzug)"
+fi
 sed -i "s|PARTUUID=${SD_BOOT_PARTUUID}|PARTUUID=${DISK_ID}-01|; s|PARTUUID=${SD_ROOT_PARTUUID}|PARTUUID=${DISK_ID}-02|" \
     "$ROOT_MNT/etc/fstab"
 
