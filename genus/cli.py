@@ -379,6 +379,61 @@ def atlas_facts_command() -> None:
     click.echo(_atlas_facts())
 
 
+@main.command("skills")
+def skills_command() -> None:
+    """Das Thermometer (Skill-Dashboard ④): Planer-Quoten, Verstehens-Belegung, Lücken.
+
+    Ein Sensor für den Menschen, kein Optimierungsziel (Goodhart-Leitplanke): die Zahlen
+    zeigen, WO der Kreislauf ansetzen soll -- sie sind nie selbst das Ziel."""
+    from genus import thermometer
+
+    conn = get_conn()
+    try:
+        s = thermometer.stand(conn)
+    finally:
+        conn.close()
+
+    click.echo("[SKILLS] Thermometer — Sensor, kein Ziel.")
+    g = s["generalisierung"]
+    click.echo(f"\nGENERALISIERUNG (die eine Zahl, die wachsen soll):")
+    click.echo(f"  Absichten auf der EINEN Planer-Mechanik: {len(g['absichten_auf_planer'])} "
+               f"({', '.join(g['absichten_auf_planer'])})")
+    anteil = g["verkehr_ueber_planer"]
+    click.echo(f"  Live-Verkehr über den Planer: "
+               f"{('%.0f%%' % (anteil * 100)) if anteil is not None else 'noch kein Verkehr'}")
+    click.echo(f"  Raster: {g['blaetter_handelbar']}/{g['blaetter_gesaet']} Blätter handelbar")
+
+    click.echo("\nPLANER (Zählwerk, live):")
+    if not s["planer"]:
+        click.echo("  noch keine Zählung")
+    for absicht, w in sorted(s["planer"].items()):
+        quote = f"{w['quote']:.0%}" if w.get("quote") is not None else "—"
+        click.echo(f"  {absicht:<12} treffer={w.get('treffer', 0):<5} "
+                   f"rückfall={w.get('rueckfall', 0):<4} anker_frei={w.get('anker_frei', 0):<4} "
+                   f"quote={quote}")
+
+    v = s["verstehen"]
+    click.echo("\nVERSTEHEN (Belegung je Blatt, retraktions-bewusst):")
+    if not v["blaetter"]:
+        click.echo("  noch keine Lesungen")
+    for blatt, w in sorted(v["blaetter"].items(), key=lambda kv: -sum(kv[1]["gelesen"].values())):
+        quellen = ", ".join(f"{q}={n}" for q, n in sorted(w["gelesen"].items()))
+        feh = f"  fehlgriffe={w['fehlgriffe']}" if w["fehlgriffe"] else ""
+        click.echo(f"  {blatt:<18} {quellen}{feh}")
+    if v["unklar"]:
+        click.echo(f"  {'unklar':<18} " + ", ".join(f"{q}={n}" for q, n in sorted(v["unklar"].items()))
+                   + "   <- blinde Flecken, Futter für den Lücken-Detektor")
+    for verw in v["verwechslungen"]:
+        click.echo(f"  Verwechslung: {verw}")
+
+    lk = s["luecken"]
+    click.echo("\nLÜCKEN (ehrlich benannt):")
+    click.echo(f"  Blätter ohne Handler: {', '.join(lk['blaetter_ohne_handler']) or 'keine'}")
+    for f in lk["faehigkeiten_nicht_live"]:
+        click.echo(f"  Fähigkeit {f['id']}: {f['status']}")
+    click.echo(f"  offene Proposals am Gate: {lk['offene_proposals']}")
+
+
 @main.command("ask")
 @click.argument("question", nargs=-1, required=True)
 def ask_command(question: tuple[str, ...]) -> None:
