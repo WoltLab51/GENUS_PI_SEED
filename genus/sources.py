@@ -34,6 +34,17 @@ SOURCE_TRUST_SEED = 0.5
 MODEL_SOURCE_PREFIX = "model:"
 MODEL_TRUST_SEED = SOURCE_TRUST_SEED / 2
 
+# Der SPIEGEL der Modell-Kappe: eine handkuratierte, menschlich-verifizierte Quelle ist der
+# VERTRAUENSWÜRDIGSTE Zeuge (ein Mensch hat sie bewusst gesetzt, sie ist keine Übereinstimmungs-
+# Statistik einer offenen Quelle). Solche Quellen bekommen einen hohen BODEN -- symmetrisch zur
+# tiefen Kappe des Modells; die zwei Pole der Zeugen-Güte: model < unbewiesen < … < geerdet. Ein
+# Boden (max), keine feste Zahl: eine Quelle, die sich MEHR verdient, behält den höheren Wert.
+# „Geerdet" heißt handverlesen + gegen die Quelle geprüft (genus.orte: Q-IDs gegen Wikidata),
+# nicht bloß behauptet. (Bewusst NICHT „ronny": dessen Vertrauen berührt Ziele/Gedächtnis --
+# eine breitere Entscheidung, hier nicht mitgetroffen.)
+GROUNDED_SOURCES = frozenset({"kuratiert"})
+GROUNDED_TRUST = 0.9
+
 # A candidate counts as a *current* claimant only while it is at least this fresh
 # relative to the freshest source -- i.e. within one cadence (one freshness
 # half-life). Beyond that it fades and no longer drives selection or contradiction.
@@ -271,6 +282,8 @@ def source_trust(conn, source: str) -> float:
         trust = _trust(_group_by_claim([dict(row) for row in rows]), source)
     if source.startswith(MODEL_SOURCE_PREFIX):
         return min(trust, MODEL_TRUST_SEED)  # the least-trustworthy witness, capped below seed
+    if source in GROUNDED_SOURCES:
+        return max(trust, GROUNDED_TRUST)    # human-verified: floored high, can still earn more
     return trust
 
 

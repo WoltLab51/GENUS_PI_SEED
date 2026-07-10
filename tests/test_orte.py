@@ -117,6 +117,15 @@ def test_deuter_ort_guess_wird_graph_verifiziert():
     assert "Sprachmodell gedeutet" in res["text"]
 
 
+def test_kuratierte_geo_fakten_sind_hoch_vertraut():
+    # handverlesen + gegen Wikidata geprüft -> geerdeter Boden (nicht der 0.5-Seed einer
+    # unbewiesenen Quelle); schlägt sich im Vertrauen der Antwort nieder
+    from genus import companion, sources
+    conn = _geseedet()
+    assert sources.source_trust(conn, "kuratiert") >= 0.9
+    assert companion.ort(conn, "Ist Kassel in Hessen?")["trust"] >= 0.9
+
+
 def test_narrate_ort_richtung_kann_nicht_kippen():
     from genus import companion
     conn = _geseedet()
