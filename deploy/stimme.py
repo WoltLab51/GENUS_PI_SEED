@@ -125,8 +125,17 @@ def formuliere(satz: str, model=None, anweisung: str | None = None,
         "aendern oder zu ergaenzen: " + anweisung
     )
     if kern:
-        system += (" Dieser Kern-Satz MUSS WORTWOERTLICH und voellig unveraendert erhalten "
-                   "bleiben (formuliere nur davor und dahinter, nie mittendrin): " + kern)
+        # Ohne diese Fuehrung kollabiert das kleine Modell auf den blossen Kern (und verliert die
+        # Zahl -> Anker verwirft alles); mit „gib den GANZEN Satz zurueck" + einem Beispiel behaelt
+        # es Kern UND Rahmen (live gemessen auf dem Pi: aus 0/4 wurden ~2-3/4 echte Glaettungen).
+        system += (
+            " Gib IMMER den GANZEN Satz zurueck (nie nur einen Teil) und behalte alle Zahlen. "
+            "Der folgende Kern MUSS wortwoertlich und voellig unveraendert enthalten bleiben "
+            "(nur davor und dahinter darfst du umformulieren, nie mittendrin). "
+            "Beispiel: Kern »Katze« zaehlt zu »Tier« | Eingabe: Ja, klar - »Katze« zaehlt zu "
+            "»Tier«. Ziemlich sicher (0.90). | Ausgabe: Ja klar, »Katze« zaehlt zu »Tier« - da "
+            "bin ich mir ziemlich sicher (0.90)! | Der Kern hier: " + kern
+        )
     try:
         result = model.create_chat_completion(
             messages=[
