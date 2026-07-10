@@ -94,8 +94,10 @@ _ERKLAERUNGEN = {
     "vergleich": "was haben X und Y gemeinsam",
     "grammatik": "Artikel/Geschlecht eines Wortes",
     "eigenschaft": "welche Eigenschaft hat X",
-    "ursache": "was verursacht X / wodurch entsteht X / was loest X aus (die Ursachen EINES "
-               "genannten Dings)",
+    "ursache": "was verursacht X / wodurch entsteht X / was loest X aus -- X ist ein "
+               "AUSDRUECKLICH GENANNTES Ding (Kopfschmerz, Rost). Bezieht sich die Frage nur "
+               "auf 'das' / die letzte Antwort (KEIN neu genanntes Ding), ist es "
+               "warum-herkunft, NICHT ursache",
     "menge": "wie viele",
     "zustand": "wie geht es dir / dein Zustand",
     "offene-fragen": "was beschaeftigt dich",
@@ -103,7 +105,9 @@ _ERKLAERUNGEN = {
     "ziele": "was sind deine Ziele / deine Mission / was willst du werden / was fehlt dir",
     "empfehlungsfrage": "was empfiehlst du / was ist besser / deine Meinung dazu",
     "erinnerungs-abruf": "was weisst du ueber mich / hast du dir gemerkt",
-    "warum-herkunft": "warum / woher weisst du das (zur letzten Antwort)",
+    "warum-herkunft": "warum / wieso / woran liegt das / wie kommt das / woher weisst du das "
+                      "-- bezogen auf die letzte Antwort oder ein 'das', OHNE ein neu "
+                      "genanntes Ding (sonst waere es ursache)",
     "vertiefung": "mehr dazu (zur letzten Antwort)",
     "anschlussfrage": "bezieht sich auf die letzte Antwort (z.B. und er?)",
     "weltfrage": "Wetter, Nachrichten, aktuelle Ereignisse -- irgendwas Reales, nicht Gespeichertes",
@@ -218,6 +222,12 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         "Was verursacht Kopfschmerzen? -> "
         "[{\"text\": \"Was verursacht Kopfschmerzen?\", \"absicht\": \"ursache\", "
         "\"subject\": \"Kopfschmerz\", \"object\": null}]\n"
+        "und woran liegt das? -> "
+        "[{\"text\": \"und woran liegt das?\", \"absicht\": \"warum-herkunft\", "
+        "\"subject\": null, \"object\": null}]\n"
+        "wie kommt das eigentlich? -> "
+        "[{\"text\": \"wie kommt das eigentlich?\", \"absicht\": \"warum-herkunft\", "
+        "\"subject\": null, \"object\": null}]\n"
         "Fuehrt Rauchen zu Krebs? -> "
         "[{\"text\": \"Fuehrt Rauchen zu Krebs?\", \"absicht\": \"beziehung\", "
         "\"subject\": \"Rauchen\", \"object\": \"Krebs\"}]\n"
