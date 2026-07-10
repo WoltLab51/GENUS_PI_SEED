@@ -140,7 +140,7 @@ def test_conversational_wuerfel_records_but_the_users_words_never_reach_the_ledg
     reactors.observe_relation(conn, "Q144", "is_a", "Q_m", "wikidata")
     frage = "Ist ein Hund ein Säugetier?"
     result = companion.respond_with_deuter(conn, frage, deuter=lambda q: None)
-    assert result["text"].startswith("Ja.")
+    assert "»Hund« zählt zu »Säugetier«" in result["text"]   # Voice 1: warmer Rahmen, fester Kern
     assert verstehen.belegung(conn, "beziehung")["je_quelle"] == {"muster": 1}
     for row in conn.execute("SELECT payload FROM event_log").fetchall():
         assert frage not in row["payload"]   # Ledger != Memory: Struktur ja, Gesprächstext nie

@@ -313,16 +313,44 @@ def relate(conn, question: str) -> dict:
     return {"relational": False}
 
 
-def narrate_relation(conn, r: dict) -> str:
-    """Fluent, deterministic German for a relational answer -- glass-box: the path is shown."""
+def _sicher(trust: float) -> str:
+    """Ein menschlicher Sicherheits-Ausdruck zur kalibrierten Zahl -- ehrlich GESTUFT, damit
+    „ziemlich sicher" nie über einem schwachen Vertrauen steht (dieselbe gestufte Ehrlichkeit
+    wie überall). Die Zahl selbst bleibt daneben stehen, unangetastet."""
+    if trust >= 0.75:
+        return "Da bin ich mir ziemlich sicher"
+    if trust >= 0.5:
+        return "Da bin ich mir recht sicher"
+    return "Ganz sicher bin ich mir da nicht"
+
+
+def narrate_relation(conn, r: dict, bel: dict | None = None) -> str:
+    """Fluent, deterministic German for a relational answer -- glass-box: the path is shown.
+
+    „Rahmen frei, Kern fest" (Scheibe 1 der Antwort-Seele, Ronny 2026-07-10): mit einer Belegung
+    mit Wärme ≥ „warm" (der Antwort-Würfel steuert -- Persönlichkeit wirkt an der Sprache) wird
+    Voice 1 („warm & direkt") gewählt. Die geschützten KERN-Marken -- die Begriffe in »«, die
+    Vertrauens-Zahl, die Richtung Subjekt→Objekt -- stehen in JEDEM Ton wortgleich und an fester
+    Stelle (deterministisch platziert, die Richtung kann nicht kippen); nur der Rahmen wechselt
+    den Ton. Ohne Belegung (CLI/why) bleibt der nüchterne Wortlaut byte-genau wie zuvor."""
     x, y = r["subject"], r["object"]
+    warm = bool(bel) and bel.get("waerme") in ("warm", "herzlich")
     if r["verdict"] == "yes":
         path = _collapse([x] + [_label(conn, p["object"]) for p in r["chain"]])
+        if warm:
+            s = f"Ja, klar — »{x}« zählt zu »{y}«."
+            if len(path) > 2:
+                s += f" Der Weg dahin: {' → '.join(f'»{p}«' for p in path)}."
+            return (s + f" {_sicher(r['trust'])} ({r['trust']:.2f}), und hergeleitet aus meinem "
+                        f"Wissensnetz — nicht behauptet.")
         s = f"Ja. »{x}« zählt zu »{y}«."
         if len(path) > 2:
             # jedes Zwischenglied in Guillemets -- derselbe Stimme-Anker-Schutz wie in narrate()
             s += f" Der Weg: {' → '.join(f'»{p}«' for p in path)}."
         return s + f" (Vertrauen {r['trust']:.2f} — aus dem Wissensgraphen hergeleitet, nicht behauptet.)"
+    if warm:
+        return (f"Nach allem, was ich weiß: eher nicht — ich finde keine Verbindung von »{x}« zu "
+                f"»{y}«. Das heißt aber nur: unbekannt, nicht widerlegt.")
     return (f"Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von »{x}« zu "
             f"»{y}«. (Das heißt: unbekannt, nicht widerlegt.)")
 
@@ -525,18 +553,34 @@ def relate_kausal(conn, question: str) -> dict:
     return {"kausal_q": False}
 
 
-def narrate_kausal(conn, r: dict) -> str:
-    """Gläserne deutsche Kausal-Antwort — bei „ja" wird der Weg gezeigt, Unbekanntes ehrlich benannt."""
+def narrate_kausal(conn, r: dict, bel: dict | None = None) -> str:
+    """Gläserne deutsche Kausal-Antwort — bei „ja" wird der Weg gezeigt, Unbekanntes ehrlich benannt.
+
+    „Rahmen frei, Kern fest" wie :func:`narrate_relation`: mit warmer Belegung Voice 1, die
+    Kern-Marken (Begriffe in »«, Richtung) wortgleich; ohne Belegung byte-genau der alte Wortlaut."""
+    warm = bool(bel) and bel.get("waerme") in ("warm", "herzlich")
     if r["art"] == "ursachen":
         if r["ursachen"]:
+            if warm:
+                liste = _join_de([f"»{u}«" for u in r["ursachen"]])
+                return f"Klar, dazu kenne ich etwas: als Ursache von »{r['subjekt']}« kenne ich {liste}."
             liste = ", ".join(f"»{u}«" for u in r["ursachen"])
             return f"Als Ursache von »{r['subjekt']}« kenne ich: {liste}."
+        if warm:
+            return (f"Hm, eine Ursache von »{r['subjekt']}« kenne ich gerade nicht — das heißt nicht, "
+                    f"dass es keine gibt, nur dass mein Wissensnetz keine nennt.")
         return (f"Eine Ursache von »{r['subjekt']}« kenne ich nicht — das heißt nicht, dass es "
                 f"keine gibt, nur dass mein Graph keine nennt.")
     if r["art"] == "ja":
         pfad = r["pfad"]
         if len(pfad) <= 2:
-            return f"Ja. »{r['subjekt']}« verursacht »{r['objekt']}«."
-        return "Ja, über eine Kausalkette: " + " → ".join(f"»{p}«" for p in pfad) + "."
+            return (f"Ja — »{r['subjekt']}« verursacht »{r['objekt']}«." if warm
+                    else f"Ja. »{r['subjekt']}« verursacht »{r['objekt']}«.")
+        kette = " → ".join(f"»{p}«" for p in pfad)
+        return (f"Ja, und zwar über eine Kausalkette: {kette}." if warm
+                else f"Ja, über eine Kausalkette: {kette}.")
+    if warm:
+        return (f"Einen Zusammenhang von »{r['subjekt']}« zu »{r['objekt']}« kenne ich gerade nicht "
+                f"— das heißt nicht, dass es keinen gibt.")
     return (f"Einen Kausal-Zusammenhang von »{r['subjekt']}« zu »{r['objekt']}« kenne ich nicht "
             f"— das heißt nicht, dass es keinen gibt.")

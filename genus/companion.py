@@ -356,17 +356,21 @@ def _ritual_antwort(conn, question: str) -> str | None:
     return None
 
 
-def _muster_antwort(conn, question: str) -> tuple[str, str] | None:
+def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, str] | None:
     """The fixed-pattern cells (relation/kausal/comparative/gender/derivative) -- self-verifying: a
     pattern only claims the question when its terms actually resolve (in the graph, or -- for
     the derivative cell -- as a valid computable term). Returns ``(text, zelle)`` so a caller
-    can record WHICH cell answered; ``None`` otherwise."""
+    can record WHICH cell answered; ``None`` otherwise.
+
+    ``bel`` (Antwort-Würfel-Belegung, optional): reicht die Wärme an die relationalen/kausalen
+    Narrationen durch (Voice 1, Scheibe 1). Ohne Belegung -- der CLI-nahe :func:`respond` --
+    bleibt der nüchterne Wortlaut; die Gesprächs-Einstiege reichen sie durch."""
     rel = relate(conn, question)
     if rel.get("relational"):
-        return narrate_relation(conn, rel), "beziehung"
+        return narrate_relation(conn, rel, bel), "beziehung"
     kau = relate_kausal(conn, question)
     if kau.get("kausal_q"):
-        return narrate_kausal(conn, kau), "beziehung"
+        return narrate_kausal(conn, kau, bel), "beziehung"
     com = common(conn, question)
     if com.get("common"):
         return narrate_common(conn, com), "vergleich"
@@ -410,17 +414,21 @@ def _wort_antwort(conn, question: str) -> str | None:
     return text
 
 
-def respond(conn, question: str) -> str:
+def respond(conn, question: str, bel: dict | None = None) -> str:
     """The full conversational answer to ``question``: remember -> recall -> state ->
     relational -> comparative -> gender -> word -> help, in that order (the personal-memory
     checks run first so they can never be shadowed by a fixed pattern or a known word; the rest
     matches ``cli.ask_command``). Plain text, no CLI tags. Pure deterministic half -- no model,
     and (except the explicit "merke dir") no writes: the Würfel's reading-records happen only
-    in ``respond_with_deuter``, the conversational channel."""
+    in ``respond_with_deuter``, the conversational channel.
+
+    ``bel`` (optional): die Antwort-Würfel-Belegung für die warme Stimme (Voice 1) der
+    relationalen/kausalen Antworten. Der reine CLI-Weg (``genus ask``) ruft ``narrate_*``
+    direkt und bleibt nüchtern; die Gesprächs-Einstiege reichen die Belegung durch."""
     text = _ritual_antwort(conn, question)
     if text is not None:
         return text
-    muster = _muster_antwort(conn, question)
+    muster = _muster_antwort(conn, question, bel)
     if muster is not None:
         return muster[0]
     text = _wort_antwort(conn, question)
@@ -635,7 +643,9 @@ def respond_in_conversation(conn, question: str, last_question: str | None = Non
     if last_question and is_why_followup(question):
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
         return {"text": text, "question": last_question}  # still "about" the same thing
-    return {"text": respond(conn, question), "question": question}
+    from genus import antwort as _antwort
+    return {"text": respond(conn, question, _antwort.belegung(conn, "plausch")),
+            "question": question}
 
 
 # --- der VERSTEHENS-WÜRFEL: erst einordnen, dann lösen -- als echte Zwicky-Box -----------
@@ -732,10 +742,11 @@ def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=N
     if not _anker_ok(question, guess["subject"], guess["object"]):
         from genus import zaehlwerk
         zaehlwerk.zaehle("beziehung", "anker_frei")   # gedeutet statt zitiert -- messen, nicht blocken
-    from genus import werkzeuge_auskunft
+    from genus import antwort as _antwort, werkzeuge_auskunft
+    bel = _antwort.belegung(conn, "plausch")   # Voice 1 (Scheibe 1) -- Wärme aus dem Antwort-Würfel
     r = werkzeuge_auskunft.relate_geplant(conn, guess["subject"], guess["object"])
     if r["relational"] and r["verdict"] == "yes":
-        return narrate_relation(conn, r)      # eine echte is_a-Einordnung -- die stärkste Antwort
+        return narrate_relation(conn, r, bel)   # eine echte is_a-Einordnung -- die stärkste Antwort
     # keine POSITIVE is_a-Beziehung? -> dieselbe Zelle trägt auch die GERICHTETE Kausal-Beziehung
     # („Verursacht X Y?", „Führt X zu Y?" -- Formulierungen, die die festen Muster von
     # _muster_antwort verfehlen, der Deuter aber als beziehung liest). Wichtig: „beide bekannt,
@@ -744,8 +755,8 @@ def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=N
     # ehrliche is_a-Zurückhaltung. Die Kausal-Antwort ist selbst wortlautfest (Richtung = Wahrheit).
     k = _kausal_zwischen(conn, guess["subject"], guess["object"])
     if k["kausal_q"] and k["art"] == "ja":
-        return narrate_kausal(conn, k)
-    return narrate_relation(conn, r) if r["relational"] else None
+        return narrate_kausal(conn, k, bel)
+    return narrate_relation(conn, r, bel) if r["relational"] else None
 
 
 def _zelle_ursache(conn, guess, question, last_question, last_answer, stimme=None):
@@ -760,9 +771,10 @@ def _zelle_ursache(conn, guess, question, last_question, last_answer, stimme=Non
     if not _anker_ok(question, subject):
         from genus import zaehlwerk
         zaehlwerk.zaehle("ursache", "anker_frei")
-    from genus import werkzeuge_auskunft
+    from genus import antwort as _antwort, werkzeuge_auskunft
     r = werkzeuge_auskunft.ursachen_geplant(conn, subject)
-    return narrate_kausal(conn, r) if r["kausal_q"] else None
+    bel = _antwort.belegung(conn, "plausch")   # Voice 1 (Scheibe 1)
+    return narrate_kausal(conn, r, bel) if r["kausal_q"] else None
 
 
 def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1458,7 +1470,8 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     text = _ritual_antwort(conn, question)
     if text is not None:
         return {"text": text, "question": question}
-    muster = _muster_antwort(conn, question)
+    from genus import antwort as _antwort
+    muster = _muster_antwort(conn, question, _antwort.belegung(conn, "plausch"))
     if muster is not None:
         if deuter is not None:   # recording/notes only on the conversational (bot) path, not
             # for the CLI -- Stimme itself stays independent of deuter (always offered when given)

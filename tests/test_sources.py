@@ -833,6 +833,75 @@ def test_kausal_ohne_bekannte_ursache_antwortet_ehrlich():
     assert "kenne ich nicht" in companion.narrate_kausal(conn, r)
 
 
+# --- Voice 1 („warm & direkt"): „Rahmen frei, Kern fest" (Antwort-Seele, Scheibe 1) --------
+#
+# Der warme Ton wird über eine Belegung mit Wärme ≥ „warm" gewählt (der Antwort-Würfel steuert).
+# Der Fakt-Kern -- die Begriffe in »«, die Vertrauens-Zahl, die Richtung Subjekt→Objekt -- steht
+# in beiden Tönen wortgleich und deterministisch platziert; ohne Belegung bleibt der nüchterne
+# Wortlaut byte-genau wie zuvor (CLI/why).
+
+_WARM = {"waerme": "warm"}
+
+
+def test_narrate_relation_ohne_belegung_bleibt_byte_genau_wie_zuvor():
+    from genus import companion
+    conn = _isa_graph()
+    r = companion.relate(conn, "Ist ein Hund ein Haustier?")
+    assert companion.narrate_relation(conn, r) == (
+        "Ja. »Hund« zählt zu »Haustier«. "
+        "(Vertrauen 0.50 — aus dem Wissensgraphen hergeleitet, nicht behauptet.)")
+
+
+def test_narrate_relation_warm_ist_voice_eins_mit_festem_kern():
+    from genus import companion
+    conn = _isa_graph()
+    r = companion.relate(conn, "Ist ein Hund ein Haustier?")
+    warm = companion.narrate_relation(conn, r, _WARM)
+    assert warm.startswith("Ja, klar —")                 # der warme Rahmen
+    assert "»Hund« zählt zu »Haustier«" in warm          # der Kern
+    assert "0.50" in warm                                # die Vertrauens-Zahl überlebt wortgleich
+    assert "Wissensnetz" in warm and "nicht behauptet" in warm
+
+
+def test_narrate_relation_warm_richtung_kann_nicht_kippen():
+    # „Kern fest": das Subjekt steht IMMER vor dem Objekt -- deterministisch platziert, keine Umkehr
+    from genus import companion
+    conn = _isa_graph()
+    r = companion.relate(conn, "Ist ein Hund ein Haustier?")
+    warm = companion.narrate_relation(conn, r, _WARM)
+    assert warm.index("»Hund«") < warm.index("»Haustier«")
+
+
+def test_narrate_relation_warm_niedriges_vertrauen_bleibt_ehrlich():
+    # gestufte Ehrlichkeit: „ziemlich sicher" steht nie über einem schwachen Vertrauen
+    from genus import companion
+    conn = _isa_graph()
+    r = companion.relate(conn, "Ist ein Hund ein Haustier?")
+    r["trust"] = 0.30
+    warm = companion.narrate_relation(conn, r, _WARM)
+    assert "Ganz sicher bin ich mir da nicht" in warm and "0.30" in warm
+
+
+def test_narrate_kausal_warm_und_plain_teilen_den_kern():
+    from genus import companion
+    conn = _kausal_graph()
+    r = companion.relate_kausal(conn, "Was verursacht Fieber?")
+    assert companion.narrate_kausal(conn, r) == "Als Ursache von »Fieber« kenne ich: »Grippe«."
+    warm = companion.narrate_kausal(conn, r, _WARM)
+    assert warm.startswith("Klar, dazu kenne ich etwas")
+    assert "»Fieber«" in warm and "»Grippe«" in warm
+
+
+def test_konversation_waermt_beziehung_der_reine_respond_bleibt_nuechtern():
+    # der Gesprächs-Einstieg (respond_with_deuter) trägt Voice 1; der CLI-nahe respond() bleibt plain
+    from genus import companion
+    conn = _isa_graph()
+    warm = companion.respond_with_deuter(conn, "Ist ein Hund ein Haustier?")["text"]
+    plain = companion.respond(conn, "Ist ein Hund ein Haustier?")
+    assert warm.startswith("Ja, klar —") and plain.startswith("Ja. »Hund«")
+    assert "»Hund« zählt zu »Haustier«" in warm and "»Hund« zählt zu »Haustier«" in plain
+
+
 def test_beziehung_ist_wortlautfest_die_stimme_dreht_nicht_um():
     # gerichtete Relations-/Kausal-Aussagen („A verursacht B") dürfen NICHT vom Modell umformuliert
     # werden -- die Substantiv-Leine prüft Vorkommen, nicht Richtung (live-Fund: Stimme kehrte um)
@@ -1119,7 +1188,8 @@ def test_conversation_retraces_the_previous_relational_answer():
     from genus import companion
     conn = _isa_graph()
     first = companion.respond_in_conversation(conn, "Ist ein Hund ein Säugetier?")
-    assert "Ja." in first["text"] and first["question"] == "Ist ein Hund ein Säugetier?"
+    # Voice 1 (Scheibe 1): der Rahmen ist warm, der Fakt-Kern steht wortgleich
+    assert "»Hund« zählt zu »Säugetier«" in first["text"] and first["question"] == "Ist ein Hund ein Säugetier?"
 
     followup = companion.respond_in_conversation(conn, "warum?", last_question=first["question"])
     assert "Herleitung" in followup["text"] and "Vertrauen" in followup["text"]
@@ -1245,7 +1315,7 @@ def test_stimme_laesst_gerichtete_relation_wortlautfest():
     result = companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", stimme=stimme)
     assert "»Säugetier« gehört laut GENUS zu »Hund«" not in result["text"]   # die Umkehrung greift NIE
     assert "geglättet" not in result["text"]                                # wortlautfest -> keine Stimme
-    assert result["text"].startswith("Ja.")                                 # das gläserne Template steht
+    assert "»Hund« zählt zu »Säugetier«" in result["text"]                   # der Fakt-Kern (Richtung!) steht
 
 
 def test_stimme_none_or_failed_rephrase_keeps_the_original_template():
@@ -1933,7 +2003,7 @@ def test_deuter_relation_guess_with_both_terms_resolves_via_the_graph():
     conn = _isa_graph()
     deuter = lambda q: {"absicht": "beziehung", "subject": "Hund", "object": "Säugetier"}
     result = companion.respond_with_deuter(conn, "gehoert sowas wie ein wuffwuff eigentlich dahin", deuter=deuter)
-    assert result["text"].startswith("Ja.") and "Säugetier" in result["text"]
+    assert "»Hund« zählt zu »Säugetier«" in result["text"]
     assert "Sprachmodell gedeutet" in result["text"]
 
 
@@ -1949,7 +2019,7 @@ def test_deuter_reading_outranks_the_greedy_word_lookup():
     deuter = lambda q: {"absicht": "beziehung", "subject": "Apfel", "object": "Pflanzen"}
     result = companion.respond_with_deuter(
         conn, "gehört der Apfel nicht irgendwie zu den Pflanzen", deuter=deuter)
-    assert result["text"].startswith("Ja.")            # the relation -- NOT a lecture on "Pflanzen"
+    assert "»Apfel« zählt zu »Pflanzen«" in result["text"]   # the relation -- NOT a lecture on "Pflanzen"
     assert "Sprachmodell gedeutet" in result["text"]
 
 
