@@ -108,6 +108,42 @@ def test_deploy_stimme_traegt_die_anweisung_in_den_system_prompt():
                                    anweisung="Ton: herzlich und zugewandt.") is None
 
 
+def _stimme_modul():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy"))
+    import stimme as stimme_modul
+    return stimme_modul
+
+
+def _fake_stimme(rueckgabe):
+    class FakeModel:
+        def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+            return {"choices": [{"message": {"content": rueckgabe}}]}
+    return FakeModel()
+
+
+def test_formuliere_verwirft_eine_richtungsumkehr_und_haelt_gleiche_reihenfolge():
+    # Antwort-Seele Scheibe 2: der reihenfolge-bewusste Anker. Eine Umformulierung, die die
+    # zitierten Begriffe VERTAUSCHT (Richtung gekippt), wird verworfen (None -> Aufrufer nimmt
+    # den Voice-1-Satz); eine, die die Reihenfolge WAHRT, darf durch.
+    sm = _stimme_modul()
+    satz = "Ja, klar — »Hund« zählt zu »Haustier«. Da bin ich mir ziemlich sicher (0.85)."
+    # Umkehr: »Haustier« steht jetzt vor »Hund« -- alle Anker VORHANDEN, aber Reihenfolge gebrochen
+    umkehr = "»Haustier« umfasst »Hund«, da bin ich ziemlich sicher (0.85)."
+    assert sm.formuliere(satz, model=_fake_stimme(umkehr)) is None
+    # gleiche Reihenfolge, natürlicher formuliert -> akzeptiert
+    natuerlich = "Ja klar, ein »Hund« ist ein »Haustier« — da bin ich ziemlich sicher (0.85)."
+    assert sm.formuliere(satz, model=_fake_stimme(natuerlich)) == natuerlich
+
+
+def test_reihenfolge_haelt_ist_die_leine_gegen_umkehr():
+    sm = _stimme_modul()
+    assert sm._reihenfolge_haelt("erst »A« dann »B«", ["A", "B"]) is True
+    assert sm._reihenfolge_haelt("erst »B« dann »A«", ["A", "B"]) is False
+    assert sm._reihenfolge_haelt("nur »A« da", ["A", "B"]) is False   # fehlt ganz
+
+
 def test_stimme_substantiv_leine_faengt_den_hausvoegel_fund():
     # live gefunden beim ERSTEN Anweisungs-Test auf dem Pi: das 1.5B machte unter
     # "Ton: freundlich und warm." aus "Haustier" ein "Hausvögel" -- die Anker-Prüfung

@@ -902,12 +902,15 @@ def test_konversation_waermt_beziehung_der_reine_respond_bleibt_nuechtern():
     assert "»Hund« zählt zu »Haustier«" in warm and "»Hund« zählt zu »Haustier«" in plain
 
 
-def test_beziehung_ist_wortlautfest_die_stimme_dreht_nicht_um():
-    # gerichtete Relations-/Kausal-Aussagen („A verursacht B") dürfen NICHT vom Modell umformuliert
-    # werden -- die Substantiv-Leine prüft Vorkommen, nicht Richtung (live-Fund: Stimme kehrte um)
+def test_beziehung_und_ursache_sind_jetzt_stimme_geeignet_ordnungsanker_schuetzt():
+    # Antwort-Seele Scheibe 2: die gerichteten Relationen (beziehung/ursache) DÜRFEN jetzt der
+    # Stimme angeboten werden -- die Richtungs-Sicherheit liegt nicht mehr im Aussperren
+    # (wortlautfest), sondern im reihenfolge-bewussten Anker (deploy.stimme._reihenfolge_haelt,
+    # eigener Test). vergleich war schon frei (nicht gerichtet).
     from genus import companion, werkzeug
     companion.registriere_zellen()
-    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung") is False
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung") is True
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}ursache") is True
 
 
 def test_muster_antwort_routet_die_kausal_frage():
@@ -968,12 +971,14 @@ def test_zelle_ursache_ohne_bekanntes_subjekt_klettert_ehrlich():
     assert a is None
 
 
-def test_ursache_und_beziehung_sind_wortlautfest():
-    # beide Kausal-Zellen sind gerichtet -> sie dürfen NICHT der Stimme angeboten werden
-    from genus import companion, werkzeug
+def test_ursache_und_beziehung_sind_nicht_mehr_wortlautfest():
+    # Antwort-Seele Scheibe 2: die gerichteten Kausal-/Relations-Zellen sind auf Spec-Ebene NICHT
+    # mehr wortlautfest -> sie erreichen die Stimme; die Richtung schützt der Reihenfolge-Anker.
+    from genus import companion
     companion.registriere_zellen()
-    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}ursache") is False
-    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung") is False
+    zellen = companion._handelbare_werkzeuge()
+    assert zellen["beziehung"].wortlautfest is False
+    assert zellen["ursache"].wortlautfest is False
 
 
 def test_ask_cli_routes_relational_question(monkeypatch):
@@ -1319,16 +1324,22 @@ def test_stimme_rephrases_a_deterministic_word_answer():
     assert "Sprachlich vom Modell geglättet" in result["text"]
 
 
-def test_stimme_laesst_gerichtete_relation_wortlautfest():
-    # eine GERICHTETE Relations-Antwort wird NICHT vom Modell umformuliert (Richtungs-Umkehr-Schutz,
-    # live-Fund 2026-07-06): selbst eine angebotene Stimme greift nicht, das Template steht.
+def test_beziehung_erreicht_die_stimme_umkehr_faellt_auf_voice1_zurueck():
+    # Antwort-Seele Scheibe 2: die gerichtete beziehung erreicht JETZT die Stimme. Verwirft die
+    # (echte) Stimme eine Umformulierung -- so wie ihr Reihenfolge-Anker eine Richtungs-Umkehr
+    # verwirft (eigener Test an deploy.stimme.formuliere) --, steht der deterministische
+    # Voice-1-Satz (Fallback, kein Tag). Eine gültige, gleich-gerichtete Glättung greift.
     from genus import companion
     conn = _isa_graph()
-    stimme = lambda satz: "»Säugetier« gehört laut GENUS zu »Hund«."   # das Modell KÖNNTE umkehren
-    result = companion.respond_with_deuter(conn, "Ist ein Hund ein Säugetier?", stimme=stimme)
-    assert "»Säugetier« gehört laut GENUS zu »Hund«" not in result["text"]   # die Umkehrung greift NIE
-    assert "geglättet" not in result["text"]                                # wortlautfest -> keine Stimme
-    assert "»Hund« zählt zu »Säugetier«" in result["text"]                   # der Fakt-Kern (Richtung!) steht
+    verworfen = companion.respond_with_deuter(
+        conn, "Ist ein Hund ein Säugetier?", stimme=lambda satz, **k: None)
+    assert "»Hund« zählt zu »Säugetier«" in verworfen["text"]   # der Fakt-Kern (Richtung!) steht
+    assert "geglättet" not in verworfen["text"]                 # verworfen -> kein Tag
+    geglaettet = companion.respond_with_deuter(
+        conn, "Ist ein Hund ein Säugetier?",
+        stimme=lambda satz, **k: satz.replace("Ja, klar —", "Ja klar,"))   # Reihenfolge gewahrt
+    assert "»Hund« zählt zu »Säugetier«" in geglaettet["text"]   # Kern bleibt
+    assert "geglättet" in geglaettet["text"]                     # die Stimme erreichte die beziehung
 
 
 def test_stimme_none_or_failed_rephrase_keeps_the_original_template():

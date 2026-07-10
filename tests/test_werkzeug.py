@@ -186,11 +186,12 @@ def test_stimme_eignung_folgt_strukturell_aus_der_spec():
     companion.registriere_zellen()
     frei = {name for name, w in companion._handelbare_werkzeuge().items()
             if not w.wortlautfest}
-    # „beziehung" ist bewusst NICHT dabei: gerichtete Relations-/Kausal-Aussagen sind wortlautfest
-    # (die Stimme dürfte sonst die Richtung umkehren — live-Fund 2026-07-06)
-    assert frei == {"definition", "vergleich", "grammatik", "frage-begriff"}
+    # beziehung/ursache SIND jetzt dabei (Antwort-Seele Scheibe 2): gerichtete Relationen dürfen
+    # der Stimme angeboten werden, seit der Anker reihenfolge-bewusst ist (die Richtung kann nicht
+    # mehr kippen — deploy.stimme._reihenfolge_haelt)
+    assert frei == {"definition", "beziehung", "ursache", "vergleich", "grammatik", "frage-begriff"}
     assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}definition")
-    assert not werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung")
+    assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung")
     assert not werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}wiederholen")
     assert not hasattr(companion, "_STIMME_GEEIGNET")
 

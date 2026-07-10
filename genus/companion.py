@@ -1044,12 +1044,15 @@ ZELLE_PREFIX = "zelle:"
 # Menge _STIMME_GEEIGNET ist damit weg; die Eignung folgt strukturell aus der Spec,
 # genau die Bug-Klasse, für die werkzeug.wortlautfest gebaut wurde).
 _ZELLEN_SCHREIBEND = frozenset({"tatsache", "merken", "einstellung"})
-# „beziehung" ist NICHT frei formulierbar: eine Relations-Aussage ist GERICHTET („A verursacht B",
-# „A zählt zu B") -- die Stimme kann die Richtung umkehren, und die Substantiv-Leine prüft nur
-# Vorkommen, nicht Reihenfolge (live gefunden 2026-07-06: „Staubsauger verursacht Sog" wurde zu
-# „Sog verursacht Staubsauger"). Bei gerichteten Fakten IST die Struktur die Wahrheit -> wortlautfest.
+# beziehung/ursache DÜRFEN jetzt der Stimme angeboten werden (Antwort-Seele Scheibe 2). Sie sind
+# GERICHTET („A zählt zu B", „A verursacht B"), und genau das war der Grund, sie bisher wortlautfest
+# zu halten: die Substantiv-Leine prüfte nur Vorkommen, nicht Reihenfolge (live 2026-07-06:
+# „Staubsauger verursacht Sog" -> „Sog verursacht Staubsauger"). Seit die Anker-Prüfung
+# REIHENFOLGE-bewusst ist (deploy.stimme._reihenfolge_haelt) wird eine Umkehr erkannt und
+# verworfen -> Rückfall auf den deterministischen Voice-1-Satz. Der Grund ist damit weg; der
+# Kern (Begriffe, Richtung, Zahl) bleibt fest, die Stimme rahmt nur wärmer.
 _ZELLEN_FREI_FORMULIERBAR = frozenset({
-    "definition", "vergleich", "grammatik", "frage-begriff",
+    "definition", "beziehung", "ursache", "vergleich", "grammatik", "frage-begriff",
 })
 _ZELLEN_PRUEFBAR = {
     "definition": "graph", "beziehung": "graph", "ursache": "graph", "vergleich": "graph",

@@ -52,6 +52,23 @@ def _anchors(satz: str) -> list[str]:
     return _QUOTED.findall(satz) + _NUMBER.findall(satz)
 
 
+def _reihenfolge_haelt(text: str, quoted: list[str]) -> bool:
+    """Die zitierten Begriffe müssen im umformulierten Satz in DERSELBEN Reihenfolge auftauchen
+    wie im Original -- die Leine gegen Richtungs-Umkehr (Antwort-Seele Scheibe 2). Die reine
+    Vorkommens-Prüfung (:func:`_anchors`) sah nur, DASS »Hund« und »Haustier« beide da sind,
+    nicht in welcher Reihenfolge -- genau diese Lücke (live-Fund 2026-07-06: „Staubsauger
+    verursacht Sog" wurde zu „Sog verursacht Staubsauger") entzog gerichtete Relationen bisher
+    der Stimme ganz. Mit dieser Prüfung kann die Stimme sie umformulieren, und eine Umkehr wird
+    erkannt und verworfen (der Aufrufer fällt auf den deterministischen Voice-1-Satz zurück)."""
+    pos = -1
+    for q in quoted:
+        i = text.find(q, pos + 1)
+        if i < 0:
+            return False   # ein Begriff fehlt oder steht vor seinem Vorgänger -> Reihenfolge gebrochen
+        pos = i
+    return True
+
+
 def _inhaltsworte(satz: str) -> list[str]:
     """Die zweite, härtere Leine — live gefunden (2026-07-04, beim ersten Anweisungs-Test):
     unter einer Stil-Anweisung machte das 1.5B aus „Haustier" ein „Hausvögel", und die
@@ -116,6 +133,8 @@ def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | Non
         return None   # a fact/number went missing or was changed -- fail safe to the original
     if any(wort not in text for wort in _inhaltsworte(satz)):
         return None   # ein tragendes Substantiv wurde wegformuliert/korrumpiert (Hausvögel-Fund)
+    if not _reihenfolge_haelt(text, _QUOTED.findall(satz)):
+        return None   # die zitierten Begriffe stehen in anderer Reihenfolge -> Richtung evtl. gekippt
     if text == satz:
         return None   # wortidentisch ist keine Glättung -- ehrlich kein Gewinn, kein Tag
     return text
