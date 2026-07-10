@@ -10,6 +10,19 @@ ANCHOR_DIR="${GENUS_ANCHOR_DIR:-$HOME/.genus/anchors}"
 SKIP_TESTS="${GENUS_DEPLOY_SKIP_TESTS:-0}"
 SKIP_ANCHOR="${GENUS_DEPLOY_SKIP_ANCHOR:-0}"
 
+# GENUS_CORE_ID robust selbst beschaffen (Betriebsdrift-Fix): eine nicht-interaktive SSH-Shell
+# erbt die Cron-Env NICHT, also ist GENUS_CORE_ID bei `ssh pi bash deploy/pi_deploy.sh` leer --
+# der Anker-Export wurde dann still übersprungen und musste von Hand nachgeholt werden. Der
+# Cron-Installer persistiert die Core-ID sticky in ~/.genus/core_id (EINE Quelle der Wahrheit);
+# wir lesen sie hier, wenn die Env sie nicht liefert, VOR dem Anker-Zweig. Fehlt die Datei
+# ECHT, bleibt der ehrliche "skip"-Fallback weiter unten bestehen.
+CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"
+if [ -z "${GENUS_CORE_ID:-}" ] && [ -f "$CORE_ID_FILE" ]; then
+    GENUS_CORE_ID="$(cat "$CORE_ID_FILE")"
+    export GENUS_CORE_ID
+    echo "[DEPLOY] core-id: read GENUS_CORE_ID from $CORE_ID_FILE"
+fi
+
 cd "$REPO_DIR"
 
 echo "[DEPLOY] repo=$REPO_DIR branch=$BRANCH"

@@ -487,6 +487,26 @@ def test_pi_deploy_rebuilds_projection_before_integrity():
     assert script.index("genus replay || true") < script.index("genus integrity check")
 
 
+def test_pi_deploy_reads_core_id_from_the_sticky_marker_before_the_anchor_branch():
+    # Betriebsdrift-Fix (Ronny 2026-07-10): eine nicht-interaktive SSH-Shell erbt die Cron-Env
+    # NICHT, also ist GENUS_CORE_ID bei `ssh pi bash deploy/pi_deploy.sh` leer -> der Anker-Export
+    # (Manipulations-Nachweis) wurde still übersprungen und musste von Hand nachgeholt werden.
+    deploy = (ROOT / "deploy" / "pi_deploy.sh").read_text(encoding="utf-8")
+    cron = (ROOT / "deploy" / "pi_install_cron.sh").read_text(encoding="utf-8")
+
+    # EINE Quelle der Wahrheit: dieselbe Marker-Datei, die der Cron-Installer sticky schreibt
+    assert "core_id" in deploy and "CORE_ID_FILE" in deploy
+    assert "core_id" in cron and "CORE_ID_FILE" in cron
+    # das Deploy liest nur, wenn die Env sie nicht liefert -- die Env behält Vorrang
+    assert 'if [ -z "${GENUS_CORE_ID:-}" ] && [ -f "$CORE_ID_FILE" ]; then' in deploy
+    # ... und der beschaffte Wert wird exportiert, damit `genus ledger anchor create` ihn sieht
+    assert "export GENUS_CORE_ID" in deploy
+    # die Beschaffung muss VOR dem Anker-Zweig stehen, sonst greift der Skip trotzdem
+    assert deploy.index("CORE_ID_FILE") < deploy.index("exporting offline anchor")
+    # der ehrliche Fallback bleibt: fehlt die Core-ID ECHT, wird der Anker übersprungen (kein Raten)
+    assert "skipping anchor export" in deploy
+
+
 def test_network_watchdog_records_operation_events_and_governed_recovery():
     watchdog = (ROOT / "deploy" / "pi_network_watchdog.sh").read_text(
         encoding="utf-8"
