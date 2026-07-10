@@ -67,7 +67,9 @@ from genus.auskunft import (
     narrate_common,
     narrate_gender,
     narrate_kausal,
+    narrate_ort,
     narrate_relation,
+    ort,
     relate,
     relate_kausal,
     vertiefung,
@@ -374,6 +376,9 @@ def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, 
     com = common(conn, question)
     if com.get("common"):
         return narrate_common(conn, com, bel), "vergleich"
+    ort_r = ort(conn, question)
+    if ort_r.get("relational"):
+        return narrate_ort(conn, ort_r, bel), "ort"
     gen = gender_question(conn, question)
     if gen.get("gender_q"):
         return narrate_gender(gen), "grammatik"
@@ -789,6 +794,20 @@ def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=N
     return narrate_common(conn, r, bel) if r["common"] else None
 
 
+def _zelle_ort(conn, guess, question, last_question, last_answer, stimme=None):
+    # „Ist X in Y?" -- dieselbe Mechanik wie beziehung, nur located_in. Gerichtet (X liegt in Y,
+    # nicht umgekehrt), darum Verbatim-Insel (Scheibe 2). Der Anker bleibt Sensor, nicht Tor.
+    if not (guess.get("subject") and guess.get("object")):
+        return None
+    if not _anker_ok(question, guess["subject"], guess["object"]):
+        from genus import zaehlwerk
+        zaehlwerk.zaehle("ort", "anker_frei")
+    from genus import antwort as _antwort, werkzeuge_auskunft
+    r = werkzeuge_auskunft.ort_geplant(conn, guess["subject"], guess["object"])
+    bel = _antwort.belegung(conn, "plausch")   # Voice 1
+    return narrate_ort(conn, r, bel) if r["relational"] else None
+
+
 def _zelle_grammatik(conn, guess, question, last_question, last_answer, stimme=None):
     if not guess.get("subject"):
         return None
@@ -1013,6 +1032,7 @@ _HANDELBAR = {
     "beziehung": _zelle_beziehung,
     "ursache": _zelle_ursache,
     "vergleich": _zelle_vergleich,
+    "ort": _zelle_ort,
     "grammatik": _zelle_grammatik,
     "warum-herkunft": _zelle_nachfrage,
     "vertiefung": _zelle_nachfrage,
@@ -1052,11 +1072,11 @@ _ZELLEN_SCHREIBEND = frozenset({"tatsache", "merken", "einstellung"})
 # verworfen -> Rückfall auf den deterministischen Voice-1-Satz. Der Grund ist damit weg; der
 # Kern (Begriffe, Richtung, Zahl) bleibt fest, die Stimme rahmt nur wärmer.
 _ZELLEN_FREI_FORMULIERBAR = frozenset({
-    "definition", "beziehung", "ursache", "vergleich", "grammatik", "frage-begriff",
+    "definition", "beziehung", "ursache", "vergleich", "ort", "grammatik", "frage-begriff",
 })
 _ZELLEN_PRUEFBAR = {
     "definition": "graph", "beziehung": "graph", "ursache": "graph", "vergleich": "graph",
-    "grammatik": "graph", "frage-begriff": "graph", "zustand": "graph",
+    "ort": "graph", "grammatik": "graph", "frage-begriff": "graph", "zustand": "graph",
     "offene-fragen": "graph", "ziele": "graph",
     "warum-herkunft": "sitzung", "vertiefung": "sitzung", "anschlussfrage": "sitzung",
     "kuerzer": "sitzung", "ausfuehrlicher": "sitzung", "anders-erklaeren": "sitzung",
@@ -1155,7 +1175,7 @@ _STIMME_TAG = " (Sprachlich vom Modell geglättet — Fakten unverändert.)"
 # Die GERICHTETEN Zellen: bei ihnen trägt die Struktur die Wahrheit (»A« zählt zu »B«, »A«
 # hat als Ursache »B«). Damit die Stimme die Richtung nie umkehren kann, wird ihr gerichteter
 # Kern-Satz als VERBATIM-INSEL geschützt (Antwort-Seele Scheibe 2, „Rahmen frei, Kern fest").
-_GERICHTETE_ZELLEN = frozenset({"beziehung", "ursache"})
+_GERICHTETE_ZELLEN = frozenset({"beziehung", "ursache", "ort"})
 
 
 def _kern_span(text: str) -> str | None:

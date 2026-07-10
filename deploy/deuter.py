@@ -52,6 +52,7 @@ N_THREADS = int(os.environ.get("GENUS_DEUTER_THREADS", "4"))
 # die Struktur mit, nicht nur eine flache Liste.
 DEFAULT_ABSICHTEN = (
     "definition", "beziehung", "vergleich", "grammatik", "eigenschaft", "ursache", "menge",
+    "ort",
     "zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage", "ziele",
     "erinnerungs-abruf",
     "warum-herkunft", "vertiefung", "anschlussfrage",
@@ -70,7 +71,7 @@ DEFAULT_ABSICHTEN = (
 # Wahrheit für den Dispatch; das hier ist reine Prompt-Lesbarkeit).
 _GRUPPEN = (
     ("FRAGEN über einen Begriff/ein Wort", ("definition", "beziehung", "vergleich", "grammatik",
-                                             "eigenschaft", "ursache", "menge")),
+                                             "eigenschaft", "ursache", "menge", "ort")),
     ("FRAGEN über GENUS selbst", ("zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage",
                                    "ziele")),
     ("FRAGEN über dich (den Menschen)", ("erinnerungs-abruf",)),
@@ -99,6 +100,7 @@ _ERKLAERUNGEN = {
                "auf 'das' / die letzte Antwort (KEIN neu genanntes Ding), ist es "
                "warum-herkunft, NICHT ursache",
     "menge": "wie viele",
+    "ort": "liegt/ist X in Y -- geografische Lage (Stadt in Bundesland/Land), zwei genannte Orte",
     "zustand": "wie geht es dir / dein Zustand",
     "offene-fragen": "was beschaeftigt dich",
     "faehigkeiten": "was kannst du",
@@ -231,6 +233,9 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         "Fuehrt Rauchen zu Krebs? -> "
         "[{\"text\": \"Fuehrt Rauchen zu Krebs?\", \"absicht\": \"beziehung\", "
         "\"subject\": \"Rauchen\", \"object\": \"Krebs\"}]\n"
+        "Ist Kassel in Hessen? -> "
+        "[{\"text\": \"Ist Kassel in Hessen?\", \"absicht\": \"ort\", "
+        "\"subject\": \"Kassel\", \"object\": \"Hessen\"}]\n"
         "Wie wird das Wetter morgen? -> "
         "[{\"text\": \"Wie wird das Wetter morgen?\", \"absicht\": \"weltfrage\", "
         "\"subject\": null, \"object\": null}]\n"

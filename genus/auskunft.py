@@ -313,6 +313,61 @@ def relate(conn, question: str) -> dict:
     return {"relational": False}
 
 
+# --- die Ortsfrage („Ist Kassel in Hessen?") -- beziehung mit located_in ------------------
+#
+# Eigenes Term-Muster: Ortsnamen tragen Bindestriche (Baden-Württemberg, Rheinland-Pfalz), die
+# das strikte _TERM (nur Einzelwort) verfehlt. Mehrwort-Namen (Frankfurt am Main) laufen über
+# die Kurzform-Aliase des Seeds. „in" statt eines Artikels trennt Ort von beziehung (die
+# is_a-Muster verlangen einen Artikel und greifen deshalb bei „X in Y" nicht).
+_ORT_TERM = r"([A-Za-zäöüÄÖÜß]+(?:-[A-Za-zäöüÄÖÜß]+)*)"
+_ORT_PATTERNS = [
+    re.compile(r"\b(?:ist|liegt)\s+" + _FILL + _ART + r"?\s*" + _ORT_TERM
+               + r"\s+" + _FILL + r"in\s+" + _ART + r"?\s*" + _ORT_TERM, re.I),
+    re.compile(r"\bbefindet\s+sich\s+" + _FILL + _ART + r"?\s*" + _ORT_TERM
+               + r"\s+" + _FILL + r"in\s+" + _ART + r"?\s*" + _ORT_TERM, re.I),
+]
+
+
+def ort(conn, question: str) -> dict:
+    """Eine Ortsfrage („Ist/Liegt X in Y?") aus dem Graphen -- Planer zuerst (Netz:
+    ``werkzeuge_auskunft._ort_netz``), located_in statt is_a. ``{relational: False}``, wenn
+    keine Ortsfrage erkannt wird (dann versucht der Wort-Pfad weiter)."""
+    from genus import werkzeuge_auskunft
+
+    for pattern in _ORT_PATTERNS:
+        m = pattern.search(question)
+        if not m:
+            continue
+        r = werkzeuge_auskunft.ort_geplant(conn, m.group(1), m.group(2))
+        if r["relational"]:
+            return r
+    return {"relational": False}
+
+
+def narrate_ort(conn, r: dict, bel: dict | None = None) -> str:
+    """Gläserne deutsche Ortsantwort -- wie :func:`narrate_relation`, nur „liegt in" statt
+    „zählt zu". Gerichtet: der Kern »X« liegt in »Y« ist eine Verbatim-Insel (Scheibe 2), die
+    Richtung kann nicht kippen. Ohne Belegung nüchtern, mit warmer Belegung Voice 1."""
+    x, y = r["subject"], r["object"]
+    warm = bool(bel) and bel.get("waerme") in ("warm", "herzlich")
+    if r["verdict"] == "yes":
+        path = _collapse([x] + [_label(conn, p["object"]) for p in r["chain"]])
+        if warm:
+            s = f"Ja, klar — »{x}« liegt in »{y}«."
+            if len(path) > 2:
+                s += f" Der Weg dahin: {' → '.join(f'»{p}«' for p in path)}."
+            return s + f" {_sicher(r['trust'])} ({r['trust']:.2f}), aus dem Wissensgraphen."
+        s = f"Ja. »{x}« liegt in »{y}«."
+        if len(path) > 2:
+            s += f" Der Weg: {' → '.join(f'»{p}«' for p in path)}."
+        return s + f" (Vertrauen {r['trust']:.2f} — aus dem Wissensgraphen, nicht behauptet.)"
+    if warm:
+        return (f"Nach allem, was ich weiß: eher nicht — ich finde keine located_in-Verbindung "
+                f"von »{x}« zu »{y}«. Das heißt aber nur: unbekannt, nicht widerlegt.")
+    return (f"Nach allem, was GENUS weiß, nicht: es findet keine located_in-Verbindung von »{x}« "
+            f"zu »{y}«. (Das heißt: unbekannt, nicht widerlegt.)")
+
+
 def _sicher(trust: float) -> str:
     """Ein menschlicher Sicherheits-Ausdruck zur kalibrierten Zahl -- ehrlich GESTUFT, damit
     „ziemlich sicher" nie über einem schwachen Vertrauen steht (dieselbe gestufte Ehrlichkeit

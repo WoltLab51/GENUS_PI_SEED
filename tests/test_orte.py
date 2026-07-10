@@ -64,3 +64,63 @@ def test_alle_bundeslaender_haengen_am_land():
             continue
         ahnen = {r["object"] for r in sources.relations(conn, subject=qid, predicate=orte.LOCATED_IN)}
         assert orte.DEUTSCHLAND in ahnen, f"{qid} haengt nicht an Deutschland"
+
+
+# --- Scheibe ②: die Absicht „ort" auf dem Primärpfad ---------------------------------------
+
+def test_planer_deduziert_den_ort_plan_und_beziehung_bleibt_intakt():
+    from genus import reactors, werkzeuge_auskunft as wa
+    conn = _geseedet()
+    assert wa.ort_geplant(conn, "Kassel", "Hessen")["verdict"] == "yes"
+    assert wa.ort_geplant(conn, "Kassel", "Deutschland")["verdict"] == "yes"   # transitiv
+    assert wa.ort_geplant(conn, "Hessen", "Kassel")["verdict"] == "no_path"    # Richtung
+    assert wa.ort_geplant(conn, "Kassel", "Bayern")["verdict"] == "no_path"    # falsch
+    # beziehung (is_a) darf durch das zweite located_in-Primitiv NICHT brechen
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Haustier@de", "expresses", "Q_pet", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_pet", "wikidata")
+    assert wa.relate_geplant(conn, "Hund", "Haustier")["verdict"] == "yes"
+
+
+def test_ort_regex_erkennt_und_beantwortet():
+    from genus import companion
+    conn = _geseedet()
+    r = companion.ort(conn, "Ist Kassel in Hessen?")
+    assert r["relational"] and r["verdict"] == "yes"
+    assert companion.ort(conn, "Liegt München in Bayern?")["verdict"] == "yes"
+    # „X in Y" trennt Ort von beziehung: der is_a-Erkenner greift hier NICHT
+    assert companion.relate(conn, "Ist Kassel in Hessen?")["relational"] is False
+
+
+def test_muster_pfad_liefert_die_ort_zelle():
+    from genus import companion
+    conn = _geseedet()
+    text, zelle = companion._muster_antwort(conn, "Ist Kassel in Hessen?")
+    assert zelle == "ort"
+    assert "»Kassel« liegt in »Hessen«" in text
+
+
+def test_gespraech_beantwortet_ort_warm_mit_festem_kern():
+    from genus import companion
+    conn = _geseedet()
+    res = companion.respond_with_deuter(conn, "Ist Kassel in Hessen?")
+    assert "»Kassel« liegt in »Hessen«" in res["text"]   # der gerichtete Fakt-Kern
+    assert res["gelesen"] == ["ort"]
+
+
+def test_deuter_ort_guess_wird_graph_verifiziert():
+    from genus import companion
+    conn = _geseedet()
+    deuter = lambda q: {"absicht": "ort", "subject": "Kassel", "object": "Hessen"}
+    res = companion.respond_with_deuter(conn, "liegt dieses kassel eigentlich in hessen", deuter=deuter)
+    assert "»Kassel« liegt in »Hessen«" in res["text"]
+    assert "Sprachmodell gedeutet" in res["text"]
+
+
+def test_narrate_ort_richtung_kann_nicht_kippen():
+    from genus import companion
+    conn = _geseedet()
+    r = companion.ort(conn, "Ist Kassel in Hessen?")
+    warm = companion.narrate_ort(conn, r, {"waerme": "warm"})
+    assert warm.startswith("Ja, klar —") and "»Kassel« liegt in »Hessen«" in warm
+    assert warm.index("»Kassel«") < warm.index("»Hessen«")   # Kern-Insel, Richtung fest

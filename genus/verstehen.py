@@ -115,7 +115,7 @@ def bezug_node(b: str) -> str:
 RASTER_SEED: tuple[tuple[str, str], ...] = (
     ("definition", "frage-begriff"), ("beziehung", "frage-begriff"), ("vergleich", "frage-begriff"),
     ("grammatik", "frage-begriff"), ("eigenschaft", "frage-begriff"), ("ursache", "frage-begriff"),
-    ("menge", "frage-begriff"),
+    ("menge", "frage-begriff"), ("ort", "frage-begriff"),
     ("zustand", "frage-genus"), ("offene-fragen", "frage-genus"), ("faehigkeiten", "frage-genus"),
     ("empfehlungsfrage", "frage-genus"), ("ziele", "frage-genus"),
     ("erinnerungs-abruf", "frage-nutzer"),

@@ -189,7 +189,7 @@ def test_stimme_eignung_folgt_strukturell_aus_der_spec():
     # beziehung/ursache SIND jetzt dabei (Antwort-Seele Scheibe 2): gerichtete Relationen dürfen
     # der Stimme angeboten werden, seit der Anker reihenfolge-bewusst ist (die Richtung kann nicht
     # mehr kippen — deploy.stimme._reihenfolge_haelt)
-    assert frei == {"definition", "beziehung", "ursache", "vergleich", "grammatik", "frage-begriff"}
+    assert frei == {"definition", "beziehung", "ursache", "vergleich", "ort", "grammatik", "frage-begriff"}
     assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}definition")
     assert werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}beziehung")
     assert not werkzeug.stimme_geeignet(f"{companion.ZELLE_PREFIX}wiederholen")

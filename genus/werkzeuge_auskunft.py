@@ -42,6 +42,18 @@ def oberbegriffe(conn, form):
     return {"oberbegriffe": inference.infer_lexeme(conn, form, "is_a", "de")}
 
 
+def ortsbegriffe(conn, form):
+    """Die transitiven ``located_in``-Oberorte einer Form (Stadt -> Bundesland -> Deutschland,
+    mit Kette + Vertrauen) -- das Geo-Zwilling von :func:`oberbegriffe`. Dieselbe Inferenz,
+    nur das Prädikat wechselt; ``verbindung`` prüft die Linie danach prädikat-agnostisch.
+    Liefert bewusst denselben Schlüssel ``oberbegriffe`` wie is_a, damit ``verbindung``
+    unverändert konsumiert -- welches der beiden Primitive der Plan wählt, entscheidet die
+    Fälle-Verifikation (die Geo-Fälle tragen nur mit located_in)."""
+    if form is None:
+        return {"oberbegriffe": []}
+    return {"oberbegriffe": inference.infer_lexeme(conn, form, "located_in", "de")}
+
+
 def gemeinsame_kategorien(conn, x_form, y_form):
     """Wo treffen sich die is_a-Linien zweier Formen -- die nächste gemeinsame, BENENNBARE
     Oberkategorie zuerst (die klassische LCA-Frage als EIN kohärenter Graph-Schritt).
@@ -118,6 +130,14 @@ def registriere_auskunft_werkzeuge() -> None:
         schreibt=False, wortlautfest=False, pruefbar_als="graph",
         liefert={"oberbegriffe": "Liste"},
         implementierung=oberbegriffe,
+    ))
+    werkzeug.verdrahten(werkzeug.Werkzeug(
+        name="ortsbegriffe",
+        beschreibung="Die transitiven located_in-Oberorte einer Form (Stadt→Land→Deutschland).",
+        parameter={"form": werkzeug.Parameter("Wort", pflicht=True)},
+        schreibt=False, wortlautfest=False, pruefbar_als="graph",
+        liefert={"oberbegriffe": "Liste"},
+        implementierung=ortsbegriffe,
     ))
     werkzeug.verdrahten(werkzeug.Werkzeug(
         name="gemeinsame_kategorien",
@@ -250,11 +270,33 @@ URSACHE_FAELLE = (
                       erwartet={"kausal_q": True, "ursachen": []}),
 )
 
+# Die Ortsfrage („Ist Kassel in Hessen?") -- dasselbe Ziel wie beziehung (verbindung), nur die
+# Linie klettert located_in statt is_a. Die Fälle tragen NUR mit ortsbegriffe (keine is_a-Kante
+# im Graphen), sodass die Verifikation den located_in-Zweig wählt. Richtungs-Fall Pflicht.
+_ORT_GRAPH = (
+    ("Kassel@de", "expresses", "Q_kassel", "kuratiert"),
+    ("Q_kassel", "located_in", "Q_hessen", "kuratiert"),
+    ("Hessen@de", "expresses", "Q_hessen", "kuratiert"),
+    ("Q_hessen", "located_in", "Q_de", "kuratiert"),
+    ("Deutschland@de", "expresses", "Q_de", "kuratiert"),
+)
+ORT_FAELLE = (
+    werkplan.Planfall(graph=_ORT_GRAPH,
+                      eingaben={"x_tok": "Kassel", "y_tok": "Hessen"},
+                      erwartet={"verdict": "yes", "subject": "Kassel", "object": "Hessen",
+                                "target": "Q_hessen"}),
+    # Richtung: Hessen liegt NICHT in Kassel -- der vertauschte Plan stirbt hier
+    werkplan.Planfall(graph=_ORT_GRAPH,
+                      eingaben={"x_tok": "Hessen", "y_tok": "Kassel"},
+                      erwartet={"verdict": "no_path"}),
+)
+
 # Absicht -> (Ziel-Werkzeug, Plan-Eingaben, Fälle): die EINE Saat-Tabelle des Primärpfads.
 ABSICHT_SAAT = {
     "beziehung": ("verbindung", {"x_tok": "Text", "y_tok": "Text"}, BEZIEHUNG_FAELLE),
     "vergleich": ("gemeinsame_kategorien", {"x_tok": "Text", "y_tok": "Text"}, VERGLEICH_FAELLE),
     "ursache": ("ursachen_im_graph", {"x_tok": "Text"}, URSACHE_FAELLE),
+    "ort": ("verbindung", {"x_tok": "Text", "y_tok": "Text"}, ORT_FAELLE),
 }
 
 _PLAN_CACHE: dict[str, object] = {}
@@ -306,3 +348,17 @@ def ursachen_geplant(conn, x_tok: str) -> dict:
     """Die Ursachen-Frage, Planer zuerst (Netz: :func:`auskunft._ursachen_von`)."""
     return _geplant("ursache", lambda: auskunft._ursachen_von(conn, x_tok),
                     conn, x_tok=x_tok)
+
+
+def _ort_netz(conn, x_tok: str, y_tok: str) -> dict:
+    """Das handgebaute Rückfall-Netz der Ortsfrage: dieselben Primitive wie der Plan, nur
+    located_in statt is_a -- rein lesend, drop-in-gleich zum deduzierten Plan."""
+    xf = konzept_form(conn, x_tok)["form"]
+    yk = konzepte_von(conn, y_tok)
+    ob = ortsbegriffe(conn, xf)["oberbegriffe"]
+    return verbindung(xf, yk["form"], ob, yk["konzepte"])
+
+
+def ort_geplant(conn, x_tok: str, y_tok: str) -> dict:
+    """Die Ortsfrage („Ist X in Y?"), Planer zuerst (Netz: :func:`_ort_netz`, located_in)."""
+    return _geplant("ort", lambda: _ort_netz(conn, x_tok, y_tok), conn, x_tok=x_tok, y_tok=y_tok)
