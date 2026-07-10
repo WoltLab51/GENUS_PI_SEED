@@ -94,7 +94,8 @@ def _get_model():
     return _model
 
 
-def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | None:
+def formuliere(satz: str, model=None, anweisung: str | None = None,
+               kern: str | None = None) -> str | None:
     """A faithfulness-checked rephrasing of an ALREADY-VERIFIED sentence -- ``None`` on any
     problem (model missing, inference error, malformed output) OR when an anchor (a quoted
     word, a confidence number) went missing from the rephrase, so the caller always has a
@@ -105,7 +106,15 @@ def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | Non
     ``anweisung`` (der Antwort-Würfel, ``genus.antwort.anweisung``): eine deterministisch
     gewählte STIL-Vorgabe („Ton: freundlich und warm."), als reine Daten über die Membran
     gereicht -- dieselbe Rolle wie die GBNF-Grammatik beim Deuter. Sie ändert nur, WIE
-    formuliert wird; die Anker-Prüfung danach ist von ihr völlig unabhängig."""
+    formuliert wird; die Anker-Prüfung danach ist von ihr völlig unabhängig.
+
+    ``kern`` (Antwort-Seele Scheibe 2, „Rahmen frei, Kern fest"): eine VERBATIM-INSEL -- der
+    gerichtete Fakt-Satz (»Hund« zählt zu »Haustier«), der WORTWÖRTLICH und unverändert im
+    Ergebnis stehen muss. Nur so ist eine Richtungs-Umkehr strukturell unmöglich: die Stimme
+    darf frei DRUMHERUM formulieren (Anrede, Wärme, Anschluss), aber den Kern nicht anfassen.
+    Fehlt der Kern-Satz als exakte Teilzeichenkette, gilt der Versuch als gescheitert (``None``,
+    Rückfall auf den deterministischen Voice-1-Satz). ``None`` = keine Insel (freie Umformung,
+    nur die üblichen Anker), für die ungerichteten Zellen (Definition, Vergleich)."""
     if model is None:
         if not os.path.exists(MODEL_PATH):
             return None
@@ -115,6 +124,9 @@ def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | Non
         _SYSTEM + " Halte dich zusaetzlich an diese Stil-Vorgabe, ohne je Fakten zu "
         "aendern oder zu ergaenzen: " + anweisung
     )
+    if kern:
+        system += (" Dieser Kern-Satz MUSS WORTWOERTLICH und voellig unveraendert erhalten "
+                   "bleiben (formuliere nur davor und dahinter, nie mittendrin): " + kern)
     try:
         result = model.create_chat_completion(
             messages=[
@@ -135,6 +147,8 @@ def formuliere(satz: str, model=None, anweisung: str | None = None) -> str | Non
         return None   # ein tragendes Substantiv wurde wegformuliert/korrumpiert (Hausvögel-Fund)
     if not _reihenfolge_haelt(text, _QUOTED.findall(satz)):
         return None   # die zitierten Begriffe stehen in anderer Reihenfolge -> Richtung evtl. gekippt
+    if kern and kern not in text:
+        return None   # die Verbatim-Insel (gerichteter Kern-Satz) wurde angetastet -> verworfen
     if text == satz:
         return None   # wortidentisch ist keine Glättung -- ehrlich kein Gewinn, kein Tag
     return text

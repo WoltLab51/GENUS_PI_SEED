@@ -144,6 +144,20 @@ def test_reihenfolge_haelt_ist_die_leine_gegen_umkehr():
     assert sm._reihenfolge_haelt("nur »A« da", ["A", "B"]) is False   # fehlt ganz
 
 
+def test_formuliere_haelt_die_verbatim_insel_gegen_verb_umkehr():
+    # Antwort-Seele Scheibe 2 (Approach A): der gerichtete Kern-Satz ist eine VERBATIM-INSEL.
+    # Der Reihenfolge-Anker allein liesse eine Verb-Umkehr bei GLEICHER Wortstellung durch
+    # („»Hund« umfasst »Haustier«"); die Insel faengt sie, weil der Kern nicht mehr woertlich
+    # dasteht -> None -> Voice-1-Fallback. Bleibt der Kern woertlich, darf der Rahmen frei sein.
+    sm = _stimme_modul()
+    satz = "Ja, klar — »Hund« zählt zu »Haustier«. Da bin ich mir ziemlich sicher (0.85)."
+    kern = "»Hund« zählt zu »Haustier«"
+    gekippt = "Also »Hund« umfasst »Haustier«, da bin ich ziemlich sicher (0.85)."
+    assert sm.formuliere(satz, model=_fake_stimme(gekippt), kern=kern) is None
+    frei_gerahmt = "Na klar: »Hund« zählt zu »Haustier«. Da bin ich ziemlich sicher (0.85)!"
+    assert sm.formuliere(satz, model=_fake_stimme(frei_gerahmt), kern=kern) == frei_gerahmt
+
+
 def test_stimme_substantiv_leine_faengt_den_hausvoegel_fund():
     # live gefunden beim ERSTEN Anweisungs-Test auf dem Pi: das 1.5B machte unter
     # "Ton: freundlich und warm." aus "Haustier" ein "Hausvögel" -- die Anker-Prüfung

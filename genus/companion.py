@@ -1151,12 +1151,31 @@ def _record_still(fn, *args) -> None:
 # Zeile größer als der Stil-Gewinn.
 
 _STIMME_TAG = " (Sprachlich vom Modell geglättet — Fakten unverändert.)"
+
+# Die GERICHTETEN Zellen: bei ihnen trägt die Struktur die Wahrheit (»A« zählt zu »B«, »A«
+# hat als Ursache »B«). Damit die Stimme die Richtung nie umkehren kann, wird ihr gerichteter
+# Kern-Satz als VERBATIM-INSEL geschützt (Antwort-Seele Scheibe 2, „Rahmen frei, Kern fest").
+_GERICHTETE_ZELLEN = frozenset({"beziehung", "ursache"})
+
+
+def _kern_span(text: str) -> str | None:
+    """Die Verbatim-Insel eines gerichteten Satzes: die Spanne vom ERSTEN bis zum LETZTEN in
+    Guillemets genannten Begriff (inklusive). Die narrate-Sätze der gerichteten Zellen sind so
+    gebaut, dass die RICHTUNG genau zwischen diesen Begriffen steht (»Hund« zählt zu »Haustier«;
+    »Infektion« hat als bekannte Ursache »Krankheitserreger«) -- diese Spanne wortgleich zu
+    halten macht eine Umkehr unmöglich. Der Rahmen davor/dahinter (Anrede, Vertrauens-Satz)
+    bleibt der Stimme frei. ``None``, wenn kein Begriffspaar vorkommt (nichts zu schützen)."""
+    a = text.find("»")
+    b = text.rfind("«")
+    if a < 0 or b <= a:
+        return None
+    return text[a:b + 1]
 # Die frühere Menge _STIMME_GEEIGNET ist weg (Phase 3): welche Zellen der Stimme angeboten
 # werden dürfen, folgt strukturell aus der wortlautfest-Pflichtentscheidung ihrer
 # Werkzeug-Spec (registriere_zellen / werkzeug.stimme_geeignet) -- eine Quelle, kein Paar.
 
 
-def _stimme_versucht(conn, text: str, stimme) -> str:
+def _stimme_versucht(conn, text: str, stimme, kern: str | None = None) -> str:
     """``text``, natürlicher formuliert via ``stimme`` (dependency-injected wie ``deuter``,
     z.B. ``deploy.stimme.formuliere``) -- unverändert, wenn ``stimme`` fehlt oder sein Versuch
     die Faktentreue-Prüfung nicht besteht (``None``). Nie stillschweigend: eine geglättete
@@ -1180,22 +1199,31 @@ def _stimme_versucht(conn, text: str, stimme) -> str:
     from genus import antwort
 
     anw = antwort.anweisung(antwort.belegung(conn, "plausch"))
-    if anw is not None:
-        try:
-            geglaettet = stimme(text, anweisung=anw)
-        except TypeError:
-            geglaettet = stimme(text)
-    else:
-        geglaettet = stimme(text)
+    geglaettet = _stimme_ruf(stimme, text, anw, kern)
     return text if geglaettet is None else geglaettet + _STIMME_TAG
 
 
-def _personalisiert(conn, question: str, text: str, stimme, marker: str = "") -> str:
+def _stimme_ruf(stimme, text: str, anw: str | None, kern: str | None):
+    """Ruft die Stimme mit der reichsten Signatur, auf die sie passt (kern+anweisung ->
+    anweisung -> nur text) -- kompatibel zu älteren Membranen und Test-Fakes ohne kern-/
+    anweisung-Parameter. Ein TypeError heißt „diese Signatur passt nicht", nie ein Fehler in
+    der Umformung (die echte Stimme fängt eigene Fehler selbst ab und gibt None zurück)."""
+    for extra in ({"anweisung": anw, "kern": kern}, {"anweisung": anw}, {}):
+        try:
+            return stimme(text, **extra)
+        except TypeError:
+            continue
+    return None
+
+
+def _personalisiert(conn, question: str, text: str, stimme, marker: str = "",
+                    kern: str | None = None) -> str:
     """Stimme-Versuch, dann ``marker`` (z.B. der Deuter-Hinweis), dann die Notiz-Einwebung
     (Personen-Gedächtnis Scheibe 2) -- in dieser Reihenfolge: die Notiz ist eine reine,
     deterministische Ergänzung ganz am Ende und darf die Anker-Prüfung der Stimme (die nur den
-    narrate-Kern beurteilen soll) nicht verwirren."""
-    text = _stimme_versucht(conn, text, stimme)
+    narrate-Kern beurteilen soll) nicht verwirren. ``kern`` (Scheibe 2): die Verbatim-Insel des
+    gerichteten Fakt-Satzes, an die Stimme durchgereicht."""
+    text = _stimme_versucht(conn, text, stimme, kern=kern)
     return text + marker + (_notiz_bezug(conn, question) or "")
 
 
@@ -1276,8 +1304,9 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
             anchor = last_question if step in _ANCHOR_BLEIBT else question
             if not zellen_werkzeug.wortlautfest:
                 # Stimme-Eignung folgt strukturell aus der Spec (Phase 3) -- keine zweite,
-                # separat zu pflegende Menge mehr
-                text = _personalisiert(conn, question, text, stimme, marker)
+                # separat zu pflegende Menge mehr. Gerichtete Zelle -> Verbatim-Insel (Scheibe 2).
+                insel = _kern_span(text) if kind in _GERICHTETE_ZELLEN else None
+                text = _personalisiert(conn, question, text, stimme, marker, kern=insel)
             elif marker and marker not in text:
                 # die Meta-Zellen bauen auf last_answer auf, das oft schon einen Hinweis trägt
                 # (Nochmal/Ausführlicher wiederholen ihn wörtlich mit) -- nie doppelt anhängen
@@ -1486,8 +1515,12 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         # niemand kann die Eignung mehr an einer zweiten Stelle vergessen
         registriere_zellen()
         from genus import werkzeug as _werkzeug
-        text = (_stimme_versucht(conn, muster[0], stimme)
-                if _werkzeug.stimme_geeignet(f"{ZELLE_PREFIX}{muster[1]}") else muster[0])
+        if _werkzeug.stimme_geeignet(f"{ZELLE_PREFIX}{muster[1]}"):
+            # gerichtete Zelle -> ihr Fakt-Satz ist eine Verbatim-Insel (Richtung kann nicht kippen)
+            kern = _kern_span(muster[0]) if muster[1] in _GERICHTETE_ZELLEN else None
+            text = _stimme_versucht(conn, muster[0], stimme, kern=kern)
+        else:
+            text = muster[0]
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
         return {"text": text, "question": question, "gelesen": [muster[1]]}

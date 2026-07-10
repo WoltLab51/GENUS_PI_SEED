@@ -570,8 +570,11 @@ def narrate_kausal(conn, r: dict, bel: dict | None = None) -> str:
     if r["art"] == "ursachen":
         if r["ursachen"]:
             if warm:
+                # RICHTUNG zwischen den Begriffen (Effekt zuerst, „hat als Ursache" in der Mitte),
+                # damit die Verbatim-Insel (»Effekt« … »Ursache«) die Richtung mitschützt (Scheibe 2)
                 liste = _join_de([f"»{u}«" for u in r["ursachen"]])
-                return f"Klar, dazu kenne ich etwas: als Ursache von »{r['subjekt']}« kenne ich {liste}."
+                wort = "Ursache" if len(r["ursachen"]) == 1 else "Ursachen"
+                return f"Klar, dazu kenne ich etwas: »{r['subjekt']}« hat als bekannte {wort} {liste}."
             liste = ", ".join(f"»{u}«" for u in r["ursachen"])
             return f"Als Ursache von »{r['subjekt']}« kenne ich: {liste}."
         if warm:
