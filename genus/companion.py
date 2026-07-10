@@ -1189,13 +1189,40 @@ _ANCHOR_BLEIBT = {   # cells that reformat/retrace the EXISTING topic, never int
 }
 
 
+def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
+                     last_answer: str | None, stimme, quelle: str):
+    """Löst eine Liste von Segment-Lesarten (aus dem Deuter ODER der Gebärden-Schnellspur) über
+    :func:`_deuter_antwort` und sammelt die Teil-Antworten. Rückgabe ``(teile, gelesen, anchor)``
+    -- ``teile`` sind die Segment-Antworten (für :func:`_komponiere`), ``gelesen`` die erkannten
+    Blätter (Belegung/Korrektur-Kanal), ``anchor`` die für die Rückbezüge maßgebliche Frage.
+    ``quelle`` wird für die ehrliche Herkunft der Belegung durchgereicht."""
+    teile: list[str] = []
+    gelesen: list[str] = []
+    anchor = question
+    for segment in segmente:
+        gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
+                                   stimme=stimme, quelle=quelle)
+        if gedeutet is not None:
+            teile.append(gedeutet["text"])
+            anchor = gedeutet["question"]
+            if gedeutet.get("kind"):
+                gelesen.append(gedeutet["kind"])
+    return teile, gelesen, anchor
+
+
 def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
-                     last_answer: str | None = None, stimme=None) -> dict | None:
-    """Map an OPEN model reading onto the Absichts-Raster and act from the known cell -- or
+                     last_answer: str | None = None, stimme=None,
+                     quelle: str = "model:deuter") -> dict | None:
+    """Map an OPEN reading onto the Absichts-Raster and act from the known cell -- or
     climb ONE step to its Zwicky-Zelle (Blatt -> Zelle, nie tiefer -- eine Zelle ist schon die
     gröbste sinnvolle Einheit) -- or name honestly what GENUS read but cannot do yet. ``None``
     only when the reading is unklar/unbekannt or empty (then the caller falls through to the
-    last word reading and the honest fallback)."""
+    last word reading and the honest fallback).
+
+    ``quelle`` ist die Herkunft der Lesart für die Belegungs-Kennzahl (record_reading) --
+    normalerweise "model:deuter", aber die deterministische Gebärden-Schnellspur reicht
+    "gebaerde" durch, damit die Statistik ehrlich bleibt (eine glasklar gelesene 👍 ist keine
+    Modell-Vermutung)."""
     from genus import verstehen
 
     kind = (guess.get("absicht") or "").strip().lower()
@@ -1210,7 +1237,7 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         # wird GEZÄHLT (nur Struktur, nie Nutzer-Text): "unklar" ist ein blinder Fleck des
         # Rasters, und genau diese Zählung ist das Material für den VerstehensLuecke-Detector
         # (Selbst-Codieren Stufe 0 -- GENUS spürt selbst, wo sein Verstehen nicht hinreicht)
-        _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
+        _record_still(verstehen.record_reading, conn, "unklar", quelle)
         return None
     zellen = _handelbare_werkzeuge()
     zelle = verstehen.zelle_of(conn, kind)
@@ -1224,8 +1251,12 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         text = zellen_werkzeug.implementierung(conn, guess, question, last_question,
                                                last_answer, stimme)
         if text is not None:
-            _record_still(verstehen.record_reading, conn, kind, "model:deuter")
-            marker = "" if step in ("tatsache", "merken") else _DEUTED
+            _record_still(verstehen.record_reading, conn, kind, quelle)
+            # der Transparenz-Hinweis gilt NUR für eine echte Modell-Deutung -- eine
+            # deterministisch gelesene Gebärde (quelle="gebaerde") bekommt keinen "vom
+            # Sprachmodell gedeutet"-Zusatz, das wäre schlicht falsch
+            marker = _DEUTED if (quelle == "model:deuter"
+                                 and step not in ("tatsache", "merken")) else ""
             anchor = last_question if step in _ANCHOR_BLEIBT else question
             if not zellen_werkzeug.wortlautfest:
                 # Stimme-Eignung folgt strukturell aus der Spec (Phase 3) -- keine zweite,
@@ -1240,7 +1271,7 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         return None   # capability exists but nothing resolved here -- fail safe, never claim inability
     # known cell, no capability anywhere up the chain: say so, honestly -- and count it,
     # because exactly these counts prioritise what gets built next
-    _record_still(verstehen.record_reading, conn, kind, "model:deuter")
+    _record_still(verstehen.record_reading, conn, kind, quelle)
     label = _ZELLEN_LABELS.get(kind, f"„{kind}“")
     return {"text": f"Ich lese das als {label} — das kann ich noch nicht. Ich habe es mir "
                     f"als Lücke gemerkt." + _luecken_vorschlag_hinweis(conn),
@@ -1444,21 +1475,23 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             text += _notiz_bezug(conn, question) or ""
         return {"text": text, "question": question, "gelesen": [muster[1]]}
     if deuter is not None:
+        # DIE GEBÄRDEN-SCHNELLSPUR (Proposal #14): eine reine Emoji-Nachricht wird gläsern und
+        # modellfrei gelesen, VOR dem Deuter -- ein 👍 ist eindeutiger als jeder Modell-Tipp.
+        # Ehrliche Herkunft "gebaerde"; keine Anschlussfrage (eine warme Floskel braucht keinen
+        # Sog). Nicht als Gebärde erkannt -> None -> der Deuter läuft wie bisher.
+        from genus import gebaerde
+        gesten = gebaerde.lies(question)
+        if gesten is not None:
+            teile, gelesen, anchor = _segmente_loesen(
+                conn, gesten, question, last_question, last_answer, stimme, "gebaerde")
+            if teile:
+                return {"text": _komponiere(teile), "question": anchor, "gelesen": gelesen}
         segmente = deuter(question)
         if isinstance(segmente, dict):
             segmente = [segmente]
         if segmente is not None:   # der Deuter LIEF -- auch eine leere Liste zählt als Lauf
-            teile: list[str] = []
-            gelesen: list[str] = []
-            anchor = question
-            for segment in segmente:
-                gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
-                                            stimme=stimme)
-                if gedeutet is not None:
-                    teile.append(gedeutet["text"])
-                    anchor = gedeutet["question"]
-                    if gedeutet.get("kind"):
-                        gelesen.append(gedeutet["kind"])
+            teile, gelesen, anchor = _segmente_loesen(
+                conn, segmente, question, last_question, last_answer, stimme, "model:deuter")
             if teile:
                 bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
                 res = {"text": _komponiere(teile) + bei, "question": anchor, "gelesen": gelesen}
