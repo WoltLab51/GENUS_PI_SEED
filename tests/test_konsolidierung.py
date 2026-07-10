@@ -142,9 +142,12 @@ def test_morgen_briefing_webt_wetter_und_schlagzeile(conn, tmp_path, monkeypatch
     assert "In den Nachrichten:" in text and "Wichtige Nachricht heute" in text
 
 
-def test_leerer_morgen_ist_nie_leer_sondern_erzaehlt_das_gelernte(conn):
+def test_leerer_morgen_ist_nie_leer_sondern_erzaehlt_das_gelernte(conn, tmp_path, monkeypatch):
     # Ronnys Entscheidung: kein Schweigen -- wenn nichts wartet, erzaehlt GENUS,
     # was der Nacht-Lerner zuletzt gelernt hat.
+    # Hermetisch: den echten Live-News-Puffer aussperren (auf dem Pi gefüllt) -- sonst
+    # verdrängt eine frische Schlagzeile das gelernte Wort und der Test bricht (live gefunden).
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(tmp_path / "keine_news.json"))
     reactors.observe_relation(conn, "Fernweh@de", "expresses", "Q_fernweh", "wikidata")
     reactors.observe_relation(conn, "Fernweh@de", "primary_gloss",
                               "Sehnsucht nach der Ferne", "dbnary")
@@ -153,6 +156,8 @@ def test_leerer_morgen_ist_nie_leer_sondern_erzaehlt_das_gelernte(conn):
     assert text.startswith("Guten Morgen, Ronny!") and "guten Start" in text
 
 
-def test_voellig_frischer_kern_bleibt_trotzdem_warm(conn):
+def test_voellig_frischer_kern_bleibt_trotzdem_warm(conn, tmp_path, monkeypatch):
+    # dieselbe Isolation: ein völlig frischer Kern darf nicht heimlich Live-News einweben
+    monkeypatch.setenv("GENUS_NEWS_PUFFER", str(tmp_path / "keine_news.json"))
     text = konsolidierung.morgen_nachricht(conn, None)
     assert text.startswith("Guten Morgen, Ronny!") and "guten Start" in text
