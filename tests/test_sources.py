@@ -1024,6 +1024,19 @@ def test_common_none_when_unrelated():
     assert "keine gemeinsame" in companion.narrate_common(conn, r)
 
 
+def test_narrate_common_warm_ist_voice_eins_mit_festem_kern():
+    # vergleich „mitgenommen" (Antwort-Seele, gleiche Mechanik wie beziehung/ursache)
+    from genus import companion
+    conn = _kinship_graph()
+    r = companion.common(conn, "Was haben ein Hund und eine Katze gemeinsam?")
+    plain = companion.narrate_common(conn, r)
+    warm = companion.narrate_common(conn, r, _WARM)
+    assert plain.startswith("»Hund« und »Katze« haben gemeinsam:")   # nüchtern, byte-genau wie zuvor
+    assert "ja, die haben was gemeinsam" in warm                      # der warme Rahmen (Voice 1)
+    assert "beide zählen zu" in warm and "Säugetier" in warm          # der Fakt-Kern steht
+    assert "»Hund«" in warm and "»Katze«" in warm
+
+
 def test_common_not_triggered_by_plain_question():
     from genus import companion
     conn = _kinship_graph()

@@ -373,7 +373,7 @@ def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, 
         return narrate_kausal(conn, kau, bel), "beziehung"
     com = common(conn, question)
     if com.get("common"):
-        return narrate_common(conn, com), "vergleich"
+        return narrate_common(conn, com, bel), "vergleich"
     gen = gender_question(conn, question)
     if gen.get("gender_q"):
         return narrate_gender(gen), "grammatik"
@@ -783,9 +783,10 @@ def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=N
     if not _anker_ok(question, guess["subject"], guess["object"]):
         from genus import zaehlwerk
         zaehlwerk.zaehle("vergleich", "anker_frei")
-    from genus import werkzeuge_auskunft
+    from genus import antwort as _antwort, werkzeuge_auskunft
     r = werkzeuge_auskunft.vergleich_geplant(conn, guess["subject"], guess["object"])
-    return narrate_common(conn, r) if r["common"] else None
+    bel = _antwort.belegung(conn, "plausch")   # Voice 1
+    return narrate_common(conn, r, bel) if r["common"] else None
 
 
 def _zelle_grammatik(conn, guess, question, last_question, last_answer, stimme=None):

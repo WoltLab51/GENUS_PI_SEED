@@ -410,12 +410,20 @@ def common(conn, question: str) -> dict:
     return {"common": False}
 
 
-def narrate_common(conn, r: dict) -> str:
+def narrate_common(conn, r: dict, bel: dict | None = None) -> str:
+    """Wie :func:`narrate_relation`: „Rahmen frei, Kern fest" -- mit warmer Belegung Voice 1,
+    die Kern-Marken (Begriffe in »«) wortgleich; ohne Belegung byte-genau der alte Wortlaut."""
+    warm = bool(bel) and bel.get("waerme") in ("warm", "herzlich")
     if not r["found"]:
+        if warm:
+            return f"Eine gemeinsame Oberkategorie von »{r['x']}« und »{r['y']}« finde ich gerade nicht."
         return f"GENUS findet keine gemeinsame Oberkategorie von »{r['x']}« und »{r['y']}«."
     labels = _collapse([_label(conn, c) for c in r["shared"]])[:3]
     # in Guillemets -- derselbe Stimme-Anker-Schutz wie in narrate()/narrate_relation()
-    s = f"»{r['x']}« und »{r['y']}« haben gemeinsam: beide zählen zu »{labels[0]}«"
+    if warm:
+        s = f"»{r['x']}« und »{r['y']}« — ja, die haben was gemeinsam: beide zählen zu »{labels[0]}«"
+    else:
+        s = f"»{r['x']}« und »{r['y']}« haben gemeinsam: beide zählen zu »{labels[0]}«"
     if len(labels) > 1:
         s += f" (und weiter zu {_join_de([f'»{lbl}«' for lbl in labels[1:]])})"
     return s + "."
