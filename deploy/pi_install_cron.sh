@@ -70,6 +70,7 @@ fi
     echo '*/20 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] news $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_news.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/3 * * * * cd "$GENUS_REPO_DIR" && echo "[TICK] gedanken-push $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus gedanken-push >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/2 * * * * cd "$GENUS_REPO_DIR" && ./deploy/hand_ausfuehren.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    echo '7 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] ledger-backup $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/backup_ledger_to_sd.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '17 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] experience-scan $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && .venv/bin/genus experience scan >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '57 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] nacht-konsolidierung $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && bash ./deploy/nacht_konsolidierung.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/10 5-9 * * * cd "$GENUS_REPO_DIR" && bash ./deploy/morgen_push.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
