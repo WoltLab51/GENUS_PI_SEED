@@ -13,14 +13,18 @@ Verbatim-Insel, Reihenfolge-Prüfung: alle überflüssig, weil nichts zu schütz
 deterministisch (temperature 0, keine Stichprobe) → gleiche Eingabe, gleiches Gewicht → testbar,
 replay-freundlich, planfähig.
 
-Wie: `create_completion(echo=True, logprobs=1)` gibt die Token-Log-Wahrscheinlichkeiten des
-GESAMTEN Prompts zurück; über den Zeichen-Offset trennen wir die Kandidaten-Token vom Kontext
-und mitteln PRO TOKEN (sonst wiegt Längeres scheinbar leichter — mehr Token, kleinere Summe).
-Der Kontext sollte an einer natürlichen Grenze enden (Leerzeichen/Satzzeichen), damit kein
-Token Kontext und Kandidat überspannt. Dieses Modul importiert nie genus.* (Membran).
+Wie (der SCHNELLE Weg -- live gemessen, warum er nötig ist): NICHT `create_completion(echo,
+logits_all=True)` -- das rechnet die Vokabular-Projektion (~150k) an JEDER Position und braucht
+auf dem Pi Minuten. Stattdessen low-level: den Kontext EINMAL durchrechnen, dann pro Kandidaten-
+Token nur die LETZTE Position lesen (`model.eval` + `model.scores`, logits_all=False) und den
+Log-Softmax des jeweiligen Tokens nehmen. Gemittelt PRO TOKEN (sonst wiegt Längeres scheinbar
+leichter -- mehr Token, kleinere Summe). Der Kontext sollte an einer natürlichen Grenze enden
+(Leerzeichen/Satzzeichen), damit kein Token Kontext und Kandidat überspannt. Dieses Modul
+importiert nie genus.* (Membran).
 """
 from __future__ import annotations
 
+import math
 import os
 
 MODEL_PATH = os.environ.get(
@@ -38,23 +42,30 @@ def _get_model():
         if not os.path.exists(MODEL_PATH):
             return None
         from llama_cpp import Llama   # local import: Modul bleibt ohne die Abhängigkeit importierbar
-        # logits_all=True: nur so liefert echo die Logprobs JEDES Prompt-Tokens (das Wiege-Signal).
-        # n_ctx klein -- Wiege-Kontexte sind kurz (ein Satz), das spart Speicher/Zeit.
-        _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=512,
-                       logits_all=True, verbose=False)
+        # logits_all=False (Default): nur die LETZTE Position bekommt Logits -- genau das braucht
+        # der Token-für-Token-Weg, und es ist um Größenordnungen billiger als logits_all.
+        _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=512, verbose=False)
     return _model
 
 
-def _mittel_logprob(model, kontext: str, kandidat: str) -> float | None:
-    """Der mittlere Log-Prob PRO TOKEN des Kandidaten im Kontext -- die eigentliche Wägung.
-    ``None``, wenn kein Kandidaten-Token abgegrenzt werden konnte (leerer Kandidat o.ä.)."""
-    r = model.create_completion(prompt=kontext + kandidat, max_tokens=0,
-                                echo=True, logprobs=1, temperature=0.0)
-    lp = r["choices"][0]["logprobs"]
-    grenze = len(kontext)
-    werte = [t for t, o in zip(lp["token_logprobs"], lp["text_offset"])
-             if t is not None and o >= grenze]
-    return sum(werte) / len(werte) if werte else None
+def _mittel_logprob(model, ctx_tok: list[int], cand_tok: list[int]) -> float | None:
+    """Der mittlere Log-Prob PRO TOKEN der Kandidaten-Token, gegeben den schon getokenisierten
+    Kontext. Rechnet den Kontext einmal, liest dann Token für Token nur die letzte Position
+    (Log-Softmax des jeweiligen Kandidaten-Tokens) und rückt vor. ``None`` bei leerem Kandidaten.
+    Reines ``math`` (kein numpy-Zwang) -- der Log-Softmax über das Vokabular ist gegenüber dem
+    Modell-Vorwärtsschritt vernachlässigbar, und das Modul bleibt ohne numpy importier-/testbar."""
+    if not cand_tok:
+        return None
+    model.reset()
+    model.eval(ctx_tok)
+    total = 0.0
+    for tok in cand_tok:
+        zeile = model.scores[model.n_tokens - 1]
+        m = max(float(x) for x in zeile)
+        log_z = m + math.log(sum(math.exp(float(x) - m) for x in zeile))
+        total += float(zeile[tok]) - log_z
+        model.eval([tok])
+    return total / len(cand_tok)
 
 
 def wiege(kontext: str, kandidaten: list[str], model=None) -> list[float] | None:
@@ -67,7 +78,11 @@ def wiege(kontext: str, kandidaten: list[str], model=None) -> list[float] | None
         if model is None:
             return None
     try:
-        werte = [_mittel_logprob(model, kontext, k) for k in kandidaten]
+        ctx_tok = model.tokenize(kontext.encode("utf-8"), add_bos=True, special=True)
+        werte: list[float | None] = []
+        for kand in kandidaten:
+            voll = model.tokenize((kontext + kand).encode("utf-8"), add_bos=True, special=True)
+            werte.append(_mittel_logprob(model, ctx_tok, voll[len(ctx_tok):]))
     except Exception:
         return None
     if not werte or any(w is None for w in werte):

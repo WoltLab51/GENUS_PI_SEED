@@ -1,6 +1,9 @@
 """Die Waage (deploy/waage.py): das Modell wiegt, es schreibt nicht. Die Tests prüfen die
-LOGIK deterministisch mit einem Fake-Modell (kontrollierte Logprobs); ob die Waage GUT wiegt,
-ist eine Modell-Frage und wird live am Pi gemessen (Blind-Proben, Scheibe 2)."""
+LOGIK deterministisch mit einem Fake-Modell, das den SCHNELLEN low-level-Weg nachstellt
+(tokenize/reset/eval/scores/n_tokens) und kontrollierte Logits liefert -- so, dass der
+Log-Softmax des Kandidaten-Tokens genau den Zielwert ergibt. Ob die Waage GUT wiegt, ist eine
+Modell-Frage und wird live am Pi gemessen (Blind-Proben, Scheibe 2)."""
+import math
 import sys
 from pathlib import Path
 
@@ -9,58 +12,89 @@ import waage  # noqa: E402
 
 
 class _FakeModel:
-    """Gibt für ``kontext + kandidat`` einen kontrollierten mittleren Logprob zurück -- ein
-    Kandidaten-Token an der Kontext-Grenze mit dem Punktwert aus ``punkte``."""
+    """Stellt den low-level-Weg nach: ``kontext`` -> ein BOS-Token, jeder Kandidat -> seine
+    vorgegebenen Token-IDs. ``scores`` baut für den ZULETZT tokenisierten Kandidaten eine
+    Logit-Zeile, deren Log-Softmax an jeder Kandidaten-ID exakt den Ziel-Logprob trifft
+    (Füll-Token 0 trägt die Restmasse, damit logsumezp der Zeile 0 ist)."""
 
-    def __init__(self, kontext, punkte):
-        self.kontext = kontext
-        self.punkte = punkte
+    def __init__(self, cand_tokens, cand_L):
+        self.cand_tokens = cand_tokens          # {kandidat: [token_id, ...]}
+        self.cand_L = cand_L                    # {token_id: ziel_logprob}  (jeweils < 0)
+        self.vocab = max(cand_L) + 5
+        self._n = 0
+        self._cur = None
 
-    def create_completion(self, prompt, **kw):
-        kandidat = prompt[len(self.kontext):]
-        s = self.punkte[kandidat]
-        return {"choices": [{"logprobs": {
-            "token_logprobs": [None, s],           # Kontext-Token (None) + ein Kandidaten-Token
-            "text_offset": [0, len(self.kontext)],
-        }}]}
+    def tokenize(self, b, add_bos=True, special=True):
+        s = b.decode("utf-8")
+        treffer = None
+        for k in self.cand_tokens:              # längster passender Suffix = der Kandidat
+            if k and s.endswith(k) and (treffer is None or len(k) > len(treffer)):
+                treffer = k
+        if treffer is None:
+            return [1]                          # reiner Kontext (BOS)
+        self._cur = treffer
+        return [1] + list(self.cand_tokens[treffer])
+
+    def reset(self):
+        self._n = 0
+
+    def eval(self, toks):
+        self._n += len(toks)
+
+    @property
+    def n_tokens(self):
+        return self._n
+
+    @property
+    def scores(self):
+        ids = self.cand_tokens[self._cur]
+        zeile = [-60.0] * self.vocab
+        for i in ids:
+            zeile[i] = self.cand_L[i]
+        rest = 1.0 - sum(math.exp(self.cand_L[i]) for i in ids)
+        zeile[0] = math.log(rest)               # Füll-Token: logsumexp(zeile) == 0
+        return [zeile] * (self._n + 2)          # dieselbe Zeile an jeder Position
+
+
+def _ein_token(punkte, start=10):
+    """Baut ein FakeModel, in dem jeder Kandidat GENAU ein Token mit seinem Ziel-Logprob ist."""
+    cand_tokens, cand_L = {}, {}
+    for j, (k, L) in enumerate(punkte.items()):
+        tid = start + j
+        cand_tokens[k] = [tid]
+        cand_L[tid] = L
+    return _FakeModel(cand_tokens, cand_L)
 
 
 def test_waehle_nimmt_den_schwersten_kandidaten():
     ktx = "Ich habe zwei "
-    m = _FakeModel(ktx, {"Hund": -3.0, "Hunde": -0.5})
+    m = _ein_token({"Hund": -3.0, "Hunde": -0.5})
     r = waage.waehle(ktx, ["Hund", "Hunde"], model=m)
     assert r["kandidat"] == "Hunde"                 # Plural passt zu „zwei"
-    assert r["margin"] == 2.5                        # -0.5 - (-3.0)
+    assert r["margin"] == 2.5                         # -0.5 - (-3.0)
     assert r["gewichte"] == {"Hund": -3.0, "Hunde": -0.5}
 
 
 def test_kleiner_margin_ist_ehrliche_unsicherheit():
     ktx = "Das ist "
-    m = _FakeModel(ktx, {"schön": -1.10, "schoen": -1.02})
-    r = waage.waehle(ktx, ["schön", "schoen"], model=m)
-    assert r["kandidat"] == "schoen"
-    assert abs(r["margin"] - 0.08) < 1e-9            # knapp -> unsicher
+    m = _ein_token({"schoen": -1.10, "schlecht": -1.02})
+    r = waage.waehle(ktx, ["schoen", "schlecht"], model=m)
+    assert r["kandidat"] == "schlecht"
+    assert abs(r["margin"] - 0.08) < 1e-6            # knapp -> unsicher
 
 
 def test_wiege_gibt_rohe_gewichte_ohne_zu_waehlen():
     ktx = "x "
-    m = _FakeModel(ktx, {"a": -2.0, "b": -1.0, "c": -5.0})
-    assert waage.wiege(ktx, ["a", "b", "c"], model=m) == [-2.0, -1.0, -5.0]
+    m = _ein_token({"a": -2.0, "b": -1.0, "c": -5.0})
+    werte = waage.wiege(ktx, ["a", "b", "c"], model=m)
+    assert [round(w, 4) for w in werte] == [-2.0, -1.0, -5.0]
 
 
 def test_pro_token_normalisierung_straft_laenge_nicht():
-    # zwei Kandidaten-Token, aber gemittelt -> vergleichbar mit einem Ein-Token-Kandidaten
-    ktx = "Kontext "
-    class M:
-        def create_completion(self, prompt, **kw):
-            kand = prompt[len(ktx):]
-            if kand == "kurz":
-                tl, off = [None, -1.0], [0, len(ktx)]
-            else:  # "sehrlang" -> zwei Token, gleiche mittlere Güte
-                tl, off = [None, -1.0, -1.0], [0, len(ktx), len(ktx) + 4]
-            return {"choices": [{"logprobs": {"token_logprobs": tl, "text_offset": off}}]}
-    r = waage.wiege(ktx, ["kurz", "sehrlang"], model=M())
-    assert r == [-1.0, -1.0]                          # Mittel pro Token, nicht Summe
+    # "kurz" = ein Token (-1.0); "sehrlang" = zwei Token (je -1.0) -> gemittelt gleich schwer
+    m = _FakeModel({"kurz": [10], "sehrlang": [11, 12]}, {10: -1.0, 11: -1.0, 12: -1.0})
+    werte = waage.wiege("Kontext ", ["kurz", "sehrlang"], model=m)
+    assert [round(w, 4) for w in werte] == [-1.0, -1.0]   # Mittel pro Token, nicht Summe
 
 
 def test_fehlt_das_modell_faellt_es_sicher_auf_none():
@@ -76,8 +110,6 @@ def test_fehlt_das_modell_faellt_es_sicher_auf_none():
 
 
 def test_unabgrenzbarer_kandidat_gibt_none_statt_zu_luegen():
-    ktx = "abc"
-    class M:  # liefert keine Kandidaten-Token jenseits der Grenze
-        def create_completion(self, prompt, **kw):
-            return {"choices": [{"logprobs": {"token_logprobs": [None], "text_offset": [0]}}]}
-    assert waage.wiege(ktx, [""], model=M()) is None
+    # leerer Kandidat -> keine Kandidaten-Token jenseits des Kontexts -> None statt Erfindung
+    m = _ein_token({"a": -1.0})
+    assert waage.wiege("abc", [""], model=m) is None
