@@ -25,6 +25,7 @@ ein Token verschluckt noch doppelt zählt. Dieses Modul importiert nie genus.* (
 """
 from __future__ import annotations
 
+import json
 import math
 import os
 
@@ -33,6 +34,10 @@ MODEL_PATH = os.environ.get(
     os.path.expanduser("~/.genus/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"),
 )
 N_THREADS = int(os.environ.get("GENUS_DEUTER_THREADS", "4"))
+
+# Die per Blind-Probe VERDIENTEN Schwellen (deploy/blindprobe.py schreibt sie) -- ohne diese
+# Datei handelt kein Waage-Organ: messen vor vertrauen, strukturell erzwungen.
+KALIBRIERUNG_PFAD = os.path.expanduser("~/.genus/waage_kalibrierung.json")
 
 _model = None   # lazy singleton -- geladen mit logits_all (Prompt-Logprobs), einmal pro Prozess
 
@@ -123,6 +128,42 @@ def waehle(kontext: str, kandidaten: list[str], model=None) -> dict | None:
         "margin": round(margin, 4),
         "gewichte": {k: round(w, 4) for k, w in zip(kandidaten, werte)},
     }
+
+
+def kalibrierung() -> dict | None:
+    """Die per Blind-Probe verdienten Schwellen (:data:`KALIBRIERUNG_PFAD`) -- ``None``, wenn
+    noch nie kalibriert wurde oder die Datei unlesbar ist (dann handelt kein Organ)."""
+    try:
+        with open(KALIBRIERUNG_PFAD, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def artikel_organ(model=None):
+    """Das ARTIKEL-Organ für die Formwahl-Kette des Kerns (genus/formwahl.py, Glied ③):
+    ``(nomen) -> "ein" | "eine" | None``. Wiegt die zwei fakten-identischen Kandidaten
+    („ein Nomen" / „eine Nomen") und handelt NUR über der Blind-Proben-Schwelle der Gestalt
+    „form" (gleiches Inhaltswort, nur Funktionswörter verschieden -- die gemessen
+    vertrauenswürdige Entscheidungs-Gestalt). Gibt es keine Kalibrierung oder keine
+    form-Schwelle, gibt es KEIN Organ (``None``) -- messen vor vertrauen, strukturell."""
+    kal = kalibrierung()
+    if not kal:
+        return None
+    gestalt = (kal.get("gestalten") or {}).get("form") or {}
+    schwelle = gestalt.get("schwelle")
+    if schwelle is None:
+        return None
+
+    def organ(nomen: str) -> str | None:
+        if not nomen or not nomen[:1].isalpha():
+            return None   # nur echte Wörter wiegen (kein leerer/kryptischer Kandidatenbau)
+        r = waehle("Das ist ", [f"ein {nomen}", f"eine {nomen}"], model)
+        if r is None or r["margin"] < schwelle:
+            return None   # unter der verdienten Schwelle: ehrlich unentschieden
+        return r["kandidat"].split()[0]
+
+    return organ
 
 
 # --- Referenz-Proben: der erste Konsument, zugleich der Keim der Blind-Probe (Scheibe 2) --------

@@ -28,7 +28,7 @@ from genus.wortgraph import (
 )
 
 
-def answer(conn, question: str) -> dict:
+def answer(conn, question: str, waage=None) -> dict:
     """Answer a question about a word GENUS knows; ``{found: False}`` if it knows no word in it.
 
     Picks the *last* known content word (in "Was ist ein X?" the asked-about word comes last),
@@ -36,6 +36,10 @@ def answer(conn, question: str) -> dict:
     (meaning + is_a + other languages); a verb/adjective often has no concept node but still
     carries its glosses + part of speech -- answered word-level so the companion reaches beyond
     nouns. A real parse of the question is the LLM's job at the edge later.
+
+    ``waage`` (optional, injiziert wie ``stimme``): das Wiege-Organ für die Formwahl-Kette —
+    ohne bleibt die Kette rein deterministisch (Gegründetes + eigene Regel), siehe
+    :func:`genus.formwahl.artikel_ein`.
     """
     found = _last_known_word(conn, question)
     if found is None:
@@ -48,13 +52,28 @@ def answer(conn, question: str) -> dict:
         c = sources.concept_meaning(conn, qid)
         langs = list(dict.fromkeys(  # other-language forms, order-preserving dedup
             w.rsplit("@", 1)[0] for w in c["words"] if not w.endswith("@de")))
+        is_a = [sources.display(conn, p) for p in c["is_a"]]
         return {**base, "concept": qid, "label": c["label"], "meaning": c["meaning"],
-                "is_a": [sources.display(conn, p) for p in c["is_a"]], "languages": langs[:6],
+                "is_a": is_a, "languages": langs[:6], "artikel": _artikel_der_eltern(conn, is_a, waage),
                 **_meaning_grounding(conn, found, qid, c["meaning"])}
     # word-level (e.g. a verb): its own glosses + part of speech, no concept node yet
     meaning = _objects(conn, found, "primary_gloss") or _objects(conn, found, "defined_as")
     return {**base, "concept": None, "label": found, "meaning": meaning, "is_a": [],
             **_meaning_grounding(conn, found, None, meaning)}
+
+
+def _artikel_der_eltern(conn, is_a: list[str], waage=None) -> dict:
+    """Der unbestimmte Artikel je benanntem is_a-Elternteil (Formwahl-Kette) — nur entschiedene
+    Einträge; ein Elternteil ohne Entscheidung fehlt schlicht (dann behält :func:`narrate` seine
+    alte, formfreie Phrasierung)."""
+    from genus import formwahl
+
+    artikel: dict[str, dict] = {}
+    for name in (_LABEL.sub(r"\1", x) for x in is_a if not _BARE_QID.match(x)):
+        w = formwahl.artikel_ein(conn, name, waage=waage)
+        if w is not None:
+            artikel[name] = w
+    return artikel
 
 def _meaning_grounding(conn, word: str, qid: str | None, meaning) -> dict:
     """How well the SHOWN meaning is backed: its read-time relation-confidence and how many
@@ -98,7 +117,15 @@ def narrate(a: dict) -> str:
         # zeichen-Wörter müssen wortwörtlich überleben). Live gefunden (2026-07-03): ungeschützt
         # wurde "Kernobst" beim Umformulieren zu "Kernaubere" -- eine echte, unbemerkte
         # Faktenverfälschung, weil nur der Kopf-Begriff geschützt war.
-        sentence += f"; es zählt zu {_join_de([f'»{parent}«' for parent in named])}"
+        artikel = (a.get("artikel") or {}).get(named[0]) if len(named) == 1 else None
+        if artikel is not None:
+            # die natürliche Kopula, sobald die Formwahl-Kette den Artikel ENTSCHEIDEN kann
+            # (Gegründetes -> eigene Regel -> gewogen; genus/formwahl.py) -- der Artikel steht
+            # bewusst AUSSERHALB der »«, die Anker-Wörter bleiben wortgleich. Unentschieden ->
+            # byte-genau die alte, formfreie Phrasierung („zählt zu" braucht keinen Artikel).
+            sentence += f"; es ist {artikel['artikel']} »{named[0]}«"
+        else:
+            sentence += f"; es zählt zu {_join_de([f'»{parent}«' for parent in named])}"
     sentence += "."
     # Tiered honesty, relative to the trust seed (no new constant): a meaning carried only by
     # a below-seed witness (e.g. the capped model bridge) is said WITH the doubt; independent

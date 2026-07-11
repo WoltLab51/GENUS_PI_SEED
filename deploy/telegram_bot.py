@@ -437,6 +437,7 @@ def handle_update(
     from genus import companion, verstehen
     import deuter
     import stimme
+    import waage
 
     message = update.get("message") or update.get("edited_message")
     if not message or "text" not in message:
@@ -465,7 +466,7 @@ def handle_update(
         if erinnerung is not None:
             return chat_id, erinnerung
         if sessions is None:
-            answer = companion.respond(conn, question)
+            answer = companion.respond(conn, question, waage=waage.artikel_organ())
         else:
             # the OFFER of known Absichten comes from GENUS's own sown raster (the graph is
             # authoritative); before the one clean seed-apply, the module default steps in.
@@ -500,6 +501,10 @@ def handle_update(
                 verlauf=zuege[:-1],
                 letzte_lesarten=vorher.get("gelesen"),
                 letzter_anschluss=vorher.get("anschluss"),
+                # das Wiege-Organ der Formwahl-Kette: liest nur, handelt nur über seiner
+                # Blind-Proben-Schwelle; ohne Kalibrierung (~/.genus/waage_kalibrierung.json)
+                # ist es None und die Kette bleibt rein deterministisch
+                waage=waage.artikel_organ(),
             )
             answer = result["text"]
             # Lernkreis v1: eine angenommene Korrektur wird als Beispiel-Paar in der

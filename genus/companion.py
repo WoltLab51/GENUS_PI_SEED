@@ -400,11 +400,11 @@ def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, 
     return None
 
 
-def _wort_antwort(conn, question: str) -> str | None:
+def _wort_antwort(conn, question: str, waage=None) -> str | None:
     """The bare word reading -- any known word in the question, answered from its grounding.
     Deliberately the LAST reading in the Würfel order (it is greedy by nature and used to
     shadow better readings when it ran early -- the live bug class of 2026-07-02)."""
-    a = answer(conn, question)
+    a = answer(conn, question, waage=waage)
     if not a["found"]:
         return None
     text = narrate(a)
@@ -419,7 +419,7 @@ def _wort_antwort(conn, question: str) -> str | None:
     return text
 
 
-def respond(conn, question: str, bel: dict | None = None) -> str:
+def respond(conn, question: str, bel: dict | None = None, waage=None) -> str:
     """The full conversational answer to ``question``: remember -> recall -> state ->
     relational -> comparative -> gender -> word -> help, in that order (the personal-memory
     checks run first so they can never be shadowed by a fixed pattern or a known word; the rest
@@ -429,14 +429,18 @@ def respond(conn, question: str, bel: dict | None = None) -> str:
 
     ``bel`` (optional): die Antwort-Würfel-Belegung für die warme Stimme (Voice 1) der
     relationalen/kausalen Antworten. Der reine CLI-Weg (``genus ask``) ruft ``narrate_*``
-    direkt und bleibt nüchtern; die Gesprächs-Einstiege reichen die Belegung durch."""
+    direkt und bleibt nüchtern; die Gesprächs-Einstiege reichen die Belegung durch.
+
+    ``waage`` (optional, wie ``stimme``/``deuter`` von der Membran injiziert): das Wiege-Organ
+    der Formwahl-Kette — es LIEST nur (kein Erzeugungskanal, ``respond`` bleibt schreibfrei);
+    ohne Organ entscheiden Gegründetes + eigene Regel allein."""
     text = _ritual_antwort(conn, question)
     if text is not None:
         return text
     muster = _muster_antwort(conn, question, bel)
     if muster is not None:
         return muster[0]
-    text = _wort_antwort(conn, question)
+    text = _wort_antwort(conn, question, waage=waage)
     if text is not None:
         return text
     return _UNKNOWN_FALLBACK  # the honest "nothing recognized" help, same fallback as the CLI
@@ -718,14 +722,17 @@ _ZELLEN_LABELS = {
 }
 
 
-def _zelle_definition(conn, guess, question, last_question, last_answer, stimme=None):
+def _zelle_definition(conn, guess, question, last_question, last_answer, stimme=None,
+                      waage=None):
+    # ``waage``: die einzige Zelle mit dem reicheren Parameter -- der Dispatch verhandelt die
+    # Signatur (wie ``_stimme_versucht``), die übrigen Zellen bleiben unberührt
     subject = guess.get("subject")
     if not subject:
         return None
     found = _last_known_word(conn, subject)
     if found is None:
         return None
-    return respond(conn, f"Was ist {found}?")
+    return respond(conn, f"Was ist {found}?", waage=waage)
 
 
 def _anker_ok(question: str, *begriffe: str) -> bool:
@@ -1307,7 +1314,7 @@ _ANCHOR_BLEIBT = {   # cells that reformat/retrace the EXISTING topic, never int
 
 
 def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
-                     last_answer: str | None, stimme, quelle: str):
+                     last_answer: str | None, stimme, quelle: str, waage=None):
     """Löst eine Liste von Segment-Lesarten (aus dem Deuter ODER der Gebärden-Schnellspur) über
     :func:`_deuter_antwort` und sammelt die Teil-Antworten. Rückgabe ``(teile, gelesen, anchor)``
     -- ``teile`` sind die Segment-Antworten (für :func:`_komponiere`), ``gelesen`` die erkannten
@@ -1318,7 +1325,7 @@ def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
     anchor = question
     for segment in segmente:
         gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
-                                   stimme=stimme, quelle=quelle)
+                                   stimme=stimme, quelle=quelle, waage=waage)
         if gedeutet is not None:
             teile.append(gedeutet["text"])
             anchor = gedeutet["question"]
@@ -1329,7 +1336,7 @@ def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
 
 def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                      last_answer: str | None = None, stimme=None,
-                     quelle: str = "model:deuter") -> dict | None:
+                     quelle: str = "model:deuter", waage=None) -> dict | None:
     """Map an OPEN reading onto the Absichts-Raster and act from the known cell -- or
     climb ONE step to its Zwicky-Zelle (Blatt -> Zelle, nie tiefer -- eine Zelle ist schon die
     gröbste sinnvolle Einheit) -- or name honestly what GENUS read but cannot do yet. ``None``
@@ -1365,8 +1372,15 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         if zellen_werkzeug is None:
             continue
         hatte_handler = True
-        text = zellen_werkzeug.implementierung(conn, guess, question, last_question,
-                                               last_answer, stimme)
+        # Signatur-Verhandlung wie bei :func:`_stimme_versucht`: nur Zellen, die das reichere
+        # ``waage``-Organ annehmen (heute: definition), bekommen es -- die übrigen behalten
+        # ihre schlanke, feste Signatur
+        try:
+            text = zellen_werkzeug.implementierung(conn, guess, question, last_question,
+                                                   last_answer, stimme, waage=waage)
+        except TypeError:
+            text = zellen_werkzeug.implementierung(conn, guess, question, last_question,
+                                                   last_answer, stimme)
         if text is not None:
             _record_still(verstehen.record_reading, conn, kind, quelle)
             # der Transparenz-Hinweis gilt NUR für eine echte Modell-Deutung -- eine
@@ -1496,7 +1510,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                          deuter=None, stimme=None, last_answer: str | None = None,
                          verlauf: list[dict] | None = None,
                          letzte_lesarten: list[str] | None = None,
-                         letzter_anschluss: str | None = None) -> dict:
+                         letzter_anschluss: str | None = None, waage=None) -> dict:
     """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
     offene Deuter-SEGMENTIERUNG (eine Nachricht kann mehrere Sprechhandlungen enthalten, ISO
     24617-2 -- jedes Segment aufs Raster abgebildet, is_a-Fallback GENAU einen Schritt,
@@ -1563,7 +1577,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     # jeder Deutung, damit ein „ja" nie durch den Klassifikator muss (und nie ins Leere läuft).
     # Kein neues Angebot aus der Einlösung (keine endlose Angebots-Kette; ein Blick, kein Sog).
     if letzter_anschluss and _ist_zustimmung(question):
-        text = _stimme_versucht(conn, respond(conn, letzter_anschluss), stimme)
+        text = _stimme_versucht(conn, respond(conn, letzter_anschluss, waage=waage), stimme)
         return {"text": text, "question": letzter_anschluss, "gelesen": []}
     if last_question and is_why_followup(question):
         text = "\n".join(render_trace(conn, trace(conn, last_question)))
@@ -1571,7 +1585,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     if verlauf and is_backreference(question):
         frueher = _fruehere_frage_mit_bekanntem_begriff(conn, verlauf)
         if frueher is not None:
-            text = respond(conn, frueher) + _BACKREF_TAG.format(frueher)
+            text = respond(conn, frueher, waage=waage) + _BACKREF_TAG.format(frueher)
             return {"text": text, "question": frueher}
     text = _ritual_antwort(conn, question)
     if text is not None:
@@ -1606,7 +1620,8 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         gesten = gebaerde.lies(question)
         if gesten is not None:
             teile, gelesen, anchor = _segmente_loesen(
-                conn, gesten, question, last_question, last_answer, stimme, "gebaerde")
+                conn, gesten, question, last_question, last_answer, stimme, "gebaerde",
+                waage=waage)
             if teile:
                 return {"text": _komponiere(teile), "question": anchor, "gelesen": gelesen}
         segmente = deuter(question)
@@ -1614,7 +1629,8 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             segmente = [segmente]
         if segmente is not None:   # der Deuter LIEF -- auch eine leere Liste zählt als Lauf
             teile, gelesen, anchor = _segmente_loesen(
-                conn, segmente, question, last_question, last_answer, stimme, "model:deuter")
+                conn, segmente, question, last_question, last_answer, stimme, "model:deuter",
+                waage=waage)
             if teile:
                 bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
                 res = {"text": _komponiere(teile) + bei, "question": anchor, "gelesen": gelesen}
@@ -1628,7 +1644,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                 _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
             return {"text": _NICHT_VERSTANDEN + _luecken_vorschlag_hinweis(conn),
                     "question": question}
-    text = _wort_antwort(conn, question)
+    text = _wort_antwort(conn, question, waage=waage)
     if text is not None:
         text = _stimme_versucht(conn, text, stimme)
         if deuter is not None:

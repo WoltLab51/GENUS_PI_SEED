@@ -1,0 +1,659 @@
+[
+ {
+  "name": "plural-nach-drei-zeitungen",
+  "kontext": "Am Kiosk kauft er drei ",
+  "kandidaten": [
+   "Zeitungen",
+   "Zeitung"
+  ],
+  "erwartet": "Zeitungen",
+  "begruendung": "Das Zahlwort \"drei\" erzwingt grammatisch den Plural; \"drei Zeitung\" ist ungrammatisch.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "plural-umlaut-zwei-baeume",
+  "kontext": "Im Garten wachsen zwei ",
+  "kandidaten": [
+   "Bäume",
+   "Baume"
+  ],
+  "erwartet": "Bäume",
+  "begruendung": "Der Plural von \"Baum\" wird zwingend mit Umlaut gebildet; \"Baume\" ist als Pluralform ungrammatisch.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "dativ-plural-mit-den-kindern",
+  "kontext": "Die Lehrerin spricht mit den ",
+  "kandidaten": [
+   "Kindern",
+   "Kinder"
+  ],
+  "erwartet": "Kindern",
+  "begruendung": "Die Präposition \"mit\" regiert den Dativ, und der Dativ Plural verlangt das Endungs-n (\"den Kindern\").",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "genitiv-des-waldes",
+  "kontext": "Der Weg endet am Rand des ",
+  "kandidaten": [
+   "Waldes",
+   "Wald"
+  ],
+  "erwartet": "Waldes",
+  "begruendung": "Der Artikel \"des\" markiert den Genitiv, der bei starken Maskulina wie \"Wald\" die Endung -es erzwingt.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "akkusativ-einen-schluessel",
+  "kontext": "Seit Stunden sucht er ",
+  "kandidaten": [
+   "einen Schlüssel",
+   "ein Schlüssel",
+   "einem Schlüssel"
+  ],
+  "erwartet": "einen Schlüssel",
+  "begruendung": "\"suchen\" verlangt ein direktes Objekt im Akkusativ; da \"er\" eindeutig Nominativ ist, kann \"ein Schlüssel\" nicht als Subjekt gelesen werden — nur der maskuline Akkusativ-Artikel \"einen\" ist grammatisch.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "dativ-wechselpraep-regal",
+  "kontext": "Die Vase steht auf ",
+  "kandidaten": [
+   "dem Regal",
+   "das Regal"
+  ],
+  "erwartet": "dem Regal",
+  "begruendung": "\"stehen\" bezeichnet eine Position, daher regiert die Wechselpräposition \"auf\" hier zwingend den Dativ.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "adjektiv-neutrum-kaltes-bier",
+  "kontext": "Nach der Wanderung trinkt er ein ",
+  "kandidaten": [
+   "kaltes Bier",
+   "kalter Bier",
+   "kalte Bier"
+  ],
+  "erwartet": "kaltes Bier",
+  "begruendung": "\"Bier\" ist Neutrum, und nach dem endungslosen Artikel \"ein\" muss das Adjektiv im Akkusativ Neutrum die Endung -es tragen.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "verb-plural-und-ich-wohnen",
+  "kontext": "Meine Schwester und ich ",
+  "kandidaten": [
+   "wohnen",
+   "wohnt"
+  ],
+  "erwartet": "wohnen",
+  "begruendung": "Das koordinierte Subjekt \"meine Schwester und ich\" steht in der 1. Person Plural und erzwingt die Verbform \"wohnen\".",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "partizip-stark-geschlafen",
+  "kontext": "Nach der langen Reise hat sie tief ",
+  "kandidaten": [
+   "geschlafen",
+   "geschlaft"
+  ],
+  "erwartet": "geschlafen",
+  "begruendung": "\"schlafen\" ist ein starkes Verb, dessen Partizip II \"geschlafen\" lautet; die schwache Form \"geschlaft\" existiert nicht.",
+  "klasse": "morphologie",
+  "gestalt": "form"
+ },
+ {
+  "name": "akkusativ-den-baum",
+  "kontext": "Der Gärtner gießt ",
+  "kandidaten": [
+   "den Baum",
+   "der Baum"
+  ],
+  "erwartet": "den Baum",
+  "begruendung": "Das Verb gießen verlangt den Akkusativ, und Baum ist maskulin — als direktes Objekt ist nur \"den Baum\" grammatisch.",
+  "klasse": "genus-artikel",
+  "gestalt": "form"
+ },
+ {
+  "name": "dativ-nach-mit-messer",
+  "kontext": "Sie schneidet das Brot mit ",
+  "kandidaten": [
+   "dem Messer",
+   "das Messer"
+  ],
+  "erwartet": "dem Messer",
+  "begruendung": "Die Präposition \"mit\" regiert immer den Dativ, also muss das neutrale Messer als \"dem Messer\" erscheinen.",
+  "klasse": "genus-artikel",
+  "gestalt": "form"
+ },
+ {
+  "name": "nominativ-die-butter",
+  "kontext": "Im Kühlschrank liegt ",
+  "kandidaten": [
+   "die Butter",
+   "der Butter"
+  ],
+  "erwartet": "die Butter",
+  "begruendung": "Butter ist feminin und steht hier als Subjekt im Nominativ, daher zwingend \"die Butter\" — \"der Butter\" wäre Dativ/Genitiv und hier ungrammatisch.",
+  "klasse": "genus-artikel",
+  "gestalt": "form"
+ },
+ {
+  "name": "nominativ-der-kaese",
+  "kontext": "Auf dem Teller liegt ",
+  "kandidaten": [
+   "der Käse",
+   "das Käse"
+  ],
+  "erwartet": "der Käse",
+  "begruendung": "Käse ist im Standarddeutschen maskulin, als Subjekt im Nominativ also nur \"der Käse\" korrekt.",
+  "klasse": "genus-artikel",
+  "gestalt": "form"
+ },
+ {
+  "name": "neutrum-das-maedchen",
+  "kontext": "Im Garten spielt ",
+  "kandidaten": [
+   "das Mädchen",
+   "die Mädchen"
+  ],
+  "erwartet": "das Mädchen",
+  "begruendung": "Mädchen ist als -chen-Diminutiv neutral, und das singularische \"spielt\" schließt die Plurallesart \"die Mädchen\" grammatisch aus.",
+  "klasse": "genus-artikel",
+  "gestalt": "form"
+ },
+ {
+  "name": "das-vor-auto",
+  "kontext": "Vor dem Haus parkt das ",
+  "kandidaten": [
+   "Auto",
+   "Wagen"
+  ],
+  "erwartet": "Auto",
+  "begruendung": "Beide Nomen passen semantisch perfekt, aber nur das neutrale \"Auto\" stimmt mit dem Artikel \"das\" überein — Wagen ist maskulin.",
+  "klasse": "genus-artikel",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "die-vor-hoffnung",
+  "kontext": "Zum Schluss bleibt die ",
+  "kandidaten": [
+   "Hoffnung",
+   "Mut"
+  ],
+  "erwartet": "Hoffnung",
+  "begruendung": "Beide Abstrakta passen zu \"bleibt\", aber nur die feminine \"Hoffnung\" (Endung -ung ist immer feminin) stimmt mit \"die\" überein; Mut ist maskulin.",
+  "klasse": "genus-artikel",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "das-vor-buch",
+  "kontext": "Im Regal steht das ",
+  "kandidaten": [
+   "Buch",
+   "Roman"
+  ],
+  "erwartet": "Buch",
+  "begruendung": "Beide stehen typischerweise im Regal, aber nur das neutrale \"Buch\" passt zum Artikel \"das\"; Roman ist maskulin und verlangte \"der\".",
+  "klasse": "genus-artikel",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "dativ-der-feder",
+  "kontext": "Sie schreibt den Brief mit der ",
+  "kandidaten": [
+   "Feder",
+   "Stift"
+  ],
+  "erwartet": "Feder",
+  "begruendung": "Nach \"mit der\" kann nur ein feminines Nomen folgen; \"Feder\" ist feminin und als Schreibinstrument idiomatisch, der maskuline \"Stift\" verlangte \"mit dem\". Beide sind gleich plausible Schreibgeräte, nur das Genus entscheidet.",
+  "klasse": "genus-artikel",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "bank-parkbank-holz",
+  "kontext": "Die Bank im Park ist frisch lackiert, man riecht noch das ",
+  "kandidaten": [
+   "Holz",
+   "Geld"
+  ],
+  "erwartet": "Holz",
+  "begruendung": "Park und frischer Lack aktivieren eindeutig die Sitzbank aus Holz; Geld gehört zur Geldinstitut-Lesart und ergibt hier keinen Sinn.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "schloss-gebaeude-tuerme",
+  "kontext": "Das Schloss auf dem Hügel hat hohe ",
+  "kandidaten": [
+   "Türme",
+   "Riegel"
+  ],
+  "erwartet": "Türme",
+  "begruendung": "Ein Schloss auf einem Hügel ist zwingend das Gebäude mit Türmen; Riegel verrieten die Türschloss-Lesart und passen nicht zu 'hohe'.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "birne-lampe-durchgebrannt",
+  "kontext": "Die Birne in der Deckenlampe ist wieder ",
+  "kandidaten": [
+   "durchgebrannt",
+   "verfault"
+  ],
+  "erwartet": "durchgebrannt",
+  "begruendung": "In einer Deckenlampe kann nur die Glühbirne stecken, und die brennt durch; verfaulen kann ausschließlich das Obst.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "fluegel-klavier-tasten",
+  "kontext": "Der Konzertsaal bekam einen neuen Flügel mit glänzenden ",
+  "kandidaten": [
+   "Tasten",
+   "Federn"
+  ],
+  "erwartet": "Tasten",
+  "begruendung": "Im Konzertsaal ist der Flügel zwingend das Instrument mit Tasten; Federn gehören zur Vogelflügel-Lesart.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "maus-computer-rechner",
+  "kontext": "Er verband die neue Maus per USB mit dem ",
+  "kandidaten": [
+   "Rechner",
+   "Käfig"
+  ],
+  "erwartet": "Rechner",
+  "begruendung": "USB erzwingt die Eingabegerät-Lesart, und verbunden wird die Computermaus mit dem Rechner; ein Käfig gehört zum Tier. 'Verbinden mit' statt 'schließen an', weil 'anschließen' trennbar ist und das nachgestellte 'an' hinter dem Schlusskandidaten zwingend fehlen würde.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "kiefer-baum-nadeln",
+  "kontext": "Die Kiefer am Waldrand verlor im Sturm viele ",
+  "kandidaten": [
+   "Nadeln",
+   "Zähne"
+  ],
+  "erwartet": "Nadeln",
+  "begruendung": "Der feminine Artikel und der Waldrand erzwingen den Nadelbaum, der Nadeln verliert; Zähne verrieten die Lesart 'der Kiefer' (Knochen).",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "steuer-abgabe-zahlt",
+  "kontext": "Auf Tabak erhebt der Staat eine hohe Steuer, die jeder ",
+  "kandidaten": [
+   "zahlt",
+   "lenkt"
+  ],
+  "erwartet": "zahlt",
+  "begruendung": "Vom Staat auf Tabak erhoben ist zwingend die Abgabe (die Steuer), und die wird gezahlt; gelenkt wird nur das Steuer eines Fahrzeugs.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "gericht-speise-pfeffer",
+  "kontext": "Der Koch würzte das Gericht kräftig mit ",
+  "kandidaten": [
+   "Pfeffer",
+   "Paragrafen"
+  ],
+  "erwartet": "Pfeffer",
+  "begruendung": "Was ein Koch würzt, ist zwingend die Speise, und gewürzt wird mit Pfeffer; Paragrafen gehören zur Justiz-Lesart.",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "leiter-geraet-sprossen",
+  "kontext": "Die Leiter am Baugerüst hat zwölf stabile ",
+  "kandidaten": [
+   "Sprossen",
+   "Abteilungen"
+  ],
+  "erwartet": "Sprossen",
+  "begruendung": "Der feminine Artikel und das Baugerüst erzwingen das Steiggerät mit Sprossen; Abteilungen verrieten die Lesart 'der Leiter' (Person).",
+  "klasse": "wsd",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "weil-verbend-drucker",
+  "kontext": "",
+  "kandidaten": [
+   "Der Drucker bleibt stumm, weil das Kabel locker ist.",
+   "Der Drucker bleibt stumm, weil das Kabel ist locker."
+  ],
+  "erwartet": "Der Drucker bleibt stumm, weil das Kabel locker ist.",
+  "begruendung": "Nach der Subjunktion »weil« steht das finite Verb im Standarddeutschen zwingend am Satzende; die Verbzweit-Variante ist umgangssprachlich-holprig, aber verständlich.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "zeit-vor-ort-island",
+  "kontext": "Der Urlaub ist gebucht. ",
+  "kandidaten": [
+   "Wir fliegen im August nach Island.",
+   "Wir fliegen nach Island im August."
+  ],
+  "erwartet": "Wir fliegen im August nach Island.",
+  "begruendung": "Im neutralen deutschen Mittelfeld steht die Zeitangabe vor der Ortsangabe (te-ka-mo-lo); die umgedrehte Reihenfolge klingt ohne Kontrastbetonung fremd und hölzern.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "genitiv-nachgestellt-kirche",
+  "kontext": "",
+  "kandidaten": [
+   "Das Dach der Kirche wurde neu gedeckt.",
+   "Der Kirche Dach wurde neu gedeckt."
+  ],
+  "erwartet": "Das Dach der Kirche wurde neu gedeckt.",
+  "begruendung": "Der vorangestellte Genitiv bei gewöhnlichen Substantiven (»der Kirche Dach«) ist im heutigen Deutsch archaisch-gestelzt; nachgestellter Genitiv ist die eindeutig natürliche Form.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "pronomen-vor-objekt-werkzeug",
+  "kontext": "",
+  "kandidaten": [
+   "Die Nachbarin hat ihm den Werkzeugkasten geliehen.",
+   "Die Nachbarin hat den Werkzeugkasten ihm geliehen."
+  ],
+  "erwartet": "Die Nachbarin hat ihm den Werkzeugkasten geliehen.",
+  "begruendung": "Ein unbetontes Pronomen steht im Mittelfeld vor der vollen Nominalphrase; die Umkehrung ist grammatisch möglich, wird von Muttersprachlern aber klar als verdreht empfunden.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "relativsatz-statt-partizip-turbine",
+  "kontext": "",
+  "kandidaten": [
+   "Eine Turbine ist eine Maschine, die Strömung in Drehung umwandelt.",
+   "Eine Turbine ist eine Strömung in Drehung umwandelnde Maschine."
+  ],
+  "erwartet": "Eine Turbine ist eine Maschine, die Strömung in Drehung umwandelt.",
+  "begruendung": "Der Relativsatz ist die natürliche Definitionsform; das gestapelte Partizipialattribut ist grammatisch, wirkt aber amtsdeutsch-schwerfällig und zwingt den Leser in einen Holzweg-Parse (»Eine Turbine ist eine Strömung …«).",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "verbklammer-nachfeld-garten",
+  "kontext": "Es war ein warmer Tag. ",
+  "kandidaten": [
+   "Die Kinder haben den ganzen Nachmittag im Garten gespielt.",
+   "Die Kinder haben den ganzen Nachmittag gespielt im Garten."
+  ],
+  "erwartet": "Die Kinder haben den ganzen Nachmittag im Garten gespielt.",
+  "begruendung": "Die deutsche Verbklammer schließt mit dem Partizip; die Ausklammerung der Ortsangabe ins Nachfeld ist zwar hörbar-umgangssprachlich möglich, im neutralen Erzähltext aber klar unnatürlich.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "satzadverb-stellung-aufzug",
+  "kontext": "",
+  "kandidaten": [
+   "Der Aufzug hält normalerweise in jedem Stockwerk.",
+   "Der Aufzug hält in jedem Stockwerk normalerweise."
+  ],
+  "erwartet": "Der Aufzug hält normalerweise in jedem Stockwerk.",
+  "begruendung": "Das Satzadverb »normalerweise« steht natürlich früh im Mittelfeld; ans Satzende gestellt wirkt es nachgeklappt und hölzern, ohne ungrammatisch zu sein.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "genitiv-statt-possessivdativ-hut",
+  "kontext": "",
+  "kandidaten": [
+   "Der Hut des Mannes lag auf der Bank.",
+   "Dem Mann sein Hut lag auf der Bank."
+  ],
+  "erwartet": "Der Hut des Mannes lag auf der Bank.",
+  "begruendung": "Der possessive Dativ (»dem Mann sein Hut«) ist verbreitete, aber klar substandardliche Umgangssprache; in neutralem Schriftdeutsch ist die Genitiv-Fassung objektiv die richtige.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "infinitivklammer-laerm",
+  "kontext": "",
+  "kandidaten": [
+   "Es ist schwer, bei Lärm zu arbeiten.",
+   "Es ist schwer, zu arbeiten bei Lärm."
+  ],
+  "erwartet": "Es ist schwer, bei Lärm zu arbeiten.",
+  "begruendung": "Im Infinitivsatz steht die Präpositionalangabe vor »zu arbeiten«; die Nachstellung ins Nachfeld ist parseabar, klingt für Muttersprachler aber eindeutig verdreht.",
+  "klasse": "stil",
+  "gestalt": "stil"
+ },
+ {
+  "name": "gruss-hallo-wiedersehen",
+  "kontext": "Nachricht: \"Hallo, schön dich zu sehen!\" Das ist ",
+  "kandidaten": [
+   "ein Gruß",
+   "eine Verabschiedung",
+   "ein Dank"
+  ],
+  "erwartet": "ein Gruß",
+  "begruendung": "„Hallo“ am Gesprächsanfang ist die kanonische deutsche Begrüßungsformel und kann weder Abschied noch Dank sein.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "dank-paket-angenommen",
+  "kontext": "Nachricht: \"Danke, dass du das Paket angenommen hast!\" Das ist ",
+  "kandidaten": [
+   "ein Dank",
+   "eine Bitte um Hilfe",
+   "ein Gruß"
+  ],
+  "erwartet": "ein Dank",
+  "begruendung": "Das explizite „Danke“ für eine bereits erfolgte Handlung macht die Nachricht eindeutig zu einer Danksagung, nicht zu einer Bitte.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "abschied-tschuess-montag",
+  "kontext": "Nachricht: \"Tschüss, bis Montag!\" Das ist ",
+  "kandidaten": [
+   "eine Verabschiedung",
+   "eine Begrüßung",
+   "ein Dank"
+  ],
+  "erwartet": "eine Verabschiedung",
+  "begruendung": "„Tschüss“ mit Wiedersehensformel („bis Montag“) sagt man ausschließlich beim Auseinandergehen. „Eine Begrüßung“ statt des mehrdeutigen „ein Gruß“, weil ‚Gruß‘ im Deutschen auch Abschiedsgrüße umfasst und sonst mit-richtig wäre.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "bedeutungsfrage-fernweh",
+  "kontext": "Nachricht: \"Was bedeutet das Wort Fernweh?\" Das ist ",
+  "kandidaten": [
+   "eine Frage nach einer Bedeutung",
+   "eine Wetterfrage",
+   "eine Bitte um Hilfe"
+  ],
+  "erwartet": "eine Frage nach einer Bedeutung",
+  "begruendung": "Die Formel „Was bedeutet das Wort …?“ fragt wörtlich nach einer Wortbedeutung und hat mit Wetter oder praktischer Hilfe nichts zu tun.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "wetterfrage-regen-hamburg",
+  "kontext": "Nachricht: \"Regnet es morgen in Hamburg?\" Das ist ",
+  "kandidaten": [
+   "eine Wetterfrage",
+   "eine Frage nach einer Bedeutung",
+   "eine Verabschiedung"
+  ],
+  "erwartet": "eine Wetterfrage",
+  "begruendung": "Ob es morgen regnet, ist eine reine Frage nach dem Wetter; es wird keine Wortbedeutung erfragt und niemand verabschiedet sich.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "bitte-drucker-einrichten",
+  "kontext": "Nachricht: \"Kannst du mir bitte den Drucker einrichten?\" Das ist ",
+  "kandidaten": [
+   "eine Bitte um Hilfe",
+   "ein Dank",
+   "eine Aussage"
+  ],
+  "erwartet": "eine Bitte um Hilfe",
+  "begruendung": "„Kannst du mir bitte …?“ ist die idiomatische deutsche Höflichkeitsform einer Hilfsbitte, kein Dank und keine Feststellung.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "aussage-mond-erde",
+  "kontext": "Nachricht: \"Der Mond umkreist die Erde.\" Das ist ",
+  "kandidaten": [
+   "eine Aussage",
+   "eine Frage",
+   "eine Bitte um Hilfe"
+  ],
+  "erwartet": "eine Aussage",
+  "begruendung": "Ein Deklarativsatz, der eine Tatsache feststellt, ist eine Aussage; es wird nichts gefragt und um nichts gebeten.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "abschied-machs-gut-hart",
+  "kontext": "Nachricht: \"Mach's gut, wir sehen uns im August!\" Das ist ",
+  "kandidaten": [
+   "eine Verabschiedung",
+   "eine Begrüßung"
+  ],
+  "erwartet": "eine Verabschiedung",
+  "begruendung": "„Mach's gut“ sagt man ausschließlich zum Abschied, nie zur Begrüßung — das nahe Minimalpaar Begrüßung/Verabschiedung prüft, ob die Margin ehrliche Sicherheit zeigt; „Begrüßung“ statt des mehrdeutigen „Gruß“, damit der Distraktor objektiv falsch ist.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "wetterfrage-nacht-kalt-hart",
+  "kontext": "Nachricht: \"Wie kalt wird es heute Nacht?\" Das ist ",
+  "kandidaten": [
+   "eine Wetterfrage",
+   "eine Frage nach einer Bedeutung"
+  ],
+  "erwartet": "eine Wetterfrage",
+  "begruendung": "Die Frage nach der Nachttemperatur betrifft eindeutig das Wetter, obwohl das Wort „Wetter“ selbst nicht fällt — erfragt wird keine Wortbedeutung.",
+  "klasse": "einordnung",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "kuh-gibt-milch",
+  "kontext": "Eine Kuh gibt uns ",
+  "kandidaten": [
+   "Milch",
+   "Eier"
+  ],
+  "erwartet": "Milch",
+  "begruendung": "Kühe sind Säugetiere und geben Milch, während Eier von Hühnern stammen — nur 'Milch' ist sachlich richtig.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "hauptstadt-berlin",
+  "kontext": "Die Hauptstadt von Deutschland ist ",
+  "kandidaten": [
+   "Berlin",
+   "Hamburg"
+  ],
+  "erwartet": "Berlin",
+  "begruendung": "Berlin ist die Hauptstadt der Bundesrepublik Deutschland; Hamburg ist zwar eine Großstadt, aber nicht die Hauptstadt.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "hoechster-berg-zugspitze",
+  "kontext": "Der höchste Berg Deutschlands heißt ",
+  "kandidaten": [
+   "Zugspitze",
+   "Brocken"
+  ],
+  "erwartet": "Zugspitze",
+  "begruendung": "Die Zugspitze ist mit 2962 m der höchste Berg Deutschlands, der Brocken misst nur 1141 m.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "wasser-siedet-hundert",
+  "kontext": "Bei normalem Luftdruck siedet Wasser bei ",
+  "kandidaten": [
+   "hundert Grad Celsius",
+   "null Grad Celsius"
+  ],
+  "erwartet": "hundert Grad Celsius",
+  "begruendung": "Bei normalem Luftdruck siedet Wasser definitionsgemäß bei hundert Grad Celsius; bei null Grad gefriert es.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "fahrrad-zwei-raeder",
+  "kontext": "Ein Fahrrad hat normalerweise ",
+  "kandidaten": [
+   "zwei Räder",
+   "vier Räder"
+  ],
+  "erwartet": "zwei Räder",
+  "begruendung": "Ein Fahrrad ist ein Zweirad und hat per Definition zwei Räder, nicht vier.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "jahr-zwoelf-monate",
+  "kontext": "Ein Jahr hat zwölf ",
+  "kandidaten": [
+   "Monate",
+   "Wochen"
+  ],
+  "erwartet": "Monate",
+  "begruendung": "Das Kalenderjahr ist in zwölf Monate gegliedert, während es rund zweiundfünfzig Wochen zählt.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "hoeren-mit-ohren",
+  "kontext": "Der Mensch hört mit den ",
+  "kandidaten": [
+   "Ohren",
+   "Augen"
+  ],
+  "erwartet": "Ohren",
+  "begruendung": "Der Mensch nimmt Schall über die Ohren wahr, während die Augen dem Sehen dienen.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "schlange-keine-beine",
+  "kontext": "Eine Schlange hat keine ",
+  "kandidaten": [
+   "Beine",
+   "Schuppen"
+  ],
+  "erwartet": "Beine",
+  "begruendung": "Schlangen sind beinlose Reptilien, besitzen aber sehr wohl Schuppen — die wahre Negation ist 'keine Beine'.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ },
+ {
+  "name": "baum-kann-nicht-laufen",
+  "kontext": "Ein Baum kann nicht ",
+  "kandidaten": [
+   "laufen",
+   "wachsen"
+  ],
+  "erwartet": "laufen",
+  "begruendung": "Ein Baum ist ortsfest verwurzelt und kann nicht laufen, wächst aber sehr wohl — die wahre Negation ist 'laufen'.",
+  "klasse": "fakten",
+  "gestalt": "inhalt"
+ }
+]
