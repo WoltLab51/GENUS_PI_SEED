@@ -117,14 +117,18 @@ def narrate(a: dict) -> str:
         # zeichen-Wörter müssen wortwörtlich überleben). Live gefunden (2026-07-03): ungeschützt
         # wurde "Kernobst" beim Umformulieren zu "Kernaubere" -- eine echte, unbemerkte
         # Faktenverfälschung, weil nur der Kopf-Begriff geschützt war.
-        artikel = (a.get("artikel") or {}).get(named[0]) if len(named) == 1 else None
-        if artikel is not None:
-            # die natürliche Kopula, sobald die Formwahl-Kette den Artikel ENTSCHEIDEN kann
-            # (Gegründetes -> eigene Regel -> gewogen; genus/formwahl.py) -- der Artikel steht
-            # bewusst AUSSERHALB der »«, die Anker-Wörter bleiben wortgleich. Unentschieden ->
-            # byte-genau die alte, formfreie Phrasierung („zählt zu" braucht keinen Artikel).
-            sentence += f"; es ist {artikel['artikel']} »{named[0]}«"
+        artikel = a.get("artikel") or {}
+        if all(p in artikel for p in named):
+            # die natürliche Kopula, sobald die Formwahl-Kette JEDEN Elternteil-Artikel
+            # ENTSCHEIDEN kann (Gegründetes -> eigene Regel -> gewogen; genus/formwahl.py).
+            # Sicher für den Nominativ: das bare is_a-Label trägt schon die Adjektiv-Endung, die
+            # nach „ein/eine" steht („ein domestiziertes Säugetier", „eine große Katze"), also
+            # wird nur der Artikel VORGESETZT, AUSSERHALB der »«, die Anker-Wörter wortgleich.
+            teile = [f"{artikel[p]['artikel']} »{p}«" for p in named]
+            sentence += f"; es ist {_join_de(teile)}"
         else:
+            # mindestens ein Elternteil unentschieden -> byte-genau die alte, formfreie
+            # Phrasierung („zählt zu" braucht keinen Artikel)
             sentence += f"; es zählt zu {_join_de([f'»{parent}«' for parent in named])}"
     sentence += "."
     # Tiered honesty, relative to the trust seed (no new constant): a meaning carried only by

@@ -54,9 +54,9 @@ def test_feminines_elternteil_bekommt_eine():
     assert "es ist eine »Frucht«" in text
 
 
-def test_mehrere_eltern_behalten_die_formfreie_aufzaehlung():
-    # bei ZWEI benannten Eltern bleibt die "; es zählt zu A und B"-Aufzählung (kein Artikel je
-    # Glied nötig, und die Formwahl greift bewusst nur den Ein-Elternteil-Fall)
+def test_mehrere_eltern_bekommen_je_ihren_artikel_wenn_alle_entschieden():
+    # ALLE benannten Eltern entschieden -> "es ist ein »A« und ein »B«" (Nominativ ist sicher,
+    # das Label trägt schon die richtige Adjektiv-Endung); die Klasse, nicht nur der Einzelfall
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Q144", "is_a", "Q3736439", "wikidata")
@@ -65,8 +65,25 @@ def test_mehrere_eltern_behalten_die_formfreie_aufzaehlung():
     reactors.observe_relation(conn, "Tier@de", "expresses", "Q729", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
     reactors.observe_relation(conn, "Haustier@de", "grammatical_gender", "neutrum", "wikidata-lexemes")
+    reactors.observe_relation(conn, "Tier@de", "grammatical_gender", "neutrum", "wikidata-lexemes")
     text = auskunft.narrate(auskunft.answer(conn, "Was ist ein Hund?"))
-    assert "zählt zu" in text and "»Haustier«" in text and "»Tier«" in text
+    assert "es ist ein »Haustier« und ein »Tier«" in text
+    assert "zählt zu" not in text
+
+
+def test_ein_unentschiedener_elternteil_faellt_ganz_auf_formfrei_zurueck():
+    # ein Elternteil ohne Entscheidung (kein Genus, keine Regel) -> die GANZE Aufzählung bleibt
+    # formfrei, statt halb Artikel / halb nicht zu mischen
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q3736439", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q729", "wikidata")
+    reactors.observe_relation(conn, "Haustier@de", "expresses", "Q3736439", "wikidata")
+    reactors.observe_relation(conn, "Xyzzytier@de", "expresses", "Q729", "wikidata")   # kein Genus/Regel
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
+    reactors.observe_relation(conn, "Haustier@de", "grammatical_gender", "neutrum", "wikidata-lexemes")
+    text = auskunft.narrate(auskunft.answer(conn, "Was ist ein Hund?"))
+    assert "zählt zu" in text and "»Haustier«" in text and "»Xyzzytier«" in text
     assert "es ist ein »" not in text
 
 
