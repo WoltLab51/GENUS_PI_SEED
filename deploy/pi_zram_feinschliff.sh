@@ -1,66 +1,52 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# ZRAM-FEINSCHLIFF (2026-07-11, nach dem SSD-Umzug): zwei Handgriffe, beide im Geist der
-# SD-Schonung und des 7B-Waage-Plans.
+# ZRAM-FEINSCHLIFF v2 (2026-07-11): auf dem VENDOR-WEG. Der erste Versuch schrieb den
+# systemd-zram-generator direkt um -- aber auf Raspberry Pi OS verwaltet das Paket rpi-swap
+# das zram (eigener Generator, /etc/rpi/swap.conf, BindsTo auf den /var/swap-Loop beim
+# Hybrid-Mechanismus). Gegen das Vendor-Tooling zu arbeiten erzeugte genau den Fehler
+# "Failed to configure write-back device". Lehre: konfigurieren, wo der Eigentuemer liest.
 #
-#   1. zRAM 2 GB -> 4 GB (zstd bleibt): mehr komprimierter RAM-Puffer = Luft fuer das warme
-#      7B-Praezisionswaage-Experiment, ohne je eine Platte zu beruehren.
-#   2. zram-WRITEBACK entsorgen: der (inaktive) Mechanismus haengt an loop0 -> /var/swap,
-#      und die liegt auf der SD -- genau die Schreiblast, die der SSD-Umzug eliminiert hat.
-#      Swap-Nutzung ist ohnehin 0 B; /var/swap loeschen gibt 2 GB SD-Platz frei.
-#
-# Provider ist der systemd-zram-generator (dpkg: systemd-zram-generator); die Konfig gehoert
-# nach /etc/systemd/zram-generator.conf (Override-Pfad, bootfest). Idempotent; swapoff bei
-# 0 B Nutzung ist augenblicklich und beruehrt Bot/GENUS nicht.
+# Ziel unveraendert: zRAM 4 GB, KEIN Writeback auf die SD (Mechanism=zram statt auto/hybrid).
+# Laut man rpi-swap brauchen Aenderungen einen REBOOT -- das Skript konfiguriert nur und
+# raeumt die Reste von v1 auf; danach: sudo reboot (bzw. shutdown fuer den Kabel-Tausch).
 
-CONF=/etc/systemd/zram-generator.conf
+CONF_D=/etc/rpi/swap.conf.d
+ALT=/etc/systemd/zram-generator.conf
 
 log() { printf '[ZRAM] %s %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 fehler() { printf '[ZRAM] FEHLER: %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || fehler "bitte mit sudo ausfuehren"
+[ -d /etc/rpi ] || fehler "/etc/rpi fehlt -- kein rpi-swap-System?"
 
-log "vorher: $(swapon --show --noheadings | tr '\n' ' ' || true)"
+# --- 1. v1-Reste zuruecknehmen (mein direkter zram-generator-Eingriff) ------------------
+if [ -f "$ALT.vor-feinschliff" ]; then
+    mv "$ALT.vor-feinschliff" "$ALT"
+    log "zram-generator.conf auf den Originalzustand zurueckgesetzt"
+elif [ -f "$ALT" ] && grep -q "GENUS zRAM-Feinschliff" "$ALT"; then
+    rm -f "$ALT"
+    log "v1-Konfig entfernt"
+fi
 
-# --- 1. Konfig schreiben (Override in /etc, bootfest) ----------------------------------
-if [ -f "$CONF" ]; then cp -a "$CONF" "$CONF.vor-feinschliff"; fi
-cat > "$CONF" <<'EOF'
-# GENUS zRAM-Feinschliff (deploy/pi_zram_feinschliff.sh, 2026-07-11):
-# 4 GB komprimierter Swap im RAM (zstd), KEIN writeback-device -- die SD wird geschont,
-# die SSD bleibt dem Ledger. Bei 8 GB RAM ist min(ram/2, 4096) = 4096 MB.
-[zram0]
-zram-size = min(ram / 2, 4096)
-compression-algorithm = zstd
-swap-priority = 100
+# --- 2. Der Vendor-Weg: rpi-swap-Drop-in (empfohlener Pfad laut swap.conf-Kopf) ---------
+mkdir -p "$CONF_D"
+cat > "$CONF_D/50-genus.conf" <<'EOF'
+# GENUS zRAM-Feinschliff (deploy/pi_zram_feinschliff.sh v2, 2026-07-11):
+# reines zram (KEIN Hybrid, kein Writeback-Loop auf die SD -- die wird geschont,
+# die SSD gehoert dem Ledger), 4 GB komprimierter RAM-Swap.
+[Main]
+Mechanism=zram
+
+[Zram]
+FixedSizeMiB=4096
 EOF
-log "Konfig geschrieben: $CONF (4 GB, zstd, kein writeback)"
+log "geschrieben: $CONF_D/50-genus.conf (Mechanism=zram, 4096 MiB)"
 
-# --- 2. Writeback-Reste entsorgen -------------------------------------------------------
-systemctl disable --now rpi-zram-writeback.service 2>/dev/null || true
-systemctl disable --now rpi-zram-writeback.timer 2>/dev/null || true
-if losetup /dev/loop0 >/dev/null 2>&1; then
-    losetup -d /dev/loop0 2>/dev/null || true
-    log "loop0 abgehaengt"
-fi
-if [ -f /var/swap ]; then
-    rm -f /var/swap
-    log "/var/swap geloescht (2 GB SD-Platz frei)"
-fi
+# --- 3. /var/swap bleibt geloescht (Mechanism=zram referenziert ihn nicht mehr) ---------
+[ ! -f /var/swap ] && log "/var/swap ist weg (2 GB SD frei) -- bleibt so" || true
 
-# --- 3. zram0 mit neuer Groesse neu aufsetzen -------------------------------------------
-swapoff /dev/zram0 2>/dev/null || true
-systemctl daemon-reload
-systemctl restart systemd-zram-setup@zram0.service
-systemctl restart dev-zram0.swap 2>/dev/null || swapon /dev/zram0 2>/dev/null || true
-
-# --- 4. Verifikation ---------------------------------------------------------------------
-GROESSE="$(cat /sys/block/zram0/disksize)"
-[ "$GROESSE" = "4294967296" ] || fehler "zram0 ist $GROESSE Bytes, erwartet 4294967296 (4 GB)"
-swapon --show | grep -q zram0 || fehler "zram0 ist nicht als Swap aktiv"
-! losetup /dev/loop0 >/dev/null 2>&1 || fehler "loop0 haengt noch"
-[ ! -f /var/swap ] || fehler "/var/swap existiert noch"
-
-log "nachher: $(swapon --show --noheadings | tr '\n' ' ')"
-log "FERTIG. zRAM = 4 GB (zstd, prio 100), kein Writeback, SD um 2 GB leichter."
-log "Bootfest via $CONF -- ein Reboot ist NICHT noetig."
+echo
+log "FERTIG konfiguriert. Laut man rpi-swap greift das erst nach einem Neustart:"
+log "  sudo reboot     (oder: sudo shutdown now, falls du dabei das Kabel tauschst)"
+log "Erwartung danach: zram0 = 4 GB (prio hoch), kein loop0, kein /var/swap."
