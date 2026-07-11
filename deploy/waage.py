@@ -18,9 +18,10 @@ logits_all=True)` -- das rechnet die Vokabular-Projektion (~150k) an JEDER Posit
 auf dem Pi Minuten. Stattdessen low-level: den Kontext EINMAL durchrechnen, dann pro Kandidaten-
 Token nur die LETZTE Position lesen (`model.eval` + `model.scores`, logits_all=False) und den
 Log-Softmax des jeweiligen Tokens nehmen. Gemittelt PRO TOKEN (sonst wiegt Längeres scheinbar
-leichter -- mehr Token, kleinere Summe). Der Kontext sollte an einer natürlichen Grenze enden
-(Leerzeichen/Satzzeichen), damit kein Token Kontext und Kandidat überspannt. Dieses Modul
-importiert nie genus.* (Membran).
+leichter -- mehr Token, kleinere Summe). Die Kandidaten-Token werden am längsten GEMEINSAMEN
+Token-Präfix von Kontext und Kontext+Kandidat abgetrennt (nicht bei ``len(ctx_tok)``), damit ein
+BPE-Merge an der Grenze -- etwa ein Kontext-Leerzeichen, das ins Folgewort gezogen wird -- weder
+ein Token verschluckt noch doppelt zählt. Dieses Modul importiert nie genus.* (Membran).
 """
 from __future__ import annotations
 
@@ -48,6 +49,18 @@ def _get_model():
     return _model
 
 
+def _lies_logits(model):
+    """Die Logits (n_vocab Floats) der ZULETZT ausgewerteten Position, roh aus llama.cpp.
+    Bewusst NICHT ``model.scores``: in llama-cpp-python füllt ``eval`` mit logits_all=False die
+    scores-Matrix nicht (der Zweig ist auskommentiert) -- man läse eine uniforme Nullzeile
+    (Log-Softmax == -log(Vokabular) für alles). ``get_logits()`` liefert dagegen die echte
+    Ausgabezeile des letzten Tokens (bei logits_all=False genau eine Zeile). Lokaler numpy-Import,
+    damit das Modul ohne die Abhängigkeit importier- und (über einen Fake) testbar bleibt."""
+    import numpy as np
+
+    return np.ctypeslib.as_array(model._ctx.get_logits(), shape=(model._n_vocab,))
+
+
 def _mittel_logprob(model, ctx_tok: list[int], cand_tok: list[int]) -> float | None:
     """Der mittlere Log-Prob PRO TOKEN der Kandidaten-Token, gegeben den schon getokenisierten
     Kontext. Rechnet den Kontext einmal, liest dann Token für Token nur die letzte Position
@@ -60,7 +73,7 @@ def _mittel_logprob(model, ctx_tok: list[int], cand_tok: list[int]) -> float | N
     model.eval(ctx_tok)
     total = 0.0
     for tok in cand_tok:
-        zeile = model.scores[model.n_tokens - 1]
+        zeile = _lies_logits(model)
         m = max(float(x) for x in zeile)
         log_z = m + math.log(sum(math.exp(float(x) - m) for x in zeile))
         total += float(zeile[tok]) - log_z
@@ -82,7 +95,14 @@ def wiege(kontext: str, kandidaten: list[str], model=None) -> list[float] | None
         werte: list[float | None] = []
         for kand in kandidaten:
             voll = model.tokenize((kontext + kand).encode("utf-8"), add_bos=True, special=True)
-            werte.append(_mittel_logprob(model, ctx_tok, voll[len(ctx_tok):]))
+            # Am längsten GEMEINSAMEN Token-Präfix trennen, nicht bei len(ctx_tok): BPE zieht ein
+            # Kontext-Leerzeichen ins Folgewort ("Ġzwei"+" " vs "Ġzwei"+"ĠHund"), die Tokenfolgen
+            # weichen also schon VOR dem Kandidaten ab. Der gemeinsame Präfix ist der echte Kontext,
+            # der Rest der Kandidat -- so wird kein Token verschluckt und keins doppelt gezählt.
+            i = 0
+            while i < len(ctx_tok) and i < len(voll) and ctx_tok[i] == voll[i]:
+                i += 1
+            werte.append(_mittel_logprob(model, voll[:i], voll[i:]))
     except Exception:
         return None
     if not werte or any(w is None for w in werte):
@@ -105,8 +125,50 @@ def waehle(kontext: str, kandidaten: list[str], model=None) -> dict | None:
     }
 
 
+# --- Referenz-Proben: der erste Konsument, zugleich der Keim der Blind-Probe (Scheibe 2) --------
+# Jede Probe hat eine erwartete Antwort. Hier NUR angezeigt (offen, ohne Urteil); Scheibe 2 macht
+# daraus eine kalibrierte, gescorte Blind-Probe, die entscheidet, WO die Waage Vertrauen verdient.
+REFERENZ_PROBEN = [
+    ("Plural nach 'zwei'",      "Ich habe zwei ",         ["Hund", "Hunde"],            "Hunde"),
+    ("Ursache Sing./Plural",    "Die ",                   ["Ursache", "Ursachen"],      "Ursache"),
+    ("Artikel/Genus Tisch",     "Ich sehe den ",          ["Tisch", "Tische"],          "Tisch"),
+    ("WSD Bergbau/Tier",        "Im Bergwerk zieht der ", ["Hund", "Wagen"],            "Wagen"),
+    ("Eröffnung flüssig",       "",                       ["Guten Morgen!", "Morgen gut!"], "Guten Morgen!"),
+    ("Genus 'die' Sonne",       "Am Himmel steht die ",   ["Sonne", "Mond"],            "Sonne"),
+]
+
+
+def _demo() -> int:
+    """Wiegt die Referenz-Proben und zeigt Kandidat, Margin und Gewichte -- glass-box, read-only.
+    Rückgabewert 1, wenn das Modell fehlt (nichts zu wiegen), sonst 0."""
+    treffer = 0
+    gewogen = 0
+    for name, ktx, kand, erwartet in REFERENZ_PROBEN:
+        r = waehle(ktx, kand)
+        if r is None:
+            print(f"  {name:22} -> (kein Modell / nicht wägbar)")
+            continue
+        gewogen += 1
+        ok = r["kandidat"] == erwartet
+        treffer += ok
+        marke = "✓" if ok else "·"   # · = die Waage las das Modell treu, das Modell lag daneben
+        print(f"  {marke} {name:22} -> {r['kandidat']!r:16} margin={r['margin']:.2f}  {r['gewichte']}")
+    if gewogen == 0:
+        print("  (Modell nicht gefunden -- GENUS_DEUTER_MODEL setzen)")
+        return 1
+    print(f"\n  Referenz: {treffer}/{gewogen} wie erwartet (die Waage misst treu; der Rest ist "
+          f"Modell-Güte, die Scheibe 2 kalibriert).")
+    return 0
+
+
 if __name__ == "__main__":
     import sys
-    ktx = sys.argv[1] if len(sys.argv) > 1 else "Ich habe zwei "
-    kand = sys.argv[2:] or ["Hund", "Hunde"]
-    print(f"[WAAGE] {ktx!r} + {kand} -> {waehle(ktx, kand)}")
+    if len(sys.argv) <= 1 or sys.argv[1] == "--demo":
+        print("[WAAGE] Referenz-Proben (das Modell WIEGT, es schreibt nicht):")
+        raise SystemExit(_demo())
+    ktx = sys.argv[1]
+    kand = sys.argv[2:]
+    if len(kand) < 2:
+        print("Aufruf: waage.py \"<Kontext>\" <Kandidat1> <Kandidat2> [...]   (oder --demo)")
+        raise SystemExit(2)
+    print(f"[WAAGE] {ktx!r} + {kand}\n        -> {waehle(ktx, kand)}")

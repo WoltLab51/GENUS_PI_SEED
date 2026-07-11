@@ -1,27 +1,35 @@
 """Die Waage (deploy/waage.py): das Modell wiegt, es schreibt nicht. Die Tests prüfen die
 LOGIK deterministisch mit einem Fake-Modell, das den SCHNELLEN low-level-Weg nachstellt
-(tokenize/reset/eval/scores/n_tokens) und kontrollierte Logits liefert -- so, dass der
-Log-Softmax des Kandidaten-Tokens genau den Zielwert ergibt. Ob die Waage GUT wiegt, ist eine
-Modell-Frage und wird live am Pi gemessen (Blind-Proben, Scheibe 2)."""
+(tokenize/reset/eval + gelesene Logits über die Naht ``_lies_logits``) und kontrollierte Logits
+liefert -- so, dass der Log-Softmax des Kandidaten-Tokens genau den Zielwert ergibt. Ob die
+Waage GUT wiegt, ist eine Modell-Frage und wird live am Pi gemessen (Blind-Proben, Scheibe 2)."""
 import math
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy"))
 import waage  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _naht_auf_fake(monkeypatch):
+    """``_lies_logits`` liest sonst roh aus llama.cpp -- im Test delegiert die Naht an das
+    Fake-Modell, das die kontrollierte Logit-Zeile seiner aktuellen Kandidaten kennt."""
+    monkeypatch.setattr(waage, "_lies_logits", lambda model: model.letzte_logits())
+
+
 class _FakeModel:
-    """Stellt den low-level-Weg nach: ``kontext`` -> ein BOS-Token, jeder Kandidat -> seine
-    vorgegebenen Token-IDs. ``scores`` baut für den ZULETZT tokenisierten Kandidaten eine
-    Logit-Zeile, deren Log-Softmax an jeder Kandidaten-ID exakt den Ziel-Logprob trifft
-    (Füll-Token 0 trägt die Restmasse, damit logsumezp der Zeile 0 ist)."""
+    """``kontext`` -> ein BOS-Token, jeder Kandidat -> seine vorgegebenen Token-IDs.
+    ``letzte_logits`` baut für den ZULETZT tokenisierten Kandidaten eine Logit-Zeile, deren
+    Log-Softmax an jeder Kandidaten-ID exakt den Ziel-Logprob trifft (Füll-Token 0 trägt die
+    Restmasse, damit logsumexp der Zeile 0 ist -> Log-Softmax == roher Logit)."""
 
     def __init__(self, cand_tokens, cand_L):
         self.cand_tokens = cand_tokens          # {kandidat: [token_id, ...]}
         self.cand_L = cand_L                    # {token_id: ziel_logprob}  (jeweils < 0)
         self.vocab = max(cand_L) + 5
-        self._n = 0
         self._cur = None
 
     def tokenize(self, b, add_bos=True, special=True):
@@ -36,24 +44,19 @@ class _FakeModel:
         return [1] + list(self.cand_tokens[treffer])
 
     def reset(self):
-        self._n = 0
+        pass
 
     def eval(self, toks):
-        self._n += len(toks)
+        pass
 
-    @property
-    def n_tokens(self):
-        return self._n
-
-    @property
-    def scores(self):
+    def letzte_logits(self):
         ids = self.cand_tokens[self._cur]
         zeile = [-60.0] * self.vocab
         for i in ids:
             zeile[i] = self.cand_L[i]
         rest = 1.0 - sum(math.exp(self.cand_L[i]) for i in ids)
         zeile[0] = math.log(rest)               # Füll-Token: logsumexp(zeile) == 0
-        return [zeile] * (self._n + 2)          # dieselbe Zeile an jeder Position
+        return zeile
 
 
 def _ein_token(punkte, start=10):
