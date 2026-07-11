@@ -81,7 +81,8 @@ def test_luecken_nennen_blaetter_ohne_handler_ehrlich(tmp_path, monkeypatch):
     _zaehlwerk_datei(tmp_path, monkeypatch, [])
     s = thermometer.stand(_conn())
     ohne = s["luecken"]["blaetter_ohne_handler"]
-    assert "faehigkeiten" in ohne          # die bekannte, ehrlich benannte Lücke
+    assert "tun" in ohne                   # eine ehrlich benannte Lücke
+    assert "faehigkeiten" not in ohne      # seit Proposal #15 gebaut -- GENUS' eigener Wunsch
     assert "beziehung" not in ohne         # handelbar -> keine Lücke
     assert "unklar" not in ohne            # kein Blatt, sondern der blinde Fleck selbst
 

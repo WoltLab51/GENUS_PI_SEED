@@ -709,7 +709,6 @@ _DEUTED = " (Frage vom Sprachmodell gedeutet.)"
 # P3.1 ein eigenes Kausal-Blatt und fällt bei Unauflösbarkeit dorthin, brauchen also gar keine
 # eigene Lücken-Formulierung mehr).
 _ZELLEN_LABELS = {
-    "faehigkeiten": "eine Frage danach, was ich kann",
     "empfehlungsfrage": "eine Bitte um Empfehlung",
     "weltfrage": "eine Frage über die Welt draußen",
     "korrektur": "eine Korrektur an einer Tatsache",
@@ -855,6 +854,58 @@ def _zelle_offene_fragen(conn, guess, question, last_question, last_answer, stim
 
 def _zelle_ziele(conn, guess, question, last_question, last_answer, stimme=None):
     return narrate_ziele(conn)
+
+
+# Reine SPRACHE (kein Fakt): wie eine Zwicky-Zelle im Fähigkeits-Satz heißt -- dieselbe Rolle
+# wie antwort.FLOSKELN (Charta §2: eine Anzeige-Tabelle, keine zweite Wissens-Quelle; die
+# WAHRHEIT, was GENUS kann, kommt aus der Registry via hat_handler).
+_FAEHIGKEIT_ANZEIGE = (
+    ("frage-begriff", "Fragen zu Begriffen"),
+    ("frage-genus", "Fragen über mich"),
+    ("frage-nutzer", "Fragen über dich"),
+    ("frage-gespraech", "Rückfragen zum Gespräch"),
+    ("frage-welt", "Fragen zur Welt draußen"),
+    ("aussage-begriff", "Korrekturen an meinem Wissen"),
+    ("aussage-nutzer", "was du mir über dich erzählst"),
+    ("aufforderung-genus", "Bitten an mich"),
+    ("aufforderung-gespraech", "Wünsche zur Antwort"),
+    ("aufforderung-welt", "Handlungen in der Welt"),
+    ("floskel", "die alltäglichen Gesten"),
+)
+
+
+def _zelle_faehigkeiten(conn, guess, question, last_question, last_answer, stimme=None):
+    """„Was kannst du?" -- die Zelle, um die GENUS SELBST gebeten hat (Proposal #15, der
+    VerstehensLuecke-Detector: 3x gelesen, nie beantwortbar; von Ronny 2026-07-11 freigegeben).
+    Die Antwort wird GLASKLAR aus der lebenden Werkzeug-Registry gelesen (hat_handler je
+    gesätem Raster-Blatt, gruppiert nach Zwicky-Zelle) -- keine hartcodierte Selbstbeschreibung,
+    die driften könnte; wächst die Registry, wächst die Antwort. Ehrlich in beide Richtungen:
+    nennt auch, was es liest, aber (frei formuliert) noch nicht kann. Zählt sich dabei selbst
+    als beantwortbar -- die Zelle IST ihr eigener erster Beleg."""
+    from genus import verstehen
+    from genus.werkzeuge_auskunft import ABSICHT_SAAT
+
+    koennen: dict[str, list[str]] = {}
+    fehlt: list[str] = []
+    for blatt in verstehen.leaf_kinds(conn):
+        if blatt == "unklar":
+            continue   # der blinde Fleck ist keine Fähigkeit und keine Lücke -- er ist der Sensor
+        if hat_handler(conn, blatt):
+            koennen.setdefault(verstehen.zelle_of(conn, blatt) or "?", []).append(blatt)
+        else:
+            fehlt.append(blatt)
+    gesamt = sum(len(b) for b in koennen.values())
+    gruppen = [f"{anzeige} ({', '.join(sorted(koennen[zelle]))})"
+               for zelle, anzeige in _FAEHIGKEIT_ANZEIGE if koennen.get(zelle)]
+    saat = sorted(ABSICHT_SAAT)
+    text = (f"Das lese ich dir live aus meiner eigenen Werkzeug-Registry ab: "
+            f"{gesamt} Lesarten kann ich beantworten — " + "; ".join(gruppen) + ". "
+            f"{len(saat)} Absichten davon plant mein Werkzeug-Planer selbst "
+            f"({', '.join(saat)}).")
+    if fehlt:
+        text += (f" Frei formuliert noch nicht handeln kann ich auf: {', '.join(sorted(fehlt))} "
+                 f"— die lese ich und zähle sie ehrlich als Lücken.")
+    return text + " Und was mir zu meinen Zielen fehlt, sage ich dir auf „Was fehlt dir?“."
 
 
 def _zelle_frage_begriff(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1043,6 +1094,7 @@ _HANDELBAR = {
     "zustand": _zelle_zustand,
     "offene-fragen": _zelle_offene_fragen,
     "ziele": _zelle_ziele,
+    "faehigkeiten": _zelle_faehigkeiten,
     "kuerzer": _zelle_kuerzer,
     "ausfuehrlicher": _zelle_ausfuehrlicher,
     "anders-erklaeren": _zelle_anders_erklaeren,
@@ -1081,6 +1133,7 @@ _ZELLEN_PRUEFBAR = {
     "warum-herkunft": "sitzung", "vertiefung": "sitzung", "anschlussfrage": "sitzung",
     "kuerzer": "sitzung", "ausfuehrlicher": "sitzung", "anders-erklaeren": "sitzung",
     "wiederholen": "sitzung",
+    "faehigkeiten": "graph",
     "tatsache": "erinnerung", "merken": "erinnerung", "erinnerungs-abruf": "erinnerung",
     "gruss": "fest", "dank": "fest", "lob": "fest", "kritik": "fest", "abschied": "fest",
     "einstellung": "graph",

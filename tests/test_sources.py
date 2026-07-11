@@ -1029,6 +1029,24 @@ def test_common_none_when_unrelated():
     assert "keine gemeinsame" in companion.narrate_common(conn, r)
 
 
+def test_zelle_faehigkeiten_antwortet_glaesern_aus_der_registry():
+    # die Zelle, um die GENUS SELBST gebeten hat (Proposal #15): „Was kannst du?" wird live
+    # aus der Werkzeug-Registry beantwortet -- Können UND ehrliche Lücken, keine hartcodierte
+    # Selbstbeschreibung. Selbst-referentiell: sie zählt sich selbst als beantwortbar.
+    from genus import companion, verstehen
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    deuter = lambda q: {"absicht": "faehigkeiten", "subject": None}
+    res = companion.respond_with_deuter(conn, "was kannst du eigentlich so alles", deuter=deuter)
+    t = res["text"]
+    assert "Werkzeug-Registry" in t
+    assert "beziehung" in t and "ort" in t            # Können, aus der Registry gelesen
+    assert "faehigkeiten" in t                        # zählt sich selbst -- ihr eigener Beleg
+    assert "tun" in t and "Lücken" in t               # ehrlich, was noch fehlt
+    assert "kann ich noch nicht. Ich habe es mir" not in t   # der alte Lücken-Satz ist Geschichte
+    assert res["gelesen"] == ["faehigkeiten"]
+
+
 def test_narrate_common_warm_ist_voice_eins_mit_festem_kern():
     # vergleich „mitgenommen" (Antwort-Seele, gleiche Mechanik wie beziehung/ursache)
     from genus import companion
