@@ -684,3 +684,21 @@ def test_watchdog_supervises_the_telegram_bot_at_normal_priority():
     assert "--unit=genus-telegram-bot-fallback.service" in bot_fn
     assert "--property=MemoryMax=3G" in bot_fn
     assert "--setenv=GENUS_TELEGRAM_STIMME=0" in bot_fn
+
+
+def test_privileged_watchdog_repairs_service_identity_and_hardening_drift():
+    script = (ROOT / "deploy" / "pi_network_watchdog.sh").read_text(encoding="utf-8")
+    learner_fn = script.split("ensure_learner()")[1].split("ensure_telegram_bot()")[0]
+    bot_fn = script.split("ensure_telegram_bot()")[1].split("json_field()")[0]
+
+    assert "systemctl show genus-learner.service -p User" in learner_fn
+    assert 'grep -Fq "GENUS_DB_PATH=$DB_PATH"' in learner_fn
+    assert "pi_install_learner.sh" in learner_fn
+    assert "root scatter ledger detected" in learner_fn
+
+    assert "Environment=GENUS_TELEGRAM_STIMME=0" in bot_fn
+    assert "MemoryMax=3G" in bot_fn
+    assert "pi_install_telegram_bot.sh" in bot_fn
+    assert "allow-list malformed" in bot_fn
+
+    assert 'CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"' in script

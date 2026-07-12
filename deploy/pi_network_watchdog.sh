@@ -10,6 +10,14 @@ LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 FAIL_FILE="${GENUS_NETWORK_FAILURE_FILE:-$GENUS_HOME/.genus/network-watchdog.failures}"
 TARGET="${GENUS_NETWORK_TARGET:-}"
 
+# The sticky core id is the runtime source of truth. An older unit may still carry
+# a stale Environment= value; reading the file repairs behavior immediately.
+CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"
+if [ -s "$CORE_ID_FILE" ]; then
+    GENUS_CORE_ID="$(cat "$CORE_ID_FILE")"
+    export GENUS_CORE_ID
+fi
+
 mkdir -p "$LOG_DIR" "$(dirname "$FAIL_FILE")"
 
 log() {
@@ -47,6 +55,29 @@ ensure_learner() {
     local learner="$REPO_DIR/deploy/pi_learn.sh"
     if [ ! -x "$learner" ]; then return 0; fi
     if [ -f "$(dirname "$DB_PATH")/paused" ]; then return 0; fi
+    if systemctl cat genus-learner.service >/dev/null 2>&1; then
+        local unit_user unit_env
+        unit_user="$(systemctl show genus-learner.service -p User --value 2>/dev/null || true)"
+        unit_env="$(systemctl show genus-learner.service -p Environment --value 2>/dev/null || true)"
+        if [ "$unit_user" != "$GENUS_USER" ] \
+           || ! grep -Fq "GENUS_USER=$GENUS_USER" <<<"$unit_env" \
+           || ! grep -Fq "GENUS_DB_PATH=$DB_PATH" <<<"$unit_env"; then
+            log "learner unit identity drift — reinstalling for user=$GENUS_USER db=$DB_PATH"
+            if [ -f /root/.genus/genus.sqlite3 ]; then
+                log "root scatter ledger detected at /root/.genus/genus.sqlite3 — left untouched for audit"
+            fi
+            env GENUS_USER="$GENUS_USER" GENUS_HOME="$GENUS_HOME" \
+                GENUS_REPO_DIR="$REPO_DIR" GENUS_DB_PATH="$DB_PATH" \
+                GENUS_LOG_DIR="$LOG_DIR" GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
+                "$REPO_DIR/deploy/pi_install_learner.sh" \
+                || log "could not repair learner unit identity"
+            return 0
+        fi
+        if systemctl is-active --quiet genus-learner.service; then return 0; fi
+        log "learner down — starting installed service"
+        systemctl start genus-learner.service || log "could not start learner service"
+        return 0
+    fi
     if pgrep -f "deploy/pi_learn.sh" >/dev/null 2>&1; then return 0; fi
     if ! command -v systemd-run >/dev/null 2>&1; then return 0; fi
     log "learner down — starting it (idle priority, own transient unit)"
@@ -75,10 +106,32 @@ ensure_telegram_bot() {
     local token_file="$GENUS_HOME/.genus/telegram_bot_token"
     local env_file="$GENUS_HOME/.genus/telegram_bot.env"
     if [ ! -f "$bot" ] || [ ! -s "$token_file" ] || [ ! -f "$env_file" ]; then return 0; fi
+    local allowed_ids
+    allowed_ids="$(grep -E '^GENUS_TELEGRAM_ALLOWED_IDS=' "$env_file" | tail -1 | cut -d= -f2-)"
+    if [ -z "$allowed_ids" ]; then return 0; fi
     # Die dauerhaft installierte, gehärtete Unit ist die EINE Eigentümerin des Pollers. Der
     # frühere direkte systemd-run-Fallback konnte während Boot/Deploy neben ihr starten und
     # Telegram-HTTP-409 erzeugen. Existiert die Unit, startet der Watchdog ausschließlich sie.
     if systemctl cat genus-telegram-bot.service >/dev/null 2>&1; then
+        local unit_text unit_user
+        unit_text="$(systemctl cat genus-telegram-bot.service 2>/dev/null || true)"
+        unit_user="$(systemctl show genus-telegram-bot.service -p User --value 2>/dev/null || true)"
+        if [ "$unit_user" != "$GENUS_USER" ] \
+           || ! grep -Fq "Environment=GENUS_TELEGRAM_STIMME=0" <<<"$unit_text" \
+           || ! grep -Fq "MemoryMax=3G" <<<"$unit_text"; then
+            case "$allowed_ids" in
+                *[!0-9,]*) log "telegram allow-list malformed — refusing unit repair"; return 0 ;;
+            esac
+            local ids
+            IFS=',' read -r -a ids <<<"$allowed_ids"
+            log "telegram unit hardening drift — reinstalling bounded service"
+            env GENUS_USER="$GENUS_USER" GENUS_HOME="$GENUS_HOME" \
+                GENUS_REPO_DIR="$REPO_DIR" GENUS_DB_PATH="$DB_PATH" \
+                GENUS_LOG_DIR="$LOG_DIR" \
+                "$REPO_DIR/deploy/pi_install_telegram_bot.sh" "${ids[@]}" \
+                || log "could not repair telegram unit hardening"
+            return 0
+        fi
         if systemctl is-active --quiet genus-telegram-bot.service; then return 0; fi
         log "telegram bridge down — starting installed service"
         systemctl start genus-telegram-bot.service || log "could not start telegram bridge service"
@@ -86,9 +139,6 @@ ensure_telegram_bot() {
     fi
     if pgrep -f "deploy/telegram_bot.py" >/dev/null 2>&1; then return 0; fi
     if ! command -v systemd-run >/dev/null 2>&1; then return 0; fi
-    local allowed_ids
-    allowed_ids="$(grep -E '^GENUS_TELEGRAM_ALLOWED_IDS=' "$env_file" | tail -1 | cut -d= -f2-)"
-    if [ -z "$allowed_ids" ]; then return 0; fi
     log "telegram bridge down — no installed unit; starting one hardened fallback"
     systemd-run --quiet --collect --unit=genus-telegram-bot-fallback.service \
         --uid="$GENUS_USER" \

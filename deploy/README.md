@@ -15,6 +15,9 @@ and ledger path even when installed through `sudo`. The Telegram membrane uses
 one process lock, keeps the optional second voice model disabled by default, and
 applies systemd memory, swap, and privilege limits. Re-run the corresponding
 installer after upgrades so changed unit properties take effect immediately.
+The privileged network watchdog also verifies those installed unit invariants on
+each tick and re-runs the idempotent installers when user, ledger path, memory
+limits, or Telegram model policy drift from the repository contract.
 
 ## First Pi Setup
 
