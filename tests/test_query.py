@@ -24,7 +24,15 @@ def test_ask_status_returns_projection_counts(conn):
     assert response["kind"] == "status"
     assert response["status"]["events"] == 8
     assert response["status"]["active_beliefs"] == 1
+    assert response["status"]["supported_beliefs"] == 1
+    assert response["status"]["contested_beliefs"] == 0
+    assert response["status"]["uncertain_beliefs"] == 0
     assert response["status"]["pending_proposals"] == 1
+    assert response["status"]["open_inquiry_claims"] == 0
+    assert response["status"]["ledger_storage_bytes"] > 0
+    assert response["status"]["ledger_bytes_per_event"] > 0
+    assert response["status"]["ledger_events_24h"] == 8
+    assert response["status"]["ledger_estimated_daily_growth_bytes"] > 0
 
 
 def test_unknown_ask_returns_supported_patterns(conn):
@@ -97,6 +105,7 @@ def test_why_proposal_links_event_belief_and_evidence(conn):
 
 def test_query_cli_commands_do_not_write_events_or_rebuild_state(monkeypatch, cli_conn, conn):
     monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: cli_conn)
     for _ in range(3):
         observe_cpu_value(conn, 92.0)
     belief = conn.execute("SELECT * FROM belief_projection").fetchone()

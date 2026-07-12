@@ -664,6 +664,7 @@ def test_ask_cli_routes_to_companion(monkeypatch):
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: conn)
     result = CliRunner().invoke(cli.main, ["ask", "Was", "ist", "ein", "Hund?"])
     assert result.exit_code == 0, result.output
     assert "Wolf" in result.output and "Hund" in result.output
@@ -708,6 +709,7 @@ def test_ask_state_query_wins_over_learned_word(monkeypatch):
     reactors.observe_relation(conn, "Status@de", "expresses", "Q_status", "wikidata")
     reactors.observe_relation(conn, "Status@de", "primary_gloss", "Art und Weise, wie etwas ist", "dbnary")
     monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: conn)
     result = CliRunner().invoke(cli.main, ["ask", "status"])
     assert result.exit_code == 0, result.output
     assert "Art und Weise" not in result.output   # not the word gloss -> the state answer instead
@@ -984,6 +986,7 @@ def test_ursache_und_beziehung_sind_nicht_mehr_wortlautfest():
 def test_ask_cli_routes_relational_question(monkeypatch):
     conn = _isa_graph()  # a relational question reaches the inference route, not the word lookup
     monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: conn)
     result = CliRunner().invoke(cli.main, ["ask", "Ist", "ein", "Hund", "ein", "Säugetier?"])
     assert result.exit_code == 0, result.output
     assert "Ja." in result.output and "Säugetier" in result.output
@@ -1069,6 +1072,7 @@ def test_common_not_triggered_by_plain_question():
 def test_ask_cli_routes_comparative(monkeypatch):
     conn = _kinship_graph()
     monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: conn)
     result = CliRunner().invoke(cli.main, ["ask", "Was", "haben", "Hund", "und", "Katze", "gemeinsam?"])
     assert result.exit_code == 0, result.output
     assert "gemeinsam" in result.output and "Säugetier" in result.output

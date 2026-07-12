@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 import click
@@ -25,7 +26,6 @@ from genus import (
     governance,
     hypothese,
     inference,
-    inquiries,
     integrity,
     learning,
     ledger,
@@ -48,6 +48,7 @@ from genus import (
     werkzeug,
     werkzeuge_seed,
 )
+from genus import cli_inquiries
 from genus.cli_format import (
     _print_active_belief_summary,
     _print_ask_response,
@@ -73,15 +74,27 @@ def get_conn():
     return db.connect(os.environ.get("GENUS_DB_PATH", "genus.sqlite3"))
 
 
+def get_diagnostic_conn():
+    """Open the configured ledger read-only and never create a diagnostic DB."""
+    db_path = os.environ.get("GENUS_DB_PATH", "genus.sqlite3")
+    try:
+        return db.connect_readonly(db_path)
+    except db.DatabaseNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 @click.group()
 def main() -> None:
     pass
 
 
+cli_inquiries.register(main, lambda: get_conn())
+
+
 @main.command("doctor")
 def doctor() -> None:
     db_path = os.environ.get("GENUS_DB_PATH", "genus.sqlite3")
-    conn = get_conn()
+    conn = get_diagnostic_conn()
     try:
         checks = doctor_checks.run(
             conn,
@@ -438,7 +451,7 @@ def skills_command() -> None:
 @click.argument("question", nargs=-1, required=True)
 def ask_command(question: tuple[str, ...]) -> None:
     """Ask GENUS something — about its own state (status/zustand/…) or about a word it knows."""
-    conn = get_conn()
+    conn = get_diagnostic_conn()
     try:
         q = " ".join(question)
         state = query.ask(conn, q)                 # first: a recognised state/belief query?
@@ -1378,11 +1391,11 @@ def beliefs_show() -> None:
     try:
         rows = projection.list_active_beliefs(conn)
         click.echo("ACTIVE BELIEFS")
-        click.echo("claim_key    claim_value  confidence  supporting  contradicting  derivation")
+        click.echo("claim_key    claim_value  confidence  epistemic   supporting  contradicting  derivation")
         for row in rows:
             click.echo(
                 f"{row['claim_key']:<12} {row['claim_value']:<12} "
-                f"{row['confidence']:<10.3f} {row['supporting']:<11} "
+                f"{row['confidence']:<10.3f} {row['epistemic_state']:<11} {row['supporting']:<11} "
                 f"{row['contradicting']:<14} {row['derivation']}"
             )
     finally:
@@ -1925,9 +1938,11 @@ def integrity_group() -> None:
 
 @integrity_group.command("check")
 def integrity_check() -> None:
-    conn = get_conn()
+    conn = get_diagnostic_conn()
     try:
+        started = time.perf_counter()
         result = integrity.check(conn)
+        check_ms = (time.perf_counter() - started) * 1000
         if result["ok"]:
             click.echo(
                 f"[INTEGRITY] OK events={result['events']} "
@@ -1937,50 +1952,14 @@ def integrity_check() -> None:
                 f"active_states={result['active_states']} "
                 f"governance_decisions={result['governance_decisions']} "
                 f"operations={result['operations']} "
-                f"active_rules={result['active_rules']}"
+                f"active_rules={result['active_rules']} "
+                f"check_ms={check_ms:.1f}"
             )
             return
         for issue in result["issues"]:
             click.echo(f"[INTEGRITY] FAIL {issue}")
+        click.echo(f"[INTEGRITY] check_ms={check_ms:.1f}")
         raise click.ClickException("integrity check failed")
-    finally:
-        conn.close()
-
-
-@main.group(name="inquiries")
-def inquiries_group() -> None:
-    pass
-
-
-@inquiries_group.command("list")
-@click.option("--all", "include_all", is_flag=True)
-def inquiries_list(include_all: bool) -> None:
-    conn = get_conn()
-    try:
-        rows = inquiries.list_inquiries(conn, include_all=include_all)
-        click.echo("INQUIRIES" if include_all else "OPEN INQUIRIES")
-        click.echo("id  type          claim_key      state     question_key")
-        for row in rows:
-            click.echo(
-                f"{row['id']:<3} {row['inquiry_type']:<13} {row['claim_key']:<14} "
-                f"{row['state']:<9} {row['question_key']}"
-            )
-    finally:
-        conn.close()
-
-
-@inquiries_group.command("resolve")
-@click.argument("inquiry_id", type=int)
-@click.option("--answer", required=True)
-def inquiries_resolve(inquiry_id: int, answer: str) -> None:
-    conn = get_conn()
-    try:
-        try:
-            inquiries.record_inquiry_resolved_event(conn, inquiry_id, answer)
-            conn.commit()
-        except ValueError as exc:
-            raise click.ClickException(str(exc)) from exc
-        click.echo(f"[GOV] inquiry {inquiry_id} resolved")
     finally:
         conn.close()
 
@@ -1993,7 +1972,7 @@ def ledger_group() -> None:
 @ledger_group.command("tail")
 @click.option("--n", default=20, show_default=True, type=int)
 def ledger_tail(n: int) -> None:
-    conn = get_conn()
+    conn = get_diagnostic_conn()
     try:
         for event in ledger.tail(conn, n):
             click.echo(
@@ -2022,7 +2001,7 @@ def ledger_seal_init() -> None:
 
 @ledger_group.command("head")
 def ledger_head() -> None:
-    conn = get_conn()
+    conn = get_diagnostic_conn()
     try:
         head = sealing.head(conn)
         if head is None:
@@ -2037,18 +2016,28 @@ def ledger_head() -> None:
 
 @ledger_group.command("verify")
 def ledger_verify() -> None:
-    conn = get_conn()
+    conn = get_diagnostic_conn()
     try:
+        started = time.perf_counter()
         if not sealing.is_active(conn):
-            click.echo("[SEAL] sealing not initialized (run: genus ledger seal-init)")
+            check_ms = (time.perf_counter() - started) * 1000
+            click.echo(
+                "[SEAL] sealing not initialized (run: genus ledger seal-init) "
+                f"check_ms={check_ms:.1f}"
+            )
             return
         issues = sealing.verify_chain(conn)
+        check_ms = (time.perf_counter() - started) * 1000
         if not issues:
             head = sealing.head(conn)
-            click.echo(f"[SEAL] OK chain intact, head={head['seal']}")
+            click.echo(
+                f"[SEAL] OK chain intact, head={head['seal']} "
+                f"check_ms={check_ms:.1f}"
+            )
             return
         for issue in issues:
             click.echo(f"[SEAL] FAIL {issue}")
+        click.echo(f"[SEAL] check_ms={check_ms:.1f}")
         raise click.ClickException("ledger verification failed")
     finally:
         conn.close()

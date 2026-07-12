@@ -73,6 +73,7 @@ PROJEKTOREN: dict[str, Callable] = {
     "rule_activated": maturation.apply_rule_activated,
     "inquiry_created": inquiries.apply_inquiry_created,
     "inquiry_resolved": inquiries.apply_inquiry_resolved,
+    "inquiries_reconciled": inquiries.apply_inquiries_reconciled,
 }
 
 # Bewusst OHNE Projektion -- jede Zeile mit ihrem Grund:

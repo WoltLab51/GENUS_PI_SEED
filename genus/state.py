@@ -12,6 +12,7 @@ DERIVATION = "rule:system_pressure_state_v1"
 ELEVATED = "elevated"
 LATENT = "latent"
 NOMINAL = "nominal"
+UNKNOWN = "unknown"
 ACTIVITY_CLAIM_KEY = "system.activity"
 PRESSURE_CLAIM_KEYS = (
     "system.load",
@@ -45,8 +46,8 @@ def refresh(conn) -> list[dict]:
 
 
 def derive_pressure_state(conn) -> dict | None:
-    rows = _active_relevant_beliefs(conn)
-    if not rows:
+    rows, excluded = _active_relevant_beliefs(conn)
+    if not rows and not excluded:
         return None
 
     pressure_rows = [row for row in rows if row["claim_key"] in PRESSURE_CLAIM_KEYS]
@@ -56,7 +57,11 @@ def derive_pressure_state(conn) -> dict | None:
         None,
     )
 
-    if high_rows:
+    if not pressure_rows:
+        state_value = UNKNOWN
+        reason = "no epistemically supported resource-pressure belief"
+        supporting_rows = [activity] if activity is not None else []
+    elif high_rows:
         if activity is not None and activity["claim_value"] == "idle":
             state_value = LATENT
             reason = "high resource pressure while activity is idle"
@@ -74,6 +79,7 @@ def derive_pressure_state(conn) -> dict | None:
         row["claim_key"]: row["claim_value"]
         for row in sorted(rows, key=lambda item: (item["claim_key"], item["id"]))
     }
+    components["excluded_contested_beliefs"] = sorted(excluded)
     components["pressure_high_count"] = len(high_rows)
     if activity is not None:
         components["activity"] = activity["claim_value"]
@@ -201,12 +207,12 @@ def next_state_id(conn) -> int:
     return int(row["max_id"]) + 1
 
 
-def _active_relevant_beliefs(conn) -> list[dict]:
+def _active_relevant_beliefs(conn) -> tuple[list[dict], list[int]]:
     keys = (ACTIVITY_CLAIM_KEY, *PRESSURE_CLAIM_KEYS)
     placeholders = ",".join("?" for _ in keys)
     rows = conn.execute(
         f"""
-        SELECT id, claim_key, claim_value
+        SELECT *
         FROM belief_projection
         WHERE state = ?
           AND claim_key IN ({placeholders})
@@ -214,7 +220,15 @@ def _active_relevant_beliefs(conn) -> list[dict]:
         """,
         (projection.ACTIVE, *keys),
     ).fetchall()
-    return [dict(row) for row in rows]
+    supported: list[dict] = []
+    excluded: list[int] = []
+    for row in rows:
+        belief = projection.belief_with_confidence(conn, row)
+        if belief["epistemic_state"] == projection.SUPPORTED:
+            supported.append(belief)
+        else:
+            excluded.append(int(row["id"]))
+    return supported, excluded
 
 
 def _same_state(current, candidate: dict) -> bool:

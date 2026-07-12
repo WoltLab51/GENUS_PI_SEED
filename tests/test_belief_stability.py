@@ -230,6 +230,25 @@ def test_stability_inquiry_is_deduped_across_scans():
     conn.close()
 
 
+def test_new_flips_do_not_stack_while_stability_question_is_still_open():
+    conn = _fresh()
+    ids = _Ids()
+    _emit_lifecycle(conn, ids, "alpha.stable", confirms=20, flips=0)
+    _emit_lifecycle(conn, ids, "beta.volatile", confirms=5, flips=15)
+    experience.scan(conn)
+    _flip(conn, ids, "alpha.stable")
+    event_router.replay(conn)
+    experience.scan(conn)
+    _flip(conn, ids, "alpha.stable")
+    event_router.replay(conn)
+    experience.scan(conn)
+
+    open_rows = [row for row in _stability_inquiries(conn, "alpha.stable")
+                 if row["state"] == "open"]
+    assert len(open_rows) == 1
+    conn.close()
+
+
 def _rechar_count(conn):
     return conn.execute(
         "SELECT COUNT(*) AS n FROM event_log "

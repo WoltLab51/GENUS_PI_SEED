@@ -2,6 +2,8 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 .venv/
 build/
 dist/

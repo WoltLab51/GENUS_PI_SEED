@@ -152,7 +152,8 @@ def _print_active_belief_summary(conn) -> None:
             f"(supporting: {row['supporting']}, contradicting: {row['contradicting']})"
         )
         click.echo(
-            f"      confidence: {row['confidence']:.3f}  derivation: {row['derivation']}"
+            f"      confidence: {row['confidence']:.3f}  "
+            f"epistemic: {row['epistemic_state']}  derivation: {row['derivation']}"
         )
 
 
@@ -196,7 +197,8 @@ def _print_ask_response(response: dict) -> None:
         for belief in response["beliefs"]:
             click.echo(
                 f"[BLF] #{belief['id']} {belief['claim_key']}={belief['claim_value']} "
-                f"state={belief['state']} confidence={belief['confidence']:.3f}"
+                f"state={belief['state']} epistemic={belief['epistemic_state']} "
+                f"confidence={belief['confidence']:.3f}"
             )
     elif response["kind"] == "pending_proposals":
         for proposal in response["proposals"]:
@@ -260,7 +262,7 @@ def _print_belief_explanation(explanation: dict) -> None:
     )
     click.echo(
         f"confidence={belief['confidence']:.3f} supporting={belief['supporting']} "
-        f"contradicting={belief['contradicting']}"
+        f"contradicting={belief['contradicting']} epistemic={belief['epistemic_state']}"
     )
     click.echo(f"derivation={belief['derivation']}")
     if explanation["created_by"] is not None:

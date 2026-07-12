@@ -288,12 +288,11 @@ def test_stimme_formuliere_returns_none_without_a_model_and_none_installed():
     assert stimme.formuliere("Unter »Hund« versteht GENUS: Haustier.") is None
 
 
-def test_bot_gives_deuter_and_stimme_each_their_own_model(monkeypatch):
-    # live gemessen (2026-07-03): ein geteiltes Modell verwarf bei jedem Stimme-Aufruf den
-    # Prompt-Cache des Deuter (anderer System-Prompt) -- der NÄCHSTE Deuter-Aufruf brauchte dann
-    # 26s statt 3s. Jetzt bekommt jede Rolle ihr eigenes warmes Modell; der Bot ruft
-    # stimme.formuliere direkt auf (ohne ein model= von deuter.get_model() durchzureichen --
-    # die Funktion existiert seit diesem Fix gar nicht mehr).
+def test_bot_can_opt_in_to_the_separate_stimme_model(monkeypatch):
+    # Die zweite Modellkopie ist seit dem 4-GiB-Live-Befund kein Default mehr. Wer die optionale
+    # Glättung ausdrücklich einschaltet, bekommt weiterhin die getrennte Stimme (kein Teilen:
+    # das verdrängte den Deuter-Prompt-Cache und machte den nächsten Aufruf 26s langsam).
+    monkeypatch.setenv("GENUS_TELEGRAM_STIMME", "1")
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
@@ -310,6 +309,28 @@ def test_bot_gives_deuter_and_stimme_each_their_own_model(monkeypatch):
     )
     assert seen_models == [None]   # kein geteiltes Modell durchgereicht -- stimme lädt ihr eigenes
     assert "Sprachlich vom Modell geglättet" in answer
+
+
+def test_bot_does_not_load_stimme_by_default_and_keeps_the_complete_answer(monkeypatch):
+    monkeypatch.delenv("GENUS_TELEGRAM_STIMME", raising=False)
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
+    monkeypatch.setattr(
+        deuter, "interpret",
+        lambda q, absichten=None, grammatik=None, korrekturen=None:
+            {"absicht": "definition", "subject": "Hund"},
+    )
+
+    def unerlaubt(*args, **kwargs):
+        raise AssertionError("Stimme must stay unloaded without an explicit opt-in")
+
+    monkeypatch.setattr(stimme, "formuliere", unerlaubt)
+    chat_id, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions={},
+    )
+    assert chat_id == 42 and "Wolf" in answer
+    assert "Sprachlich vom Modell geglättet" not in answer
 
 
 def test_bot_falls_back_to_the_template_when_no_model_is_installed():
@@ -349,6 +370,63 @@ def test_main_refuses_to_start_with_an_empty_allowlist(monkeypatch):
     monkeypatch.setenv("GENUS_TELEGRAM_BOT_TOKEN", "fake-token-for-test")
     monkeypatch.delenv("GENUS_TELEGRAM_ALLOWED_IDS", raising=False)
     assert telegram_bot.main() == 1
+
+
+def test_instance_lock_rejects_a_second_poller(monkeypatch, tmp_path):
+    # Portable fake for Linux flock (the test suite also runs on Windows): the second open
+    # simulates a competing process. The bot must request EX|NB and close/reject that instance.
+    import types
+
+    calls = []
+
+    def flock(fd, flags):
+        calls.append((fd, flags))
+        if len(calls) == 2:
+            raise BlockingIOError("already locked")
+
+    fake_fcntl = types.SimpleNamespace(LOCK_EX=1, LOCK_NB=2, flock=flock)
+    monkeypatch.setitem(sys.modules, "fcntl", fake_fcntl)
+    monkeypatch.setattr(telegram_bot, "INSTANCE_LOCK_FILE", str(tmp_path / "telegram.lock"))
+
+    first = telegram_bot._acquire_instance_lock()
+    try:
+        assert first is not None
+        assert telegram_bot._acquire_instance_lock() is None
+        assert [flags for _, flags in calls] == [3, 3]
+    finally:
+        first.close()
+
+
+def test_main_stops_before_db_and_network_when_poll_lock_is_owned(monkeypatch, tmp_path):
+    from genus import db
+
+    monkeypatch.setattr(telegram_bot, "_token", lambda: "test-token")
+    monkeypatch.setattr(telegram_bot, "_allowed_ids", lambda: {42})
+    monkeypatch.setattr(telegram_bot, "LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(telegram_bot, "_acquire_instance_lock", lambda: None)
+    monkeypatch.setattr(
+        db, "connect", lambda path: (_ for _ in ()).throw(AssertionError("must not open DB")),
+    )
+    assert telegram_bot.main() == 0
+
+
+def test_main_treats_telegram_409_as_a_competing_poller_and_stops(monkeypatch, tmp_path):
+    from genus import db
+
+    monkeypatch.setattr(telegram_bot, "_token", lambda: "test-token")
+    monkeypatch.setattr(telegram_bot, "_allowed_ids", lambda: {42})
+    monkeypatch.setattr(telegram_bot, "LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(telegram_bot, "_acquire_instance_lock", lambda: object())
+    monkeypatch.setattr(db, "connect", lambda path: object())
+    monkeypatch.setattr(telegram_bot, "_load_offset", lambda: 0)
+
+    def konflikt(token, offset):
+        raise telegram_bot.urllib.error.HTTPError(
+            "https://api.telegram.invalid", 409, "Conflict", None, None,
+        )
+
+    monkeypatch.setattr(telegram_bot, "_get_updates", konflikt)
+    assert telegram_bot.main() == 0
 
 
 def test_bot_verbindet_ueber_genus_db_connect_nicht_roh():

@@ -9,18 +9,19 @@ Arbeitsgedächtnis, docs/GENUS_GEDAECHTNIS.md Punkt 4) -- a bare "warum?"/"woher
 retraces the last turn, and "... von vorhin"/"... von eben" can reach further back, instead of
 failing (per-chat state lives here in the membrane, in-process only -- the ledger stays the
 source of epistemic truth, this is UX plumbing, not knowledge).
-Two capped edge models, both dependency-injected, never trusted blindly: `deuter.py` reads
-free phrasing INTO the deterministic core (an intent/subject/object GUESS, graph-verified
-before anything acts); `stimme.py` reads an ALREADY-verified answer back OUT more naturally
-(a faithfulness-checked rephrase -- every quoted word/number must survive, or the original
-template stands). Each keeps its OWN warm 1.5B model, deliberately NOT shared -- live measured
-(2026-07-03): sharing one model meant every Stimme call evicted the Deuter's llama.cpp prompt
-cache (a different system prompt), so the NEXT Deuter call had to reprocess its whole ~1300-
-token prompt from scratch (26s instead of 3s). Two models cost ~1-1.5 GB more RAM (the Pi has
-plenty free) but keep latency predictable instead of depending on call order. Neither ever
-writes the answer itself. The core is untouched: this is a new DOOR, not a new ROOM. Strictly
-answer-only -- no proposal, governance, pause/resume, or any state-changing command is
-reachable here, on purpose (Hände stay parked; this is a Mundstück).
+The capped `deuter.py` edge model reads free phrasing INTO the deterministic core (an
+intent/subject/object GUESS, graph-verified before anything acts). The optional `stimme.py`
+model can read an ALREADY-verified answer back OUT more naturally (a faithfulness-checked
+rephrase -- every quoted word/number must survive, or the original template stands). It is
+disabled by default: keeping both 1.5B models warm made the bridge occupy roughly 4 GiB on the
+Pi, while Stimme changes style only and the verified template is already a complete answer.
+Set GENUS_TELEGRAM_STIMME=1 explicitly to accept that extra memory cost (the hardened systemd
+service also requires an intentional MemoryMax override). Sharing one model is not the fallback
+because the two system prompts evict each other's llama.cpp prompt cache and made measured
+latency jump from about 3s to 26s. Neither model ever writes the answer itself.
+The core is untouched: this is a new DOOR, not a new ROOM. Strictly answer-only -- no proposal,
+governance, pause/resume, or any state-changing command is reachable here, on purpose (Hände
+stay parked; this is a Mundstück).
 
 Security: a message is answered ONLY if its sender's Telegram user id is on the allow-list
 (GENUS_TELEGRAM_ALLOWED_IDS). Everyone else is silently ignored (logged, not replied to, so a
@@ -47,9 +48,13 @@ TOKEN_FILE = os.environ.get(
     "GENUS_TELEGRAM_TOKEN_FILE", os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot_token")
 )
 OFFSET_FILE = os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.offset")
+INSTANCE_LOCK_FILE = os.environ.get(
+    "GENUS_TELEGRAM_LOCK_FILE", os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.lock")
+)
 UA = "GENUS-PI/0.1 (personal companion bridge)"
 _CTX = ssl.create_default_context()
 _VERLAUF_MAX = 6   # Mehr-Zug-Arbeitsgedächtnis: wie viele Züge pro Chat im Blick bleiben
+_RESTART_EXIT_CODE = 75  # EX_TEMPFAIL: Restart=on-failure startet nach einem Deploy-Flag neu
 
 # Der Lernkreis v1 (Naht 4): korrigierte Beispiele sind MEMBRAN-Wissen -- eine Edge-Datei
 # wie die Lerner-Cursor (learn.cursor, learn.gap_attempts), nie das Ledger. Der Text der
@@ -62,7 +67,7 @@ KORREKTUR_DATEI = os.environ.get(
 # Der Selbst-Neustart (Ronnys Frage 2026-07-04: „eine einfachere Möglichkeit für die
 # nötigen Neustarts") -- derselbe Flag-Stil wie der Pause-Schalter, KEIN sudo: der Deploy
 # berührt diese Datei, der Bot sieht sie im nächsten Poll-Zyklus (~25 s), beendet sich
-# sauber, und systemd (Restart=always in der Unit) startet ihn mit dem frischen Code.
+# sauber mit EX_TEMPFAIL, und systemd (Restart=on-failure) startet ihn mit frischem Code.
 NEUSTART_DATEI = os.environ.get(
     "GENUS_BOT_NEUSTART_DATEI",
     os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.neustart"),
@@ -311,6 +316,45 @@ def _log(msg: str) -> None:
     print(line, flush=True)
 
 
+def _stimme_aktiv() -> bool:
+    """Die zweite Modellkopie ist ein ausdrückliches Qualitäts-/RAM-Opt-in.
+
+    Ohne Opt-in bleibt die bereits verifizierte, deterministische Antwort vollständig erhalten;
+    nur ihre optionale sprachliche Glättung entfällt. Unbekannte Werte sind sicher AUS statt
+    versehentlich einen weiteren dauerhaften 1.5B-Singleton zu laden.
+    """
+    return os.environ.get("GENUS_TELEGRAM_STIMME", "0").strip().casefold() in {
+        "1", "true", "yes", "on", "ja",
+    }
+
+
+def _acquire_instance_lock():
+    """Exklusiven Prozess-Lock halten; ``None`` heißt: ein Poller läuft bereits.
+
+    Telegram erlaubt je Bot-Token nur einen ``getUpdates``-Long-Poller. systemd ist der erste
+    Wächter, dieser Linux-advisory-lock die letzte Barriere gegen manuell oder transient
+    gestartete Doppelinstanzen. Der offene Dateideskriptor hält den Lock bis zum Prozessende;
+    ein Absturz hinterlässt deshalb keinen stale PID-Lock. Auf nicht-POSIX-Testsystemen bleibt
+    die Funktion importierbar, produktiv läuft die Brücke ausschließlich unter Linux/systemd.
+    """
+    os.makedirs(os.path.dirname(INSTANCE_LOCK_FILE) or ".", exist_ok=True)
+    lock = open(INSTANCE_LOCK_FILE, "a+", encoding="ascii")
+    try:
+        os.chmod(INSTANCE_LOCK_FILE, 0o600)
+        try:
+            import fcntl
+        except ImportError:  # pragma: no cover - production is Linux; keeps local Windows tests usable
+            return lock
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock.close()
+        return None
+    except OSError:
+        lock.close()
+        raise
+    return lock
+
+
 def _token() -> str:
     token = os.environ.get("GENUS_TELEGRAM_BOT_TOKEN", "").strip()
     if token:
@@ -436,7 +480,6 @@ def handle_update(
     (Deuten, Formulieren -- beides Modell; die Graph-Arbeit ist ms und bekommt keine Show)."""
     from genus import companion, verstehen
     import deuter
-    import stimme
     import waage
 
     message = update.get("message") or update.get("edited_message")
@@ -476,22 +519,24 @@ def handle_update(
             # ist strukturell unmöglich. Wächst das Raster, wächst die Grenze mit.
             angebot = verstehen.leaf_kinds(conn) or None
             grenze = verstehen.gbnf_grammatik(angebot)
-            # Deuter und Stimme haben JEWEILS ihr eigenes warmes Modell -- live gemessen
-            # (2026-07-03): geteilt verwarf jeder Stimme-Aufruf den Prompt-Cache des Deuter
-            # (ein anderer System-Prompt), sodass der NÄCHSTE Deuter-Aufruf seinen ganzen
-            # ~1300-Token-Prompt neu verarbeiten musste -- 26s statt 3s. Kostet dauerhaft ein
-            # zweites 1.5B-Modell im RAM (~1-1.5 GB, auf dem Pi reichlich frei), aber macht die
-            # Latenz durchgehend vorhersagbar statt vom Zufall der Aufrufreihenfolge abzuhängen.
+            # Nur der Deuter bleibt standardmäßig warm. Die Stimme ist ein ausdrückliches
+            # Opt-in: ihr zweiter 1.5B-Singleton machte aus dem Bot live einen ~4-GiB-Prozess,
+            # obwohl ohne sie dieselbe verifizierte Template-Antwort vollständig erhalten bleibt.
+            # Ein Modell zu teilen wäre keine robuste Sparvariante: die verschiedenen Prompts
+            # verdrängen den Cache und machten den nächsten Deuter-Aufruf gemessen 26s langsam.
             zuege = sessions.get(chat_id) or []
             vorher = zuege[-1] if zuege else {}
             hinweise = _korrektur_hinweise(conn)   # Lernkreis-Rückfluss, frisch berechnet
-            sprich = stimme.formuliere
+            sprich = None
             if status is not None:
                 status(chat_id, "🤔 Ich denke nach …")   # gleich ruft der Deuter (Sekunden)
-
-                def sprich(text, **kw):   # die zweite ehrliche Modell-Phase: das Formulieren
-                    status(chat_id, "✍️ Ich formuliere …")
-                    return stimme.formuliere(text, **kw)
+            if _stimme_aktiv():
+                import stimme
+                sprich = stimme.formuliere
+                if status is not None:
+                    def sprich(text, **kw):   # die zweite ehrliche Modell-Phase: Formulieren
+                        status(chat_id, "✍️ Ich formuliere …")
+                        return stimme.formuliere(text, **kw)
             result = companion.respond_with_deuter(
                 conn, question, vorher.get("question"),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze,
@@ -546,9 +591,20 @@ def main() -> int:
     if not allowed:
         _log("GENUS_TELEGRAM_ALLOWED_IDS is empty — refusing to start (no open bots)")
         return 1
-    _log(f"telegram bridge started — {len(allowed)} allowed id(s)")
 
     os.makedirs(LOG_DIR, exist_ok=True)
+    # Telegram beantwortet getUpdates mit HTTP 409, sobald derselbe Token parallel gepollt
+    # wird. Vor DB und Netzwerk genau EINE Prozessinstanz zulassen; der offene Handle bleibt
+    # absichtlich bis zum Ende dieses main()-Frames referenziert.
+    _instance_lock = _acquire_instance_lock()
+    if _instance_lock is None:
+        _log("another telegram bridge instance already owns the poll lock — stopping")
+        return 0
+    _log(
+        f"telegram bridge started — {len(allowed)} allowed id(s), "
+        f"Stimme={'on' if _stimme_aktiv() else 'off'}"
+    )
+
     # Über genus.db.connect statt rohem sqlite3.connect (Phase 0 der Ziel-Architektur):
     # der Bot bekommt damit dieselben Pragmas (WAL, busy_timeout, foreign_keys) und
     # Spalten-Migrationen wie die CLI -- vorher konnte dieser Pfad sich auf einer
@@ -568,9 +624,19 @@ def main() -> int:
                 os.remove(NEUSTART_DATEI)
             except OSError:
                 pass
-            return 0
+            return _RESTART_EXIT_CODE
         try:
             updates = _get_updates(token, offset)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 409:
+                # Ein älterer/unverwalteter Poller ohne unseren Lock kann während eines
+                # Rolling-Deploys noch leben. Nicht mit endlosen Requests dagegen anrennen:
+                # sauber stoppen; der Watchdog versucht die verwaltete Unit später erneut.
+                _log("getUpdates conflict (HTTP 409) — another poller owns this token; stopping")
+                return 0
+            _log(f"getUpdates failed (HTTP {exc.code}) — retrying shortly")
+            time.sleep(5)
+            continue
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             _log(f"getUpdates failed ({exc}) — retrying shortly")
             time.sleep(5)

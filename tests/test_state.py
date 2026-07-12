@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from genus import cli, event_router, integrity, query, state
+from genus import cli, event_router, integrity, ledger, projection, query, state
 from tests.conftest import observe_activity_value, observe_cpu_value
 
 
@@ -128,3 +128,30 @@ def test_state_cli_refresh_show_and_explain(monkeypatch, cli_conn, conn):
     assert "elevated" in show_result.output
     assert explain_result.exit_code == 0
     assert "supporting_beliefs:" in explain_result.output
+
+
+def test_contested_active_belief_does_not_support_derived_pressure_state(conn):
+    observe_activity_value(conn, 0.0)
+    support = ledger.append(
+        conn, "evidence_recorded",
+        {"metric_key": "system.load", "metric_value": 10.0, "source_observation": 1},
+    )
+    belief_id = projection.next_belief_id(conn)
+    projection.apply_belief_created(conn, {
+        "belief_id": belief_id, "claim_key": "system.load", "claim_value": "normal",
+        "derivation": "test", "supporting_events": [support],
+    })
+    for i in (2, 3):
+        counter = ledger.append(
+            conn, "evidence_recorded",
+            {"metric_key": "system.load", "metric_value": 99.0, "source_observation": i},
+        )
+        projection.apply_belief_weakened(
+            conn, {"belief_id": belief_id, "contradicting_event": counter}
+        )
+
+    candidate = state.derive_pressure_state(conn)
+
+    assert candidate["state_value"] == state.UNKNOWN
+    assert "system.load" not in candidate["components"]
+    assert candidate["components"]["excluded_contested_beliefs"] == [belief_id]

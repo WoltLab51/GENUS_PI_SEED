@@ -23,6 +23,11 @@ from genus import self_calibration, sources
 # Selbst-Kalibrierung darf sie später bestätigen, sobald genug geschlossene Dreiecke da sind.
 TRANSITIVE_PREDICATES = {"is_a", "part_of", "located_in"}
 SYMMETRIC_PREDICATES = {"synonym", "antonym"}
+# Acyclicity is a semantic property of hierarchy/location predicates, not a
+# consequence of transitivity alone. Dense symmetric graphs (notably `verwandt`)
+# contain closed triangles and can therefore earn a transitivity rule while their
+# cycles remain legitimate. Keep this invariant explicit and deliberately small.
+ACYCLIC_PREDICATES = {"is_a", "part_of", "has_part", "located_in", "made_of"}
 
 # Enough closed triangles / mirrored pairs to trust a rule as *learned* from the data rather than
 # assumed -- a few independent vindications, like MIN_LIFECYCLE for beliefs. A seed, not a law:
@@ -512,6 +517,8 @@ def closes_cycle(conn, subject: str, predicate: str, object_: str) -> bool:
     derives ``subject is_a subject`` and the hierarchy collapses: a self-contradiction, not a fact.
     Reachability is checked first (cheap, targeted); the transitivity decision only when a ring
     actually formed (rare), so the common assertion stays fast."""
+    if predicate not in ACYCLIC_PREDICATES:
+        return False
     if not reaches(conn, object_, subject, predicate):
         return False
-    return is_transitive(conn, predicate)
+    return True

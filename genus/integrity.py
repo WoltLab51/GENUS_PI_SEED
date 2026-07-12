@@ -153,6 +153,7 @@ REQUIRED_EVENT_KEYS = {
         "state",
     },
     "inquiry_resolved": {"inquiry_id", "answer"},
+    "inquiries_reconciled": {"inquiry_ids", "answer"},
     "forecast_made": {"metric_key", "predicted_value", "method", "support"},
     "forecast_scored": {
         "forecast_event",
@@ -563,6 +564,19 @@ def validate_event_contract(conn) -> list[str]:
             if inquiry_id in resolved_inquiries:
                 issues.append(f"inquiry {inquiry_id} resolved more than once")
             resolved_inquiries.add(inquiry_id)
+        if event_type == "inquiries_reconciled":
+            inquiry_ids = payload["inquiry_ids"]
+            if not isinstance(inquiry_ids, list) or not inquiry_ids:
+                issues.append(f"event {row['id']} inquiries_reconciled has no inquiry ids")
+                continue
+            if not str(payload["answer"]).strip():
+                issues.append(f"event {row['id']} inquiries_reconciled has empty answer")
+            if len(inquiry_ids) != len(set(inquiry_ids)):
+                issues.append(f"event {row['id']} inquiries_reconciled has duplicate inquiry ids")
+            for inquiry_id in inquiry_ids:
+                if inquiry_id in resolved_inquiries:
+                    issues.append(f"inquiry {inquiry_id} resolved more than once")
+                resolved_inquiries.add(inquiry_id)
     return issues
 
 

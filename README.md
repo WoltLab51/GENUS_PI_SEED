@@ -68,6 +68,9 @@ genus operation recovery-result --recovery-id 1 --result succeeded
 genus operation list
 genus inquiries list
 genus inquiries resolve 1 --answer "Backup lief"
+genus inquiries reconcile --dry-run
+genus inquiries reconcile
+genus inquiries reconcile --repair-cycles
 genus replay
 genus integrity check
 genus ledger tail --n 20
@@ -109,6 +112,10 @@ from projections and ledger events; they do not write events.
 - `genus explain belief <id>` shows supporting and contradicting evidence.
 - `genus why proposal <id>` shows the source event and source belief chain.
 
+Active projections also expose an epistemic state: `supported`, `contested`, or
+`uncertain`. A contested or uncertain belief remains honest history, but cannot
+support the derived system-pressure state until evidence again dominates uncertainty.
+
 ## Proposal And Inquiry Lifecycle
 
 v0.8 adds the first event-backed human governance actions:
@@ -121,6 +128,13 @@ Accepting a proposal does not execute anything; `Proposal != Change` is still a
 hard rule. Existing databases get the new projection columns automatically on
 startup; run `genus replay` after upgrading to rebuild projections from the
 ledger.
+
+`genus inquiries reconcile` is the bounded maintenance path for mechanically
+provable cases: false acyclicity alarms on non-hierarchical predicates and
+superseded duplicate stability questions. It writes one sealed, replayable batch
+event and never resolves genuine source disagreements or hierarchy cycles.
+With the explicit `--repair-cycles` flag it retracts the historically accepted
+edge that closed each proven hierarchy ring before resolving that inquiry.
 
 ## Experience Core
 
@@ -368,6 +382,10 @@ prints a final `genus doctor` report, and refuses dirty working trees. See
 
 ```bash
 python -m pytest
+ruff check genus deploy tests
+python -m pip check
+pip-audit --local --skip-editable
+bash -n deploy/*.sh
 genus doctor
 genus replay
 genus integrity check

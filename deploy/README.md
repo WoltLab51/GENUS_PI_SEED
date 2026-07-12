@@ -10,6 +10,12 @@ No daemon, no web API, no automatic remote execution by GENUS itself:
 - The Pi verifies integrity, sealing, replay, and optionally exports an anchor.
 - The Pi prints a final `genus doctor` report.
 
+The learner and Telegram services are pinned to the intended GENUS user, home,
+and ledger path even when installed through `sudo`. The Telegram membrane uses
+one process lock, keeps the optional second voice model disabled by default, and
+applies systemd memory, swap, and privilege limits. Re-run the corresponding
+installer after upgrades so changed unit properties take effect immediately.
+
 ## First Pi Setup
 
 ```bash

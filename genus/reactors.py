@@ -259,7 +259,7 @@ def observe_relation(
         # -> inquiry, exactly like the value/source contradictions above (Phase B ①c).
         from genus import inference  # local: reactors is imported broadly; avoid an import cycle
         cyc_key = f"{subject}|{predicate}|{object_}|acyclic"
-        if inference.closes_cycle(conn, subject, predicate, object_) and not _open_source_contradiction(conn, cyc_key):
+        if inference.closes_cycle(conn, subject, predicate, object_):
             contradiction_id = ledger.append(
                 conn,
                 "contradiction_detected",
@@ -267,14 +267,20 @@ def observe_relation(
                  "reason": f"{predicate} cycle: {object_} already reaches {subject}"},
             )
             events.append({"event_type": "contradiction_detected", "id": contradiction_id})
-            inquiries.record_source_contradiction_inquiry(
-                conn,
-                claim_key=cyc_key,
-                source_event=contradiction_id,
-                payload={"subject": subject, "predicate": predicate, "object": object_,
-                         "kind": "acyclicity_violation", "review_recommended": True},
-            )
-            events.append({"event_type": "inquiry_created"})
+            # Acyclicity is a hard structural invariant, not an ambiguous source
+            # disagreement. Preserve the attempted assertion in the ledger, but remove
+            # its projection in the same transaction instead of creating an unbounded
+            # human backlog for something the graph can prove mechanically.
+            retraction = {
+                "subject": subject,
+                "predicate": predicate,
+                "object": object_,
+                "source": source,
+                "reason": "auto-rejected: acyclicity invariant",
+            }
+            retraction_id = ledger.append(conn, "relation_retracted", retraction)
+            projection.apply_relation_retracted(conn, retraction)
+            events.append({"event_type": "relation_retracted", "id": retraction_id})
         if commit:
             conn.commit()
     except Exception:

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from genus.confidence import calculate_confidence
-from genus import projection
+from genus import ledger, projection
 from tests.conftest import observe_cpu_value
 
 
@@ -123,6 +123,35 @@ def test_confidence_decreases_with_contradicting_evidence():
     lower = calculate_confidence(supporting, contradicting, "system.activity", now=now)
 
     assert lower < high
+
+
+def test_belief_exposes_contested_epistemic_state_when_counterevidence_dominates(conn):
+    supporting = ledger.append(
+        conn, "evidence_recorded",
+        {"metric_key": "system.load", "metric_value": 1.0, "source_observation": 1},
+    )
+    belief_id = projection.next_belief_id(conn)
+    projection.apply_belief_created(conn, {
+        "belief_id": belief_id,
+        "claim_key": "system.load",
+        "claim_value": "normal",
+        "derivation": "test",
+        "supporting_events": [supporting],
+    })
+    for value in (2.0, 3.0):
+        evidence_id = ledger.append(
+            conn, "evidence_recorded",
+            {"metric_key": "system.load", "metric_value": value,
+             "source_observation": int(value)},
+        )
+        projection.apply_belief_weakened(conn, {
+            "belief_id": belief_id, "contradicting_event": evidence_id,
+        })
+
+    belief = projection.belief_with_confidence(conn, projection.get_belief(conn, belief_id))
+
+    assert belief["confidence"] < 0.5
+    assert belief["epistemic_state"] == projection.CONTESTED
 
 
 def test_clock_shares_the_inert_disk_halflife():

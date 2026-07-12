@@ -278,6 +278,7 @@ def test_reseal_repairs_a_forked_chain(conn):
 
 def test_ledger_sealing_cli(monkeypatch, cli_conn, conn):
     monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: cli_conn)
     runner = CliRunner()
 
     init = runner.invoke(cli.main, ["ledger", "seal-init"])
@@ -291,5 +292,6 @@ def test_ledger_sealing_cli(monkeypatch, cli_conn, conn):
     assert "head=" in head.output
     assert verify.exit_code == 0
     assert "OK chain intact" in verify.output
+    assert "check_ms=" in verify.output
     assert second_init.exit_code == 0
     assert "already initialized" in second_init.output

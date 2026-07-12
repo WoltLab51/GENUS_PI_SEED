@@ -2,7 +2,7 @@ import sqlite3
 
 from click.testing import CliRunner
 
-from genus import cli, inference, reactors, sources
+from genus import cli, inference, ledger, projection, reactors, sources
 from genus.db import init_schema
 
 
@@ -15,6 +15,17 @@ def _fresh():
 
 def _rel(conn, subject, predicate, object_, source="dict"):
     reactors.observe_relation(conn, subject, predicate, object_, source)
+
+
+def _legacy_rel(conn, subject, predicate, object_, source="dict"):
+    """Seed a pre-hardening relation projection, bypassing the new write invariant."""
+    payload = {
+        "subject": subject, "predicate": predicate, "object": object_,
+        "source": source, "derivation": f"source:{source}",
+    }
+    event_id = ledger.append(conn, "relation_asserted", payload)
+    payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
+    projection.apply_relation_asserted(conn, payload)
 
 
 def test_transitive_inference_derives_and_justifies():
@@ -178,9 +189,9 @@ def test_symmetry_needs_a_rate_not_just_a_count():
 
 def test_detects_is_a_cycles_of_any_length():
     conn = _fresh()
-    _rel(conn, "dog", "is_a", "mammal"); _rel(conn, "mammal", "is_a", "animal")  # clean DAG spine
-    _rel(conn, "X", "is_a", "Y"); _rel(conn, "Y", "is_a", "X")                   # a 2-cycle
-    _rel(conn, "A", "is_a", "B"); _rel(conn, "B", "is_a", "C"); _rel(conn, "C", "is_a", "A")  # a 3-cycle
+    _legacy_rel(conn, "dog", "is_a", "mammal"); _legacy_rel(conn, "mammal", "is_a", "animal")
+    _legacy_rel(conn, "X", "is_a", "Y"); _legacy_rel(conn, "Y", "is_a", "X")
+    _legacy_rel(conn, "A", "is_a", "B"); _legacy_rel(conn, "B", "is_a", "C"); _legacy_rel(conn, "C", "is_a", "A")
     rings = inference.cycles(conn, "is_a")
     assert len(rings) == 2                                    # the DAG spine contributes none
     assert ["A", "B", "C"] in rings                           # each ring rooted at its smallest node (once)
@@ -200,8 +211,8 @@ def test_acyclic_hierarchy_has_no_cycles():
 
 def test_knowledge_report_surfaces_is_a_cycles(monkeypatch):
     conn = _fresh()  # the live shape: one source (Wikidata) asserting an is_a cycle both ways
-    _rel(conn, "Suppe", "is_a", "minestra", "wikidata")
-    _rel(conn, "minestra", "is_a", "Suppe", "wikidata")
+    _legacy_rel(conn, "Suppe", "is_a", "minestra", "wikidata")
+    _legacy_rel(conn, "minestra", "is_a", "Suppe", "wikidata")
     k = sources.characterize_knowledge(conn)
     assert len(k["is_a_cycles"]) == 1
     assert set(k["is_a_cycles"][0]) == {"minestra", "Suppe"}
@@ -242,13 +253,48 @@ def test_closes_cycle_only_for_a_transitive_predicate():
     assert inference.closes_cycle(conn, "Z", "is_a", "X") is True
 
 
+def test_learned_transitivity_does_not_imply_acyclicity_for_symmetric_relation():
+    conn = _fresh()
+    # Dense similarity graphs contain many closed triangles and therefore legitimately
+    # look transitive to the learned inference rule. They are not hierarchies, though,
+    # and a reverse/symmetric edge must not be classified as a cycle violation.
+    for a, b, c in (("A", "B", "C"), ("D", "E", "F"), ("G", "H", "I")):
+        _rel(conn, a, "verwandt", b)
+        _rel(conn, b, "verwandt", c)
+        _rel(conn, a, "verwandt", c)
+    assert inference.is_transitive(conn, "verwandt") is True
+    assert inference.closes_cycle(conn, "B", "verwandt", "A") is False
+
+
+def test_observe_relation_never_raises_acyclicity_inquiry_for_verwandt():
+    conn = _fresh()
+    _rel(conn, "A", "verwandt", "B")
+    reactors.observe_relation(conn, "B", "verwandt", "A", "model:embedder")
+    assert conn.execute(
+        "SELECT COUNT(*) AS n FROM inquiry_log WHERE state = 'open'"
+    ).fetchone()["n"] == 0
+
+
 def test_observe_relation_flags_a_new_is_a_cycle():
     conn = _fresh()
     reactors.observe_relation(conn, "A", "is_a", "B", "src")
     reactors.observe_relation(conn, "B", "is_a", "C", "src")
     r = reactors.observe_relation(conn, "C", "is_a", "A", "src")     # closes A->B->C->A
     types = [e["event_type"] for e in r["events"]]
-    assert "contradiction_detected" in types and "inquiry_created" in types
+    assert "contradiction_detected" in types and "relation_retracted" in types
+    assert "inquiry_created" not in types
+    assert conn.execute(
+        "SELECT 1 FROM relation_projection WHERE subject='C' AND predicate='is_a' AND object='A'"
+    ).fetchone() is None
+    before = [dict(row) for row in conn.execute(
+        "SELECT * FROM relation_projection ORDER BY subject, predicate, object, source"
+    )]
+    from genus import event_router
+    event_router.replay(conn)
+    after = [dict(row) for row in conn.execute(
+        "SELECT * FROM relation_projection ORDER BY subject, predicate, object, source"
+    )]
+    assert after == before
 
 
 def test_observe_relation_does_not_flag_acyclic_is_a():

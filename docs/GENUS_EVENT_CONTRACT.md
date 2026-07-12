@@ -34,6 +34,7 @@ External ledger anchors are JSON artifacts, not events. They never appear in
 | `operation_recovery_result` | `recovery_id`, `result`, `action`, `target`, `detail`, `derivation` | Operation | Update operation recovery row |
 | `inquiry_created` | `inquiry_id`, `inquiry_type`, `claim_key`, `source_belief`, `source_event`, `question_key`, `payload`, `state` | Inquiries | Insert inquiry row |
 | `inquiry_resolved` | `inquiry_id`, `answer` | Human via CLI | Mark inquiry resolved |
+| `inquiries_reconciled` | `inquiry_ids`, `answer` | Deterministic maintenance | Resolve a mechanically proven batch of false or duplicate inquiries |
 | `forecast_made` | `metric_key`, `predicted_value`, `method`, `support` | Learning engine (24/7 loop) | None directly; raw fact, read by the learning curve |
 | `forecast_scored` | `forecast_event`, `metric_key`, `predicted_value`, `actual_value`, `error` | Learning engine | None directly; the accumulating error is the learning curve |
 

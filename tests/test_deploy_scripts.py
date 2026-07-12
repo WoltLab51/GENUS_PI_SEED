@@ -349,6 +349,53 @@ def test_learner_installer_is_a_continuous_idle_priority_service():
     assert "genus pause" in script                   # documents how to stop it
 
 
+def test_learner_installer_pins_the_genus_identity_and_paths_under_sudo():
+    # Live regression (2026-07-12): when the installer was invoked through sudo it derived
+    # root + /root from id/$HOME.  The persistent learner consequently wrote to a second
+    # ledger.  The unit must carry the intended login identity and every relevant path itself.
+    script = (ROOT / "deploy" / "pi_install_learner.sh").read_text(encoding="utf-8")
+
+    assert 'GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"' in script
+    assert 'getent passwd "$GENUS_USER"' in script
+    assert 'GENUS_HOME="${GENUS_HOME:-$HOME}"' not in script
+    assert 'GENUS_USER="${GENUS_USER:-$(id -un)}"' not in script
+
+    assert "User=$GENUS_USER" in script
+    assert "Group=$GENUS_GROUP" in script
+    assert "Environment=HOME=$GENUS_HOME" in script
+    assert "Environment=GENUS_USER=$GENUS_USER" in script
+    assert "Environment=GENUS_HOME=$GENUS_HOME" in script
+    assert "Environment=GENUS_DB_PATH=$DB_PATH" in script
+    assert 'runuser -u "$GENUS_USER"' in script
+    assert 'as_genus_user mkdir -p "$DB_DIR" "$LOG_DIR"' in script
+    assert 'as_genus_user test -w "$DB_DIR"' in script
+
+    # Installing a changed unit and calling `enable --now` leaves an already-running old
+    # process untouched.  An explicit restart is what makes the corrected identity effective.
+    assert "systemctl restart genus-learner.service" in script
+
+
+def test_learner_acquisition_chain_preserves_the_pinned_ledger_path():
+    # The service boundary pins these variables; every script that can write during one learner
+    # step must inherit/use them rather than unsetting them or deriving a separate cwd database.
+    for name in (
+        "pi_learn.sh",
+        "observe_konzept.sh",
+        "observe_lexem.sh",
+        "observe_dbnary.sh",
+    ):
+        script = (ROOT / "deploy" / name).read_text(encoding="utf-8")
+        assert 'GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"' in script, name
+        assert 'GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"' in script, name
+        assert 'DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"' in script, name
+        assert 'env -u GENUS_DB_PATH' not in script, name
+
+    # Each acquisition membrane hands that resolved path to the actual core write command.
+    for name in ("observe_konzept.sh", "observe_lexem.sh", "observe_dbnary.sh"):
+        script = (ROOT / "deploy" / name).read_text(encoding="utf-8")
+        assert 'GENUS_DB_PATH="$DB_PATH"' in script, name
+
+
 def test_deuter_installer_puts_llama_cpp_in_the_shared_venv_not_a_new_one():
     script = (ROOT / "deploy" / "pi_install_deuter.sh").read_text(encoding="utf-8")
     # unlike the embedder, this model must stay warm inside the bot's own process -- no new venv
@@ -404,15 +451,15 @@ def test_stimme_module_only_rephrases_never_invents():
         assert forbidden not in script
 
 
-def test_deuter_and_stimme_each_get_their_own_model_not_shared():
-    # live gemessen (2026-07-03): ein geteiltes Modell verwarf bei jedem Stimme-Aufruf den
-    # Deuter-Prompt-Cache (26s statt 3s beim naechsten Deuter-Aufruf) -- jede Rolle hat jetzt
-    # ihr eigenes warmes Modell
+def test_telegram_keeps_the_second_model_behind_an_explicit_opt_in():
+    # Live-Befund 2026-07-12: zwei warme 1.5B-Modelle belegten rund 4 GiB. Teilen ist wegen
+    # Prompt-Cache-Verdrängung (26s statt 3s) ebenfalls keine robuste Lösung. Daher bleibt
+    # nur der notwendige Deuter warm; Stimme ist eine explizite Stil-/RAM-Entscheidung.
     bot = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
     assert "deuter.get_model" not in bot
-    # die Stimme spricht ueber IHR Modul (stimme.formuliere) -- seit der Statuszeile ggf.
-    # durch die sprich-Huelle gereicht, aber nie ueber ein geteiltes Deuter-Modell
+    assert 'os.environ.get("GENUS_TELEGRAM_STIMME", "0")' in bot
     assert "stimme.formuliere" in bot
+    assert bot.index("if _stimme_aktiv():") < bot.index("import stimme", bot.index("if _stimme_aktiv():"))
     deuter_script = (ROOT / "deploy" / "deuter.py").read_text(encoding="utf-8")
     assert "def get_model" not in deuter_script
 
@@ -587,7 +634,23 @@ def test_telegram_bot_installer_keeps_the_token_out_of_the_unit_file():
     assert "$BOT_TOKEN" not in script.split("ExecStart=")[1].split("\n")[0]  # not in ExecStart line
     # normal priority (responsive), unlike the deliberately idle-priority learner
     assert "CPUSchedulingPolicy=idle" not in script
-    assert "Restart=always" in script
+    assert "Restart=on-failure" in script
+
+
+def test_telegram_bot_installer_caps_memory_and_drops_privileges():
+    script = (ROOT / "deploy" / "pi_install_telegram_bot.sh").read_text(encoding="utf-8")
+
+    assert "Environment=GENUS_TELEGRAM_STIMME=0" in script
+    assert "Environment=GENUS_TELEGRAM_LOCK_FILE=" in script
+    assert "systemctl restart genus-telegram-bot.service" in script
+    assert "MemoryHigh=2500M" in script and "MemoryMax=3G" in script
+    assert "MemorySwapMax=512M" in script and "TasksMax=64" in script
+    for guard in (
+        "NoNewPrivileges=true", "PrivateTmp=true", "PrivateDevices=true",
+        "ProtectSystem=full", "ProtectKernelTunables=true", "RestrictSUIDSGID=true",
+        "CapabilityBoundingSet=",
+    ):
+        assert guard in script
 
 
 def test_telegram_bot_answers_only_never_writes():
@@ -615,3 +678,9 @@ def test_watchdog_supervises_the_telegram_bot_at_normal_priority():
     bot_fn = script.split("ensure_telegram_bot()")[1].split("json_field()")[0]
     assert "CPUSchedulingPolicy=idle" not in bot_fn
     assert "Nice=19" not in bot_fn
+    # Eine installierte Unit wird direkt gestartet; erst wenn sie gar nicht existiert, darf
+    # genau eine benannte, ebenfalls begrenzte Fallback-Unit entstehen.
+    assert bot_fn.index("systemctl cat genus-telegram-bot.service") < bot_fn.index("systemd-run --quiet")
+    assert "--unit=genus-telegram-bot-fallback.service" in bot_fn
+    assert "--property=MemoryMax=3G" in bot_fn
+    assert "--setenv=GENUS_TELEGRAM_STIMME=0" in bot_fn

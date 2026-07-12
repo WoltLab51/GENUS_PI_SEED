@@ -483,8 +483,8 @@ def _raise_stability_surprises(conn) -> list[int]:
     # raise one StabilityInquiry per such flip. A volatile belief flipping is no
     # surprise, so only 'stable' experiences are watched. The frozen experience is
     # the expectation; a later belief_superseded for the same claim is the
-    # falsification. One inquiry per flip event (deduped by source_event), so the
-    # detection is idempotent and replay re-applies the inquiry_created events.
+    # falsification. One OPEN inquiry per claim captures the unresolved state;
+    # after it is answered, a later flip may legitimately raise a new question.
     raised: list[int] = []
     stable = conn.execute(
         """
@@ -512,7 +512,7 @@ def _raise_stability_surprises(conn) -> list[int]:
         ).fetchall()
         for flip in flips:
             flip_id = int(flip["id"])
-            if _stability_inquiry_exists(conn, flip_id):
+            if _stability_inquiry_exists(conn, claim_key, flip_id):
                 continue
             payload = json.loads(flip["payload"])
             inquiries.record_inquiry_created_event(
@@ -534,10 +534,15 @@ def _raise_stability_surprises(conn) -> list[int]:
     return raised
 
 
-def _stability_inquiry_exists(conn, source_event: int) -> bool:
+def _stability_inquiry_exists(conn, claim_key: str, source_event: int) -> bool:
     row = conn.execute(
-        "SELECT 1 FROM inquiry_log WHERE inquiry_type = ? AND source_event = ? LIMIT 1",
-        (STABILITY_INQUIRY_TYPE, source_event),
+        """
+        SELECT 1 FROM inquiry_log
+        WHERE inquiry_type = ?
+          AND (source_event = ? OR (claim_key = ? AND state = 'open'))
+        LIMIT 1
+        """,
+        (STABILITY_INQUIRY_TYPE, source_event, claim_key),
     ).fetchone()
     return row is not None
 

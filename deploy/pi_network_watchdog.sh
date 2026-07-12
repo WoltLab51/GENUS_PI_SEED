@@ -75,19 +75,41 @@ ensure_telegram_bot() {
     local token_file="$GENUS_HOME/.genus/telegram_bot_token"
     local env_file="$GENUS_HOME/.genus/telegram_bot.env"
     if [ ! -f "$bot" ] || [ ! -s "$token_file" ] || [ ! -f "$env_file" ]; then return 0; fi
+    # Die dauerhaft installierte, gehärtete Unit ist die EINE Eigentümerin des Pollers. Der
+    # frühere direkte systemd-run-Fallback konnte während Boot/Deploy neben ihr starten und
+    # Telegram-HTTP-409 erzeugen. Existiert die Unit, startet der Watchdog ausschließlich sie.
+    if systemctl cat genus-telegram-bot.service >/dev/null 2>&1; then
+        if systemctl is-active --quiet genus-telegram-bot.service; then return 0; fi
+        log "telegram bridge down — starting installed service"
+        systemctl start genus-telegram-bot.service || log "could not start telegram bridge service"
+        return 0
+    fi
     if pgrep -f "deploy/telegram_bot.py" >/dev/null 2>&1; then return 0; fi
     if ! command -v systemd-run >/dev/null 2>&1; then return 0; fi
     local allowed_ids
     allowed_ids="$(grep -E '^GENUS_TELEGRAM_ALLOWED_IDS=' "$env_file" | tail -1 | cut -d= -f2-)"
     if [ -z "$allowed_ids" ]; then return 0; fi
-    log "telegram bridge down — starting it (normal priority, own transient unit)"
-    systemd-run --quiet --collect \
+    log "telegram bridge down — no installed unit; starting one hardened fallback"
+    systemd-run --quiet --collect --unit=genus-telegram-bot-fallback.service \
         --uid="$GENUS_USER" \
+        --property=Restart=on-failure \
+        --property=RestartSec=15 \
+        --property=MemoryHigh=2500M \
+        --property=MemoryMax=3G \
+        --property=MemorySwapMax=512M \
+        --property=TasksMax=64 \
+        --property=NoNewPrivileges=true \
+        --property=PrivateTmp=true \
+        --property=PrivateDevices=true \
+        --property=ProtectSystem=full \
         --property="StandardOutput=append:$LOG_DIR/telegram_bot.log" \
         --property="StandardError=append:$LOG_DIR/telegram_bot.log" \
+        --setenv=HOME="$GENUS_HOME" \
         --setenv=GENUS_DB_PATH="$DB_PATH" \
         --setenv=GENUS_LOG_DIR="$LOG_DIR" \
         --setenv=GENUS_TELEGRAM_TOKEN_FILE="$token_file" \
+        --setenv=GENUS_TELEGRAM_LOCK_FILE="$GENUS_HOME/.genus/telegram_bot.lock" \
+        --setenv=GENUS_TELEGRAM_STIMME=0 \
         --setenv=GENUS_TELEGRAM_ALLOWED_IDS="$allowed_ids" \
         "$REPO_DIR/.venv/bin/python" "$bot" || log "could not start telegram bridge"
 }

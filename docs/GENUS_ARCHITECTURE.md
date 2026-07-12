@@ -134,8 +134,10 @@ own events and projections are written.
   `operation_log`, and derives the `system.network` belief from network checks.
 - `maturation.py` turns recorded experiences into `RuleProposal` rows and
   activates accepted rule proposals through a second governed human act.
-- `inquiries.py` coordinates `inquiry_created` and `inquiry_resolved` events
-  with `inquiry_log` rows.
+- `inquiries.py` coordinates `inquiry_created`, `inquiry_resolved`, and compact,
+  deterministic `inquiries_reconciled` maintenance events with `inquiry_log`
+  rows. Acyclicity belongs only to explicitly hierarchical predicates; learned
+  transitivity alone never turns a symmetric graph into a DAG.
 - `ledger.py` stores and reads immutable events.
 - `sealing.py` opens a local sealing epoch, computes event seals, verifies the
   chain, and exposes the current ledger head for future external anchors.

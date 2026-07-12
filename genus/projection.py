@@ -10,6 +10,9 @@ from genus.confidence import calculate_confidence
 
 ACTIVE = "active"
 SUPERSEDED = "superseded"
+SUPPORTED = "supported"
+CONTESTED = "contested"
+UNCERTAIN = "uncertain"
 
 # Learned confidence half-life: instead of a preset per claim_key, derive each
 # belief's decay timescale from its own lived behaviour. H = observation span /
@@ -303,6 +306,13 @@ def belief_with_confidence(conn, row) -> dict:
     contradicting = json_list(row["contradicting_events"])
     supporting_times = evidence_created_at_times(conn, supporting)
     contradicting_times = evidence_created_at_times(conn, contradicting)
+    confidence = calculate_confidence(
+        supporting_times,
+        contradicting_times,
+        claim_key=row["claim_key"],
+        # learned per-belief half-life; None falls back to the seed table
+        halflife_seconds=learned_halflife(conn, row["claim_key"]),
+    )
     return {
         "id": row["id"],
         "claim_key": row["claim_key"],
@@ -311,14 +321,21 @@ def belief_with_confidence(conn, row) -> dict:
         "derivation": row["derivation"],
         "supporting": len(supporting),
         "contradicting": len(contradicting),
-        "confidence": calculate_confidence(
-            supporting_times,
-            contradicting_times,
-            claim_key=row["claim_key"],
-            # learned per-belief half-life; None falls back to the seed table
-            halflife_seconds=learned_halflife(conn, row["claim_key"]),
-        ),
+        "confidence": confidence,
+        "epistemic_state": epistemic_state(confidence, bool(contradicting)),
     }
+
+
+def epistemic_state(confidence: float, has_counterevidence: bool) -> str:
+    """Name whether an active projection is currently fit to support decisions.
+
+    Confidence >= 0.5 means weighted support outweighs counterevidence plus the
+    uncertainty prior in ``calculate_confidence``. A lower value with explicit
+    counterevidence is contested; pure decay without contradiction is uncertain.
+    """
+    if confidence >= 0.5:
+        return SUPPORTED
+    return CONTESTED if has_counterevidence else UNCERTAIN
 
 
 def evidence_created_at_times(conn, event_ids: list[int]) -> list[str]:

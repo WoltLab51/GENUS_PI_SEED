@@ -172,6 +172,7 @@ def test_ask_cli_routes_gender_question(monkeypatch):
     conn = _fresh()
     _gender(conn, "Hund", "maskulin")
     monkeypatch.setattr(cli, "get_conn", lambda: conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: conn)
     result = CliRunner().invoke(cli.main, ["ask", "Welches", "Geschlecht", "hat", "Hund?"])
     assert result.exit_code == 0, result.output
     assert "maskulin" in result.output

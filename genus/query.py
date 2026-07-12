@@ -5,6 +5,7 @@ import math
 import string
 
 from genus import (
+    db,
     experience,
     governance,
     inquiries,
@@ -250,10 +251,13 @@ def status(conn) -> dict:
     event_count = conn.execute("SELECT COUNT(*) AS count FROM event_log").fetchone()[
         "count"
     ]
-    active_count = conn.execute(
-        "SELECT COUNT(*) AS count FROM belief_projection WHERE state = ?",
-        (projection.ACTIVE,),
-    ).fetchone()["count"]
+    metrics = db.ledger_metrics(conn, event_count=int(event_count))
+    active_beliefs = projection.list_active_beliefs(conn)
+    active_count = len(active_beliefs)
+    epistemic_counts = {
+        state: sum(1 for belief in active_beliefs if belief["epistemic_state"] == state)
+        for state in (projection.SUPPORTED, projection.CONTESTED, projection.UNCERTAIN)
+    }
     superseded_count = conn.execute(
         "SELECT COUNT(*) AS count FROM belief_projection WHERE state = ?",
         (projection.SUPERSEDED,),
@@ -263,6 +267,12 @@ def status(conn) -> dict:
     ).fetchone()["count"]
     inquiry_count = conn.execute(
         "SELECT COUNT(*) AS count FROM inquiry_log WHERE state = 'open'"
+    ).fetchone()["count"]
+    inquiry_claim_count = conn.execute(
+        """SELECT COUNT(*) AS count FROM (
+               SELECT inquiry_type, claim_key FROM inquiry_log
+               WHERE state = 'open' GROUP BY inquiry_type, claim_key
+           )"""
     ).fetchone()["count"]
     experience_count = conn.execute(
         "SELECT COUNT(*) AS count FROM experience_log"
@@ -282,14 +292,28 @@ def status(conn) -> dict:
     return {
         "events": int(event_count),
         "active_beliefs": int(active_count),
+        "supported_beliefs": epistemic_counts[projection.SUPPORTED],
+        "contested_beliefs": epistemic_counts[projection.CONTESTED],
+        "uncertain_beliefs": epistemic_counts[projection.UNCERTAIN],
         "superseded_beliefs": int(superseded_count),
         "pending_proposals": int(proposal_count),
         "open_inquiries": int(inquiry_count),
+        "open_inquiry_claims": int(inquiry_claim_count),
         "experiences": int(experience_count),
         "active_states": int(active_state_count),
         "governance_decisions": int(governance_count),
         "operations": int(operation_count),
         "active_rules": int(active_rule_count),
+        "ledger_storage_bytes": metrics["storage_bytes"],
+        "ledger_main_bytes": metrics["main_bytes"],
+        "ledger_wal_bytes": metrics["wal_bytes"],
+        "ledger_free_bytes": metrics["free_bytes"],
+        "ledger_bytes_per_event": metrics["bytes_per_event"],
+        "ledger_events_24h": metrics["events_24h"],
+        "ledger_events_7d": metrics["events_7d"],
+        "ledger_estimated_daily_growth_bytes": metrics[
+            "estimated_daily_growth_bytes"
+        ],
     }
 
 

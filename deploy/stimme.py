@@ -15,7 +15,8 @@ Eigenes warmes Modell, bewusst NICHT mit dem Deuter geteilt -- live gemessen (20
 geteiltes Modell verwarf bei jedem Stimme-Aufruf den Prompt-Cache des Deuter (ein komplett
 anderer System-Prompt), sodass der NÄCHSTE Deuter-Aufruf seinen ganzen ~1300-Token-Prompt neu
 verarbeiten musste -- 26s statt 3s, ein Zufalls-Faktor abhängig von der Aufrufreihenfolge.
-Kostet dauerhaft ein zweites 1.5B-Modell im RAM (~1-1.5 GB, auf dem Pi reichlich frei), macht
+Kostet dauerhaft ein zweites 1.5B-Modell im RAM; deshalb lädt die Telegram-Membran es seit der
+4-GiB-Live-Messung nur noch nach explizitem Opt-in. Das getrennte Modell macht
 die Latenz dafür durchgehend vorhersagbar.
 """
 from __future__ import annotations

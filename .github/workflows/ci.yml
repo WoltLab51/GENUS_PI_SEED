@@ -30,6 +30,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
+      - name: Static correctness and dependency consistency
+        run: |
+          python -m compileall -q genus deploy
+          ruff check genus deploy tests
+          python -m pip check
+
+      - name: Validate deployment shell syntax
+        run: bash -n deploy/*.sh
+
+      - name: Audit Python dependencies
+        run: pip-audit --local --skip-editable
+
       - name: Run tests
         run: python -m pytest
 

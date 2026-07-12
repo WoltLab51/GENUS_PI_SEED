@@ -121,7 +121,8 @@ echo "[DEPLOY] doctor check"
 
 # Der laufende Bot (warmer Prozess) lädt Code nur beim Start: das Neustart-Flag bittet
 # ihn, sich nach dem aktuellen Poll-Zyklus (~25 s) sauber zu beenden -- systemd
-# (Restart=always) bringt ihn mit dem frisch deployten Code zurück. Kein sudo nötig.
+# (Restart=on-failure) bringt ihn nach dem dafür reservierten Exit 75 mit dem frisch
+# deployten Code zurück. Kein sudo nötig.
 touch "$(dirname "$DB_PATH")/telegram_bot.neustart"
 echo "[DEPLOY] Bot-Neustart angefordert (Flag) — greift binnen eines Poll-Zyklus"
 
