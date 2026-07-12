@@ -698,7 +698,7 @@ def test_privileged_watchdog_repairs_service_identity_and_hardening_drift():
 
     assert "Environment=GENUS_TELEGRAM_STIMME=0" in bot_fn
     assert "MemoryMax=3G" in bot_fn
-    assert "pi_install_telegram_bot.sh" in bot_fn
+    assert 'bash "$REPO_DIR/deploy/pi_install_telegram_bot.sh"' in bot_fn
     assert "allow-list malformed" in bot_fn
 
     assert 'CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"' in script

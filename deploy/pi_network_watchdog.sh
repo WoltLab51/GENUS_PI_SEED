@@ -128,7 +128,7 @@ ensure_telegram_bot() {
             env GENUS_USER="$GENUS_USER" GENUS_HOME="$GENUS_HOME" \
                 GENUS_REPO_DIR="$REPO_DIR" GENUS_DB_PATH="$DB_PATH" \
                 GENUS_LOG_DIR="$LOG_DIR" \
-                "$REPO_DIR/deploy/pi_install_telegram_bot.sh" "${ids[@]}" \
+                bash "$REPO_DIR/deploy/pi_install_telegram_bot.sh" "${ids[@]}" \
                 || log "could not repair telegram unit hardening"
             return 0
         fi
