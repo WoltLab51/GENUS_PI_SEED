@@ -32,7 +32,7 @@ MAX_KANDIDATEN = int(os.environ.get("GENUS_VERWANDT_MAX_CAND", "80"))
 # Eine über-breite Kategorie („Artefakt" mit Tausenden Kindern) ist KEIN Bedeutungs-Nachbarschafts-
 # Kreis -- ihre Kinder sind ein Gemischtwarenladen. Solche Knoten werden beim Sammeln übersprungen
 # (Messer zieht dann aus „Stichwaffe"/„Werkzeug", nicht aus dem ganzen Artefakt-Universum).
-MAX_FANOUT = int(os.environ.get("GENUS_VERWANDT_MAX_FANOUT", "200"))
+MAX_FANOUT = int(os.environ.get("GENUS_VERWANDT_MAX_FANOUT", "20"))
 DRYRUN = os.environ.get("GENUS_VERWANDT_DRYRUN", "0") == "1"
 
 
