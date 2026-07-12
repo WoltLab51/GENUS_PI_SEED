@@ -589,6 +589,40 @@ def relate_command(subject: str, predicate: str, object: str, source: str,
         conn.close()
 
 
+@main.command("relate-bulk")
+@click.option("--chunk", default=5000, show_default=True,
+              help="Commit every N edges (bounds lock duration + transaction size).")
+def relate_bulk_command(chunk: int) -> None:
+    """Assert MANY relations from JSONL on stdin — one per line: {subject,predicate,object,
+    source[,derivation]}. One process, chunked commits (kein fsync pro Kante) — für große
+    Wissens-Anreicherungen wie den Verwandtschafts-Nachtlauf (deploy/verwandtschaft.py)."""
+    import json as _json
+    import sys as _sys
+
+    conn = get_conn()
+    n = fehler = 0
+    try:
+        for zeile in _sys.stdin:
+            zeile = zeile.strip()
+            if not zeile:
+                continue
+            try:
+                e = _json.loads(zeile)
+                reactors.observe_relation(conn, e["subject"], e["predicate"], e["object"],
+                                          e.get("source", "human"),
+                                          derivation=e.get("derivation"), commit=False)
+                n += 1
+                if n % chunk == 0:
+                    conn.commit()
+            except Exception:   # eine kaputte Zeile darf den ganzen Lauf nicht kippen
+                fehler += 1
+        conn.commit()
+    finally:
+        conn.close()
+    click.echo(f"[REL-BULK] {n} Kante(n) geschrieben"
+               + (f", {fehler} Zeile(n) übersprungen" if fehler else ""))
+
+
 @main.command("unrelate")
 @click.argument("subject")
 @click.argument("predicate")

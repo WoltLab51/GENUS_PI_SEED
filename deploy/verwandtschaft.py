@@ -96,8 +96,11 @@ def _konzepte_von(conn, word):
         (f"{word}@{LANG}",))]
 
 
-def verwandt_konzept(conn, emb, qid, cache):
-    """Wiegt die Nachbarn EINES Konzepts und schreibt die engsten als gewichtete Kante."""
+def verwandt_konzept(conn, emb, qid, cache, edges):
+    """Wiegt die Nachbarn EINES Konzepts und SAMMELT die engsten als gewichtete Kanten in
+    ``edges`` (im Dry-run nur ausgegeben). Der eigentliche Schreib-Lauf erfolgt gebündelt über
+    ``genus relate-bulk`` (EIN Prozess, gechunkte Commits) -- pro-Kante-Subprozesse wären bei
+    30k Konzepten stundenlang."""
     import numpy as np
 
     desc = concept_desc(conn, qid)
@@ -120,11 +123,17 @@ def verwandt_konzept(conn, emb, qid, cache):
         if DRYRUN:
             print(f"[VERW] {german_label(conn, qid)} ~{sim:.2f}~ {german_label(conn, other)}")
         else:
-            subprocess.run([GENUS, "relate", qid, "verwandt", other,
-                            "--source", "model:embedder", "--derivation", f"cos={sim:.4f}"],
-                           check=False, stdout=subprocess.DEVNULL)
+            edges.append({"subject": qid, "predicate": "verwandt", "object": other,
+                          "source": "model:embedder", "derivation": f"cos={sim:.4f}"})
         n += 1
     return n
+
+
+def _schreibe_gebuendelt(edges) -> None:
+    """Alle gesammelten Kanten in EINEM ``genus relate-bulk``-Aufruf (JSONL über stdin)."""
+    import json
+    jsonl = "\n".join(json.dumps(e, ensure_ascii=False) for e in edges)
+    subprocess.run([GENUS, "relate-bulk"], input=jsonl.encode("utf-8"), check=False)
 
 
 def eligible_words(conn):
@@ -147,13 +156,20 @@ def main() -> int:
         from fastembed import TextEmbedding
         emb = TextEmbedding(model_name=MODEL)   # Modell EINMAL laden
         cache: dict = {}
+        edges: list = []
         total, beruehrt = 0, 0
-        for qid in qids:
-            n = verwandt_konzept(conn, emb, qid, cache)
+        for i, qid in enumerate(qids, 1):
+            n = verwandt_konzept(conn, emb, qid, cache, edges)
             total += n
             beruehrt += 1 if n else 0
+            if i % 2000 == 0:
+                print(f"[VERW] ... {i}/{len(qids)} Konzepte gewogen, {total} Kanten gesammelt",
+                      flush=True)
     finally:
         conn.close()
+    if edges and not DRYRUN:
+        print(f"[VERW] schreibe {len(edges)} Kanten gebündelt (relate-bulk) ...", flush=True)
+        _schreibe_gebuendelt(edges)
     print(f"[VERW] {total} verwandt-Kante(n) über {beruehrt}/{len(qids)} Konzept(e) "
           f"({'dry-run' if DRYRUN else 'geschrieben als model:embedder, gewichtet'})")
     return 0

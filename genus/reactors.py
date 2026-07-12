@@ -208,7 +208,8 @@ def teach_relation(
 
 
 def observe_relation(
-    conn, subject: str, predicate: str, object_: str, source: str, derivation: str | None = None
+    conn, subject: str, predicate: str, object_: str, source: str, derivation: str | None = None,
+    commit: bool = True,
 ) -> dict:
     """Record a relation between two entities -- networked knowledge, not just a value.
 
@@ -216,7 +217,10 @@ def observe_relation(
     asserted by a source, e.g. ``(system.thermal, correlates_with, system.load)``. A raw
     fact (not projected -> replay-stable); read as a graph via ``genus relations``. The
     same source-trust applies, so a relation from a distrusted source is held lightly.
-    """
+
+    ``commit=False`` defers the commit to the caller -- for a bulk apply (tausende Kanten, z.B.
+    der Verwandtschafts-Nachtlauf) hält der Aufrufer EINE Transaktion offen und committet
+    gebündelt, statt pro Kante zu fsyncen. Ein Fehler rollt weiterhin sofort zurück."""
     try:
         payload = {
             "subject": subject,
@@ -271,7 +275,8 @@ def observe_relation(
                          "kind": "acyclicity_violation", "review_recommended": True},
             )
             events.append({"event_type": "inquiry_created"})
-        conn.commit()
+        if commit:
+            conn.commit()
     except Exception:
         conn.rollback()
         raise

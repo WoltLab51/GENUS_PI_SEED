@@ -81,6 +81,39 @@ def test_konzepte_von_wort():
     assert verwandtschaft._konzepte_von(conn, "Hund") == ["Q144"]
 
 
+def test_relate_bulk_schreibt_viele_kanten_in_einem_lauf(tmp_path, monkeypatch):
+    # der Nachtlauf-Schreibweg: JSONL auf stdin -> viele gewichtete Kanten in EINEM Prozess
+    db = tmp_path / "genus.sqlite3"
+    monkeypatch.setenv("GENUS_DB_PATH", str(db))
+    jsonl = "\n".join([
+        '{"subject":"Q144","predicate":"verwandt","object":"Q18498","source":"model:embedder","derivation":"cos=0.71"}',
+        '{"subject":"Q144","predicate":"verwandt","object":"Q146","source":"model:embedder","derivation":"cos=0.66"}',
+        'kaputte zeile',                       # muss übersprungen werden, nicht den Lauf kippen
+        '{"subject":"Q144","predicate":"verwandt","object":"Q123599","source":"model:embedder","derivation":"cos=0.41"}',
+    ])
+    r = CliRunner().invoke(cli.main, ["relate-bulk", "--chunk", "2"], input=jsonl)
+    assert r.exit_code == 0
+    assert "3 Kante(n)" in r.output and "1 Zeile(n) übersprungen" in r.output
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    for w, q in [("Hund", "Q144"), ("Wolf", "Q18498"), ("Katze", "Q146"), ("Goldfisch", "Q123599")]:
+        reactors.observe_relation(conn, f"{w}@de", "expresses", q, "wikidata")
+    res = verwandt.verwandte(conn, "Hund")
+    assert [v["name"] for v in res["verwandte"]] == ["Wolf", "Katze", "Goldfisch"]   # nach Gewicht
+
+
+def test_observe_relation_commit_false_wartet_auf_den_aufrufer():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Q144", "verwandt", "Q18498", "model:embedder",
+                              derivation="cos=0.71", commit=False)
+    # noch nicht committet -> ein zweiter Reader sieht die Kante nicht, der eigene schon (gleiche tx)
+    assert conn.execute("SELECT COUNT(*) FROM relation_projection WHERE predicate='verwandt'"
+                        ).fetchone()[0] == 1
+    conn.commit()
+    assert conn.execute("SELECT COUNT(*) FROM relation_projection WHERE predicate='verwandt'"
+                        ).fetchone()[0] == 1
+
+
 def test_relate_cli_speichert_das_gewicht_in_der_herleitung(tmp_path, monkeypatch):
     # der Schreibweg der Weberei: `genus relate ... --derivation cos=..` muss das Gewicht ablegen,
     # und das Lese-Ende (verwandt) muss es zurücklesen -- der End-zu-End-Vertrag der Kante
