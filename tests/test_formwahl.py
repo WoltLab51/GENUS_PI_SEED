@@ -42,6 +42,47 @@ def test_gegruendete_mehrdeutigkeit_ist_endgueltig_none():
     assert formwahl.artikel_ein(conn, "See", waage=lambda n: "ein") is None
 
 
+def test_graph_geerdeter_kompositum_kopf_schlaegt_eine_falsche_suffix_regel():
+    conn = _fresh()
+    # Wohngebäude ist im Graphen ein Gebäude; dessen belegtes Neutrum ist stärkere
+    # morphologische Evidenz als eine absichtlich falsche, aber statistisch dichte -äude-Regel.
+    reactors.observe_relation(conn, "Wohngebäude@de", "expresses", "Q_wohnen", "wikidata")
+    reactors.observe_relation(conn, "Q_wohnen", "is_a", "Q_gebaeude", "wikidata")
+    reactors.observe_relation(conn, "Gebäude@de", "expresses", "Q_gebaeude", "wikidata")
+    _gender(conn, "Gebäude", "neutrum")
+    for nomen in ("Bräute", "Häute", "Leute"):
+        # Die konkreten Wörter teilen nicht wirklich -äude; zusätzliche Kunstformen machen
+        # exakt diese Endung dicht und zeigen, dass der Kopf trotzdem Vorrang hat.
+        _gender(conn, f"X{nomen}äude", "feminin")
+
+    r = formwahl.artikel_ein(conn, "Wohngebäude")
+
+    assert r == {"artikel": "ein", "weg": "kompositum"}
+
+
+def test_reine_modell_kette_ist_kein_geerdeter_kompositum_kopf():
+    conn = _fresh()
+    for s, p, o in (
+        ("Wohngebäude@de", "expresses", "Q_wohnen"),
+        ("Q_wohnen", "is_a", "Q_gebaeude"),
+        ("Gebäude@de", "expresses", "Q_gebaeude"),
+        ("Gebäude@de", "grammatical_gender", "neutrum"),
+    ):
+        reactors.observe_relation(conn, s, p, o, "model:test")
+
+    assert formwahl.artikel_ein(conn, "Wohngebäude") is None
+
+
+def test_ein_kurzer_aber_graph_belegter_kopf_ist_zulaessig():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Eisbär@de", "expresses", "Q_eisbaer", "wikidata")
+    reactors.observe_relation(conn, "Q_eisbaer", "is_a", "Q_baer", "wikidata")
+    reactors.observe_relation(conn, "Bär@de", "expresses", "Q_baer", "wikidata")
+    _gender(conn, "Bär", "maskulin")
+
+    assert formwahl.artikel_ein(conn, "Eisbär") == {"artikel": "ein", "weg": "kompositum"}
+
+
 def test_gleiches_genus_aus_zwei_quellen_bleibt_entschieden():
     # zwei Belege, GLEICHER Artikel -> weiter eindeutig (nicht als "mehrdeutig" verworfen)
     conn = _fresh()

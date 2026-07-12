@@ -142,6 +142,28 @@ Registries sind die wachsenden Flächen; die Regeln, nach denen etwas registrier
 darf, gehören zum festen Boden. Lernen bedeutet nicht, Kernregeln heimlich zu ersetzen,
 sondern Material neu zu lesen, Vorschläge zu erzeugen, zu testen und gegatet zu aktivieren.
 
+Ein Feinblatt mit eigenem Werkzeug bildet eine semantische Grenze: Kann dieses Werkzeug den
+konkreten Fall nicht lösen, darf der Dispatcher nicht auf eine gröbere Elternzelle ausweichen
+und dort eine andere Frage beantworten. Der Eltern-Fallback gehört nur Blättern ohne eigenes
+Werkzeug. Fehlende Pflichtslots werden in der erkannten Fähigkeit benannt.
+
+### Lesbares Selbstbild
+
+`genus/selbstbild.py` ist ein read-only Composer, keine zweite Identitätsdatenbank. Das
+Rasterblatt `selbstbild` verbindet Fragen nach Identität und Habitat mit drei vorhandenen
+Wahrheitsflächen:
+
+| Facette | Quelle |
+|---|---|
+| Name und Version | laufender Code |
+| Mission und Stand der Selbstbild-Fähigkeit | provenanzierter Zielgraph |
+| Habitat | aktive Belief- und State-Projektionen |
+
+Belegte, umstrittene und unsichere Habitat-Zustände bleiben getrennt. Hostname, physischer
+Ort, Dienstetopologie oder andere nicht bequellte Details werden nicht aus der Laufzeit
+geraten. Damit ändert sich die Selbstauskunft mit dem Systemzustand, ohne Doctor oder Sensoren
+pro Chat neu auszuführen.
+
 Der akzeptierte Wachstumsvertrag steht in
 [ADR-0003](decisions/ADR-0003-GROWTH-LOOP.md).
 
@@ -172,6 +194,14 @@ Vorbild für weitere Außenabhängigkeiten im Kern dienen.
 
 Eine Membran darf fehlschlagen, ohne den Wahrheitsvertrag umzuschreiben. Ihr Output
 trägt Quelle und wird so wenig vertraut, wie seine Herkunft verdient.
+
+Die Telegram-Membran minimiert Gesprächsdaten vor dem Speichern: Journald erhält nur
+Betriebsmetadaten; der Tagespuffer nur Zeit, erkannte Konzept-IDs, Lesarten und das boolesche
+Warum-Folgesignal. Nachtrotation und Bot-Schreiber teilen einen Lock. Aus Themenhäufigkeit
+entsteht keine persönliche Episode. Bis Nutzer-Namespaces existieren, spricht der persönliche
+Kern nur mit genau einem Owner im Direktchat. Chat-abgeleitetes externes Wortlernen ist Opt-in.
+Der genaue Speicher- und Abrufvertrag steht in
+[design/MEMORY.md](design/MEMORY.md).
 
 ## 7. Privileggrenze auf dem Pi
 
@@ -229,6 +259,8 @@ ziehen oder eine Registry-/Vertragsgrenze einzuführen.
 - Das Ledger wächst dauerhaft; Archivierung darf die belegte Historie nicht still brechen.
 - Ein lokaler Seal schützt nicht gegen adaptives Neuversiegeln ohne externen Anchor.
 - Föderation benötigt strukturell getrennte Kerne und ein Löschkonzept.
+- Volltext-Episoden im heutigen append-only Ledger sind nicht physisch löschbar; ein echter
+  persönlicher Memory-Vault mit Export, Retention und verifizierbarem Vergessen fehlt noch.
 - Selbst-Codieren bleibt menschlich gemergt.
 - Modelle verbessern Ausdruck und Deutung, nicht den Wahrheitsrang.
 

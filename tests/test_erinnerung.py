@@ -97,6 +97,14 @@ def test_bestaetigt_und_vermutet_bleiben_nach_quelle_getrennt():
     assert erinnerung.vermutete_episoden(conn) == ["ich soll mein Fahrrad reparieren lassen"]
 
 
+def test_historische_nacht_aggregate_sind_keine_persoenliche_vermutung():
+    conn = _mit_begriffen()
+    erinnerung.merke(conn, "Gestern ging es mehrfach um den Tisch", quelle="model:nacht")
+    erinnerung.merke(conn, "ich soll mein Fahrrad reparieren lassen", quelle="model:deuter")
+
+    assert erinnerung.vermutete_episoden(conn) == ["ich soll mein Fahrrad reparieren lassen"]
+
+
 def test_neueste_episode_zuerst_bei_mehreren_treffern():
     conn = _mit_begriffen()
     erinnerung.merke(conn, "das Konzert war laut", quelle="ronny")

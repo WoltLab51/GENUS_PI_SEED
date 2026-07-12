@@ -30,7 +30,12 @@ GENUS_GROUP="${GENUS_GROUP:-$(id -gn "$GENUS_USER")}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
 DELAY="${GENUS_LEARN_DELAY:-2}"
+CHAT_WORD_LEARNING="${GENUS_CHAT_WORD_LEARNING:-0}"
 SERVICE_PATH="/etc/systemd/system/genus-learner.service"
+if [ "$CHAT_WORD_LEARNING" != "0" ] && [ "$CHAT_WORD_LEARNING" != "1" ]; then
+    echo "[LEARNER] GENUS_CHAT_WORD_LEARNING must be 0 or 1" >&2
+    exit 1
+fi
 CORE_ID="${GENUS_CORE_ID:-}"
 case "$CORE_ID" in
     ''|*[!A-Za-z0-9._:-]*)
@@ -93,6 +98,7 @@ Environment=GENUS_DB_PATH=$DB_PATH
 Environment=GENUS_LOG_DIR=$LOG_DIR
 Environment=GENUS_CORE_ID=$CORE_ID
 Environment=GENUS_LEARN_DELAY=$DELAY
+Environment=GENUS_CHAT_WORD_LEARNING=$CHAT_WORD_LEARNING
 ExecStart=/bin/bash $REPO_DIR/deploy/pi_learn.sh
 StandardOutput=journal
 StandardError=journal

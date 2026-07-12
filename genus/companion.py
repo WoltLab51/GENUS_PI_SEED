@@ -219,24 +219,12 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
     return "\n".join(lines)
 
 
-# --- Personen-Gedächtnis, Scheibe 2: Episoden beiläufig in Antworten einweben -------------
-#
-# Scheibe 1 machte das Gedächtnis nur auf explizite Rückfrage sichtbar ("Was weißt du über
-# mich?"). Der reale nächste Schritt (Ronny) ist NICHT die automatische Extraktion aus
-# gewöhnlichem Gespräch -- die gibt es faktisch schon: die "tatsache"-Zelle des Verstehens-
-# Würfels notiert unaufgefordert erwähnte Aussagen längst (gedeckelt, unbestätigt). Was fehlt,
-# ist das WEBEN: eine Erinnerung taucht bisher nie beiläufig in einer anderen Antwort auf, selbst
-# wenn das Thema überschneidet. Der Abruf (Punkt 2 von docs/design/MEMORY.md, 2026-07-03)
-# läuft jetzt über den echten Graphen (``erinnerung.erwaehnter_bezug`` -- Konzept-Anker, nicht
-# roher Substring-Abgleich), nicht mehr über einen reinen Wort-in-Wort-Vergleich. Nur EIN
-# Treffer, um nicht aufdringlich zu werden; bestätigt/vermutet bleibt sichtbar unterschieden,
-# wie überall sonst in diesem Speicher.
+# --- bestätigte Episoden beiläufig einweben -----------------------------------------------
+# Der Graph findet semantische Nähe; die Oberfläche ist strenger: ungefragtes Beiwerk darf nur
+# aus einer ausdrücklich menschlich bestätigten Episode stammen (docs/design/MEMORY.md).
 
 def _notiz_bezug(conn, question: str) -> str | None:
-    """Ein kurzer, ehrlicher Nebenbei-Hinweis, falls ``question`` denselben Begriff berührt wie
-    eine gemerkte Episode -- ``None`` sonst. Nie erfunden: die Episode wird wörtlich zitiert.
-    Ob das Beiläufige überhaupt erscheint, entscheidet der Antwort-Würfel (Kreuz-Konsistenz:
-    knapp ⇒ kein Beiwerk) — Persönlichkeit wirkt an der Sprache, nie am Wissen."""
+    """Bestätigte Episode als kurzes Beiwerk; der Antwort-Würfel darf es unterdrücken."""
     from genus import antwort, erinnerung  # local: keeps companion's import-time surface a leaf otherwise
 
     if not antwort.belegung(conn, "plausch")["beiwerk_notiz"]:
@@ -244,9 +232,7 @@ def _notiz_bezug(conn, question: str) -> str | None:
     treffer = erinnerung.erwaehnter_bezug(conn, question)
     if treffer is None:
         return None
-    if treffer["bestaetigt"]:
-        return f" (Nebenbei: du hast mir erzählt „{treffer['inhalt']}“.)"
-    return f" (Nebenbei, noch unbestätigt: du hattest erwähnt „{treffer['inhalt']}“.)"
+    return f" (Nebenbei: du hast mir erzählt „{treffer['inhalt']}“.)"
 
 
 # --- a single shared answer, for any conversational channel -----------------------------
@@ -343,7 +329,7 @@ def _ritual_antwort(conn, question: str) -> str | None:
 
     fact = remember_command(question)
     if fact is not None:
-        erinnerung.merke(conn, fact, quelle="ronny")
+        erinnerung.merke(conn, fact, quelle=erinnerung.HUMAN_SOURCE)
         return f"Gemerkt: „{fact}“"
     if is_recall_question(question):
         return narrate_notes(erinnerung.bestaetigte_episoden(conn), erinnerung.vermutete_episoden(conn))
@@ -806,10 +792,12 @@ def _zelle_vergleich(conn, guess, question, last_question, last_answer, stimme=N
 
 
 def _zelle_ort(conn, guess, question, last_question, last_answer, stimme=None):
-    # „Ist X in Y?" -- dieselbe Mechanik wie beziehung, nur located_in. Gerichtet (X liegt in Y,
-    # nicht umgekehrt), darum Verbatim-Insel (Scheibe 2). Der Anker bleibt Sensor, nicht Tor.
+    # Gerichtet (X liegt in Y, nicht umgekehrt), darum Verbatim-Insel.
     if not (guess.get("subject") and guess.get("object")):
-        return None
+        # Fehlender Pflichtslot wird im Werkzeugvertrag geklärt, nie per Begriffs-Fallback.
+        return ("Ich habe eine Ortsfrage erkannt, aber mir fehlt der zweite konkrete Ort. "
+                "Meine Ortsfähigkeit prüft derzeit Beziehungen wie „Liegt Kassel in Hessen?“. "
+                "Welchen Ausgangsort und welchen Zielort soll ich prüfen?")
     if not _anker_ok(question, guess["subject"], guess["object"]):
         from genus import zaehlwerk
         zaehlwerk.zaehle("ort", "anker_frei")
@@ -858,6 +846,13 @@ def _zelle_erinnerung(conn, guess, question, last_question, last_answer, stimme=
 def _zelle_zustand(conn, guess, question, last_question, last_answer, stimme=None):
     from genus import query
     return query.ask(conn, "zustand")["answer"]
+
+
+def _zelle_selbstbild(conn, guess, question, last_question, last_answer, stimme=None):
+    from genus import selbstbild
+
+    aspekt = " ".join(str(v) for v in (guess.get("subject"), guess.get("object")) if v)
+    return selbstbild.bericht(conn, aspekt=aspekt or None)
 
 
 def _zelle_offene_fragen(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1104,6 +1099,7 @@ _HANDELBAR = {
     "merken": _zelle_merken,
     "erinnerungs-abruf": _zelle_erinnerung,
     "zustand": _zelle_zustand,
+    "selbstbild": _zelle_selbstbild,
     "offene-fragen": _zelle_offene_fragen,
     "ziele": _zelle_ziele,
     "faehigkeiten": _zelle_faehigkeiten,
@@ -1141,7 +1137,7 @@ _ZELLEN_FREI_FORMULIERBAR = frozenset({
 _ZELLEN_PRUEFBAR = {
     "definition": "graph", "beziehung": "graph", "ursache": "graph", "vergleich": "graph",
     "ort": "graph", "grammatik": "graph", "frage-begriff": "graph", "zustand": "graph",
-    "offene-fragen": "graph", "ziele": "graph",
+    "selbstbild": "graph", "offene-fragen": "graph", "ziele": "graph",
     "warum-herkunft": "sitzung", "vertiefung": "sitzung", "anschlussfrage": "sitzung",
     "kuerzer": "sitzung", "ausfuehrlicher": "sitzung", "anders-erklaeren": "sitzung",
     "wiederholen": "sitzung",
@@ -1370,7 +1366,8 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
         return None
     zellen = _handelbare_werkzeuge()
     zelle = verstehen.zelle_of(conn, kind)
-    attempted = [kind] + ([zelle] if zelle else [])
+    # Ein eigenes Blatt-Werkzeug ist die semantische Grenze; nur werkzeuglose Blätter landen weich.
+    attempted = [kind] if kind in zellen else ([zelle] if zelle else [])
     hatte_handler = False
     for step in attempted:
         zellen_werkzeug = zellen.get(step)

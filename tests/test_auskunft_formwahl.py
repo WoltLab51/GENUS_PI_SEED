@@ -91,3 +91,41 @@ def test_answer_ohne_waage_bleibt_deterministisch_und_traegt_artikel_feld():
     conn = _hund(_fresh(), mit_genus=True)
     a = auskunft.answer(conn, "Was ist ein Hund?")   # keine Waage injiziert
     assert a["artikel"]["Haustier"]["weg"] == "gegruendet"
+
+
+def test_wohngebaeude_bekommt_ueber_seinen_graph_kopf_den_richtigen_artikel():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Haus@de", "expresses", "Q3947", "wikidata")
+    reactors.observe_relation(conn, "Q3947", "is_a", "Q11755880", "wikidata")
+    reactors.observe_relation(conn, "Wohngebäude@de", "expresses", "Q11755880", "wikidata")
+    reactors.observe_relation(conn, "Q11755880", "is_a", "Q41176", "wikidata")
+    reactors.observe_relation(conn, "Gebäude@de", "expresses", "Q41176", "wikidata")
+    reactors.observe_relation(conn, "Gebäude@de", "grammatical_gender", "neutrum",
+                              "wikidata-lexemes")
+    reactors.observe_relation(conn, "Haus@de", "primary_gloss", "ein Bauwerk", "dbnary")
+
+    text = auskunft.narrate(auskunft.answer(conn, "Was ist ein Haus?"))
+
+    assert "es ist ein »Wohngebäude«" in text
+    assert "eine »Wohngebäude«" not in text
+
+
+def test_lexikon_usage_label_bleibt_im_graph_aber_nicht_in_der_gesprochenen_definition():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Demokratie@de", "primary_gloss",
+                              "ohne Plural: Volksherrschaft; politisches Prinzip", "dbnary")
+
+    antwort = auskunft.answer(conn, "Was ist Demokratie?")
+    text = auskunft.narrate(antwort)
+
+    assert antwort["meaning"] == ["ohne Plural: Volksherrschaft; politisches Prinzip"]
+    assert "versteht GENUS: Volksherrschaft" in text
+    assert "ohne Plural" not in text
+
+
+def test_normale_doppelpunkts_bedeutung_wird_nicht_weggeputzt():
+    assert auskunft._sprechgloss("ohne Zweifel: eine gute Idee") == "ohne Zweifel: eine gute Idee"
+
+
+def test_geklammerte_usage_marke_verbraucht_auch_ihren_doppelpunkt():
+    assert auskunft._sprechgloss("[ohne Plural]: Volksherrschaft") == "Volksherrschaft"

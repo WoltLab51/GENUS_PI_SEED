@@ -4,8 +4,8 @@
 Long-polls Telegram's Bot API (outbound HTTPS only; no inbound port, no public server needed)
 and answers each allowed message with `genus.companion.respond_with_deuter` -- the
 Verstehens-Würfel (Rituale -> Muster-Zellen -> offene Deuter-Lesart aufs Absichts-Raster ->
-Wort-Lesart), aware of a bounded WINDOW of previous turns in the same chat (Mehr-Zug-
-Arbeitsgedächtnis, docs/design/MEMORY.md Punkt 4) -- a bare "warum?"/"woher weißt du das?"
+Wort-Lesart), aware of a bounded WINDOW of previous turns in the same chat (siehe
+„Arbeitsgedächtnis“ in docs/design/MEMORY.md) -- a bare "warum?"/"woher weißt du das?"
 retraces the last turn, and "... von vorhin"/"... von eben" can reach further back, instead of
 failing (per-chat state lives here in the membrane, in-process only -- the ledger stays the
 source of epistemic truth, this is UX plumbing, not knowledge).
@@ -73,9 +73,9 @@ NEUSTART_DATEI = os.environ.get(
     os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.neustart"),
 )
 
-# Der TAGESPUFFER (docs/design/MEMORY.md, Punkt ④): jeder Zug wird mitgeschrieben --
-# Rohtext NUR hier in der Membran (Ledger ≠ Memory), bis die Nacht-Konsolidierung ihn
-# EINMAL liest, Struktur destilliert und den Puffer leert. Vergessen ist Funktion.
+# Der TAGESPUFFER (docs/design/MEMORY.md, „Tagesrhythmus“): pro Zug nur destillierte Struktur
+# (Konzept-IDs, Lesarten, Warum-Folge), niemals Frage/Antwort/Telegram-ID. Die Nacht rotiert
+# ihn atomar und fasst Tagesmuster zusammen. Ledger ≠ Memory; Datenminimierung vor Retention.
 TAGESPUFFER = os.environ.get(
     "GENUS_TAGESPUFFER", os.path.join(GENUS_USER_HOME, ".genus", "chat_tag.jsonl")
 )
@@ -94,36 +94,65 @@ _LERNWUNSCH_MAX = 200   # die Schlange bleibt gedeckelt (jüngste Begegnungen zu
 def _schreibe_lernwunsch(woerter: list[str]) -> None:
     """Unbekannt begegnete Wörter in die Lern-Warteschlange -- dedupliziert gegen die
     bestehende Schlange, gedeckelt; darf nie eine Antwort kosten (still bei jedem Fehler)."""
+    tmp = None
     try:
-        vorhanden: list[str] = []
-        try:
-            with open(LERNWUNSCH, encoding="utf-8") as f:
-                vorhanden = [z.strip() for z in f if z.strip()]
-        except FileNotFoundError:
-            pass
-        neu = [w for w in woerter if w not in vorhanden]
-        if not neu:
-            return
-        alle = (vorhanden + neu)[-_LERNWUNSCH_MAX:]
-        os.makedirs(os.path.dirname(LERNWUNSCH), exist_ok=True)
-        with open(LERNWUNSCH, "w", encoding="utf-8") as f:
-            f.write("\n".join(alle) + "\n")
+        os.makedirs(os.path.dirname(LERNWUNSCH) or ".", exist_ok=True)
+        lock_path = LERNWUNSCH + ".lock"
+        with open(lock_path, "a", encoding="ascii") as lock:
+            os.chmod(lock_path, 0o600)
+            try:
+                import fcntl
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            except ImportError:  # pragma: no cover - production is Linux
+                pass
+            try:
+                with open(LERNWUNSCH, encoding="utf-8") as f:
+                    vorhanden = [z.strip() for z in f if z.strip()]
+            except FileNotFoundError:
+                vorhanden = []
+            neu = [w for w in woerter if w not in vorhanden]
+            if not neu:
+                return
+            alle = (vorhanden + neu)[-_LERNWUNSCH_MAX:]
+            tmp = LERNWUNSCH + f".tmp-{os.getpid()}"
+            with open(tmp, "w", encoding="utf-8") as f:
+                os.chmod(tmp, 0o600)
+                f.write("\n".join(alle) + "\n")
+            os.replace(tmp, LERNWUNSCH)
+            tmp = None
     except Exception:
-        pass
+        if tmp is not None:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
-def _schreibe_tagespuffer(frage: str, antwort: str, gelesen: list[str]) -> None:
-    """Ein Zug in den Tagespuffer -- darf nie eine Antwort kosten (still bei Fehlern)."""
+def _schreibe_tagespuffer(conn, frage: str, gelesen: list[str]) -> None:
+    """Eine rohtextfreie Tagesstruktur puffern -- nie Frage, Antwort oder Telegram-ID.
+
+    Der separate Advisory-Lock schließt das Rennen mit der atomaren Nacht-Rotation. Auf
+    Nicht-POSIX-Testsystemen bleibt der Schreibweg ohne ``fcntl`` nutzbar.
+    """
     try:
-        eintrag = json.dumps({
+        from genus import konsolidierung
+
+        eintrag = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "question": frage,
-            "answer": antwort[:500],
-            "gelesen": gelesen,
-        }, ensure_ascii=False)
-        os.makedirs(os.path.dirname(TAGESPUFFER), exist_ok=True)
-        with open(TAGESPUFFER, "a", encoding="utf-8") as f:
-            f.write(eintrag + "\n")
+            **konsolidierung.tagesstruktur(conn, frage, gelesen),
+        }
+        os.makedirs(os.path.dirname(TAGESPUFFER) or ".", exist_ok=True)
+        lock_path = TAGESPUFFER + ".lock"
+        with open(lock_path, "a", encoding="ascii") as lock:
+            os.chmod(lock_path, 0o600)
+            try:
+                import fcntl
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            except ImportError:  # pragma: no cover - production is Linux
+                pass
+            with open(TAGESPUFFER, "a", encoding="utf-8") as f:
+                os.chmod(TAGESPUFFER, 0o600)
+                f.write(json.dumps(eintrag, ensure_ascii=False) + "\n")
     except Exception:
         pass
 
@@ -273,6 +302,7 @@ def _merke_korrektur(frage: str, falsch: list[str], richtig: str | None) -> None
     zeilen = (zeilen + [eintrag])[-_KORREKTUR_MAX:]
     os.makedirs(os.path.dirname(KORREKTUR_DATEI), exist_ok=True)
     with open(KORREKTUR_DATEI, "w", encoding="utf-8") as f:
+        os.chmod(KORREKTUR_DATEI, 0o600)
         f.write("\n".join(zeilen) + "\n")
 
 
@@ -328,6 +358,17 @@ def _stimme_aktiv() -> bool:
     }
 
 
+def _chat_wortlernen_aktiv() -> bool:
+    """Chat-Wörter verlassen den Pi nur nach bewusstem Opt-in.
+
+    Der Learner fragt externe Lexikonquellen ab und schreibt erworbenes Wissen ins Ledger.
+    Deshalb ist die frühere automatische Queue für private Chats standardmäßig geschlossen.
+    """
+    return os.environ.get("GENUS_CHAT_WORD_LEARNING", "0").strip().casefold() in {
+        "1", "true", "yes", "on", "ja",
+    }
+
+
 def _acquire_instance_lock():
     """Exklusiven Prozess-Lock halten; ``None`` heißt: ein Poller läuft bereits.
 
@@ -375,7 +416,7 @@ def _allowed_ids() -> set[int]:
             try:
                 ids.add(int(part))
             except ValueError:
-                _log(f"ignoring malformed id in GENUS_TELEGRAM_ALLOWED_IDS: {part!r}")
+                _log("ignoring one malformed entry in GENUS_TELEGRAM_ALLOWED_IDS")
     return ids
 
 
@@ -466,7 +507,7 @@ def handle_update(
 
     ``sessions`` (optional), keyed by chat_id, holds a bounded LIST of that conversation's last
     turns (``[{"question": ..., "answer": ...}, ...]``, oldest first, capped at
-    :data:`_VERLAUF_MAX`) -- Mehr-Zug-Arbeitsgedächtnis (docs/design/MEMORY.md, Punkt 4):
+    :data:`_VERLAUF_MAX`) -- Mehr-Zug-Arbeitsgedächtnis (docs/design/MEMORY.md):
     a bare follow-up ("warum?", "kürzer", "nochmal", ...) reads against the LAST turn as before;
     a "... von vorhin"/"... von eben" question can additionally reach further back
     (``companion.is_backreference``). In-process only, forgotten on a restart -- an honest,
@@ -490,10 +531,13 @@ def handle_update(
     if sender is None or chat_id is None:
         return None
     if sender not in allowed:
-        _log(f"ignored message from unauthorized id {sender}")
+        _log("ignored one message from an unauthorized sender")
+        return None
+    if chat_id != sender:
+        _log("ignored one message outside the owner's private chat")
         return None
     question = message["text"]
-    _log(f"question from {sender}: {question!r}")
+    _log(f"accepted text message (characters={len(question)})")
     try:
         # Membran-Ritual VOR dem Kern: die Morgenzeit ist Betriebskonfiguration dieser
         # Membran (Datei, die morgen_push.sh liest), kein Wissen -- der Kern sieht sie nie.
@@ -566,19 +610,20 @@ def handle_update(
                          "gelesen": result.get("gelesen") or [],
                          "anschluss": result.get("anschluss")}
             sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
-            _schreibe_tagespuffer(question, answer, result.get("gelesen") or [])
+            _schreibe_tagespuffer(conn, question, result.get("gelesen") or [])
     except Exception as exc:  # a bug in answering must never take the bridge down
-        _log(f"error answering {question!r}: {exc}")
+        _log(f"error answering message ({type(exc).__name__})")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."
     # Vokabel-bei-Begegnung: GENUS spürt (Kern, rein lesend), welche Wörter der Nachricht es
     # nicht kennt, und legt sie in die Lern-Warteschlange (Membran) -- der Lerner holt sie vor
     # den Frequenzlisten. Nach der Antwort, nie sie kostend (still bei jedem Fehler).
-    try:
-        begegnet = companion.unbekannte_woerter(conn, question)
-        if begegnet:
-            _schreibe_lernwunsch(begegnet)
-    except Exception:
-        pass
+    if _chat_wortlernen_aktiv():
+        try:
+            begegnet = companion.unbekannte_woerter(conn, question)
+            if begegnet:
+                _schreibe_lernwunsch(begegnet)
+        except Exception:
+            pass
     return chat_id, answer
 
 
@@ -591,6 +636,9 @@ def main() -> int:
     if not allowed:
         _log("GENUS_TELEGRAM_ALLOWED_IDS is empty — refusing to start (no open bots)")
         return 1
+    if len(allowed) != 1:
+        _log("GENUS requires exactly one Telegram owner until personal memories are isolated")
+        return 1
 
     os.makedirs(LOG_DIR, exist_ok=True)
     # Telegram beantwortet getUpdates mit HTTP 409, sobald derselbe Token parallel gepollt
@@ -601,8 +649,8 @@ def main() -> int:
         _log("another telegram bridge instance already owns the poll lock — stopping")
         return 0
     _log(
-        f"telegram bridge started — {len(allowed)} allowed id(s), "
-        f"Stimme={'on' if _stimme_aktiv() else 'off'}"
+        f"telegram bridge started — one private owner, Stimme={'on' if _stimme_aktiv() else 'off'}, "
+        f"Chat-Wortlernen={'on' if _chat_wortlernen_aktiv() else 'off'}"
     )
 
     # Über genus.db.connect statt rohem sqlite3.connect (Phase 0 der Ziel-Architektur):
@@ -638,7 +686,7 @@ def main() -> int:
             time.sleep(5)
             continue
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            _log(f"getUpdates failed ({exc}) — retrying shortly")
+            _log(f"getUpdates failed ({type(exc).__name__}) — retrying shortly")
             time.sleep(5)
             continue
         for update in updates:
@@ -650,7 +698,7 @@ def main() -> int:
             try:
                 result = handle_update(conn, update, allowed, sessions, status=melder.melde)
             except Exception as exc:
-                _log(f"handle_update crashed on update {update.get('update_id')}: {exc}")
+                _log(f"handle_update crashed ({type(exc).__name__})")
                 result = None
                 # nie ein ewiges „Ich denke nach …" stehen lassen
                 melder.raeume_auf("Da ist etwas schiefgelaufen — magst du es nochmal versuchen?")
@@ -659,7 +707,7 @@ def main() -> int:
                 try:
                     melder.abschliessen(chat_id, answer)   # Status-Nachricht WIRD die Antwort
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
-                    _log(f"sendMessage failed ({exc})")
+                    _log(f"sendMessage failed ({type(exc).__name__})")
             _save_offset(offset)
 
 

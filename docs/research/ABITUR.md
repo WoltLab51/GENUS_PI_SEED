@@ -4,7 +4,7 @@
 
 ## 1 · Das Ziel, in Ronnys eigenen Worten (2026-07-03)
 
-Nach dem Fachwissen-Fahrplan im [Gedächtnis-Entwurf](../design/MEMORY.md) (Punkt 3) begann ich einen
+Nach dem damaligen Fachwissen-Fahrplan im [Gedächtnis-Entwurf](../design/MEMORY.md) begann ich einen
 Fachwortschatz zu bauen — Ronny stoppte das sofort:
 
 > "ich meine nicht die Wörter kennen. GENUS soll die Aufgaben einer Abiturprüfung schaffen.
@@ -133,7 +133,7 @@ gemessen an gelebter Nutzung (Belegung, Folge-Signale, Korrekturen).
 
 ## 6 · Verwandte Entscheidungen
 
-- Punkt 4 des Gedächtnis-Konzepts (Tagespuffer + Nacht-Konsolidierung + Morgen-Push) wurde
+- Tagespuffer, Nacht-Konsolidierung und Morgen-Push aus dem Gedächtnis-Konzept wurden
   bewusst zurückgestellt, um sich auf dieses Ziel zu konzentrieren (Ronny, 2026-07-03) — nicht
   vergessen, nur nicht aktiv.
 - sympy als erste externe Kern-Abhängigkeit war eine explizit bestätigte Entscheidung

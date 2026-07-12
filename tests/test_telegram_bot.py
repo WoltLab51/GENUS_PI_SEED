@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -128,18 +129,20 @@ def test_session_threads_last_answer_into_the_meta_zellen(monkeypatch):
     assert answer.startswith("Nochmal: ") and "Wolf" in answer
 
 
-def test_sessions_are_kept_separate_per_chat():
+def test_authorized_owner_is_ignored_outside_the_private_chat():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     sessions: dict = {}
 
     telegram_bot.handle_update(conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions)
-    # a DIFFERENT chat asks a bare followup with no history of its own -- must not see chat 42's question
-    _, answer = telegram_bot.handle_update(
+    # Persönliche Erinnerungen besitzen noch keinen Nutzer-/Raum-Namespace. Bis zur Föderation
+    # antwortet der persönliche Kern deshalb ausschließlich im Owner-Direktchat, nie in Gruppen.
+    result = telegram_bot.handle_update(
         conn, _msg(2, 42, "warum?", chat_id=99), allowed={42}, sessions=sessions,
     )
-    assert "Herleitung" not in answer   # chat 99 has no prior turn -> ordinary routing, not a stale trace
+    assert result is None
+    assert 99 not in sessions
 
 
 def test_sessions_resolve_a_von_vorhin_backreference_across_two_turns():
@@ -369,6 +372,13 @@ def test_main_refuses_to_start_without_a_token(monkeypatch, tmp_path):
 def test_main_refuses_to_start_with_an_empty_allowlist(monkeypatch):
     monkeypatch.setenv("GENUS_TELEGRAM_BOT_TOKEN", "fake-token-for-test")
     monkeypatch.delenv("GENUS_TELEGRAM_ALLOWED_IDS", raising=False)
+    assert telegram_bot.main() == 1
+
+
+def test_main_refuses_multiple_owners_until_memories_are_isolated(monkeypatch):
+    monkeypatch.setenv("GENUS_TELEGRAM_BOT_TOKEN", "fake-token-for-test")
+    monkeypatch.setattr(telegram_bot, "_allowed_ids", lambda: {41, 42})
+
     assert telegram_bot.main() == 1
 
 
@@ -861,7 +871,7 @@ def test_ein_absturz_im_erinnerungs_ritual_toetet_die_bruecke_nicht(monkeypatch)
     assert chat_id == 42 and "schiefgelaufen" in answer   # gefangen, nie geworfen -> Offset speichert
 
 
-# --- der Tagespuffer: Mitschreiben in der Membran (Gedaechtnis Punkt 4) ---------------
+# --- der Tagespuffer: nur Struktur, kein Gesprächsmitschnitt ----------------------------
 
 
 @pytest.fixture(autouse=True)
@@ -881,7 +891,22 @@ def test_jeder_zug_wandert_in_den_tagespuffer():
     zeilen = open(telegram_bot.TAGESPUFFER, encoding="utf-8").read().splitlines()
     assert len(zeilen) == 1
     zug = _json.loads(zeilen[0])
-    assert zug["question"] == "Was ist ein Hund?" and "Wolf" in zug["answer"]
+    assert zug["konzepte"] == ["Q144"]
+    assert set(zug) == {"ts", "konzepte", "warum_folge", "gelesen"}
+    assert "Was ist ein Hund?" not in zeilen[0] and "Wolf" not in zeilen[0]
+
+
+def test_telegram_journal_bekommt_nur_metadaten_keinen_rohtext_oder_absender(monkeypatch):
+    protokoll = []
+    monkeypatch.setattr(telegram_bot, "_log", protokoll.append)
+    conn = _fresh()
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "mein sehr privater Satz"),
+                               allowed={42}, sessions={})
+
+    text = "\n".join(protokoll)
+    assert "characters=" in text
+    assert "privater" not in text and "42" not in text
 
 
 def test_morgen_push_und_nacht_stehen_im_cron_installer():
@@ -915,7 +940,8 @@ def _lernwunsch(bot):
         return [z.strip() for z in f if z.strip()]
 
 
-def test_ein_unbekanntes_wort_landet_in_der_lernwarteschlange():
+def test_ein_unbekanntes_wort_landet_nur_nach_opt_in_in_der_lernwarteschlange(monkeypatch):
+    monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
@@ -924,12 +950,22 @@ def test_ein_unbekanntes_wort_landet_in_der_lernwarteschlange():
     assert _lernwunsch(telegram_bot) == ["Fernweh"]   # „Hund" ist bekannt, „Hat" gefiltert
 
 
-def test_lernwarteschlange_dedupliziert_ueber_nachrichten():
+def test_lernwarteschlange_dedupliziert_ueber_nachrichten(monkeypatch):
+    monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
     conn = _fresh()
     for _ in range(3):
         telegram_bot.handle_update(conn, _msg(1, 42, "Was bedeutet Fernweh?"),
                                    allowed={42}, sessions={})
     assert _lernwunsch(telegram_bot) == ["Fernweh"]   # dreimal begegnet, einmal in der Schlange
+
+
+def test_chat_wortlernen_ist_standardmaessig_aus():
+    conn = _fresh()
+
+    telegram_bot.handle_update(conn, _msg(1, 42, "Was bedeutet Privatname?"),
+                               allowed={42}, sessions={})
+
+    assert not os.path.exists(telegram_bot.LERNWUNSCH)
 
 
 def test_schreibe_lernwunsch_bleibt_gedeckelt():
@@ -942,6 +978,9 @@ def test_der_lerner_holt_die_begegnung_vor_den_listen():
     text = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
     assert "learn_begegnung || learn_fach || learn_next || learn_gap" in text
     assert "if learn_begegnung; then" in text   # auch in der kontinuierlichen Schleife
+    assert 'GENUS_CHAT_WORD_LEARNING:-0' in text  # private Wörter verlassen den Pi nur opt-in
+    assert 'content redacted' in text and "word '$word'" not in text
+    assert 'flock -x "$lock_fd"' in text and 'chmod 600 "$tmp"' in text
 
 
 # --- die Morgenzeit-Zelle: Push-Zeit per Chat stellen (Membran-Konfiguration) ----------

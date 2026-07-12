@@ -99,6 +99,23 @@ def _meaning_grounding(conn, word: str, qid: str | None, meaning) -> dict:
 _POS_DE = {"noun": "Substantiv", "verb": "Verb", "adjective": "Adjektiv", "adverb": "Adverb"}
 _LABEL = re.compile(r"^Q\d+\s*\((.*)\)$")
 _BARE_QID = re.compile(r"^Q\d+$")   # a concept with no label in any shown language
+_GLOSS_META = re.compile(
+    r"^\s*(?:\[(?:(?:ohne|kein(?:en)?|nur|meist(?:ens)?)\s+(?:im\s+)?"
+    r"(?:Plural|Singular)|(?:Plural|Singular)\s+(?:selten|ungebräuchlich))\]\s*:?\s*|"
+    r"(?:(?:ohne|kein(?:en)?|nur|meist(?:ens)?)\s+(?:im\s+)?(?:Plural|Singular)|"
+    r"(?:Plural|Singular)\s+(?:selten|ungebräuchlich))\s*:\s*)",
+    re.IGNORECASE,
+)
+
+
+def _sprechgloss(gloss: str) -> str:
+    """Lexikografische Gebrauchsmarke vom gesprochenen Bedeutungs-Kern trennen.
+
+    Der Rohgloss bleibt unverändert im Graphen und damit vollständig bequellt. Nur die Stimme
+    liest einen führenden Hinweis wie ``ohne Plural:`` nicht mehr als Teil der Definition vor.
+    """
+    bereinigt = _GLOSS_META.sub("", gloss, count=1).strip()
+    return bereinigt or gloss
 
 def narrate(a: dict) -> str:
     """A fluent, deterministic German answer composed from the verified facts -- a glass-box
@@ -108,7 +125,7 @@ def narrate(a: dict) -> str:
     pos = a.get("pos") or []
     tag = f" ({_join_de([_POS_DE.get(p, p) for p in pos])})" if pos else ""
     if a["meaning"]:
-        sentence = f"Unter »{a['word']}«{tag} versteht GENUS: {a['meaning'][0].rstrip('.')}"
+        sentence = f"Unter »{a['word']}«{tag} versteht GENUS: {_sprechgloss(a['meaning'][0]).rstrip('.')}"
     else:
         sentence = f"»{a['word']}«{tag} kennt GENUS, aber eine Bedeutung ist noch nicht erschlossen"
     named = [_LABEL.sub(r"\1", x) for x in a["is_a"] if not _BARE_QID.match(x)]
@@ -168,7 +185,7 @@ def vertiefung(conn, a: dict) -> list[str]:
     saetze: list[str] = []
     if len(a.get("meaning") or []) > 1:
         saetze.append(f"Daneben kenne ich eine weitere Bedeutung von »{a['word']}«: "
-                      f"{a['meaning'][1].rstrip('.')}.")
+                      f"{_sprechgloss(a['meaning'][1]).rstrip('.')}.")
     qid = a.get("concept")
     if not qid:
         return saetze

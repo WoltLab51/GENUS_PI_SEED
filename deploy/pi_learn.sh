@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
+umask 077
 
 # Background vocabulary learner — GENUS grows its Grundwortschatz on its own, continuously,
 # in the idle gaps. It runs as a long-lived daemon: word after word, forever, learning each
@@ -93,17 +94,32 @@ learn_from() {
 # auflösbares Wort (Tippfehler/fremd) wird trotzdem entfernt (kein Retry-Hämmern). 1, wenn die
 # Schlange leer ist.
 LERNWUNSCH="${GENUS_LERNWUNSCH:-$(dirname "$DB_PATH")/lernwunsch.txt}"
+CHAT_WORD_LEARNING="${GENUS_CHAT_WORD_LEARNING:-0}"
 learn_begegnung() {
-    local word
-    [ -s "$LERNWUNSCH" ] || return 1
+    local word tmp lock_fd dequeued=0
+    [ "$CHAT_WORD_LEARNING" = "1" ] || return 1
+    mkdir -p "$(dirname "$LERNWUNSCH")" || return 1
+    exec {lock_fd}>"$LERNWUNSCH.lock" || return 1
+    chmod 600 "$LERNWUNSCH.lock" 2>/dev/null || true
+    flock -x "$lock_fd" || { exec {lock_fd}>&-; return 1; }
+    if [ ! -s "$LERNWUNSCH" ]; then
+        flock -u "$lock_fd"
+        exec {lock_fd}>&-
+        return 1
+    fi
     word="$(sed -n '1p' "$LERNWUNSCH" | tr -d '\r' | awk '{print $1}')"
     # das erste Wort aus der Schlange nehmen (auch wenn das Lernen scheitert -- one-shot)
-    if tail -n +2 "$LERNWUNSCH" > "$LERNWUNSCH.tmp" 2>/dev/null; then
-        mv "$LERNWUNSCH.tmp" "$LERNWUNSCH"
+    tmp="$LERNWUNSCH.tmp.$$"
+    if tail -n +2 "$LERNWUNSCH" > "$tmp" 2>/dev/null \
+       && chmod 600 "$tmp" \
+       && mv "$tmp" "$LERNWUNSCH"; then
+        dequeued=1
     else
-        rm -f "$LERNWUNSCH.tmp"
+        rm -f "$tmp"
     fi
-    [ -n "$word" ] || return 1
+    flock -u "$lock_fd"
+    exec {lock_fd}>&-
+    [ "$dequeued" = "1" ] && [ -n "$word" ] || return 1
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
     GENUS_LEXEM_LANG=de "$SCRIPT_DIR/observe_lexem.sh" "$word" >/dev/null 2>&1 || true
     GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
@@ -111,7 +127,7 @@ learn_begegnung() {
         GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/bridge_senses.py" "$word" >/dev/null 2>&1 || true
         GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/verwandtschaft.py" "$word" >/dev/null 2>&1 || true
     fi
-    log "learned encountered word '$word' (Vokabel-bei-Begegnung, vor den Listen)"
+    log "learned one encountered chat word (content redacted; explicit opt-in)"
     return 0
 }
 

@@ -89,6 +89,22 @@ untersuchen; Semantik korrigieren oder bewusst Enthaltung erhalten.
 - Regressionstest deckt Stützung, Widerspruch und Unsicherheit ab
 - Replay bleibt event- und projektionsstabil
 
+### H0.4 · Gesprächsdateien und historische Logs bewusst behandeln
+
+**Abhängigkeit:** keine; Löschung braucht eine ausdrückliche Betriebsentscheidung.
+
+**Arbeit:** Umfang und Alter alter Telegram-Journal-/Legacy-Logs sowie der aktuellen begrenzten
+Korrektur- und optionalen Wortlern-Dateien nur über Metadaten erfassen, Retention/Opt-in
+entscheiden und anschließend gezielt löschen oder geschützt archivieren.
+
+**Definition of Done**
+
+- Bestandsaufnahme nennt Pfadklasse, Zeitraum, Größe und Rechte, nicht den Gesprächsinhalt
+- Ronny entscheidet Retention, Löschung oder geschützte Archivierung ausdrücklich
+- Ausführung ist protokolliert und anschließend read-only verifiziert
+- neue Telegram-Journalzeilen enthalten weiterhin nur Betriebsmetadaten, insbesondere Länge
+  und Fehlerklasse — keinen Text und keine Nutzer-ID
+
 ## H1 · Der alltagstaugliche Begleiter
 
 **Abhängigkeit:** H0 ohne unkontrolliertes Wachstum oder ungeklärte
@@ -102,6 +118,9 @@ epistemischen Grenzen zu verwischen.
 - relevanten statt nur ähnlichen Kontext auswählen
 - Zeit, Quelle, Beziehung, Aktualität und Unsicherheit gemeinsam gewichten
 - Privates nicht über Gesprächs- oder Nutzergrenzen tragen
+- persönliche Inhalte aus dem append-only Ledger in einen isolierten, exportierbaren und
+  tatsächlich löschbaren Memory-Vault überführen
+- `vergiss`, Retention und Löschbestätigung als einen gemeinsamen Vertrag bauen
 
 ### H1.2 · Seele der Antworten
 
@@ -116,6 +135,8 @@ epistemischen Grenzen zu verwischen.
 - jede Tatsachenbehauptung ist belegt oder ausdrücklich als unsicher erkennbar
 - Korrekturen wirken im nächsten passenden Dialog und sind replaybar
 - sensible oder irrelevante Erinnerungen werden nachweislich nicht eingeblendet
+- persönliche Episoden können exportiert und physisch gelöscht werden; eine Retraktion allein
+  gilt nicht als „vergessen“
 - Ronny bestätigt, dass Ton und Nützlichkeit im Alltag tragen
 
 ## H2 · Der generalisierende Fähigkeitsloop

@@ -1,4 +1,5 @@
-"""Erinnerungen als echte Episoden -- Punkt 1+2 des Gedächtnis-Konzepts (docs/design/MEMORY.md).
+"""Erinnerungen als echte Episoden -- siehe „Wie eine Episode entsteht“ und „Abruf“ in
+``docs/design/MEMORY.md``.
 
 Tulving (1972): episodisches Gedächtnis (an Zeit/Sprecher gebundene Ereignisse) ist etwas
 anderes als semantisches Gedächtnis (zeitloses Allgemeinwissen, der Wissensgraph). Bisher
@@ -49,6 +50,7 @@ AM = "am"
 ERWAEHNT = "erwaehnt"   # ASCII, wie jedes andere Prädikat in diesem Graphen (is_a, notiz, ...)
 
 STATEMENT_SOURCE = "model:deuter"   # unverändert: eine unaufgefordert bemerkte Aussage
+HUMAN_SOURCE = "ronny"              # heutiger persönliche Kern hat genau einen Owner
 _WORD = re.compile(r"[\wäöüÄÖÜß]+", re.UNICODE)
 _MIN_WORTLAENGE = 4   # kürzere Wörter sind zu generisch, um einen Begriff zu verankern
 # Grobe, deterministische Endungs-Toleranz für deutsche Substantiv-Flexion (Plural/Kasus) --
@@ -165,16 +167,23 @@ def episoden(conn) -> list[dict]:
 
 def bestaetigte_episoden(conn) -> list[str]:
     """Inhalte der Episoden mit menschlicher Quelle (voll vertraut), älteste zuerst."""
-    return [e["inhalt"] for e in episoden(conn) if not e["quelle"].startswith(sources.MODEL_SOURCE_PREFIX)]
+    return [e["inhalt"] for e in episoden(conn) if e["quelle"] == HUMAN_SOURCE]
 
 
 def vermutete_episoden(conn) -> list[str]:
-    """Inhalte der vom Modell beiläufig bemerkten, gedeckelten Episoden, älteste zuerst."""
-    return [e["inhalt"] for e in episoden(conn) if e["quelle"].startswith(sources.MODEL_SOURCE_PREFIX)]
+    """Vom Deuter beiläufig bemerkte Episoden, älteste zuerst.
+
+    Historische ``model:nacht``-Verdichtungen sind Tagesmuster, keine Aussagen der Person und
+    deshalb kein persönliches Erinnerungswissen. Sie bleiben im unveränderlichen Ledger
+    auditierbar, werden aber weder hier noch ungefragt als Nutzererinnerung ausgegeben.
+    """
+    return [e["inhalt"] for e in episoden(conn)
+            if e["quelle"].startswith(sources.MODEL_SOURCE_PREFIX)
+            and e["quelle"] != "model:nacht"]
 
 
 def verwandte_episoden(conn, frage: str, begrenzt: int = 3) -> list[dict]:
-    """Der Abruf (Punkt 2): welche Episoden erwähnen einen Begriff, der auch in ``frage``
+    """Welche Episoden erwähnen einen Begriff, der auch in ``frage``
     vorkommt? Deterministische Aktivierungsausbreitung (Collins & Loftus 1975) -- kein
     Embedding, keine Ähnlichkeit, nur echte gemeinsame Graph-Knoten. Neueste zuerst, auf
     ``begrenzt`` Treffer gekappt, damit eine Antwort nicht mit Vergangenem überladen wird."""
@@ -192,21 +201,17 @@ def verwandte_episoden(conn, frage: str, begrenzt: int = 3) -> list[dict]:
 
 
 def erwaehnter_bezug(conn, frage: str) -> dict | None:
-    """Der EINE Nebenbei-würdigste Treffer zu ``frage`` -- für den beiläufigen Hinweis in einer
-    sonst unabhängigen Antwort (Personen-Gedächtnis Scheibe 2). Dieselbe gestufte Ehrlichkeit
-    wie überall sonst im Graphen: eine bestätigte (menschliche) Episode schlägt eine vermutete
-    (modellgedeckelte), UNABHÄNGIG von der Aktualität -- erst innerhalb derselben Vertrauensstufe
-    zählt neu vor alt. ``None`` ohne Treffer. Gibt ``{"inhalt", "bestaetigt"}`` zurück; die
-    Formulierung ("Nebenbei: ..." vs. "noch unbestätigt") bleibt Sache der aufrufenden Stelle."""
+    """Der EINE Nebenbei-würdige, *menschlich bestätigte* Treffer zu ``frage``.
+
+    Unaufgefordertes Erinnern ist eine Oberflächen- und Vertrauensentscheidung, nicht bloß
+    semantische Nähe: Modellbeobachtungen und Nacht-Aggregate dürfen bei explizitem Abruf
+    prüfbar bleiben, aber nie eine unabhängige Antwort kapern. ``None`` ohne bestätigten Treffer.
+    """
     treffer = verwandte_episoden(conn, frage, begrenzt=10)
-    if not treffer:
+    bestaetigt = [e for e in treffer if e["quelle"] == HUMAN_SOURCE]
+    if not bestaetigt:
         return None
-    bestaetigt = [e for e in treffer if not e["quelle"].startswith(sources.MODEL_SOURCE_PREFIX)]
-    kandidat = bestaetigt[0] if bestaetigt else treffer[0]
-    return {
-        "inhalt": kandidat["inhalt"],
-        "bestaetigt": not kandidat["quelle"].startswith(sources.MODEL_SOURCE_PREFIX),
-    }
+    return {"inhalt": bestaetigt[0]["inhalt"], "bestaetigt": True}
 
 
 def migriere_notizen(conn) -> int:
@@ -227,6 +232,6 @@ def migriere_notizen(conn) -> int:
         merke(conn, row["object"], quelle=row["source"], datum=datum)
         reactors.retract_relation(
             conn, "genus:notizen", "notiz", row["object"], source=row["source"],
-            reason="Migration auf Episoden (docs/design/MEMORY.md, Punkt 1)",
+            reason="Migration auf Episoden (docs/design/MEMORY.md: Wie eine Episode entsteht)",
         )
     return len(rows)

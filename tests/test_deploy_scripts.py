@@ -347,6 +347,8 @@ def test_learner_installer_is_a_continuous_idle_priority_service():
     assert "CPUSchedulingPolicy=idle" in script      # SCHED_IDLE
     assert "IOSchedulingClass=idle" in script        # idle IO -- yields to everything
     assert "genus pause" in script                   # documents how to stop it
+    assert "Environment=GENUS_CHAT_WORD_LEARNING=$CHAT_WORD_LEARNING" in script
+    assert "GENUS_CHAT_WORD_LEARNING must be 0 or 1" in script
 
 
 def test_learner_installer_pins_the_genus_identity_and_paths_under_sudo():
@@ -504,6 +506,17 @@ def test_migriere_notizen_script_is_one_clean_idempotent_apply():
     assert "idempotent" in script.lower()      # re-running must find nothing left to migrate
 
 
+def test_nacht_rotiert_den_rohtextfreien_puffer_atomar_und_speichert_keine_themen_episode():
+    script = (ROOT / "deploy" / "nacht_konsolidierung.sh").read_text(encoding="utf-8")
+
+    assert "fcntl.flock" in script
+    assert "os.replace(puffer, verarbeitung)" in script
+    assert 'verarbeitung = puffer + ".nacht"' in script
+    assert 'puffer + ".nacht.lock"' in script and "fcntl.LOCK_NB" in script
+    assert ': > "$PUFFER"' not in script
+    assert "keine Häufigkeit als persönliche Episode" in script
+
+
 def test_stimme_module_only_rephrases_never_invents():
     script = (ROOT / "deploy" / "stimme.py").read_text(encoding="utf-8")
     # the faithfulness leash: every quoted word/number must survive, or it fails to None
@@ -607,6 +620,15 @@ def test_pi_deploy_rebuilds_projection_before_integrity():
     assert "env -u GENUS_DB_PATH" in script and "GENUS_PAUSE_FILE" in script
     # the tolerant rebuild command must precede the integrity-check command
     assert script.index("genus replay || true") < script.index("genus integrity check")
+
+
+def test_pi_deploy_gleicht_deklarative_graph_saat_vor_replay_automatisch_ab():
+    script = (ROOT / "deploy" / "pi_deploy.sh").read_text(encoding="utf-8")
+
+    assert "bash ./deploy/seed_verstehen.sh" in script
+    assert "bash ./deploy/gleiche_ziele_ab.sh" in script
+    assert script.index("./deploy/seed_verstehen.sh") < script.index("genus replay || true")
+    assert script.index("./deploy/gleiche_ziele_ab.sh") < script.index("genus replay || true")
 
 
 def test_pi_deploy_reads_core_id_from_the_sticky_marker_before_the_anchor_branch():
@@ -748,8 +770,12 @@ def test_telegram_bot_installer_keeps_the_token_out_of_the_unit_file():
     assert "chmod 600" in script
     assert "TOKEN_FILE" in script
     assert "Environment=GENUS_TELEGRAM_ALLOWED_IDS=$ALLOWED_IDS" in script
+    assert "Environment=GENUS_CHAT_WORD_LEARNING=$CHAT_WORD_LEARNING" in script
+    assert "GENUS_CHAT_WORD_LEARNING must be 0 or 1" in script
     assert "EnvironmentFile=" not in script
     assert "$BOT_TOKEN" not in script.split("ExecStart=")[1].split("\n")[0]  # not in ExecStart line
+    assert 'if [ "$#" -ne 1 ]' in script   # one personal core, one owner until isolation exists
+    assert "exactly one numeric owner ID" in script
     # normal priority (responsive), unlike the deliberately idle-priority learner
     assert "CPUSchedulingPolicy=idle" not in script
     assert "Restart=on-failure" in script
@@ -777,6 +803,7 @@ def test_telegram_bot_answers_only_never_writes():
     # pause/resume, governance, teach-relation, or any state-changing command
     assert "companion.respond" in script
     assert "allow" in script.lower()
+    assert "if chat_id != sender:" in script  # never disclose personal memory into a group chat
     for forbidden in ("import governance", "import proposals", "control.pause", "control.resume",
                       "teach_relation", "record_proposal"):
         assert forbidden not in script
@@ -802,6 +829,7 @@ def test_watchdog_supervises_the_telegram_bot_at_normal_priority():
     assert "--unit=genus-telegram-bot-fallback.service" in bot_fn
     assert "--property=MemoryMax=3G" in bot_fn
     assert "--setenv=GENUS_TELEGRAM_STIMME=0" in bot_fn
+    assert "--setenv=GENUS_CHAT_WORD_LEARNING=0" in bot_fn
 
 
 def test_privileged_watchdog_repairs_service_identity_and_hardening_drift():

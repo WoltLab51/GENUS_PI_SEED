@@ -30,6 +30,9 @@ kontrolliert **verdient**.
 | Betrieb | Learner, Telegram und Watchdogs aktiv; Root-/User-Grenze gehärtet |
 | Streudaten | historisches Root-Ledger read-only geprüft und quarantänisiert |
 | Graph | Hierarchiezyklen abgewehrt; deterministische Relationen idempotent |
+| Selbstbild | Identität, Mission und Habitat werden aus Code, Zielgraph und aktiven Zuständen gelesen |
+| Gesprächsgrenze | spezifische Absichten fallen nicht mehr auf semantisch andere Elternantworten zurück |
+| Datenschutz | Owner-Direktchat; neue Logs/Tagespuffer rohtextfrei; Nachtrotation atomar; Chat-Wortlernen opt-in |
 
 Die Zahlen sind ein **Abnahme-Snapshot**, keine automatisch gepflegten
 Live-Metriken. Aktuelle Strukturzahlen stehen in
@@ -72,6 +75,14 @@ GENUS soll Kontext nicht nur finden, sondern passend gewichten: Was weiß er?
 Was ist unsicher? Was ist für Ronny **jetzt** wichtig? Die Stimme darf warm und
 persönlich sein, ohne Herkunft zu erfinden oder das Modell zum Orakel zu machen.
 
+Die erste Reifung aus echten Telegram-Zügen ist umgesetzt: unbestätigte und nächtlich
+abgeleitete Episoden drängen sich nicht mehr in Sachantworten; Themenhäufigkeit wird nicht als
+Interesse gespeichert; Selbst- und Habitatfragen besitzen eine datengetriebene Heimat.
+
+Offen bleibt die größere Gedächtnisgrenze: bereits als Volltext im append-only Ledger liegende
+persönliche Episoden sind durch Retraktion ausblendbar, aber nicht physisch löschbar. Ein
+getrennter Memory-Vault mit Export, Retention und überprüfbarem `vergiss` gehört deshalb zu H1.
+
 ### Generalisierender Fähigkeitsloop
 
 Eine echte Fähigkeit folgt dem ganzen Weg:
@@ -88,6 +99,7 @@ neuer Regexe, Sonderfälle oder Handler.
 
 - keine automatische Ausführung von Vorschlägen oder Codeänderungen
 - kein ungeprüftes Verschieben von quarantänisierten Ereignissen ins Produkt-Ledger
+- kein stilles Löschen historischer Telegram-Logs ohne ausdrückliche Retention-Entscheidung
 - kein LLM als Wahrheitsquelle
 - keine neuen Produzenten ohne Eventbudget und Beobachtbarkeit
 - keine Föderation oder Marktaktion vor geklärter Isolation, Löschung und Governance

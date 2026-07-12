@@ -79,6 +79,15 @@ else
     echo "[DEPLOY] skipping tests"
 fi
 
+echo "[DEPLOY] reconciling declarative understanding and goal graphs"
+# Code und lebender Graph dürfen nicht auseinanderlaufen. Ein früherer Deploy brachte neue
+# Raster-Blätter auf den Pi, ohne die idempotente Saat erneut anzuwenden; die Fähigkeit war im
+# Code vorhanden, für den constrained Deuter aber strukturell unerreichbar. Beide Applies laufen
+# unter der Pause und VOR Replay/Integrität, schreiben ausschließlich fehlende bzw. ausdrücklich
+# abzugleichende Seed-Kanten und sind bei Wiederholung leer.
+bash ./deploy/seed_verstehen.sh
+bash ./deploy/gleiche_ziele_ab.sh
+
 echo "[DEPLOY] rebuilding projection with the deployed code"
 # A projection-LOGIC change (a new derivation, a bounded window) makes the stored
 # projection differ from a fresh replay. Rebuild it here, tolerating the legitimate

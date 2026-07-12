@@ -162,14 +162,17 @@ Watchdog-Tick ist deshalb kein vollständiges systemd-Unit-Audit.
 Alle drei Units schreiben in das systemd-Journal. Das vermeidet privilegiertes
 Öffnen nutzerkontrollierter Append-Pfade. Relevante Ausgaben werden mit
 `journalctl -u <unit>` gelesen und müssen vor öffentlicher Weitergabe redigiert
-werden.
+werden. Die Telegram-Unit schreibt seit v1.17.0 nur Betriebsmetadaten: keinen
+Nachrichtentext, keine Absender-ID und bei Fehlern nur die Exception-Klasse.
 
 ## Telegram-Grenze
 
 Die Telegram-Membran in
 [`telegram_bot.py`](../deploy/telegram_bot.py) spricht per HTTPS mit Telegram
-und verarbeitet ausschließlich numerisch allowlistete Absender. Die Allowlist
-wird beim Installieren streng validiert und ihr Wert direkt in die
+und verarbeitet ausschließlich den einen numerisch allowlisteten Besitzer in
+seinem privaten Direktchat. Gruppen werden auch dann abgewiesen, wenn der Besitzer
+dort schreibt; mehrere Besitzer bleiben bis zu echtem Nutzer-Namespace/Föderation gesperrt.
+Die Owner-ID wird beim Installieren streng validiert und ihr Wert direkt in die
 root-eigene Unit geschrieben. PID 1 lädt **kein** nutzerkontrolliertes
 `EnvironmentFile`.
 
@@ -182,6 +185,20 @@ Der Bot-Token:
 
 Die Allowlist ist ein Autorisierungsmerkmal, kein kryptografisches Secret. Sie
 ist dennoch persönliche Betriebsmetadaten und wird nicht veröffentlicht.
+
+Der Tagespuffer unter `~/.genus/chat_tag.jsonl` enthält nur Zeit, erkannte
+Konzept-IDs, Lesarten und ein boolesches Warum-Folgesignal. Frage und Antwort
+werden nicht dupliziert. Bot und Nachtrotation teilen einen Lock; die Nacht
+rotiert per atomarem Rename statt nachträglich zu truncaten. Historische
+Journale oder Legacy-Logs können noch Rohtext aus älteren Versionen enthalten
+und werden bei einem Deploy nicht still gelöscht.
+
+`~/.genus/korrekturen.jsonl` ist die ausdrückliche, begrenzte Rohtext-Ausnahme: höchstens 50
+korrigierte vorherige Fragen, `0600`, ohne Alters-TTL. Automatisches Chat-Wortlernen ist
+standardmäßig aus. Erst `GENUS_CHAT_WORD_LEARNING=1` erlaubt, unbekannte einzelne Wortformen
+in `lernwunsch.txt` zu puffern und an externe Lexikonquellen zu senden; der Learner redigiert
+die Wortform in seinen Logs. Beide Dateien bleiben löschbare Membran-Daten, nicht geheime
+Ledger-Nebenkanäle.
 
 Die Unit begrenzt den Bot auf `MemoryHigh=2500M`, `MemoryMax=3G`,
 `MemorySwapMax=512M`, `TasksMax=64` und `LimitNOFILE=256`. Unter anderem sind
@@ -288,6 +305,10 @@ quarantänisiert; Details stehen im [Härtungsaudit](reports/2026-07-12-hardenin
 | Manipulierte Netzwerk-/Modellantwort | Membranvalidierung, Herkunft und epistemischer Status verhindern automatische Wahrheit. | Plausible Falschdaten können als falsche Beobachtung im Ledger landen. |
 | Kompromittierter Telegram-Absender | Allowlist verwirft nicht autorisierte IDs. | Telegram-Kontoübernahme einer erlaubten Identität liegt außerhalb des Pi. |
 | Kompromittierte Telegram-Membran | Unprivilegierter Nutzer, Sandbox, leere Capabilities und Ressourcenlimits begrenzen Schaden. | Zugriff auf Nutzer-Ledger und Token bleibt innerhalb dieser Zone möglich. |
+| Gesprächsdaten in Betriebslogs | Telegram protokolliert nur Betriebsmetadaten, insbesondere Länge/Fehlerklasse; Tagespuffer ist rohtextfrei und `0600`. | Historische Logs vor v1.17.0 und begrenzte Korrekturdateien können Rohtext enthalten; bewusste Retention/Löschung steht aus. |
+| Persönliche Antwort in einem Gruppenchat | Bot akzeptiert nur den Owner-Direktchat; genau eine Owner-ID ist zulässig. | Echte Gruppenräume brauchen getrennte Speicher- und Berechtigungsnamespaces. |
+| Chat-Wort wird extern nachgeschlagen | Standardmäßig deaktiviert; Opt-in, Queue/Lock `0600`, Logs ohne Wortform. | Bei Opt-in sieht der externe Lexikonanbieter die Wortform und das erworbene Wissen bleibt im Ledger. |
+| „Vergessen“ einer persönlichen Episode | Retraktion entfernt die aktive Graphsicht. | Volltext bleibt heute im append-only Ledger und in Backups; echter löschbarer Memory-Vault fehlt. |
 | Manipulierter Nutzer-Checkout | Root startet keinen privilegierten Code daraus; Kernaufrufe erfolgen als Nutzer. | Nutzer-Dienste führen den Checkout erwartungsgemäß als derselbe Nutzer aus. |
 | Manipulierter Nutzer-State fordert Reboot | Root verlangt eigenen Netzfehler, Schwelle und Cooldown; GENUS kann nur vetoieren. | Root-/Kernel-Kompromittierung umgeht diese Logik. |
 | Adaptive lokale Ledger-Umschreibung | Extern verwahrter Anchor erkennt Änderungen bis zum Head. | Unverankerter Tail und zukünftige Events bleiben lokal kontrollierbar. |
@@ -348,6 +369,9 @@ verwenden dafür ebenfalls Platzhalter.
 - Vertraulichkeit gegenüber dem lokalen GENUS-Nutzer;
 - Vertrauenswürdigkeit von Telegram, Netzwerkprovidern, Modellgewichten oder
   externen Datenquellen;
+- physische Löschung bereits im append-only Ledger gespeicherter persönlicher
+  Episoden; dafür braucht GENUS einen getrennten Memory-Vault mit Export- und
+  Retention-Vertrag;
 - externe, signierte Zeitstempelung der Anchor-Artefakte.
 
 Diese Grenzen sind keine Ausrede, sondern Teil der Sicherheitsgarantie: GENUS

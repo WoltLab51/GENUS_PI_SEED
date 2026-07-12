@@ -1416,12 +1416,22 @@ def test_notiz_bezug_finds_a_confirmed_note_sharing_a_word_with_the_question():
     assert aside is not None and "Platten" in aside and "Nebenbei" in aside
 
 
-def test_notiz_bezug_marks_a_suggested_note_as_unconfirmed():
+def test_notiz_bezug_suppresses_unconfirmed_deuter_episode():
     from genus import companion, erinnerung
+
+    # Modell-Inferenzen bleiben für den ausdrücklichen Erinnerungsabruf erhalten, dürfen
+    # aber nicht ungefragt in eine sachliche Antwort hineinragen.
     conn = _fahrrad_graph()
     erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle=erinnerung.STATEMENT_SOURCE)
-    aside = companion._notiz_bezug(conn, "Was ist ein Fahrrad?")
-    assert aside is not None and "noch unbestätigt" in aside
+    assert companion._notiz_bezug(conn, "Was ist ein Fahrrad?") is None
+
+
+def test_notiz_bezug_suppresses_unconfirmed_night_episode():
+    from genus import companion, erinnerung
+
+    conn = _fahrrad_graph()
+    erinnerung.merke(conn, "mein Fahrrad hat einen Platten", quelle="model:nacht")
+    assert companion._notiz_bezug(conn, "Was ist ein Fahrrad?") is None
 
 
 def test_notiz_bezug_prefers_a_confirmed_note_over_a_suggested_one():
@@ -1770,6 +1780,38 @@ def test_deuter_unknown_leaf_changes_nothing_no_freetext_escape_anymore():
     assert result["text"] == companion._NICHT_VERSTANDEN
 
 
+def test_deuter_does_not_climb_after_a_present_leaf_handler_declines(monkeypatch):
+    # Ein eigenes Blatt-Werkzeug ist die semantische Grenze: Wenn es den konkreten Fall nicht
+    # auflösen kann, darf der Dispatcher nicht anschließend eine ANDERE Frage über die grobe
+    # Elternzelle beantworten. Der Eltern-Fallback ist nur für Blätter ganz ohne Werkzeug da.
+    from genus import companion, verstehen
+
+    conn = _isa_graph()
+    verstehen.seed_raster(conn)
+    aufrufe = []
+
+    def blatt(conn, guess, question, last_question, last_answer, stimme=None, waage=None):
+        aufrufe.append("ort")
+        return None
+
+    def elternzelle(conn, guess, question, last_question, last_answer, stimme=None, waage=None):
+        aufrufe.append("frage-begriff")
+        return "semantisch falsche Elternantwort"
+
+    monkeypatch.setitem(companion._HANDELBAR, "ort", blatt)
+    monkeypatch.setitem(companion._HANDELBAR, "frage-begriff", elternzelle)
+    result = companion._deuter_antwort(
+        conn,
+        {"absicht": "ort", "subject": "Haus", "object": None},
+        "Wo steht ein Haus?",
+        None,
+        quelle="muster",
+    )
+
+    assert result is None
+    assert aufrufe == ["ort"]
+
+
 def test_deuter_reading_climbs_the_is_a_chain_to_the_nearest_actionable_cell():
     # the soft landing: "eigenschaft" has no handler of its own, but its Zelle frage-begriff
     # does -- a too-fine reading falls SOFT onto the cell instead of hard onto the fallback,
@@ -1777,6 +1819,7 @@ def test_deuter_reading_climbs_the_is_a_chain_to_the_nearest_actionable_cell():
     from genus import companion, verstehen
     conn = _isa_graph()
     verstehen.seed_raster(conn)
+    assert "eigenschaft" not in companion._handelbare_werkzeuge()  # kein eigenes Werkzeug
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     deuter = lambda q: {"absicht": "eigenschaft", "subject": "Hund"}
     result = companion.respond_with_deuter(conn, "wie schnell rennt so ein wuffwuff", deuter=deuter)

@@ -8,7 +8,7 @@ set -Eeuo pipefail
 # scripts, but PID 1 must never read that user-controlled file: only its validated value is embedded
 # in the root-owned unit. Telegram user IDs are authorization selectors, not authentication secrets.
 #
-# Usage: deploy/pi_install_telegram_bot.sh [BOT_TOKEN] <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]
+# Usage: deploy/pi_install_telegram_bot.sh [BOT_TOKEN] <OWNER_TELEGRAM_USER_ID>
 #   The token is OPTIONAL here if you've already placed it yourself in the token file -- the most
 #   private path: your secret goes straight from @BotFather onto this Pi, through no one else's
 #   hands. Detected by shape: a Telegram token contains a ':' (12345:ABC...), a user id is digits.
@@ -37,6 +37,11 @@ TOKEN_FILE="$GENUS_HOME/.genus/telegram_bot_token"
 ENV_FILE="$GENUS_HOME/.genus/telegram_bot.env"
 LOCK_FILE="$GENUS_HOME/.genus/telegram_bot.lock"
 SERVICE_PATH="/etc/systemd/system/genus-telegram-bot.service"
+CHAT_WORD_LEARNING="${GENUS_CHAT_WORD_LEARNING:-0}"
+if [ "$CHAT_WORD_LEARNING" != "0" ] && [ "$CHAT_WORD_LEARNING" != "1" ]; then
+    echo "[TGBOT] GENUS_CHAT_WORD_LEARNING must be 0 or 1" >&2
+    exit 1
+fi
 
 as_genus_user() {
     if [ "$(id -u)" -eq 0 ] && [ "$(id -un)" != "$GENUS_USER" ]; then
@@ -56,14 +61,14 @@ if [ "$#" -ge 1 ]; then
 fi
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 [BOT_TOKEN] <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]" >&2
+    echo "Usage: $0 [BOT_TOKEN] <OWNER_TELEGRAM_USER_ID>" >&2
     echo "  BOT_TOKEN is optional here if you placed it in $TOKEN_FILE yourself (chmod 600)." >&2
     echo "  ALLOWED_TELEGRAM_USER_ID: your numeric Telegram id (from @userinfobot)." >&2
     exit 1
 fi
 ALLOWED_IDS="$(IFS=,; echo "$*")"
-if ! [[ "$ALLOWED_IDS" =~ ^[0-9]{1,20}(,[0-9]{1,20}){0,15}$ ]]; then
-    echo "[TGBOT] allow-list must contain 1-16 comma-separated numeric user IDs" >&2
+if [ "$#" -ne 1 ] || ! [[ "$ALLOWED_IDS" =~ ^[0-9]{1,20}$ ]]; then
+    echo "[TGBOT] exactly one numeric owner ID is required until memories are user-isolated" >&2
     exit 1
 fi
 
@@ -122,6 +127,7 @@ Environment=GENUS_LOG_DIR=$LOG_DIR
 Environment=GENUS_TELEGRAM_TOKEN_FILE=$TOKEN_FILE
 Environment=GENUS_TELEGRAM_LOCK_FILE=$LOCK_FILE
 Environment=GENUS_TELEGRAM_ALLOWED_IDS=$ALLOWED_IDS
+Environment=GENUS_CHAT_WORD_LEARNING=$CHAT_WORD_LEARNING
 # Die Stimme ist reine Stil-Glättung und würde ein zweites 1.5B-Modell dauerhaft laden.
 # Die verifizierte Template-Antwort bleibt ohne sie vollständig; ein Opt-in braucht bewusst
 # zusätzlich einen höheren MemoryMax-Override, statt den Pi versehentlich wieder zu verdrängen.
@@ -175,7 +181,8 @@ sudo systemctl enable genus-telegram-bot.service
 # Ein expliziter Restart aktiviert Lock, RAM-Grenzen und Sandbox sofort und beendet Alt-Poller.
 sudo systemctl restart genus-telegram-bot.service
 
-echo "[TGBOT] installed genus-telegram-bot.service — allowed id(s): $ALLOWED_IDS"
+echo "[TGBOT] installed genus-telegram-bot.service — one private owner configured"
+echo "[TGBOT] chat-derived external word learning: $CHAT_WORD_LEARNING"
 echo "[TGBOT] token file: $TOKEN_FILE (chmod 600, not in git)"
 echo "[TGBOT] stop any time: sudo systemctl stop genus-telegram-bot.service"
 systemctl --no-pager status genus-telegram-bot.service | head -5

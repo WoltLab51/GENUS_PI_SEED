@@ -1,17 +1,17 @@
-"""Nacht-Konsolidierung + Morgen-Nachricht (docs/design/MEMORY.md, Punkt ④ — Ronnys
-Entscheidungen 2026-07-03/04: Tagespuffer ja · nachts still merken, morgens berichten ·
+"""Nacht-Konsolidierung + Morgen-Nachricht (docs/design/MEMORY.md, „Tagesrhythmus“ — Ronnys
+Entscheidungen 2026-07-03/04: Tagespuffer ja · morgens berichten ·
 genau EINE Morgen-Nachricht, 06:00, nie leer, warm und nativ formuliert).
 
 Dem Gehirn nachempfunden (McClelland/McNaughton/O'Reilly 1995): tagsüber schreibt die
-Membran mit (Tagespuffer, Rohtext NUR dort, verfällt — Ledger ≠ Memory), nachts liest die
-Konsolidierung den Puffer EINMAL, destilliert Struktur und vergisst den Rest, morgens
-berichtet GENUS in einem Satz, was hängengeblieben ist — der Lehrer-Loop am Frühstückstisch.
+Membran nur Struktur mit (erkannte Konzepte, Lesarten, Warum-Folge — Ledger ≠ Memory), nachts
+liest die Konsolidierung den Puffer EINMAL und verdichtet diese Struktur, morgens berichtet
+GENUS in einem Satz, was wiederkehrte — der Lehrer-Loop am Frühstückstisch.
 
 Alles hier ist DETERMINISTISCH (Ronny: „ich will nativen Text, keine kryptischen
 Ausgaben" — der Text ist nativ, weil die Vorlagen es sind, nicht weil ein Modell rät).
-Die Themen-Erkennung nutzt die vorhandene Text→Konzept-Auflösung (sources); die still
-gemerkten Episoden tragen die Quelle ``model:nacht`` und sind damit automatisch gedeckelt
-wie alles Modellhafte — korrigierbar am Morgen mit einem Wort."""
+Die Themen-Erkennung nutzt beim Eingang die vorhandene Text→Konzept-Auflösung (sources).
+Ein häufiges Wort ist aber weder automatisch ein Interesse noch eine persönliche Erinnerung;
+deshalb erzeugt die Nacht daraus keine dauerhafte Episode."""
 from __future__ import annotations
 
 import json
@@ -19,7 +19,6 @@ import re
 
 from genus import sources
 
-NACHT_QUELLE = "model:nacht"   # gedeckelt über den bestehenden model:*-Vertrauensdeckel
 _WORT = re.compile(r"[\wäöüÄÖÜß]{4,}", re.UNICODE)
 _THEMA_AB = 2   # ein Konzept wird Thema, wenn es in mindestens 2 Zügen vorkam
 
@@ -29,7 +28,12 @@ def _konzepte_im_text(conn, text: str) -> set[str]:
     for tok in _WORT.findall(text):
         for form in (tok, tok[:1].upper() + tok[1:]):
             if sources.bekanntes_wort(conn, form):
-                gefunden.add(sources.prominentes_konzept(conn, form) or f"{form}@de")
+                # Ein Lexem mit bloßer Gloss-Kante ist zwar bekannt, aber noch kein
+                # Konzept. Seine Wortform darf deshalb nicht als vermeintliche ID in
+                # den rohtextfreien Tagespuffer rutschen.
+                konzept = sources.prominentes_konzept(conn, form)
+                if konzept is not None:
+                    gefunden.add(konzept)
                 break
     return gefunden
 
@@ -42,21 +46,44 @@ def _label(conn, konzept: str) -> str:
     return konzept.split("@", 1)[0]
 
 
+def tagesstruktur(conn, frage: str, gelesen: list[str]) -> dict:
+    """Rohtextfreie Tagesbeobachtung für die Membran.
+
+    Die semantische Extraktion geschieht, solange der Zug ohnehin im Prozess liegt. Auf Platte
+    landen nur Konzept-IDs, die bereits ausgegebene Lesart und das boolesche Folge-Signal. Damit
+    kann die Nacht dieselben Kennzahlen bilden, ohne Frage, Antwort oder Telegram-Kennung zu
+    speichern.
+    """
+    from genus import companion
+
+    return {
+        "konzepte": sorted(_konzepte_im_text(conn, frage)),
+        "warum_folge": companion.is_why_followup(frage),
+        "gelesen": list(gelesen),
+    }
+
+
 def konsolidiere(conn, zuege: list[dict]) -> dict:
-    """Liest die Züge des Tages (Daten aus dem Tagespuffer der Membran) und destilliert:
-    THEMEN (Konzepte, die in ≥2 Zügen vorkamen — über die Text→Konzept-Auflösung, kein
-    Modell), still gemerkte EPISODEN pro Thema (Quelle ``model:nacht``, gedeckelt) und die
-    Warum-Folgen-KENNZAHL (ein „warum?" direkt nach einer Antwort = Beleg fürs
-    Antwort-Würfel-Lernen). Der Aufrufer leert den Puffer danach — Vergessen ist Funktion."""
-    from genus import companion, erinnerung
+    """Verdichtet rohtextfreie Tagesstrukturen zu Themen und einer Warum-Folgen-Kennzahl.
+
+    Legacy-Einträge mit ``question`` bleiben lesbar, damit der erste Lauf nach dem Upgrade den
+    alten Puffer sauber abbaut. Neue Einträge enthalten ausschließlich ``konzepte`` und
+    ``warum_folge``. Häufigkeit wird nicht mehr als persönliche Episode fehlgedeutet.
+    """
+    from genus import companion
 
     je_konzept: dict[str, int] = {}
     warum_folgen = 0
     for zug in zuege:
-        frage = zug.get("question") or ""
-        for konzept in _konzepte_im_text(conn, frage):
+        strukturiert = zug.get("konzepte")
+        if isinstance(strukturiert, list):
+            konzepte = {k for k in strukturiert if isinstance(k, str)}
+        else:
+            konzepte = _konzepte_im_text(conn, zug.get("question") or "")
+        for konzept in konzepte:
             je_konzept[konzept] = je_konzept.get(konzept, 0) + 1
-        if companion.is_why_followup(frage):
+        warum = zug.get("warum_folge")
+        if warum is True or (warum is None and companion.is_why_followup(zug.get("question") or "")):
             warum_folgen += 1
 
     themen = [
@@ -64,16 +91,8 @@ def konsolidiere(conn, zuege: list[dict]) -> dict:
         for konzept, anzahl in sorted(je_konzept.items(), key=lambda kv: -kv[1])
         if anzahl >= _THEMA_AB
     ]
-    episoden = []
-    for thema in themen:
-        eid = erinnerung.merke(
-            conn,
-            f"Gestern ging es mehrfach um „{thema['label']}“.",
-            quelle=NACHT_QUELLE,
-        )
-        episoden.append(eid)
     return {"themen": themen, "warum_folgen": warum_folgen,
-            "episoden": episoden, "zuege": len(zuege)}
+            "episoden": [], "zuege": len(zuege)}
 
 
 def _neustes_gelerntes_wort(conn) -> dict | None:
@@ -216,9 +235,9 @@ def morgen_nachricht(conn, bericht: dict | None, jetzt_iso: str | None = None) -
     themen = (bericht or {}).get("themen") or []
     if themen:
         namen = " und ".join(f"„{t['label']}“" for t in themen[:2])
-        teile.append(f"Gestern haben dich vor allem {namen} beschäftigt — "
-                     f"ich habe es mir still gemerkt. Wenn etwas davon nicht stimmt, "
-                     f"sag einfach Bescheid.")
+        teile.append(f"Gestern kamen {namen} mehrfach vor. Das ist mir als Tagesmuster "
+                     f"aufgefallen; ich mache daraus aber nicht automatisch ein Interesse "
+                     f"oder eine persönliche Erinnerung.")
         if reg["beiwerk_rueckfrage"]:
             teile.append("Magst du mir heute mehr davon erzählen?")
         inhalt = True

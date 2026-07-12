@@ -53,7 +53,7 @@ N_THREADS = int(os.environ.get("GENUS_DEUTER_THREADS", "4"))
 DEFAULT_ABSICHTEN = (
     "definition", "beziehung", "vergleich", "grammatik", "eigenschaft", "ursache", "menge",
     "ort",
-    "zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage", "ziele",
+    "zustand", "selbstbild", "offene-fragen", "faehigkeiten", "empfehlungsfrage", "ziele",
     "erinnerungs-abruf",
     "warum-herkunft", "vertiefung", "anschlussfrage",
     "weltfrage",
@@ -72,8 +72,8 @@ DEFAULT_ABSICHTEN = (
 _GRUPPEN = (
     ("FRAGEN über einen Begriff/ein Wort", ("definition", "beziehung", "vergleich", "grammatik",
                                              "eigenschaft", "ursache", "menge", "ort")),
-    ("FRAGEN über GENUS selbst", ("zustand", "offene-fragen", "faehigkeiten", "empfehlungsfrage",
-                                   "ziele")),
+    ("FRAGEN über GENUS selbst", ("zustand", "selbstbild", "offene-fragen", "faehigkeiten",
+                                   "empfehlungsfrage", "ziele")),
     ("FRAGEN über dich (den Menschen)", ("erinnerungs-abruf",)),
     ("FRAGEN über das laufende GESPRÄCH (rückbezüglich auf die letzte Antwort)",
      ("warum-herkunft", "vertiefung", "anschlussfrage")),
@@ -102,6 +102,8 @@ _ERKLAERUNGEN = {
     "menge": "wie viele",
     "ort": "liegt/ist X in Y -- geografische Lage (Stadt in Bundesland/Land), zwei genannte Orte",
     "zustand": "wie geht es dir / dein Zustand",
+    "selbstbild": "wer/was bist du; was weisst du ueber dich selbst; kennst du dein Habitat "
+                   "oder deine beobachtete Umgebung (Facette als subject, z.B. Habitat)",
     "offene-fragen": "was beschaeftigt dich",
     "faehigkeiten": "was kannst du",
     "ziele": "was sind deine Ziele / deine Mission / was willst du werden / was fehlt dir",
@@ -237,6 +239,12 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         "Ist Kassel in Hessen? -> "
         "[{\"text\": \"Ist Kassel in Hessen?\", \"absicht\": \"ort\", "
         "\"subject\": \"Kassel\", \"object\": \"Hessen\"}]\n"
+        "Was weisst du ueber dich selbst? -> "
+        "[{\"text\": \"Was weisst du ueber dich selbst?\", \"absicht\": \"selbstbild\", "
+        "\"subject\": \"Selbstbild\", \"object\": null}]\n"
+        "Kennt GENUS sein Habitat? -> "
+        "[{\"text\": \"Kennt GENUS sein Habitat?\", \"absicht\": \"selbstbild\", "
+        "\"subject\": \"Habitat\", \"object\": null}]\n"
         "Wie wird das Wetter morgen? -> "
         "[{\"text\": \"Wie wird das Wetter morgen?\", \"absicht\": \"weltfrage\", "
         "\"subject\": null, \"object\": null}]\n"
@@ -281,7 +289,7 @@ def _gbnf(text: str):
         from llama_cpp import LlamaGrammar
         grammatik = LlamaGrammar.from_string(text, verbose=False)
     except Exception as exc:
-        print(f"[DEUTER] Grammatik unbrauchbar ({exc}) — deute UNBESCHRÄNKT weiter",
+        print(f"[DEUTER] Grammatik unbrauchbar ({type(exc).__name__}) — deute UNBESCHRÄNKT weiter",
               file=sys.stderr)
         grammatik = None
     _grammatik_cache[text] = grammatik

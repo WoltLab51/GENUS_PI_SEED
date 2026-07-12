@@ -117,6 +117,38 @@ def test_deuter_ort_guess_wird_graph_verifiziert():
     assert "Sprachmodell gedeutet" in res["text"]
 
 
+def test_deuter_ort_ohne_zielort_klaert_den_slot_statt_das_subjekt_zu_definieren():
+    # Reale Telegram-Regressionsprobe: Der Deuter erkannte korrekt eine Ortsfrage, lieferte
+    # aber nur das Subjekt. GENUS darf daraus weder eine Haus-Definition machen noch so tun,
+    # als sei gar nichts erkannt worden, sondern muss den fehlenden zweiten Ort benennen.
+    from genus import companion, reactors
+
+    conn = _geseedet()
+    reactors.observe_relation(
+        conn, "Haus@de", "primary_gloss", "ein EINDEUTIGER-DEFINITIONSMARKER", "dbnary")
+    deuter = lambda q: {"absicht": "ort", "subject": "Haus", "object": None}
+
+    res = companion.respond_with_deuter(conn, "Wo steht ein Haus?", deuter=deuter)
+
+    assert res["gelesen"] == ["ort"]
+    assert "Ortsfrage" in res["text"] and "fehlt" in res["text"]
+    assert "EINDEUTIGER-DEFINITIONSMARKER" not in res["text"]
+
+
+def test_deuter_ort_klaert_jede_unvollstaendige_slot_belegung():
+    from genus import companion
+
+    conn = _geseedet()
+    for guess in (
+        {"absicht": "ort", "subject": None, "object": "Hessen"},
+        {"absicht": "ort", "subject": None, "object": None},
+    ):
+        res = companion.respond_with_deuter(
+            conn, "Wo genau?", deuter=lambda q, g=guess: g)
+        assert res["gelesen"] == ["ort"]
+        assert "Ortsfrage" in res["text"] and "Ausgangsort" in res["text"]
+
+
 def test_geerdete_quellen_sind_hoch_vertraut_strukturell_nicht_preset():
     # menschlich verantwortet -> geerdeter Boden. Der Wert ist STRUKTURELL der Spiegel der
     # Modell-Kappe (Modell halbiert das Vertrauen des Unbewiesenen, geerdet halbiert dessen

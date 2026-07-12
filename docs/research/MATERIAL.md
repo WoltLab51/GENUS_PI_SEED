@@ -43,10 +43,12 @@ Vier Ebenen, von unten:
    `(Subjekt —Prädikat→ Objekt)` plus **Quelle**, **Confidence** und **Zeit**. Ein Fakt
    ohne Herkunft existiert bei GENUS nicht. „Vertrauen" ist read-time: eine Behauptung
    einer schwachen Quelle wird leicht gehalten, nicht abgewiesen.
-4. **Die Membran-Disziplin.** Rohmaterial betritt GENUS ausschließlich durch die Membran
-   (`deploy/observe_*.sh`): es wird dort zu bequellten Relationen destilliert, und **nur
-   die Struktur** landet im Ledger. Rohtext wohnt nur in Membran-Dateien, löschbar
-   (Ledger ≠ Memory).
+4. **Die Membran-Disziplin.** Quellen-Rohmaterial betritt GENUS ausschließlich durch die
+   Membran (`deploy/observe_*.sh`): es wird dort zu bequellten Relationen destilliert, und
+   **nur die Struktur** landet im Ledger. Der Telegram-Tagespuffer ist seit v1.17.0 ebenfalls
+   rohtextfrei. Bewusste persönliche Episoden sind die benannte Ausnahme: Ihr Inhalt liegt
+   heute noch im append-only Ledger und ist deshalb nicht physisch löschbar; der geplante
+   Memory-Vault soll genau diese Schuld auflösen (siehe `docs/design/MEMORY.md`).
 
 **Was heute wirklich im Graphen liegt** (live vom Pi, 2026-07-05):
 180.102 Relationen · 84.983 verschiedene Subjekte · 21 Prädikat-Typen.
@@ -125,7 +127,7 @@ Kein Neubau — dieselbe Form wie beim Wort-Material:
 
 ```
 Membran (deploy/observe_*.sh)  →  destilliert zu bequellten Tripeln
-   →  Event im Ledger (Struktur, nie Rohtext)  →  Projektion (Graph)
+   →  Event im Ledger (Quellen-Struktur, kein Dokumentrohtext)  →  Projektion (Graph)
    →  der Selbst-Check greift automatisch
 ```
 

@@ -1,5 +1,4 @@
-"""Nacht-Konsolidierung + Morgen-Nachricht (docs/design/MEMORY.md Punkt ④, Ronnys
-Entscheidungen 2026-07-04): Themen deterministisch, Episoden gedeckelt (model:nacht),
+"""Nacht-Konsolidierung + Morgen-Nachricht: Themen deterministisch und flüchtig,
 die eine Nachricht warm und nativ — nie kryptisch, nie leer."""
 from genus import inquiries, konsolidierung, proposals, reactors, sources, ziele
 
@@ -8,7 +7,7 @@ def _zug(frage: str) -> dict:
     return {"ts": "2026-07-04T10:00:00Z", "question": frage, "answer": "…", "gelesen": []}
 
 
-def test_konsolidierung_findet_themen_und_merkt_gedeckelt(conn):
+def test_konsolidierung_findet_themen_ohne_haeufigkeit_als_person_zu_speichern(conn):
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Q144", "label", "Hund@de", "wikidata")
     zuege = [_zug("Was ist ein Hund?"), _zug("Bellt ein Hund nachts?"),
@@ -17,10 +16,31 @@ def test_konsolidierung_findet_themen_und_merkt_gedeckelt(conn):
     assert bericht["zuege"] == 3
     assert [t["konzept"] for t in bericht["themen"]] == ["Q144"]   # 2x Hund = Thema
     assert bericht["themen"][0]["anzahl"] == 2
-    # die still gemerkte Episode traegt die gedeckelte Nacht-Quelle -- korrigierbar
-    kanten = sources.relations(conn, predicate="inhalt")
-    nacht = [k for k in kanten if k["source"] == konsolidierung.NACHT_QUELLE]
-    assert len(nacht) == 1 and "Hund" in nacht[0]["object"]
+    assert bericht["episoden"] == []
+    assert sources.relations(conn, predicate="inhalt") == []
+    # Reprocessing after a crash is harmless: the consolidation is now a pure projection.
+    assert konsolidierung.konsolidiere(conn, zuege)["themen"] == bericht["themen"]
+    assert sources.relations(conn, predicate="inhalt") == []
+
+
+def test_rohtextfreie_tagesstruktur_traegt_dieselben_signale(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+
+    struktur = konsolidierung.tagesstruktur(conn, "Warum ist ein Hund ein Tier?", ["beziehung"])
+
+    assert struktur == {"konzepte": ["Q144"], "warum_folge": False,
+                        "gelesen": ["beziehung"]}
+    assert "question" not in struktur and "answer" not in struktur
+
+
+def test_tagesstruktur_speichert_kein_lexem_ohne_konzept(conn):
+    reactors.observe_relation(conn, "Privatwort@de", "primary_gloss", "nur eine Gloss",
+                               "dbnary")
+
+    struktur = konsolidierung.tagesstruktur(conn, "Privatwort", ["definition"])
+
+    assert struktur["konzepte"] == []
+    assert "Privatwort" not in str(struktur)
 
 
 def test_ein_einzelnes_vorkommen_ist_kein_thema(conn):
@@ -40,7 +60,8 @@ def test_morgen_nachricht_ist_warm_und_nennt_themen(conn):
                "warum_folgen": 0, "episoden": [], "zuege": 5}
     text = konsolidierung.morgen_nachricht(conn, bericht)
     assert text.startswith("Guten Morgen, Ronny!")
-    assert "„Hund“" in text and "still gemerkt" in text
+    assert "„Hund“" in text and "Tagesmuster" in text
+    assert "nicht automatisch" in text
     assert "guten Start" in text
     # nativ, nie kryptisch: keine internen Knoten-Namen im Klartext
     assert "Q144" not in text and "faehigkeit:" not in text

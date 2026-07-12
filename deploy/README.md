@@ -164,6 +164,11 @@ Gezielte Umgebungsoptionen sind `GENUS_DEPLOY_BRANCH`, `GENUS_DEPLOY_SKIP_TESTS=
 benötigen. Ein Fehler lässt den Pause-Schalter durch einen `trap` wieder frei; die Fehlermeldung
 bleibt trotzdem bindend.
 
+Nach den hermetischen Tests gleicht der Deploy die deklarativen Graph-Saaten automatisch ab:
+`seed_verstehen.sh` ergänzt fehlende Rasterkanten, `gleiche_ziele_ab.sh` reconciliert Ziel- und
+Fähigkeitsstatus. Beides geschieht unter der Pause und vor Replay/Integrität. Ein neues
+Rasterblatt kann dadurch nicht mehr im Code vorhanden, im lebenden Deuter aber unerreichbar sein.
+
 ## Cron-Rhythmus
 
 [`pi_install_cron.sh`](pi_install_cron.sh) ersetzt ausschließlich den Block zwischen `BEGIN GENUS_PI_SEED` und
@@ -268,10 +273,24 @@ chmod 600 "$HOME/.genus/telegram_bot_token"
 GENUS_CORE_ID="genus-pi-01" ./deploy/pi_install_telegram_bot.sh 123456789
 ```
 
-Die letzte Zahl ist durch die eigene numerische Telegram-User-ID zu ersetzen. Erlaubt sind
-1–16 IDs. Der Installer validiert sie, bettet nur die geprüfte Allow-List in die root-owned Unit
-ein und hält das Token in der Datei mit Modus `0600`. Die Unit läuft unprivilegiert, mit
+Die letzte Zahl ist durch die eigene numerische Telegram-User-ID zu ersetzen. Bis persönliche
+Erinnerungen echte Nutzer-Namespaces besitzen, ist genau **ein** Besitzer erlaubt und der Bot
+antwortet ausschließlich in dessen Direktchat. Der Installer validiert die ID, bettet nur sie
+in die root-owned Unit ein und hält das Token in der Datei mit Modus `0600`. Die Unit läuft unprivilegiert, mit
 Prozess-Lock, Systemd-Sandbox und Speichergrenzen; eine zweite Stimme bleibt standardmäßig aus.
+
+Das Journal enthält nur Betriebsmetadaten (zum Beispiel Nachrichtenlänge und Fehlerklasse),
+keinen Nachrichtentext und keine Absender-ID. `~/.genus/chat_tag.jsonl` speichert ebenfalls nur
+destillierte Struktur: Zeit, Konzept-IDs, Lesarten und Warum-Folge. Die Nacht rotiert diese Datei
+atomar unter demselben Lock wie der Bot-Schreiber. Historische Journale oder Legacy-Logs werden
+beim Installieren und Deployen nicht automatisch gelöscht; ihre Retention ist eine bewusste
+Betriebsentscheidung. Details und die noch offene physische Episodenlöschung stehen in
+[`docs/design/MEMORY.md`](../docs/design/MEMORY.md).
+
+Chat-Wortlernen ist aus Datenschutzgründen standardmäßig aus. Ein bewusstes
+`GENUS_CHAT_WORD_LEARNING=1` muss für Bot **und** Learner gesetzt werden; erst dann werden
+unbekannte einzelne Wortformen an externe Lexikonquellen übermittelt. Die Queue ist `0600`,
+gemeinsam verriegelt und der Learner schreibt die Wortform nicht ins Journal.
 
 ```bash
 systemctl status genus-telegram-bot.service

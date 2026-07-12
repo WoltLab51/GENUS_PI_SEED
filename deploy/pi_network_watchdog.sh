@@ -75,7 +75,7 @@ elif mode == "telegram_allowlist":
     except UnicodeDecodeError:
         raise SystemExit(2)
     match = re.fullmatch(
-        r"GENUS_TELEGRAM_ALLOWED_IDS=([0-9]{1,20}(?:,[0-9]{1,20}){0,15})\n?",
+        r"GENUS_TELEGRAM_ALLOWED_IDS=([0-9]{1,20})\n?",
         text,
     )
     if match is None:
@@ -319,6 +319,7 @@ ensure_telegram_bot() {
         --setenv=GENUS_TELEGRAM_TOKEN_FILE="$token_file" \
         --setenv=GENUS_TELEGRAM_LOCK_FILE="$GENUS_HOME/.genus/telegram_bot.lock" \
         --setenv=GENUS_TELEGRAM_STIMME=0 \
+        --setenv=GENUS_CHAT_WORD_LEARNING=0 \
         --setenv=GENUS_TELEGRAM_ALLOWED_IDS="$allowed_ids" \
         "$REPO_DIR/.venv/bin/python" "$bot" || log "could not start telegram bridge"
 }
