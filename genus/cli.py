@@ -1818,6 +1818,11 @@ def operation_list(n: int) -> None:
 def replay_command() -> None:
     conn = get_conn()
     try:
+        # One writer gate covers the complete before -> rebuild -> after observation.  A plain
+        # SELECT followed by replay left two race windows in which the Telegram membrane could
+        # append a perfectly valid event and make an otherwise healthy deploy fail.  WAL readers
+        # remain available; writers wait up to the configured busy_timeout.
+        conn.execute("BEGIN IMMEDIATE")
         before = _state_snapshot(conn)
         event_count = conn.execute("SELECT COUNT(*) AS count FROM event_log").fetchone()[
             "count"
@@ -1829,8 +1834,10 @@ def replay_command() -> None:
         click.echo("[REPLAY] Rebuilding proposal_log...")
         click.echo("[REPLAY] Rebuilding rule_projection...")
         click.echo("[REPLAY] Rebuilding operation_log...")
-        summary = event_router.replay(conn)
+        summary = event_router.replay(conn, commit=False)
         after = _state_snapshot(conn)
+        state_matches = before == after
+        conn.commit()
         click.echo(
             f"[REPLAY] Result: {summary['active_beliefs']} active belief(s), "
             f"{summary['proposals']} proposal(s), {summary['inquiries']} inquiry(s), "
@@ -1840,10 +1847,14 @@ def replay_command() -> None:
             f"{summary['operations']} operation(s), "
             f"{summary['active_rules']} active rule(s)"
         )
-        if before == after:
+        if state_matches:
             click.echo("[REPLAY] State matches current projection")
         else:
             raise click.ClickException("state changed after replay")
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
     finally:
         conn.close()
 

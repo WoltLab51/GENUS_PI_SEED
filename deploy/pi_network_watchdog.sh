@@ -16,6 +16,7 @@ GENUS_HOME="${GENUS_HOME:-$(printf '%s\n' "$PASSWD_ENTRY" | cut -d: -f6)}"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
+PAUSE_FILE="$(dirname "$DB_PATH")/paused"
 PRIVILEGED_DIR="/usr/local/libexec/genus"
 FAIL_FILE="/var/lib/genus-network-watchdog/failures"
 LAST_REBOOT_FILE="/var/lib/genus-network-watchdog/last-reboot-at"
@@ -160,7 +161,7 @@ run_genus() {
 ensure_learner() {
     local learner="$REPO_DIR/deploy/pi_learn.sh"
     if [ ! -x "$learner" ]; then return 0; fi
-    if [ -f "$(dirname "$DB_PATH")/paused" ]; then return 0; fi
+    if [ -f "$PAUSE_FILE" ]; then return 0; fi
     if systemctl cat genus-learner.service >/dev/null 2>&1; then
         local unit_user unit_env unit_stdout unit_stderr
         unit_user="$(systemctl show genus-learner.service -p User --value 2>/dev/null || true)"
@@ -360,7 +361,17 @@ restart_network_service() {
     fi
 }
 
-# Keep the background jobs alive every tick (before the network check, so they run regardless).
+# A deploy/replay pause is a complete autonomous-write boundary.  The old code only gated the
+# learner, then still recorded ``network.gateway`` below; that exact event raced a live replay.
+# Exit before supervision, observation and recovery so the pause contract is behavioural, not
+# merely a marker string somewhere in this file.  The installed Telegram unit remains available
+# through systemd and continues to serve the human independently.
+if [ -f "$PAUSE_FILE" ]; then
+    log "paused — watchdog supervision, network observation, and recovery skipped"
+    exit 0
+fi
+
+# Keep the background jobs alive every unpaused tick (before the network check).
 ensure_learner
 ensure_telegram_bot
 

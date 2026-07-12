@@ -673,7 +673,10 @@ def test_network_watchdog_records_operation_events_and_governed_recovery():
     assert "ensure_learner" in watchdog
     assert "pi_learn.sh" in watchdog
     assert "systemd-run" in watchdog
-    assert "paused" in watchdog  # but respects the pause switch
+    pause_gate = 'log "paused — watchdog supervision, network observation, and recovery skipped"'
+    runtime_start = watchdog.index("# A deploy/replay pause is a complete autonomous-write boundary")
+    assert watchdog.index(pause_gate, runtime_start) < watchdog.index("ensure_learner", runtime_start)
+    assert watchdog.index(pause_gate, runtime_start) < watchdog.index("operation network-check", runtime_start)
     assert "genus-network-watchdog.service" in installer
     assert "OnUnitActiveSec=5min" in installer
     assert "GENUS_USER" in installer

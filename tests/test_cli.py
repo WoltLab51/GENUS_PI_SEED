@@ -1,6 +1,9 @@
+import sqlite3
+
+import pytest
 from click.testing import CliRunner
 
-from genus import cli
+from genus import cli, db, event_router, reactors
 from genus.sensor import mock_cpu, mock_memory
 from tests.conftest import observe_cpu_value
 
@@ -68,6 +71,46 @@ def test_replay_command_exits_zero(monkeypatch, cli_conn, conn):
 
     assert result.exit_code == 0
     assert "State matches current projection" in result.output
+
+
+def test_replay_command_holds_writer_gate_through_comparison(monkeypatch, tmp_path):
+    path = tmp_path / "replay.sqlite3"
+    primary = db.connect(path)
+    secondary = db.connect(path)
+    secondary.execute("PRAGMA busy_timeout = 0")
+    reactors.observe_relation(primary, "Hund@de", "expresses", "Q144", "seed:test")
+    monkeypatch.setattr(cli, "get_conn", lambda: primary)
+    original_replay = event_router.replay
+    original_snapshot = cli._state_snapshot
+    snapshots = 0
+
+    def replay_under_probe(conn, *, commit=True):
+        assert commit is False
+        assert conn.in_transaction
+        return original_replay(conn, commit=commit)
+
+    def snapshot_under_probe(conn):
+        nonlocal snapshots
+        snapshots += 1
+        result = original_snapshot(conn)
+        if snapshots == 2:
+            # Pin the important edge: the writer gate is still held for the AFTER snapshot,
+            # not merely while event_router.replay itself executes.
+            with pytest.raises(sqlite3.OperationalError, match="locked"):
+                secondary.execute("BEGIN IMMEDIATE")
+        return result
+
+    monkeypatch.setattr(cli.event_router, "replay", replay_under_probe)
+    monkeypatch.setattr(cli, "_state_snapshot", snapshot_under_probe)
+
+    result = CliRunner().invoke(cli.main, ["replay"])
+
+    assert result.exit_code == 0
+    assert snapshots == 2
+    # The gate is released only after the comparison and commit.
+    secondary.execute("BEGIN IMMEDIATE")
+    secondary.rollback()
+    secondary.close()
 
 
 def test_integrity_check_command_exits_zero(monkeypatch, cli_conn, conn):

@@ -168,6 +168,9 @@ Nach den hermetischen Tests gleicht der Deploy die deklarativen Graph-Saaten aut
 `seed_verstehen.sh` ergänzt fehlende Rasterkanten, `gleiche_ziele_ab.sh` reconciliert Ziel- und
 Fähigkeitsstatus. Beides geschieht unter der Pause und vor Replay/Integrität. Ein neues
 Rasterblatt kann dadurch nicht mehr im Code vorhanden, im lebenden Deuter aber unerreichbar sein.
+Der Replay-Vergleich hält außerdem vom Vorher-Snapshot bis zum Nachher-Snapshot ein einziges
+SQLite-Schreibfenster; konkurrierende Schreiber können dadurch keinen falschen Driftbefund mehr
+erzeugen.
 
 ## Cron-Rhythmus
 
@@ -213,7 +216,9 @@ GENUS_CORE_ID="genus-pi-01" ./deploy/pi_install_cron.sh
 Der Watchdog prüft zwei Minuten nach Timer-Aktivierung und danach alle fünf Minuten das Default-
 Gateway. Fehler erzeugen Ledger-Evidenz. Zuerst wird der aktive Netzwerkdienst neu gestartet;
 ein Reboot kommt erst nach dem geklammerten, selbst kalibrierten Schwellenwert und dem
-root-eigenen Stunden-Cooldown infrage.
+root-eigenen Stunden-Cooldown infrage. Während `genus pause` endet der Tick vor Supervision,
+Netzwerkbeobachtung und Recovery; insbesondere schreibt er dann keine Operations-Evidenz in ein
+parallel geprüftes Ledger.
 
 Installation vom Pi als normaler Login; das Skript fordert `sudo` nur für die Systemdateien an:
 

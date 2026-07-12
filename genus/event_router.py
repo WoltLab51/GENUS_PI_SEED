@@ -120,7 +120,14 @@ def registriere_projektor(event_type: str, fn: Callable) -> None:
     PROJEKTOREN[event_type] = fn
 
 
-def replay(conn) -> dict:
+def replay(conn, *, commit: bool = True) -> dict:
+    """Rebuild every projection from the append-only event log.
+
+    ``commit=False`` lets a caller keep the rebuild inside a wider transaction.  The CLI uses
+    that mode so its before/replay/after idempotence check holds one SQLite writer gate from the
+    first snapshot through the comparison; otherwise a Telegram or autonomous write can slip
+    into the tiny gaps and create a false ``state changed after replay`` failure.
+    """
     events = conn.execute("SELECT * FROM event_log ORDER BY id").fetchall()
     conn.execute("DELETE FROM rule_projection")
     conn.execute("DELETE FROM governance_log")
@@ -176,7 +183,8 @@ def replay(conn) -> dict:
     active_rule_count = conn.execute(
         "SELECT COUNT(*) AS count FROM rule_projection WHERE status = 'active'"
     ).fetchone()["count"]
-    conn.commit()
+    if commit:
+        conn.commit()
     return {
         "events": len(events),
         "active_beliefs": int(active_count),
