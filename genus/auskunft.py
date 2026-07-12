@@ -440,6 +440,72 @@ def narrate_relation(conn, r: dict, bel: dict | None = None) -> str:
     return (f"Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von »{x}« zu "
             f"»{y}«. (Das heißt: unbekannt, nicht widerlegt.)")
 
+
+# --- verwandte Begriffe („Was ist mit X verwandt?") -- Bedeutungs-Nähe als Gewicht --------
+#
+# Ronnys „keine Definitionen, sondern Gewichte": nicht ob X mit Y verbunden IST (das sagt das
+# kristalline Netz), sondern WIE NAH sich Begriffe sind. Die Antwort liest die gewichteten
+# ``verwandt``-Kanten (genus.verwandt) — der nächste zuerst. Eigenes Term-Muster wie beim Ort,
+# und der Subjekt-Extraktor greift NICHT auf das letzte bekannte Wort zurück (sonst gewönne das
+# bekannte Wort „verwandt"/„ähnlich" selbst über das eigentliche Subjekt).
+_VERWANDT_TERM = r"([A-Za-zäöüÄÖÜß]+(?:-[A-Za-zäöüÄÖÜß]+)*)"
+# Reihenfolge = Vorrang: die spezifischeren „ähnlich wie/zu X" und „verwandt mit/zu X" VOR dem
+# gierigen „X ähnlich" (sonst finge dieses in „Was ist ähnlich wie Hund?" das Füllwort „ist" ein).
+_VERWANDT_PATTERNS = [
+    re.compile(r"\bmit\s+" + _ART + r"?\s*" + _VERWANDT_TERM + r"\s+" + _FILL + r"verwandt", re.I),
+    re.compile(r"\bverwandt\s+" + _FILL + r"(?:mit|zu)\s+" + _ART + r"?\s*" + _VERWANDT_TERM, re.I),
+    re.compile(r"\bähnlich\s+" + _FILL + r"(?:wie|zu)\s+" + _ART + r"?\s*" + _VERWANDT_TERM, re.I),
+    re.compile(r"\bwomit\s+" + _FILL + r"h[äa]ngt\s+" + _ART + r"?\s*" + _VERWANDT_TERM
+               + r"\s+" + _FILL + r"zusammen", re.I),
+    re.compile(r"\b(?:verwandte|ähnliche|verwandten|ähnlichen)\s+(?:begriffe?|w[öo]rter?|"
+               r"konzepte?)\s+(?:zu|von|für)\s+" + _ART + r"?\s*" + _VERWANDT_TERM, re.I),
+    re.compile(r"\b" + _ART + r"?\s*" + _VERWANDT_TERM + r"\s+" + _FILL + r"ähnlich", re.I),
+]
+
+
+def _verwandt_subjekt(question: str) -> str | None:
+    for pattern in _VERWANDT_PATTERNS:
+        m = pattern.search(question)
+        if m:
+            return m.group(1)
+    return None
+
+
+def verwandt_frage(conn, question: str) -> dict:
+    """Eine Verwandtschafts-Frage („Was ist mit X verwandt?", „Was ist X ähnlich?") aus den
+    gewichteten ``verwandt``-Kanten. ``{verwandt_q: False}``, wenn keine erkannt wird oder das
+    Wort unbekannt ist (dann versucht der Wort-Pfad weiter — dieselbe Selbst-Prüfung wie relate)."""
+    wort = _verwandt_subjekt(question)
+    if wort is None:
+        return {"verwandt_q": False}
+    from genus import verwandt
+    r = verwandt.verwandte(conn, wort)
+    if not r["found"]:
+        return {"verwandt_q": False}
+    return {"verwandt_q": True, **r}
+
+
+def narrate_verwandt(conn, r: dict, bel: dict | None = None) -> str:
+    """Gläserne deutsche Antwort auf die Verwandtschafts-Frage: die Begriffe nach Bedeutungs-Nähe,
+    der nächste zuerst, jeder ein Stimme-Anker in »«, die Herkunft ehrlich benannt (gemessene
+    Vektor-Nähe, kein festes Wissen). Ohne gewichtete Nachbarn: ehrlich dünnes Netz."""
+    wort = r["wort"]
+    vs = r.get("verwandte") or []
+    warm = bool(bel) and bel.get("waerme") in ("warm", "herzlich")
+    if not vs:
+        if warm:
+            return (f"Zu »{wort}« kenne ich noch keine verwandten Begriffe — das Ähnlichkeits-Netz "
+                    f"ist dort noch dünn. Das heißt nicht, dass es keine gibt.")
+        return (f"Verwandte Begriffe zu »{wort}« kenne ich noch nicht — das Ähnlichkeits-Netz ist "
+                f"dort noch dünn (unbekannt, nicht widerlegt).")
+    liste = _join_de([f"»{v['name']}« ({v['gewicht']:.2f})" for v in vs])
+    if warm:
+        return (f"Mit »{wort}« sind nach Bedeutungs-Nähe am ehesten verwandt: {liste}. Der erste "
+                f"ist der nächste — gemessen an den Wort-Vektoren, als Gewicht, nicht als feste Regel.")
+    return (f"Nach Bedeutungs-Nähe verwandt mit »{wort}«: {liste}. (Der erste ist der nächste; "
+            f"die Zahl ist die gemessene Vektor-Nähe, ein Gewicht — kein festes Wissen.)")
+
+
 # --- comparative questions ("Was haben X und Y gemeinsam?") ----------------------------
 #
 # The mirror of "ist ein X ein Y?": instead of asking whether one lies above the other, it

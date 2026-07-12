@@ -69,9 +69,11 @@ from genus.auskunft import (
     narrate_kausal,
     narrate_ort,
     narrate_relation,
+    narrate_verwandt,
     ort,
     relate,
     relate_kausal,
+    verwandt_frage,
     vertiefung,
 )
 
@@ -379,6 +381,9 @@ def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, 
     ort_r = ort(conn, question)
     if ort_r.get("relational"):
         return narrate_ort(conn, ort_r, bel), "ort"
+    vw = verwandt_frage(conn, question)
+    if vw.get("verwandt_q"):
+        return narrate_verwandt(conn, vw, bel), "verwandt"
     gen = gender_question(conn, question)
     if gen.get("gender_q"):
         return narrate_gender(gen), "grammatik"

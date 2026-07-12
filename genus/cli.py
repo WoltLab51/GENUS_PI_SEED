@@ -572,12 +572,19 @@ def teach_relation_command(subject: str, predicate: str, object: str, source: st
 @click.argument("predicate")
 @click.argument("object")
 @click.option("--source", default="human", show_default=True)
-def relate_command(subject: str, predicate: str, object: str, source: str) -> None:
-    """Assert a relation between two entities — networked knowledge (subject -[pred]-> object)."""
+@click.option("--derivation", default=None,
+              help="Provenance/metadata of the edge, e.g. a weight 'cos=0.71' for verwandt edges.")
+def relate_command(subject: str, predicate: str, object: str, source: str,
+                   derivation: str | None) -> None:
+    """Assert a relation between two entities — networked knowledge (subject -[pred]-> object).
+
+    ``--derivation`` carries edge metadata into the provenance field: e.g. the embedder's
+    cosine weight ``cos=0.71`` for a ``verwandt`` edge, which the read side orders by."""
     conn = get_conn()
     try:
-        reactors.observe_relation(conn, subject, predicate, object, source)
-        click.echo(f"[REL] {subject} -[{predicate}]-> {object}   · {source}")
+        reactors.observe_relation(conn, subject, predicate, object, source, derivation=derivation)
+        marke = f"   · {source}" + (f" ({derivation})" if derivation else "")
+        click.echo(f"[REL] {subject} -[{predicate}]-> {object}{marke}")
     finally:
         conn.close()
 
