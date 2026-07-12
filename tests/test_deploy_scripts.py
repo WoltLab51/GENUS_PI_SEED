@@ -698,6 +698,7 @@ def test_privileged_watchdog_never_executes_user_writable_code_as_root():
     assert 'limit = 130 if mode == "core_id" else 4097' in watchdog
     assert "len(raw) > 4096" in watchdog
     assert "re.fullmatch(" in watchdog
+    assert watchdog.index("CORE_ID_FILE=") < watchdog.rindex("\nmigrate_legacy_privileged_runtime\n")
 
     for name in ("pi_install_learner.sh", "pi_install_telegram_bot.sh"):
         service_installer = (ROOT / "deploy" / name).read_text(encoding="utf-8")
@@ -807,11 +808,15 @@ def test_privileged_watchdog_repairs_service_identity_and_hardening_drift():
 
     assert "systemctl show genus-learner.service -p User" in learner_fn
     assert 'grep -Fq "GENUS_DB_PATH=$DB_PATH"' in learner_fn
+    assert "genus-learner.service -p StandardOutput" in learner_fn
+    assert '"$unit_stdout" != "journal"' in learner_fn
     assert "pi_install_learner.sh" in learner_fn
     assert "root scatter ledger detected" in learner_fn
 
     assert "Environment=GENUS_TELEGRAM_STIMME=0" in bot_fn
     assert "MemoryMax=3G" in bot_fn
+    assert "genus-telegram-bot.service -p StandardOutput" in bot_fn
+    assert '"$unit_stdout" != "journal"' in bot_fn
     assert '"$PRIVILEGED_DIR/pi_install_telegram_bot.sh"' in bot_fn
     assert "allow-list malformed" in bot_fn
 

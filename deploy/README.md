@@ -164,6 +164,18 @@ stdout/stderr stay in the journal rather than a user-controlled file path.
 Re-run this installer deliberately after changing privileged watchdog code so
 the reviewed checkout is promoted across that boundary.
 
+```bash
+cd "$HOME/GENUS_PI_SEED"
+sudo env GENUS_USER="$USER" GENUS_HOME="$HOME" GENUS_REPO_DIR="$PWD" \
+  GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" GENUS_CORE_ID=pi-core \
+  ./deploy/pi_install_network_watchdog.sh
+sudo systemctl start genus-network-watchdog.service
+```
+
+The second command applies any learner/Telegram unit drift immediately; without
+it, the five-minute timer applies the same repair on its next tick. Learner,
+Telegram, and watchdog stdout/stderr all go to their respective journal units.
+
 ## Clock Check
 
 `pi_clock_check.sh` probes whether the system clock is NTP-synchronized and

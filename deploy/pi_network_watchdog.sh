@@ -108,8 +108,6 @@ migrate_legacy_privileged_runtime() {
     exit 0
 }
 
-migrate_legacy_privileged_runtime
-
 # The sticky core id is the runtime source of truth. An older unit may still carry
 # a stale Environment= value. Read it with the core owner's permissions so a
 # user-controlled symlink can never make root disclose a privileged file.
@@ -118,6 +116,8 @@ if core_id="$(read_user_control_file core_id "$CORE_ID_FILE" 2>/dev/null)"; then
     GENUS_CORE_ID="$core_id"
     export GENUS_CORE_ID
 fi
+
+migrate_legacy_privileged_runtime
 
 as_genus_user mkdir -p "$LOG_DIR"
 /usr/bin/install -d -o root -g root -m 0700 "$(dirname "$FAIL_FILE")"
@@ -162,12 +162,20 @@ ensure_learner() {
     if [ ! -x "$learner" ]; then return 0; fi
     if [ -f "$(dirname "$DB_PATH")/paused" ]; then return 0; fi
     if systemctl cat genus-learner.service >/dev/null 2>&1; then
-        local unit_user unit_env
+        local unit_user unit_env unit_stdout unit_stderr
         unit_user="$(systemctl show genus-learner.service -p User --value 2>/dev/null || true)"
         unit_env="$(systemctl show genus-learner.service -p Environment --value 2>/dev/null || true)"
+        unit_stdout="$(
+            systemctl show genus-learner.service -p StandardOutput --value 2>/dev/null || true
+        )"
+        unit_stderr="$(
+            systemctl show genus-learner.service -p StandardError --value 2>/dev/null || true
+        )"
         if [ "$unit_user" != "$GENUS_USER" ] \
            || ! grep -Fq "GENUS_USER=$GENUS_USER" <<<"$unit_env" \
-           || ! grep -Fq "GENUS_DB_PATH=$DB_PATH" <<<"$unit_env"; then
+           || ! grep -Fq "GENUS_DB_PATH=$DB_PATH" <<<"$unit_env" \
+           || [ "$unit_stdout" != "journal" ] \
+           || [ "$unit_stderr" != "journal" ]; then
             log "learner unit identity drift — reinstalling for user=$GENUS_USER db=$DB_PATH"
             if [ -f /root/.genus/genus.sqlite3 ]; then
                 log "root scatter ledger detected at /root/.genus/genus.sqlite3 — left untouched for audit"
@@ -224,12 +232,20 @@ ensure_telegram_bot() {
     # frühere direkte systemd-run-Fallback konnte während Boot/Deploy neben ihr starten und
     # Telegram-HTTP-409 erzeugen. Existiert die Unit, startet der Watchdog ausschließlich sie.
     if systemctl cat genus-telegram-bot.service >/dev/null 2>&1; then
-        local unit_text unit_user
+        local unit_text unit_user unit_stdout unit_stderr
         unit_text="$(systemctl cat genus-telegram-bot.service 2>/dev/null || true)"
         unit_user="$(systemctl show genus-telegram-bot.service -p User --value 2>/dev/null || true)"
+        unit_stdout="$(
+            systemctl show genus-telegram-bot.service -p StandardOutput --value 2>/dev/null || true
+        )"
+        unit_stderr="$(
+            systemctl show genus-telegram-bot.service -p StandardError --value 2>/dev/null || true
+        )"
         if [ "$unit_user" != "$GENUS_USER" ] \
            || ! grep -Fq "Environment=GENUS_TELEGRAM_STIMME=0" <<<"$unit_text" \
-           || ! grep -Fq "MemoryMax=3G" <<<"$unit_text"; then
+           || ! grep -Fq "MemoryMax=3G" <<<"$unit_text" \
+           || [ "$unit_stdout" != "journal" ] \
+           || [ "$unit_stderr" != "journal" ]; then
             local ids
             IFS=',' read -r -a ids <<<"$allowed_ids"
             log "telegram unit hardening drift — reinstalling bounded service"
