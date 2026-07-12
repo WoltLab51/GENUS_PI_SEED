@@ -112,6 +112,17 @@ def test_verwandt_frage_greift_nicht_ins_leere_bei_unbekanntem_wort():
     assert auskunft.verwandt_frage(conn, "Was ist mit Xyzzy verwandt?")["verwandt_q"] is False
 
 
+def test_artikel_praefix_wird_nicht_vom_wort_abgebissen():
+    # Regression: der optionale Artikel _ART? darf keinen Wort-ANFANG fressen — „Demokratie"
+    # wurde als „dem" + „okratie" zerlegt, „Denkmal" als „den" + „kmal". Betrifft den ganzen
+    # Muster-Satz (Klasse), hier am Verwandt-Extraktor gesichert.
+    from genus.auskunft import _verwandt_subjekt
+    assert _verwandt_subjekt("Was ist mit Demokratie verwandt?") == "Demokratie"
+    assert _verwandt_subjekt("Womit hängt Denkmal zusammen?") == "Denkmal"
+    assert _verwandt_subjekt("Was ist mit Einhorn verwandt?") == "Einhorn"
+    assert _verwandt_subjekt("Was ist mit der Katze verwandt?") == "Katze"   # echter Artikel weg
+
+
 def test_narrate_verwandt_nennt_die_begriffe_geordnet_mit_gewicht():
     conn = _tiere(_fresh())
     r = auskunft.verwandt_frage(conn, "Was ist mit Hund verwandt?")

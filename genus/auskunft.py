@@ -299,13 +299,17 @@ def antizipation(conn, a: dict) -> dict | None:
 # weakest premise. No model, nothing invented; the reasoning is the answer.
 
 _ART = r"(?:einen|einer|eine|ein|der|die|das|den|dem)"
+# Ein Artikel MUSS von Leerzeichen gefolgt sein -- sonst frisst das gierige _ART?\s* den
+# Wort-Anfang („Demokratie" -> Artikel „dem" + Term „okratie", „Denkmal" -> „den"+„kmal").
+# Überall statt _ART + "?\s*" verwenden (der ganze Muster-Satz teilt diesen Fehler).
+_ART_SP = r"(?:" + _ART + r"\s+)?"
 _FILL = r"(?:(?:eigentlich|denn|jetzt|nochmal|noch|so|überhaupt|gerade|wirklich)\s+)*"
 _TERM = r"([A-Za-zäöüÄÖÜß]+)"
 _REL_PATTERNS = [
-    re.compile(r"\bist\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"?\s*art(?:\s+von)?\s+" + _TERM, re.I),
-    re.compile(r"\bist\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"\s+" + _TERM, re.I),
-    re.compile(r"\bsind\s+" + _FILL + _TERM + r"\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bz(?:ä|ae|a)hlt\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"zu\s+(?:den|der|die|das)?\s*" + _TERM, re.I),
+    re.compile(r"\bist\s+" + _FILL + _ART_SP + _TERM + r"\s+" + _FILL + _ART_SP + r"art(?:\s+von)?\s+" + _TERM, re.I),
+    re.compile(r"\bist\s+" + _FILL + _ART_SP + _TERM + r"\s+" + _FILL + _ART + r"\s+" + _TERM, re.I),
+    re.compile(r"\bsind\s+" + _FILL + _TERM + r"\s+" + _FILL + _ART_SP + _TERM, re.I),
+    re.compile(r"\bz(?:ä|ae|a)hlt\s+" + _FILL + _ART_SP + _TERM + r"\s+" + _FILL + r"zu\s+(?:den|der|die|das)?\s*" + _TERM, re.I),
 ]
 
 def _relate_terms(conn, x_tok: str, y_tok: str) -> dict:
@@ -352,10 +356,10 @@ def relate(conn, question: str) -> dict:
 # is_a-Muster verlangen einen Artikel und greifen deshalb bei „X in Y" nicht).
 _ORT_TERM = r"([A-Za-zäöüÄÖÜß]+(?:-[A-Za-zäöüÄÖÜß]+)*)"
 _ORT_PATTERNS = [
-    re.compile(r"\b(?:ist|liegt)\s+" + _FILL + _ART + r"?\s*" + _ORT_TERM
-               + r"\s+" + _FILL + r"in\s+" + _ART + r"?\s*" + _ORT_TERM, re.I),
-    re.compile(r"\bbefindet\s+sich\s+" + _FILL + _ART + r"?\s*" + _ORT_TERM
-               + r"\s+" + _FILL + r"in\s+" + _ART + r"?\s*" + _ORT_TERM, re.I),
+    re.compile(r"\b(?:ist|liegt)\s+" + _FILL + _ART_SP + _ORT_TERM
+               + r"\s+" + _FILL + r"in\s+" + _ART_SP + _ORT_TERM, re.I),
+    re.compile(r"\bbefindet\s+sich\s+" + _FILL + _ART_SP + _ORT_TERM
+               + r"\s+" + _FILL + r"in\s+" + _ART_SP + _ORT_TERM, re.I),
 ]
 
 
@@ -452,14 +456,14 @@ _VERWANDT_TERM = r"([A-Za-zäöüÄÖÜß]+(?:-[A-Za-zäöüÄÖÜß]+)*)"
 # Reihenfolge = Vorrang: die spezifischeren „ähnlich wie/zu X" und „verwandt mit/zu X" VOR dem
 # gierigen „X ähnlich" (sonst finge dieses in „Was ist ähnlich wie Hund?" das Füllwort „ist" ein).
 _VERWANDT_PATTERNS = [
-    re.compile(r"\bmit\s+" + _ART + r"?\s*" + _VERWANDT_TERM + r"\s+" + _FILL + r"verwandt", re.I),
-    re.compile(r"\bverwandt\s+" + _FILL + r"(?:mit|zu)\s+" + _ART + r"?\s*" + _VERWANDT_TERM, re.I),
-    re.compile(r"\bähnlich\s+" + _FILL + r"(?:wie|zu)\s+" + _ART + r"?\s*" + _VERWANDT_TERM, re.I),
-    re.compile(r"\bwomit\s+" + _FILL + r"h[äa]ngt\s+" + _ART + r"?\s*" + _VERWANDT_TERM
+    re.compile(r"\bmit\s+" + _ART_SP + _VERWANDT_TERM + r"\s+" + _FILL + r"verwandt", re.I),
+    re.compile(r"\bverwandt\s+" + _FILL + r"(?:mit|zu)\s+" + _ART_SP + _VERWANDT_TERM, re.I),
+    re.compile(r"\bähnlich\s+" + _FILL + r"(?:wie|zu)\s+" + _ART_SP + _VERWANDT_TERM, re.I),
+    re.compile(r"\bwomit\s+" + _FILL + r"h[äa]ngt\s+" + _ART_SP + _VERWANDT_TERM
                + r"\s+" + _FILL + r"zusammen", re.I),
     re.compile(r"\b(?:verwandte|ähnliche|verwandten|ähnlichen)\s+(?:begriffe?|w[öo]rter?|"
-               r"konzepte?)\s+(?:zu|von|für)\s+" + _ART + r"?\s*" + _VERWANDT_TERM, re.I),
-    re.compile(r"\b" + _ART + r"?\s*" + _VERWANDT_TERM + r"\s+" + _FILL + r"ähnlich", re.I),
+               r"konzepte?)\s+(?:zu|von|für)\s+" + _ART_SP + _VERWANDT_TERM, re.I),
+    re.compile(r"\b" + _ART_SP + _VERWANDT_TERM + r"\s+" + _FILL + r"ähnlich", re.I),
 ]
 
 
@@ -514,10 +518,10 @@ def narrate_verwandt(conn, r: dict, bel: dict | None = None) -> str:
 # construction, glass-box (the shared category is a real graph node).
 
 _COMMON_PATTERNS = [
-    re.compile(r"\bwas\s+haben\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"gemeinsam", re.I),
-    re.compile(r"\bwas\s+ist\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + r"gemeinsam", re.I),
-    re.compile(r"\bgemeinsam(?:keit(?:en)?)?\s+(?:von|zwischen)\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bwas\s+verbindet\s+" + _ART + r"?\s*" + _TERM + r"\s+und\s+" + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwas\s+haben\s+" + _ART_SP + _TERM + r"\s+und\s+" + _ART_SP + _TERM + r"\s+" + _FILL + r"gemeinsam", re.I),
+    re.compile(r"\bwas\s+ist\s+" + _ART_SP + _TERM + r"\s+und\s+" + _ART_SP + _TERM + r"\s+" + _FILL + r"gemeinsam", re.I),
+    re.compile(r"\bgemeinsam(?:keit(?:en)?)?\s+(?:von|zwischen)\s+" + _ART_SP + _TERM + r"\s+und\s+" + _ART_SP + _TERM, re.I),
+    re.compile(r"\bwas\s+verbindet\s+" + _ART_SP + _TERM + r"\s+und\s+" + _ART_SP + _TERM, re.I),
 ]
 
 
@@ -589,8 +593,8 @@ def narrate_common(conn, r: dict, bel: dict | None = None) -> str:
 # carry more than one recorded gender (homonymous lexemes, e.g. "Messer") -- both are shown.
 
 _GENDER_PATTERNS = [
-    re.compile(r"\bwelches\s+geschlecht\s+hat\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bwelchen\s+artikel\s+(?:hat|braucht)\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwelches\s+geschlecht\s+hat\s+" + _FILL + _ART_SP + _TERM, re.I),
+    re.compile(r"\bwelchen\s+artikel\s+(?:hat|braucht)\s+" + _FILL + _ART_SP + _TERM, re.I),
     re.compile(r"\bder,?\s*die\s+oder\s+das\s+" + _TERM, re.I),
 ]
 
@@ -641,12 +645,12 @@ def narrate_gender(r: dict) -> str:
 # Ehrlich: „kein bekannter Zusammenhang" heißt NICHT „nein" (open-world). Deterministisch, kein Modell.
 
 _KAUSAL_URSACHE = [
-    re.compile(r"\bwas\s+" + _FILL + r"verursacht\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bwodurch\s+" + _FILL + r"entsteh(?:t|en)\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
-    re.compile(r"\bwoher\s+" + _FILL + r"komm(?:t|en)\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I),
+    re.compile(r"\bwas\s+" + _FILL + r"verursacht\s+" + _FILL + _ART_SP + _TERM, re.I),
+    re.compile(r"\bwodurch\s+" + _FILL + r"entsteh(?:t|en)\s+" + _FILL + _ART_SP + _TERM, re.I),
+    re.compile(r"\bwoher\s+" + _FILL + r"komm(?:t|en)\s+" + _FILL + _ART_SP + _TERM, re.I),
 ]
 _KAUSAL_JA_NEIN = re.compile(
-    r"\bverursacht\s+" + _FILL + _ART + r"?\s*" + _TERM + r"\s+" + _FILL + _ART + r"?\s*" + _TERM, re.I)
+    r"\bverursacht\s+" + _FILL + _ART_SP + _TERM + r"\s+" + _FILL + _ART_SP + _TERM, re.I)
 
 
 def _qids_of(conn, form: str) -> set[str]:
