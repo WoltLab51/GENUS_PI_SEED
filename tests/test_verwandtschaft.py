@@ -60,6 +60,22 @@ def test_kandidaten_ohne_eltern_ist_leer():
     assert verwandtschaft.kandidaten(conn, "Qsolo") == []
 
 
+def test_ueberbreite_kategorie_wird_uebersprungen(monkeypatch):
+    # ein Elternteil mit zu vielen Kindern (generische Kategorie) liefert keinen Nachbarschafts-
+    # Kreis -- sonst wären es Tausende Gemischtwaren statt echter Verwandter
+    monkeypatch.setattr(verwandtschaft, "MAX_FANOUT", 3)
+    conn = _fresh()
+    reactors.observe_relation(conn, "Messer@de", "expresses", "Qmesser", "wikidata")
+    reactors.observe_relation(conn, "Qmesser", "is_a", "Qartefakt", "wikidata")   # über-breit
+    reactors.observe_relation(conn, "Qmesser", "is_a", "Qstichwaffe", "wikidata")  # eng
+    for i in range(6):   # Qartefakt hat 6 Kinder > MAX_FANOUT 3 -> übersprungen
+        reactors.observe_relation(conn, f"Qkrimskram{i}", "is_a", "Qartefakt", "wikidata")
+    reactors.observe_relation(conn, "Qdolch", "is_a", "Qstichwaffe", "wikidata")   # echtes Geschwister
+    kand = set(verwandtschaft.kandidaten(conn, "Qmesser"))
+    assert "Qdolch" in kand                       # aus der engen „Stichwaffe"
+    assert not any(k.startswith("Qkrimskram") for k in kand)   # NICHT aus dem breiten „Artefakt"
+
+
 def test_konzepte_von_wort():
     conn = _tier_taxonomie(_fresh())
     assert verwandtschaft._konzepte_von(conn, "Hund") == ["Q144"]

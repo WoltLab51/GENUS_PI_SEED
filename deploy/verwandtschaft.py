@@ -26,9 +26,13 @@ MODEL = os.environ.get("GENUS_EMBED_MODEL",
 LANG = os.environ.get("GENUS_BRIDGE_LANG", "de")
 GENUS = os.environ.get("GENUS_BIN",
                        os.path.join(os.path.dirname(__file__), "..", ".venv", "bin", "genus"))
-MIN_SIM = float(os.environ.get("GENUS_VERWANDT_MIN_SIM", "0.55"))   # nur echt nahe Nachbarn
+MIN_SIM = float(os.environ.get("GENUS_VERWANDT_MIN_SIM", "0.60"))   # nur echt nahe Nachbarn
 TOP_K = int(os.environ.get("GENUS_VERWANDT_TOP_K", "8"))            # engste je Konzept
 MAX_KANDIDATEN = int(os.environ.get("GENUS_VERWANDT_MAX_CAND", "80"))
+# Eine über-breite Kategorie („Artefakt" mit Tausenden Kindern) ist KEIN Bedeutungs-Nachbarschafts-
+# Kreis -- ihre Kinder sind ein Gemischtwarenladen. Solche Knoten werden beim Sammeln übersprungen
+# (Messer zieht dann aus „Stichwaffe"/„Werkzeug", nicht aus dem ganzen Artefakt-Universum).
+MAX_FANOUT = int(os.environ.get("GENUS_VERWANDT_MAX_FANOUT", "200"))
 DRYRUN = os.environ.get("GENUS_VERWANDT_DRYRUN", "0") == "1"
 
 
@@ -63,17 +67,25 @@ def _kinder(conn, knoten):
         (knoten,))]
 
 
+def _enge_kinder(conn, knoten):
+    """Die Kinder eines Knotens — aber nur, wenn er ENG genug ist (≤ MAX_FANOUT). Eine über-breite
+    Kategorie definiert keinen Bedeutungs-Nachbarschafts-Kreis und wird übersprungen."""
+    kinder = _kinder(conn, knoten)
+    return kinder if len(kinder) <= MAX_FANOUT else []
+
+
 def kandidaten(conn, qid):
     """Der Nachbarschafts-Kreis eines Konzepts: Geschwister (Kinder der is_a-Eltern) plus Cousins
-    (Kinder der Onkel = Kinder der Großeltern-Kinder). Beschränkt UND bedeutungsverwandt — kein
-    O(N²) übers ganze Netz, aber breit genug, dass echte Verwandte (Hund/Wolf/Goldfisch) drin sind."""
+    (Kinder der Onkel = Kinder der Großeltern-Kinder), aber nur aus ENGEN Knoten (über-breite
+    Kategorien wie „Artefakt" liefern keinen sinnvollen Kreis). Beschränkt UND bedeutungsverwandt
+    — kein O(N²) übers ganze Netz, aber breit genug, dass echte Verwandte (Hund/Wolf) drin sind."""
     eltern = _eltern(conn, qid)
     if not eltern:
         return []
-    onkel = [o for g in {gg for e in eltern for gg in _eltern(conn, e)} for o in _kinder(conn, g)]
+    onkel = [o for g in {gg for e in eltern for gg in _eltern(conn, e)} for o in _enge_kinder(conn, g)]
     kreis = set()
     for knoten in set(eltern) | set(onkel):     # Kinder der Eltern = Geschwister; Kinder der Onkel = Cousins
-        kreis.update(_kinder(conn, knoten))
+        kreis.update(_enge_kinder(conn, knoten))
     kreis.discard(qid)
     return sorted(kreis)[:MAX_KANDIDATEN]
 
