@@ -375,6 +375,70 @@ def test_learner_installer_pins_the_genus_identity_and_paths_under_sudo():
     assert "systemctl restart genus-learner.service" in script
 
 
+@pytest.mark.parametrize(
+    "installer",
+    (
+        "pi_install_learner.sh",
+        "pi_install_telegram_bot.sh",
+        "pi_install_network_watchdog.sh",
+    ),
+)
+def test_privileged_installers_refuse_an_unapproved_root_identity(installer):
+    # A direct root shell has no SUDO_USER to identify the productive login.  Failing
+    # before path creation prevents another /root/.genus scatter ledger.  An intentional
+    # root deployment remains possible, but only through the visible GENUS_ALLOW_ROOT opt-in.
+    env = os.environ.copy()
+    env["GENUS_USER"] = "root"
+    env.pop("GENUS_ALLOW_ROOT", None)
+    bash = shutil.which("bash")
+    if bash is None and os.name == "nt":
+        git_bash = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/bin/bash.exe"
+        bash = str(git_bash) if git_bash.is_file() else None
+    if bash is None:
+        pytest.skip("needs bash to execute installers")
+    result = subprocess.run(
+        [bash, str(ROOT / "deploy" / installer)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "refusing GENUS_USER=root" in result.stderr
+    assert "GENUS_ALLOW_ROOT=1" in result.stderr
+
+
+def test_service_installers_resolve_and_validate_the_target_login_before_paths():
+    for name in (
+        "pi_install_learner.sh",
+        "pi_install_telegram_bot.sh",
+        "pi_install_network_watchdog.sh",
+    ):
+        script = (ROOT / "deploy" / name).read_text(encoding="utf-8")
+        assert 'GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"' in script, name
+        assert '"${GENUS_ALLOW_ROOT:-0}" != "1"' in script, name
+        assert 'getent passwd "$GENUS_USER"' in script, name
+        assert 'GENUS_HOME="${GENUS_HOME:-$DEFAULT_HOME}"' in script, name
+        assert script.index("refusing GENUS_USER=root") < script.index("mkdir -p"), name
+
+
+def test_bot_and_watchdog_create_and_check_state_as_the_pinned_user():
+    for name in ("pi_install_telegram_bot.sh", "pi_install_network_watchdog.sh"):
+        script = (ROOT / "deploy" / name).read_text(encoding="utf-8")
+        assert 'runuser -u "$GENUS_USER" -- "$@"' in script, name
+        assert "as_genus_user mkdir -p" in script, name
+        assert 'as_genus_user test -w "$DB_DIR"' in script, name
+        assert script.index("as_genus_user mkdir -p") < script.index("sudo install"), name
+
+    telegram = (ROOT / "deploy" / "pi_install_telegram_bot.sh").read_text(
+        encoding="utf-8"
+    )
+    assert 'as_genus_user tee "$TOKEN_FILE"' in telegram
+    assert 'as_genus_user tee "$ENV_FILE"' in telegram
+    assert 'as_genus_user chmod 600 "$TOKEN_FILE" "$ENV_FILE"' in telegram
+
+
 def test_learner_acquisition_chain_preserves_the_pinned_ledger_path():
     # The service boundary pins these variables; every script that can write during one learner
     # step must inherit/use them rather than unsetting them or deriving a separate cwd database.
@@ -577,12 +641,12 @@ def test_network_watchdog_records_operation_events_and_governed_recovery():
     assert "operation recovery-result" in watchdog
     assert "--action \"$action\"" in watchdog
     assert "systemctl reboot" in watchdog
-    # the reboot threshold is GENUS's own self-calibrated value, asked live each time -- no
-    # second, separately-typed copy of the number lives in the script; a manual override and a
-    # numeric-safe fallback both still work if the lookup is unavailable
+    # The reboot threshold is still asked from GENUS live, but root clamps that
+    # unprivileged answer into its own fixed safety envelope.
     assert "governance reboot-threshold --value-only" in watchdog
     assert "GENUS_NETWORK_REBOOT_THRESHOLD" in watchdog
-    assert "reboot_threshold=3" in watchdog
+    assert "ROOT_MIN_REBOOT_FAILURES=3" in watchdog
+    assert "ROOT_MAX_REBOOT_FAILURES=12" in watchdog
     # supervisor role: the watchdog also keeps the background learner alive (no extra sudo)
     assert "ensure_learner" in watchdog
     assert "pi_learn.sh" in watchdog
@@ -591,6 +655,56 @@ def test_network_watchdog_records_operation_events_and_governed_recovery():
     assert "genus-network-watchdog.service" in installer
     assert "OnUnitActiveSec=5min" in installer
     assert "GENUS_USER" in installer
+
+
+def test_privileged_watchdog_never_executes_user_writable_code_as_root():
+    watchdog = (ROOT / "deploy" / "pi_network_watchdog.sh").read_text(encoding="utf-8")
+    installer = (ROOT / "deploy" / "pi_install_network_watchdog.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'PRIVILEGED_DIR="/usr/local/libexec/genus"' in installer
+    assert 'install -o root -g root -m 0755 "$source_path" "$target_path"' in installer
+    assert "pi_install_network_watchdog.sh" in installer
+    assert "ExecStart=$PRIVILEGED_DIR/pi_network_watchdog.sh" in installer
+    assert "ExecStart=/bin/bash $REPO_DIR/deploy/pi_network_watchdog.sh" not in installer
+    assert "StateDirectory=genus-network-watchdog" in installer
+    assert "TimeoutStartSec=3min" in installer
+    assert "User=root" in installer and "Group=root" in installer
+    assert "StandardOutput=append:" not in installer
+    assert "StandardError=append:" not in installer
+
+    assert 'FAIL_FILE="/var/lib/genus-network-watchdog/failures"' in watchdog
+    assert '"$PRIVILEGED_DIR/pi_install_learner.sh"' in watchdog
+    assert '"$PRIVILEGED_DIR/pi_install_telegram_bot.sh"' in watchdog
+    assert '"$REPO_DIR/deploy/pi_install_learner.sh"' not in watchdog
+    assert '"$REPO_DIR/deploy/pi_install_telegram_bot.sh"' not in watchdog
+    assert "GENUS_JSON_INPUT=\"$(cat)\" /usr/bin/python3" in watchdog
+    assert 'core_id="$(read_user_control_file core_id "$CORE_ID_FILE"' in watchdog
+    assert "migrate_legacy_privileged_runtime" in watchdog
+    assert "pi_install_network_watchdog.sh" in watchdog
+    assert "/usr/bin/timeout" in watchdog and "/usr/bin/head -c" in watchdog
+    assert "ROOT_MIN_REBOOT_FAILURES=3" in watchdog
+    assert "ROOT_MAX_REBOOT_FAILURES=12" in watchdog
+    assert "ROOT_MIN_REBOOT_INTERVAL_SECONDS=3600" in watchdog
+    assert 'LAST_REBOOT_FILE="/var/lib/genus-network-watchdog/last-reboot-at"' in watchdog
+    assert 'decision in {"allowed", "blocked"}' in watchdog
+    assert "root safety veto action=reboot" in watchdog
+    assert 'read_user_control_file telegram_allowlist "$env_file"' in watchdog
+    assert "os.O_NONBLOCK | os.O_NOFOLLOW" in watchdog
+    assert "stat.S_ISREG" in watchdog
+    assert 'read_user_control_file()' in watchdog
+    assert "--kill-after=1s 2s" in watchdog
+    assert 'limit = 130 if mode == "core_id" else 4097' in watchdog
+    assert "len(raw) > 4096" in watchdog
+    assert "re.fullmatch(" in watchdog
+
+    for name in ("pi_install_learner.sh", "pi_install_telegram_bot.sh"):
+        service_installer = (ROOT / "deploy" / name).read_text(encoding="utf-8")
+        assert "StandardOutput=append:" not in service_installer, name
+        assert "StandardError=append:" not in service_installer, name
+        assert "StandardOutput=journal" in service_installer, name
+        assert "StandardError=journal" in service_installer, name
 
 
 def test_lexeme_membrane_captures_grammatical_gender_for_nouns():
@@ -698,7 +812,7 @@ def test_privileged_watchdog_repairs_service_identity_and_hardening_drift():
 
     assert "Environment=GENUS_TELEGRAM_STIMME=0" in bot_fn
     assert "MemoryMax=3G" in bot_fn
-    assert 'bash "$REPO_DIR/deploy/pi_install_telegram_bot.sh"' in bot_fn
+    assert '"$PRIVILEGED_DIR/pi_install_telegram_bot.sh"' in bot_fn
     assert "allow-list malformed" in bot_fn
 
     assert 'CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"' in script

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from typing import Iterable
 
-from genus import ledger
+from genus import ledger, relation_semantics
 from genus.confidence import calculate_confidence
 
 
@@ -397,10 +397,43 @@ def apply_belief_weakened(conn, payload: dict) -> None:
 def apply_relation_asserted(conn, payload: dict) -> None:
     """Project a relation_asserted event into the indexed knowledge graph.
 
-    One row per distinct (subject, predicate, object, source); re-assertion only
-    refreshes last_updated_at. The event stays the truth; this is the fast view.
+    One row per distinct (subject, predicate, object, source). A meaningful
+    re-assertion can update its derivation (for example a newly measured cosine
+    weight); exact duplicates are suppressed before they reach the ledger.
     """
     created_at = payload.get("_event_created_at")
+    subject, object_ = relation_semantics.canonical_pair(
+        payload["subject"], payload["predicate"], payload["object"]
+    )
+    # A live upgrade can still contain one or both pre-canonical orientations.
+    # Preserve the earliest projection id while merging them: a fresh replay also
+    # keeps the row created by the first historical event, so integrity remains
+    # byte-for-byte stable even before an explicit full rebuild.
+    if (
+        payload["predicate"] in relation_semantics.CANONICAL_PREDICATES
+        and subject != object_
+    ):
+        rows = conn.execute(
+            "SELECT id, subject, object FROM relation_projection "
+            "WHERE predicate = ? AND source = ? "
+            "AND ((subject = ? AND object = ?) OR (subject = ? AND object = ?))",
+            (payload["predicate"], payload["source"], subject, object_, object_, subject),
+        ).fetchall()
+        canonical = next(
+            (row for row in rows if row["subject"] == subject and row["object"] == object_), None
+        )
+        reverse = next(
+            (row for row in rows if row["subject"] == object_ and row["object"] == subject), None
+        )
+        if reverse is not None and (canonical is None or reverse["id"] < canonical["id"]):
+            if canonical is not None:
+                conn.execute("DELETE FROM relation_projection WHERE id = ?", (canonical["id"],))
+            conn.execute(
+                "UPDATE relation_projection SET subject = ?, object = ? WHERE id = ?",
+                (subject, object_, reverse["id"]),
+            )
+        elif reverse is not None:
+            conn.execute("DELETE FROM relation_projection WHERE id = ?", (reverse["id"],))
     conn.execute(
         """
         INSERT INTO relation_projection
@@ -408,12 +441,13 @@ def apply_relation_asserted(conn, payload: dict) -> None:
         VALUES (?, ?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                 COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))
         ON CONFLICT(subject, predicate, object, source) DO UPDATE SET
+            derivation = excluded.derivation,
             last_updated_at = COALESCE(excluded.last_updated_at, last_updated_at)
         """,
         (
-            payload["subject"],
+            subject,
             payload["predicate"],
-            payload["object"],
+            object_,
             payload["source"],
             payload["derivation"],
             created_at,
@@ -428,16 +462,33 @@ def apply_relation_retracted(conn, payload: dict) -> None:
     is replayed in order, so the projection rebuilds correctly. With ``source`` only that
     source's edge goes; without it, every source's copy of the triple is removed.
     """
-    if payload.get("source"):
+    predicate = payload["predicate"]
+    subject, object_ = relation_semantics.canonical_pair(
+        payload["subject"], predicate, payload["object"]
+    )
+    undirected = predicate in relation_semantics.CANONICAL_PREDICATES and subject != object_
+    if payload.get("source") and undirected:
+        conn.execute(
+            "DELETE FROM relation_projection WHERE predicate = ? AND source = ? "
+            "AND ((subject = ? AND object = ?) OR (subject = ? AND object = ?))",
+            (predicate, payload["source"], subject, object_, object_, subject),
+        )
+    elif payload.get("source"):
         conn.execute(
             "DELETE FROM relation_projection "
             "WHERE subject = ? AND predicate = ? AND object = ? AND source = ?",
-            (payload["subject"], payload["predicate"], payload["object"], payload["source"]),
+            (subject, predicate, object_, payload["source"]),
+        )
+    elif undirected:
+        conn.execute(
+            "DELETE FROM relation_projection WHERE predicate = ? "
+            "AND ((subject = ? AND object = ?) OR (subject = ? AND object = ?))",
+            (predicate, subject, object_, object_, subject),
         )
     else:
         conn.execute(
             "DELETE FROM relation_projection WHERE subject = ? AND predicate = ? AND object = ?",
-            (payload["subject"], payload["predicate"], payload["object"]),
+            (subject, predicate, object_),
         )
 
 

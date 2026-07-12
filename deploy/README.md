@@ -18,6 +18,9 @@ installer after upgrades so changed unit properties take effect immediately.
 The privileged network watchdog also verifies those installed unit invariants on
 each tick and re-runs the idempotent installers when user, ledger path, memory
 limits, or Telegram model policy drift from the repository contract.
+All three service installers refuse a silent `GENUS_USER=root` installation;
+an exceptional root-owned core requires the explicit `GENUS_ALLOW_ROOT=1`
+opt-in.
 
 ## First Pi Setup
 
@@ -83,6 +86,17 @@ The script refuses to run on a dirty working tree and refuses non-fast-forward
 deploys. Its final `genus doctor` step reports database, integrity, sealing,
 core ID, sensors, and forbidden-import guards.
 
+### Bounded similarity materialization
+
+`verwandtschaft.py` treats semantic proximity as an undirected relation and
+therefore emits each concept pair in one canonical orientation. Exact reruns of
+the deterministic `model:embedder` / `verwandt` tuple (including the measured
+cosine derivation) are idempotent: `genus relate-bulk` reports them as
+`unverändert` and writes no new ledger event. A changed cosine value remains a
+new observation and updates the projection. This exception is intentionally
+narrow; repeated demand and learning relations such as `gelesen` remain
+countable events.
+
 ## Cron Installation
 
 `pi_install_cron.sh` installs an idempotent marked block in the current user's
@@ -123,8 +137,9 @@ records the unstable network belief and a governed recovery attempt.
 Recovery policy:
 
 - first failures: restart the active network service
-- after 3 consecutive failures: schedule a reboot only if the governance
-  cooldown allows it
+- after the self-calibrated threshold (root-clamped to 3–12 consecutive
+  failures): schedule a reboot only if GENUS does not veto it and the root-only
+  one-hour cooldown allows it
 - every recovery attempt and result is written to the ledger
 
 Install it from Windows PowerShell:
@@ -138,9 +153,16 @@ with:
 
 ```bash
 systemctl status genus-network-watchdog.timer
-tail -f "$HOME/.genus/logs/network-watchdog.log"
+journalctl -u genus-network-watchdog.service -f
 GENUS_DB_PATH="$HOME/.genus/genus.sqlite3" "$HOME/GENUS_PI_SEED/.venv/bin/genus" operation list
 ```
+
+The root service executes a root-owned watchdog and root-owned repair helpers
+from `/usr/local/libexec/genus`; it never executes the writable checkout as
+root. Its failure counter lives in the root-only systemd `StateDirectory`, and
+stdout/stderr stay in the journal rather than a user-controlled file path.
+Re-run this installer deliberately after changing privileged watchdog code so
+the reviewed checkout is promoted across that boundary.
 
 ## Clock Check
 

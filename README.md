@@ -354,9 +354,11 @@ For headless Pi resilience, install the optional systemd network watchdog:
 .\deploy\install_pi_network_watchdog.cmd -HostName ronny@Pi -CoreId pi-core
 ```
 
-The watchdog logs to `/home/pi/.genus/logs/network-watchdog.log`, records
-operation events in GENUS, restarts the network stack on early failures, and
-reboots only after the governed repeated-failure threshold.
+The privileged watchdog runs only from a root-owned copy under
+`/usr/local/libexec/genus` and logs to the system journal (`journalctl -u
+genus-network-watchdog.service`). It records operation events in GENUS,
+restarts the network stack on early failures, and reboots only after the
+governed repeated-failure threshold.
 Repeated reboots are rate-limited by the core governance policy, not only by the
 shell script.
 

@@ -14,9 +14,9 @@ def _lines(relative: str) -> int:
 
 
 def test_root_cli_keeps_shrinking_behind_registered_command_slices():
-    # Audited baseline was 2,239 physical lines; the first extracted command slice
-    # plus new diagnostics lands below this tighter ceiling.
-    assert _lines("genus/cli.py") <= 2230
+    # Audited baseline was 2,239 physical lines. Inquiry and relation command slices
+    # now keep the root integration module below this tighter ceiling.
+    assert _lines("genus/cli.py") <= 2160
 
 
 def test_companion_does_not_grow_past_the_audited_concentration_point():

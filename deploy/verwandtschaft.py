@@ -39,6 +39,11 @@ SCHREIB_BLOCK = int(os.environ.get("GENUS_VERWANDT_BLOCK", "10000"))  # inkremen
 DRYRUN = os.environ.get("GENUS_VERWANDT_DRYRUN", "0") == "1"
 
 
+def kanonisches_paar(a, b):
+    """Undirected semantic proximity has one stable storage orientation."""
+    return tuple(sorted((a, b)))
+
+
 def lade_netz(conn):
     """Liest is_a (beide Richtungen) + deutsche Labels EINMAL in den Speicher. Danach ist die
     Kandidaten-Suche reines Dict-Lesen -- der Flaschenhals bei 30k Konzepten war das SQL pro Konzept."""
@@ -94,10 +99,23 @@ def _konzepte_von(conn, word):
 
 
 def _schreibe_gebuendelt(edges):
-    """Ein Block Kanten in EINEM ``genus relate-bulk``-Aufruf (JSONL über stdin)."""
+    """Write one block and return the ledger events actually appended."""
     import json
+    import re
     jsonl = "\n".join(json.dumps(e, ensure_ascii=False) for e in edges)
-    subprocess.run([GENUS, "relate-bulk"], input=jsonl.encode("utf-8"), check=False)
+    result = subprocess.run(
+        [GENUS, "relate-bulk"], input=jsonl.encode("utf-8"),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+    )
+    output = result.stdout.decode("utf-8", errors="replace")
+    if output:
+        print(output, end="" if output.endswith("\n") else "\n")
+    if result.returncode:
+        raise RuntimeError(f"genus relate-bulk failed with exit code {result.returncode}")
+    match = re.search(r"\[REL-BULK\]\s+(\d+)\s+Kante\(n\) geschrieben", output)
+    if match is None:
+        raise RuntimeError("genus relate-bulk returned no parseable write count")
+    return int(match.group(1))
 
 
 def main() -> int:
@@ -139,6 +157,7 @@ def main() -> int:
 
     # 3. Pro Ziel: Cosinus (reines numpy) -> engste -> Kanten, INKREMENTELL geschrieben
     edges, total, beruehrt, geschrieben = [], 0, 0, 0
+    gesehen = set()
     for q in kand_map:
         qv = vecs.get(q)
         if qv is None:
@@ -149,22 +168,24 @@ def main() -> int:
         for other, sim in sims[:TOP_K]:
             if sim < MIN_SIM:
                 break
+            paar = kanonisches_paar(q, other)
+            if paar in gesehen:
+                continue
+            gesehen.add(paar)
             if DRYRUN:
                 print(f"[VERW] {netz['label'].get(q, q)} ~{sim:.2f}~ {netz['label'].get(other, other)}")
             else:
-                edges.append({"subject": q, "predicate": "verwandt", "object": other,
+                edges.append({"subject": paar[0], "predicate": "verwandt", "object": paar[1],
                               "source": "model:embedder", "derivation": f"cos={sim:.4f}"})
             n += 1
         total += n
         beruehrt += 1 if n else 0
         if len(edges) >= SCHREIB_BLOCK:
-            _schreibe_gebuendelt(edges)
-            geschrieben += len(edges)
+            geschrieben += _schreibe_gebuendelt(edges)
             print(f"[VERW] ... {geschrieben} Kanten geschrieben", flush=True)
             edges = []
     if edges and not DRYRUN:
-        _schreibe_gebuendelt(edges)
-        geschrieben += len(edges)
+        geschrieben += _schreibe_gebuendelt(edges)
     print(f"[VERW] {total} verwandt-Kante(n) über {beruehrt} Konzept(e) "
           f"({'dry-run' if DRYRUN else f'{geschrieben} geschrieben als model:embedder, gewichtet'})")
     return 0

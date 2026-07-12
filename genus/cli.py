@@ -48,7 +48,7 @@ from genus import (
     werkzeug,
     werkzeuge_seed,
 )
-from genus import cli_inquiries
+from genus import cli_inquiries, cli_relations
 from genus.cli_format import (
     _print_active_belief_summary,
     _print_ask_response,
@@ -61,7 +61,6 @@ from genus.cli_format import (
     _print_lexeme_inferences,
     _print_observation_result,
     _print_proposal_explanation,
-    _print_relations,
     _print_resolve,
     _print_rule_explanation,
     _print_sources,
@@ -89,6 +88,7 @@ def main() -> None:
 
 
 cli_inquiries.register(main, lambda: get_conn())
+cli_relations.register(main, lambda: get_conn())
 
 
 @main.command("doctor")
@@ -576,89 +576,6 @@ def teach_relation_command(subject: str, predicate: str, object: str, source: st
         if dropped:
             msg += f", retracted {len(dropped)} wrong object(s)"
         click.echo(msg)
-    finally:
-        conn.close()
-
-
-@main.command("relate")
-@click.argument("subject")
-@click.argument("predicate")
-@click.argument("object")
-@click.option("--source", default="human", show_default=True)
-@click.option("--derivation", default=None,
-              help="Provenance/metadata of the edge, e.g. a weight 'cos=0.71' for verwandt edges.")
-def relate_command(subject: str, predicate: str, object: str, source: str,
-                   derivation: str | None) -> None:
-    """Assert a relation between two entities — networked knowledge (subject -[pred]-> object).
-
-    ``--derivation`` carries edge metadata into the provenance field: e.g. the embedder's
-    cosine weight ``cos=0.71`` for a ``verwandt`` edge, which the read side orders by."""
-    conn = get_conn()
-    try:
-        reactors.observe_relation(conn, subject, predicate, object, source, derivation=derivation)
-        marke = f"   · {source}" + (f" ({derivation})" if derivation else "")
-        click.echo(f"[REL] {subject} -[{predicate}]-> {object}{marke}")
-    finally:
-        conn.close()
-
-
-@main.command("relate-bulk")
-@click.option("--chunk", default=5000, show_default=True,
-              help="Commit every N edges (bounds lock duration + transaction size).")
-def relate_bulk_command(chunk: int) -> None:
-    """Assert MANY relations from JSONL on stdin — one per line: {subject,predicate,object,
-    source[,derivation]}. One process, chunked commits (kein fsync pro Kante) — für große
-    Wissens-Anreicherungen wie den Verwandtschafts-Nachtlauf (deploy/verwandtschaft.py)."""
-    import json as _json
-    import sys as _sys
-
-    conn = get_conn()
-    n = fehler = 0
-    try:
-        for zeile in _sys.stdin:
-            zeile = zeile.strip()
-            if not zeile:
-                continue
-            try:
-                e = _json.loads(zeile)
-                reactors.observe_relation(conn, e["subject"], e["predicate"], e["object"],
-                                          e.get("source", "human"),
-                                          derivation=e.get("derivation"), commit=False)
-                n += 1
-                if n % chunk == 0:
-                    conn.commit()
-            except Exception:   # eine kaputte Zeile darf den ganzen Lauf nicht kippen
-                fehler += 1
-        conn.commit()
-    finally:
-        conn.close()
-    click.echo(f"[REL-BULK] {n} Kante(n) geschrieben"
-               + (f", {fehler} Zeile(n) übersprungen" if fehler else ""))
-
-
-@main.command("unrelate")
-@click.argument("subject")
-@click.argument("predicate")
-@click.argument("object")
-@click.option("--source", default=None, help="retract only this source's edge (default: every source)")
-def unrelate_command(subject: str, predicate: str, object: str, source: str | None) -> None:
-    """Retract a relation — take a wrong or corrected assertion back (relation_retracted)."""
-    conn = get_conn()
-    try:
-        reactors.retract_relation(conn, subject, predicate, object, source)
-        where = f"· {source}" if source else "· all sources"
-        click.echo(f"[REL] retracted {subject} -[{predicate}]-> {object}   {where}")
-    finally:
-        conn.close()
-
-
-@main.command("relations")
-@click.argument("subject", required=False)
-def relations_command(subject: str | None) -> None:
-    """Show the knowledge graph — relations GENUS holds (optionally for one subject)."""
-    conn = get_conn()
-    try:
-        _print_relations(sources.relations(conn, subject), label=lambda n: sources.display(conn, n))
     finally:
         conn.close()
 

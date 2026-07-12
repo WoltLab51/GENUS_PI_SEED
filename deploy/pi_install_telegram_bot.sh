@@ -18,7 +18,17 @@ REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 # die Logs und der Dienst gehören aber RONNYS Nutzer (live gefunden, 2026-07-04: der
 # Installer suchte /root/.genus/telegram_bot_token und verweigerte).
 GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"
-GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"
+if [ "$GENUS_USER" = "root" ] && [ "${GENUS_ALLOW_ROOT:-0}" != "1" ]; then
+    echo "[TGBOT] refusing GENUS_USER=root; set GENUS_USER to the GENUS login (or explicitly GENUS_ALLOW_ROOT=1)" >&2
+    exit 1
+fi
+PASSWD_ENTRY="$(getent passwd "$GENUS_USER" || true)"
+if [ -z "$PASSWD_ENTRY" ]; then
+    echo "[TGBOT] unknown GENUS_USER: $GENUS_USER" >&2
+    exit 1
+fi
+DEFAULT_HOME="$(printf '%s\n' "$PASSWD_ENTRY" | cut -d: -f6)"
+GENUS_HOME="${GENUS_HOME:-$DEFAULT_HOME}"
 GENUS_GROUP="${GENUS_GROUP:-$(id -gn "$GENUS_USER")}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
@@ -26,6 +36,14 @@ TOKEN_FILE="$GENUS_HOME/.genus/telegram_bot_token"
 ENV_FILE="$GENUS_HOME/.genus/telegram_bot.env"
 LOCK_FILE="$GENUS_HOME/.genus/telegram_bot.lock"
 SERVICE_PATH="/etc/systemd/system/genus-telegram-bot.service"
+
+as_genus_user() {
+    if [ "$(id -u)" -eq 0 ] && [ "$(id -un)" != "$GENUS_USER" ]; then
+        runuser -u "$GENUS_USER" -- "$@"
+    else
+        "$@"
+    fi
+}
 
 # A first argument that looks like a token (contains ':') is used; otherwise every argument is a
 # user id and the token must already be in TOKEN_FILE (the private, pre-placed path).
@@ -43,33 +61,41 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 ALLOWED_IDS="$(IFS=,; echo "$*")"
-
-mkdir -p "$(dirname "$DB_PATH")" "$(dirname "$TOKEN_FILE")" "$LOG_DIR"
-chmod 700 "$(dirname "$DB_PATH")" "$(dirname "$TOKEN_FILE")" "$LOG_DIR"
-# Wird der Installer selbst via sudo aufgerufen, dürfen die 0600-Geheimnisse und Logs nicht
-# root gehören: die fest verdrahtete User= Unit könnte sie sonst weder lesen noch schreiben.
-if [ "$(id -u)" -eq 0 ]; then
-    chown "$GENUS_USER:$GENUS_GROUP" \
-        "$(dirname "$DB_PATH")" "$(dirname "$TOKEN_FILE")" "$LOG_DIR"
+if ! [[ "$ALLOWED_IDS" =~ ^[0-9]{1,20}(,[0-9]{1,20}){0,15}$ ]]; then
+    echo "[TGBOT] allow-list must contain 1-16 comma-separated numeric user IDs" >&2
+    exit 1
 fi
+
+DB_DIR="$(dirname "$DB_PATH")"
+TOKEN_DIR="$(dirname "$TOKEN_FILE")"
+if ! as_genus_user mkdir -p "$DB_DIR" "$TOKEN_DIR" "$LOG_DIR"; then
+    echo "[TGBOT] cannot create state paths as $GENUS_USER" >&2
+    exit 1
+fi
+if ! as_genus_user test -w "$DB_DIR" \
+        || ! as_genus_user test -w "$TOKEN_DIR" \
+        || ! as_genus_user test -w "$LOG_DIR" \
+        || { [ -e "$DB_PATH" ] && ! as_genus_user test -w "$DB_PATH"; }; then
+    echo "[TGBOT] state path is not usable by $GENUS_USER: $DB_PATH / $TOKEN_DIR / $LOG_DIR" >&2
+    exit 1
+fi
+as_genus_user chmod 700 "$DB_DIR" "$TOKEN_DIR" "$LOG_DIR"
 
 # The token lives in its own file, chmod 600, never in the world-readable unit file. Prefer a
 # token you pre-placed (so it never passed through the installer's arguments at all); only write
 # it here if you chose to pass it on the command line.
 umask 077
 if [ -n "$BOT_TOKEN" ]; then
-    printf '%s' "$BOT_TOKEN" > "$TOKEN_FILE"
-    chmod 600 "$TOKEN_FILE"
-elif [ ! -s "$TOKEN_FILE" ]; then
+    printf '%s' "$BOT_TOKEN" | as_genus_user tee "$TOKEN_FILE" >/dev/null
+    as_genus_user chmod 600 "$TOKEN_FILE"
+elif ! as_genus_user test -s "$TOKEN_FILE"; then
     echo "No token on the command line and $TOKEN_FILE is missing/empty." >&2
     echo "Place your token there first (chmod 600), or pass it as the first argument." >&2
     exit 1
 fi
-printf 'GENUS_TELEGRAM_ALLOWED_IDS=%s\n' "$ALLOWED_IDS" > "$ENV_FILE"
-chmod 600 "$ENV_FILE"
-if [ "$(id -u)" -eq 0 ]; then
-    chown "$GENUS_USER:$GENUS_GROUP" "$TOKEN_FILE" "$ENV_FILE"
-fi
+printf 'GENUS_TELEGRAM_ALLOWED_IDS=%s\n' "$ALLOWED_IDS" \
+    | as_genus_user tee "$ENV_FILE" >/dev/null
+as_genus_user chmod 600 "$TOKEN_FILE" "$ENV_FILE"
 
 tmp_service="$(mktemp)"
 trap 'rm -f "$tmp_service"' EXIT
@@ -100,8 +126,9 @@ Environment=GENUS_TELEGRAM_LOCK_FILE=$LOCK_FILE
 # zusätzlich einen höheren MemoryMax-Override, statt den Pi versehentlich wieder zu verdrängen.
 Environment=GENUS_TELEGRAM_STIMME=0
 ExecStart=$REPO_DIR/.venv/bin/python $REPO_DIR/deploy/telegram_bot.py
-StandardOutput=append:$LOG_DIR/telegram_bot.log
-StandardError=append:$LOG_DIR/telegram_bot.log
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=genus-telegram-bot
 
 # Ein Deuter-Modell passt komfortabel; ein versehentlich zweites Modell nicht. MemoryHigh
 # drosselt zuerst, MemoryMax verhindert, dass die Begleiter-Membran den ganzen Pi verdrängt.

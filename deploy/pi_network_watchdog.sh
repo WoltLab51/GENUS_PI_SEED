@@ -1,24 +1,126 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"
-GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"
+if [ "$GENUS_USER" = "root" ] && [ "${GENUS_ALLOW_ROOT:-0}" != "1" ]; then
+    echo "[NET] refusing GENUS_USER=root; the privileged watchdog needs a non-root core owner" >&2
+    exit 1
+fi
+PASSWD_ENTRY="$(getent passwd "$GENUS_USER" || true)"
+if [ -z "$PASSWD_ENTRY" ]; then
+    echo "[NET] unknown GENUS_USER: $GENUS_USER" >&2
+    exit 1
+fi
+GENUS_HOME="${GENUS_HOME:-$(printf '%s\n' "$PASSWD_ENTRY" | cut -d: -f6)}"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$GENUS_HOME/.genus/logs}"
-FAIL_FILE="${GENUS_NETWORK_FAILURE_FILE:-$GENUS_HOME/.genus/network-watchdog.failures}"
+PRIVILEGED_DIR="/usr/local/libexec/genus"
+FAIL_FILE="/var/lib/genus-network-watchdog/failures"
+LAST_REBOOT_FILE="/var/lib/genus-network-watchdog/last-reboot-at"
 TARGET="${GENUS_NETWORK_TARGET:-}"
+RUN_GENUS_TIMEOUT_SECONDS=30
+RUN_GENUS_OUTPUT_BYTES=65536
+ROOT_MIN_REBOOT_FAILURES=3
+ROOT_MAX_REBOOT_FAILURES=12
+ROOT_MIN_REBOOT_INTERVAL_SECONDS=3600
+
+as_genus_user() {
+    if [ "$(id -u)" -eq 0 ] && [ "$(id -un)" != "$GENUS_USER" ]; then
+        runuser -u "$GENUS_USER" -- "$@"
+    else
+        "$@"
+    fi
+}
+
+read_user_control_file() {
+    # Open user-controlled state without following symlinks or blocking on FIFOs/devices.
+    # Python itself runs as GENUS_USER and timeout is an outer fail-safe for hostile filesystems.
+    local mode="$1" path="$2"
+    as_genus_user /usr/bin/timeout --signal=TERM --kill-after=1s 2s \
+        /usr/bin/python3 - "$mode" "$path" <<'PY'
+import os
+import re
+import stat
+import sys
+
+mode, path = sys.argv[1:]
+try:
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+except OSError:
+    raise SystemExit(2)
+try:
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        raise SystemExit(2)
+    limit = 130 if mode == "core_id" else 4097
+    with os.fdopen(descriptor, "rb", closefd=False) as handle:
+        raw = handle.read(limit)
+finally:
+    os.close(descriptor)
+
+if mode == "core_id":
+    if len(raw) > 129:
+        raise SystemExit(2)
+    if raw.endswith(b"\n"):
+        raw = raw[:-1]
+    if re.fullmatch(rb"[A-Za-z0-9._:-]{1,128}", raw) is None:
+        raise SystemExit(2)
+    print(raw.decode("ascii"))
+elif mode == "telegram_allowlist":
+    if len(raw) > 4096:
+        raise SystemExit(2)
+    try:
+        text = raw.decode("ascii")
+    except UnicodeDecodeError:
+        raise SystemExit(2)
+    match = re.fullmatch(
+        r"GENUS_TELEGRAM_ALLOWED_IDS=([0-9]{1,20}(?:,[0-9]{1,20}){0,15})\n?",
+        text,
+    )
+    if match is None:
+        raise SystemExit(2)
+    print(match.group(1))
+else:
+    raise SystemExit(2)
+PY
+}
+
+# One-time upgrade path for legacy units that still execute this user-writable
+# checkout as root. Install root-owned code and rewrite the unit, then stop this
+# invocation; all later timer ticks start exclusively from /usr/local/libexec.
+migrate_legacy_privileged_runtime() {
+    if [ "$(id -u)" -ne 0 ]; then return 0; fi
+    local current target helper
+    current="$(readlink -f "${BASH_SOURCE[0]}")"
+    target="$PRIVILEGED_DIR/pi_network_watchdog.sh"
+    if [ "$current" = "$target" ]; then return 0; fi
+    printf '[NET] migrating legacy user-writable root watchdog to %s\n' "$PRIVILEGED_DIR"
+    /usr/bin/install -d -o root -g root -m 0755 "$PRIVILEGED_DIR"
+    for helper in pi_network_watchdog.sh pi_install_network_watchdog.sh \
+                  pi_install_learner.sh pi_install_telegram_bot.sh; do
+        /usr/bin/install -o root -g root -m 0755 "$SCRIPT_DIR/$helper" "$PRIVILEGED_DIR/$helper"
+    done
+    env GENUS_USER="$GENUS_USER" GENUS_HOME="$GENUS_HOME" \
+        GENUS_REPO_DIR="$REPO_DIR" GENUS_DB_PATH="$DB_PATH" \
+        GENUS_LOG_DIR="$LOG_DIR" GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
+        "$PRIVILEGED_DIR/pi_install_network_watchdog.sh"
+    exit 0
+}
+
+migrate_legacy_privileged_runtime
 
 # The sticky core id is the runtime source of truth. An older unit may still carry
-# a stale Environment= value; reading the file repairs behavior immediately.
+# a stale Environment= value. Read it with the core owner's permissions so a
+# user-controlled symlink can never make root disclose a privileged file.
 CORE_ID_FILE="${GENUS_CORE_ID_FILE:-$(dirname "$DB_PATH")/core_id}"
-if [ -s "$CORE_ID_FILE" ]; then
-    GENUS_CORE_ID="$(cat "$CORE_ID_FILE")"
+if core_id="$(read_user_control_file core_id "$CORE_ID_FILE" 2>/dev/null)"; then
+    GENUS_CORE_ID="$core_id"
     export GENUS_CORE_ID
 fi
 
-mkdir -p "$LOG_DIR" "$(dirname "$FAIL_FILE")"
+as_genus_user mkdir -p "$LOG_DIR"
+/usr/bin/install -d -o root -g root -m 0700 "$(dirname "$FAIL_FILE")"
 
 log() {
     printf '[NET] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
@@ -34,15 +136,19 @@ detect_target() {
 
 run_genus() {
     if [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1; then
-        runuser -u "$GENUS_USER" -- env \
-            GENUS_DB_PATH="$DB_PATH" \
-            GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
-            "$REPO_DIR/.venv/bin/genus" "$@"
+        /usr/bin/timeout --signal=TERM --kill-after=5s "${RUN_GENUS_TIMEOUT_SECONDS}s" \
+            runuser -u "$GENUS_USER" -- env \
+                GENUS_DB_PATH="$DB_PATH" \
+                GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
+                "$REPO_DIR/.venv/bin/genus" "$@" 2>&1 \
+            | /usr/bin/head -c "$RUN_GENUS_OUTPUT_BYTES"
     else
-        env \
-            GENUS_DB_PATH="$DB_PATH" \
-            GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
-            "$REPO_DIR/.venv/bin/genus" "$@"
+        /usr/bin/timeout --signal=TERM --kill-after=5s "${RUN_GENUS_TIMEOUT_SECONDS}s" \
+            env \
+                GENUS_DB_PATH="$DB_PATH" \
+                GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
+                "$REPO_DIR/.venv/bin/genus" "$@" 2>&1 \
+            | /usr/bin/head -c "$RUN_GENUS_OUTPUT_BYTES"
     fi
 }
 
@@ -69,7 +175,7 @@ ensure_learner() {
             env GENUS_USER="$GENUS_USER" GENUS_HOME="$GENUS_HOME" \
                 GENUS_REPO_DIR="$REPO_DIR" GENUS_DB_PATH="$DB_PATH" \
                 GENUS_LOG_DIR="$LOG_DIR" GENUS_CORE_ID="${GENUS_CORE_ID:-}" \
-                "$REPO_DIR/deploy/pi_install_learner.sh" \
+                "$PRIVILEGED_DIR/pi_install_learner.sh" \
                 || log "could not repair learner unit identity"
             return 0
         fi
@@ -85,8 +191,6 @@ ensure_learner() {
         --uid="$GENUS_USER" --nice=19 \
         --property=CPUSchedulingPolicy=idle \
         --property=IOSchedulingClass=idle \
-        --property="StandardOutput=append:$LOG_DIR/learn.log" \
-        --property="StandardError=append:$LOG_DIR/learn.log" \
         --setenv=GENUS_USER="$GENUS_USER" \
         --setenv=GENUS_HOME="$GENUS_HOME" \
         --setenv=GENUS_REPO_DIR="$REPO_DIR" \
@@ -98,17 +202,24 @@ ensure_learner() {
 
 # Also keep the Telegram bridge alive (only if configured). NORMAL priority -- it answers a human,
 # so it should feel responsive, unlike the deliberately idle learner. A no-op unless BOTH the token
-# file and the allow-list env file exist (so an un-set-up Pi does nothing). The allowed id(s) come
-# from the env file, read with grep (no sourcing -- the file is never executed). Read-only
+# file and the allow-list env file exist (so an un-set-up Pi does nothing). The allow-list is
+# read as the GENUS user, capped at 4 KiB, and accepted only in one canonical form; it is never
+# sourced or executed. Read-only
 # companion; deliberately NOT gated on pause (it responds on demand, it is not autonomous work).
 ensure_telegram_bot() {
     local bot="$REPO_DIR/deploy/telegram_bot.py"
     local token_file="$GENUS_HOME/.genus/telegram_bot_token"
     local env_file="$GENUS_HOME/.genus/telegram_bot.env"
-    if [ ! -f "$bot" ] || [ ! -s "$token_file" ] || [ ! -f "$env_file" ]; then return 0; fi
+    if [ ! -f "$bot" ] \
+       || ! as_genus_user test -s "$token_file" \
+       || ! as_genus_user test -f "$env_file"; then return 0; fi
     local allowed_ids
-    allowed_ids="$(grep -E '^GENUS_TELEGRAM_ALLOWED_IDS=' "$env_file" | tail -1 | cut -d= -f2-)"
-    if [ -z "$allowed_ids" ]; then return 0; fi
+    if ! allowed_ids="$(
+        read_user_control_file telegram_allowlist "$env_file" 2>/dev/null
+    )"; then
+        log "telegram allow-list malformed — refusing unit repair"
+        return 0
+    fi
     # Die dauerhaft installierte, gehärtete Unit ist die EINE Eigentümerin des Pollers. Der
     # frühere direkte systemd-run-Fallback konnte während Boot/Deploy neben ihr starten und
     # Telegram-HTTP-409 erzeugen. Existiert die Unit, startet der Watchdog ausschließlich sie.
@@ -119,16 +230,13 @@ ensure_telegram_bot() {
         if [ "$unit_user" != "$GENUS_USER" ] \
            || ! grep -Fq "Environment=GENUS_TELEGRAM_STIMME=0" <<<"$unit_text" \
            || ! grep -Fq "MemoryMax=3G" <<<"$unit_text"; then
-            case "$allowed_ids" in
-                *[!0-9,]*) log "telegram allow-list malformed — refusing unit repair"; return 0 ;;
-            esac
             local ids
             IFS=',' read -r -a ids <<<"$allowed_ids"
             log "telegram unit hardening drift — reinstalling bounded service"
             env GENUS_USER="$GENUS_USER" GENUS_HOME="$GENUS_HOME" \
                 GENUS_REPO_DIR="$REPO_DIR" GENUS_DB_PATH="$DB_PATH" \
                 GENUS_LOG_DIR="$LOG_DIR" \
-                bash "$REPO_DIR/deploy/pi_install_telegram_bot.sh" "${ids[@]}" \
+                "$PRIVILEGED_DIR/pi_install_telegram_bot.sh" "${ids[@]}" \
                 || log "could not repair telegram unit hardening"
             return 0
         fi
@@ -152,8 +260,6 @@ ensure_telegram_bot() {
         --property=PrivateTmp=true \
         --property=PrivateDevices=true \
         --property=ProtectSystem=full \
-        --property="StandardOutput=append:$LOG_DIR/telegram_bot.log" \
-        --property="StandardError=append:$LOG_DIR/telegram_bot.log" \
         --setenv=HOME="$GENUS_HOME" \
         --setenv=GENUS_DB_PATH="$DB_PATH" \
         --setenv=GENUS_LOG_DIR="$LOG_DIR" \
@@ -165,7 +271,7 @@ ensure_telegram_bot() {
 }
 
 json_field() {
-    GENUS_JSON_INPUT="$(cat)" "$REPO_DIR/.venv/bin/python" -c '
+    GENUS_JSON_INPUT="$(cat)" /usr/bin/python3 -c '
 import json
 import os
 import sys
@@ -175,9 +281,10 @@ data = json.loads(os.environ["GENUS_JSON_INPUT"])
 recovery = data.get("recovery") or {}
 verdict = recovery.get("verdict") or {}
 if field == "recovery_id":
-    print(recovery.get("recovery_id") or "")
+    print(str(recovery.get("recovery_id") or "")[:128])
 elif field == "decision":
-    print(verdict.get("decision") or "")
+    decision = verdict.get("decision") or ""
+    print(decision if decision in {"allowed", "blocked"} else "")
 else:
     print("")
 ' "$1"
@@ -238,9 +345,14 @@ if [ -n "${GENUS_NETWORK_REBOOT_THRESHOLD:-}" ]; then
     reboot_threshold="$GENUS_NETWORK_REBOOT_THRESHOLD"
 else
     reboot_threshold="$(run_genus governance reboot-threshold --value-only 2>/dev/null || true)"
-    case "$reboot_threshold" in
-        ''|*[!0-9]*) reboot_threshold=3 ;;
-    esac
+fi
+case "$reboot_threshold" in
+    ''|*[!0-9]*) reboot_threshold="$ROOT_MIN_REBOOT_FAILURES" ;;
+esac
+if [ "$reboot_threshold" -lt "$ROOT_MIN_REBOOT_FAILURES" ]; then
+    reboot_threshold="$ROOT_MIN_REBOOT_FAILURES"
+elif [ "$reboot_threshold" -gt "$ROOT_MAX_REBOOT_FAILURES" ]; then
+    reboot_threshold="$ROOT_MAX_REBOOT_FAILURES"
 fi
 
 if [ "$failures" -ge "$reboot_threshold" ]; then
@@ -267,6 +379,24 @@ if [ "$decision" != "allowed" ]; then
     exit 0
 fi
 
+# GENUS may veto a recovery, but user-owned code can never widen root authority.
+# Root independently requires a genuine ping failure, a bounded failure threshold,
+# and a one-hour reboot cooldown kept in root-only state.
+if [ "$action" = "reboot" ]; then
+    now_epoch="$(date +%s)"
+    last_reboot=0
+    if [ -f "$LAST_REBOOT_FILE" ]; then
+        last_reboot="$(cat "$LAST_REBOOT_FILE" 2>/dev/null || printf '0')"
+    fi
+    case "$last_reboot" in
+        ''|*[!0-9]*) last_reboot=0 ;;
+    esac
+    if [ $((now_epoch - last_reboot)) -lt "$ROOT_MIN_REBOOT_INTERVAL_SECONDS" ]; then
+        log "root safety veto action=reboot cooldown=${ROOT_MIN_REBOOT_INTERVAL_SECONDS}s"
+        exit 0
+    fi
+fi
+
 if [ "$action" = "restart_network" ]; then
     if service_name="$(restart_network_service)"; then
         log "network service restarted service=$service_name recovery_id=$recovery_id"
@@ -285,6 +415,7 @@ if [ "$action" = "restart_network" ]; then
 fi
 
 log "reboot scheduled recovery_id=$recovery_id"
+printf '%s\n' "$(date +%s)" > "$LAST_REBOOT_FILE"
 run_genus operation recovery-result \
     --recovery-id "$recovery_id" \
     --result scheduled \

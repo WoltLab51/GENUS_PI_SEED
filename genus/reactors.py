@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from genus import inquiries, learning, ledger, projection, rules, sources
+from genus import inquiries, learning, ledger, projection, relation_semantics, rules, sources
 
 
 # Which metrics run a 24/7 learning program, and on which cycle period. The engine
@@ -222,6 +222,17 @@ def observe_relation(
     der Verwandtschafts-Nachtlauf) hält der Aufrufer EINE Transaktion offen und committet
     gebündelt, statt pro Kante zu fsyncen. Ein Fehler rollt weiterhin sofort zurück."""
     try:
+        subject, object_ = relation_semantics.canonical_pair(subject, predicate, object_)
+        idempotent_stream = relation_semantics.is_idempotent_stream(source, predicate)
+        if idempotent_stream:
+            # ``verwandt`` is undirected. Canonicalising at the core boundary protects every
+            # caller, not just today's materializer, while the reverse lookup also recognises
+            # rows written by older releases in the opposite orientation.
+            # The lock must precede the read. Otherwise two concurrent materializers can both
+            # observe "missing" and append duplicate events before the projection conflict
+            # collapses only their read model.
+            if not conn.in_transaction:
+                conn.execute("BEGIN IMMEDIATE")
         payload = {
             "subject": subject,
             "predicate": predicate,
@@ -229,6 +240,19 @@ def observe_relation(
             "source": source,
             "derivation": derivation or f"source:{source}",
         }
+        if idempotent_stream:
+            existing = conn.execute(
+                """
+                SELECT derivation FROM relation_projection
+                WHERE predicate = ? AND source = ?
+                  AND ((subject = ? AND object = ?) OR (subject = ? AND object = ?))
+                """,
+                (predicate, source, subject, object_, object_, subject),
+            ).fetchall()
+            if any(row[0] == payload["derivation"] for row in existing):
+                if commit:
+                    conn.commit()
+                return {"event_id": None, "events": [], "unchanged": True}
         event_id = ledger.append(conn, "relation_asserted", payload)
         payload["_event_created_at"] = ledger.event_created_at(conn, event_id)
         projection.apply_relation_asserted(conn, payload)
@@ -286,7 +310,7 @@ def observe_relation(
     except Exception:
         conn.rollback()
         raise
-    return {"event_id": event_id, "events": events}
+    return {"event_id": event_id, "events": events, "unchanged": False}
 
 
 def sae_fehlende(conn, tripel: list[tuple[str, str, str]], quelle: str) -> int:
@@ -322,6 +346,7 @@ def retract_relation(
     goes; without it the triple is removed for every source.
     """
     try:
+        subject, object_ = relation_semantics.canonical_pair(subject, predicate, object_)
         payload = {
             "subject": subject,
             "predicate": predicate,
