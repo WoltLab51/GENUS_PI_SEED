@@ -220,6 +220,17 @@ def test_background_learner_runs_continuously_and_is_pausable():
     assert "loadavg" in script               # yields when the box is busy
 
 
+def test_learner_weaves_verwandt_edges_per_word_alongside_bridge():
+    # das Ähnlichkeits-Netz wächst MIT dem Wortschatz (nicht als einmaliger Schnappschuss):
+    # jedes gelernte Wort webt seine gewichteten verwandt-Kanten, direkt nach dem Sinn-Brücken,
+    # im selben (optionalen) Embedder-Block -- so bleibt es beim Nicht-installierten Embedder aus
+    script = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
+    assert "verwandtschaft.py" in script
+    assert script.index("verwandtschaft.py") > script.index("bridge_senses.py")   # nach dem Brücken
+    # innerhalb des Embedder-Wächters (nur wenn der Embedder installiert ist)
+    assert 'if [ -x "$EMBED_PY" ]; then' in script
+
+
 def test_learner_gap_climb_remembers_attempts_and_has_a_retry_ttl():
     script = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
     # the fix for the pinned-on-one-gap loop: a bounded attempts memory with a retry TTL

@@ -58,7 +58,9 @@ log() { printf '[LRN] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 #  - dbnary membrane (German Wiktionary as RDF): the human-written MEANING layer
 #    (defined_as, all word classes) -- bound sense-safe (no flat is_a), German edition only
 # Shared edges (expresses, pos) gain a second/third source -> confidence rises above seed. The
-# edge embedder then bridges the concepts to their senses (capped) -- only if installed.
+# edge embedder then bridges the concepts to their senses (capped) AND weaves the word's
+# verwandt edges (Bedeutungs-Nähe als Gewicht) -- both only if installed. So the similarity
+# net (genus.verwandt) grows WITH the vocabulary rather than staying a one-off snapshot.
 learn_from() {
     local wl="$1" cur start word
     case "$wl" in
@@ -74,9 +76,13 @@ learn_from() {
     GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
     if [ -x "$EMBED_PY" ]; then
         GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/bridge_senses.py" "$word" >/dev/null 2>&1 || true
+        # ... und die VERWANDT-Kanten dieses Worts weben (Bedeutungs-Nähe als Gewicht, gedeckelt):
+        # so wächst das Ähnlichkeits-Netz MIT dem Wortschatz mit, statt ein einmaliger Schnappschuss
+        # zu bleiben. Symmetrisch gelesen -- ein später gelerntes Geschwister findet dieses hier.
+        GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/verwandtschaft.py" "$word" >/dev/null 2>&1 || true
     fi
     echo "$((start + 1))" > "$cur"
-    log "learned '$word' (#$((start + 1)) of $(basename "$wl")) — concept + lexeme + dbnary + bridge"
+    log "learned '$word' (#$((start + 1)) of $(basename "$wl")) — concept + lexeme + dbnary + bridge + verwandt"
     return 0
 }
 
@@ -103,6 +109,7 @@ learn_begegnung() {
     GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
     if [ -x "$EMBED_PY" ]; then
         GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/bridge_senses.py" "$word" >/dev/null 2>&1 || true
+        GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/verwandtschaft.py" "$word" >/dev/null 2>&1 || true
     fi
     log "learned encountered word '$word' (Vokabel-bei-Begegnung, vor den Listen)"
     return 0
