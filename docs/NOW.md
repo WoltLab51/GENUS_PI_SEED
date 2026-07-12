@@ -4,7 +4,7 @@
 >
 > **Stand:** 12. Juli 2026
 >
-> **Verifizierte Code-/Pi-Basis:** `2e59b39`
+> **Verifizierte Funktionsbasis:** `8f8c577`
 >
 > **Zweck:** in zwei Minuten verstehen, wo GENUS steht und worauf der nächste
 > saubere Schritt zielt
@@ -25,14 +25,21 @@ kontrolliert **verdient**.
 | Bereich | Stand |
 |---|---|
 | Kern | gehärtet; Herkunft, Projektionen, Replay und Unsicherheit bleiben getrennt |
-| Linux-Nachweis | 1.253 Tests auf dem Pi bestanden |
-| Produkt-Ledger | 933.953 Ereignisse; Integrität und Siegelkette intakt |
-| Betrieb | Learner, Telegram und Watchdogs aktiv; Root-/User-Grenze gehärtet |
+| Linux-Nachweis | 1.284 Tests auf dem Pi bestanden |
+| Produkt-Ledger | 935.122 Ereignisse im Abnahme-Snapshot; Integrität und Siegelkette intakt |
+| Betrieb | Learner, Telegram und Watchdog aktiv; Root-/User-Grenze gehärtet |
 | Streudaten | historisches Root-Ledger read-only geprüft und quarantänisiert |
 | Graph | Hierarchiezyklen abgewehrt; deterministische Relationen idempotent |
 | Selbstbild | Identität, Mission und Habitat werden aus Code, Zielgraph und aktiven Zuständen gelesen |
 | Gesprächsgrenze | spezifische Absichten fallen nicht mehr auf semantisch andere Elternantworten zurück |
 | Datenschutz | Owner-Direktchat; neue Logs/Tagespuffer rohtextfrei; Nachtrotation atomar; Chat-Wortlernen opt-in |
+| Telegram-Abnahme | fünf reale Fehlgriffklassen read-only mit Live-Ledgerkopie und echtem Pi-Deuter bestanden |
+
+**Noch ausstehender privilegierter Handgriff:** Der Watchdog-Pause-Fix ist in Repository,
+Tests und normalem Pi-Kern live. Seine root-eigene Laufzeitkopie unter
+`/usr/local/libexec/genus` kann jedoch nur nach einer interaktiven `sudo`-Bestätigung durch den
+Host-Eigentümer aktualisiert werden; der Installer ist vorbereitet und idempotent. Der atomare
+Replay-Fix verhindert den beobachteten Abnahme-Wettlauf bereits unabhängig davon.
 
 Die Zahlen sind ein **Abnahme-Snapshot**, keine automatisch gepflegten
 Live-Metriken. Aktuelle Strukturzahlen stehen in
