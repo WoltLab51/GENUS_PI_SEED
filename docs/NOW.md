@@ -35,11 +35,10 @@ kontrolliert **verdient**.
 | Datenschutz | Owner-Direktchat; neue Logs/Tagespuffer rohtextfrei; Nachtrotation atomar; Chat-Wortlernen opt-in |
 | Telegram-Abnahme | fünf reale Fehlgriffklassen read-only mit Live-Ledgerkopie und echtem Pi-Deuter bestanden |
 
-**Noch ausstehender privilegierter Handgriff:** Der Watchdog-Pause-Fix ist in Repository,
-Tests und normalem Pi-Kern live. Seine root-eigene Laufzeitkopie unter
-`/usr/local/libexec/genus` kann jedoch nur nach einer interaktiven `sudo`-Bestätigung durch den
-Host-Eigentümer aktualisiert werden; der Installer ist vorbereitet und idempotent. Der atomare
-Replay-Fix verhindert den beobachteten Abnahme-Wettlauf bereits unabhängig davon.
+**Privilegierte Runtime abgenommen:** Die root-eigene Watchdog-Kopie unter
+`/usr/local/libexec/genus` ist bytegleich mit dem geprüften Repository-Skript, der Timer ist aktiv
+und die Unit führt ausschließlich diese root-eigene Kopie aus. Damit ist auch das Pause-Gate auf
+dem produktiven Pi angekommen.
 
 Die Zahlen sind ein **Abnahme-Snapshot**, keine automatisch gepflegten
 Live-Metriken. Aktuelle Strukturzahlen stehen in
