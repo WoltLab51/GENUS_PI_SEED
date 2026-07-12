@@ -1,7 +1,8 @@
 """Die HÄNDE (P4, Ronny 2026-07-08: „geben wir GENUS Hände"). Der erste Weg, auf dem GENUS die
 Welt nicht nur LIEST, sondern VERÄNDERT — und deshalb der am härtesten gegatete.
 
-Die Asymmetrie (docs/GENUS_ARCHITEKTUR.md §8): ein SINN liest (im Zweifel nur falsch — der Kern
+Die Asymmetrie (aktueller Vertrag: docs/ARCHITECTURE.md §8; historische Herkunft:
+docs/history/TARGET_ARCHITECTURE_2026-07-04.md §8): ein SINN liest (im Zweifel nur falsch — der Kern
 fängt es ab); eine HAND wirkt (oft unumkehrbar). Darum das eiserne Gate:
 
 - HARTER KERN-CONSTRAINT, nicht übersteuerbar: eine Außenhandlung wird NUR ausgeführt, wenn ein

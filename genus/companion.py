@@ -149,7 +149,7 @@ def _ist_zustimmung(text: str) -> bool:
 # NOTEBOOK, not a "things about one person" store -- GENUS doesn't (and, honestly, mostly
 # can't) know WHO or WHAT a free-text note is about; it only knows WHO TOLD it.
 #
-# Storage moved on from a flat, unnetworked relation (Punkt 1 von docs/GENUS_GEDAECHTNIS.md,
+# Storage moved on from a flat, unnetworked relation (Punkt 1 von docs/design/MEMORY.md,
 # 2026-07-03: Tulving 1972 -- episodic memory is dated and networked THROUGH shared knowledge,
 # not a pile of disconnected strings) to real episodes in :mod:`genus.erinnerung` -- this module
 # only does dispatch and phrasing now, the storage/retrieval contract lives there.
@@ -226,7 +226,7 @@ def narrate_notes(confirmed: list[str], suggested: list[str]) -> str:
 # gewöhnlichem Gespräch -- die gibt es faktisch schon: die "tatsache"-Zelle des Verstehens-
 # Würfels notiert unaufgefordert erwähnte Aussagen längst (gedeckelt, unbestätigt). Was fehlt,
 # ist das WEBEN: eine Erinnerung taucht bisher nie beiläufig in einer anderen Antwort auf, selbst
-# wenn das Thema überschneidet. Der Abruf (Punkt 2 von docs/GENUS_GEDAECHTNIS.md, 2026-07-03)
+# wenn das Thema überschneidet. Der Abruf (Punkt 2 von docs/design/MEMORY.md, 2026-07-03)
 # läuft jetzt über den echten Graphen (``erinnerung.erwaehnter_bezug`` -- Konzept-Anker, nicht
 # roher Substring-Abgleich), nicht mehr über einen reinen Wort-in-Wort-Vergleich. Nur EIN
 # Treffer, um nicht aufdringlich zu werden; bestätigt/vermutet bleibt sichtbar unterschieden,
@@ -571,7 +571,7 @@ def narrate_inquiries(conn, oq: dict) -> str:
     at the terminal, because this channel deliberately cannot write. Zusätzlich der DRUCK
     (genus.druck): die drängendste ungestillte Verstehens-Lücke -- die PERSISTIERT jetzt,
     statt sich beim Aussprechen zu entladen, und wird als solche benannt, wenn sie seit dem
-    Vorschlag weiter gewachsen ist (Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §9)."""
+    Vorschlag weiter gewachsen ist (Ronny 2026-07-05, docs/research/INTELLIGENCE.md §9)."""
     from genus import druck
 
     # nach Wiederkehr-Druck geordnet: die am häufigsten aufgefallene Sorge zuerst (der
@@ -617,7 +617,7 @@ def is_why_followup(question: str) -> bool:
     return question.strip().strip("?!.").strip().lower() in _WHY_FOLLOWUP
 
 
-# --- Mehr-Zug-Arbeitsgedächtnis (Punkt 4 von docs/GENUS_GEDAECHTNIS.md, Scheibe "das Tier von
+# --- Mehr-Zug-Arbeitsgedächtnis (Punkt 4 von docs/design/MEMORY.md, Scheibe "das Tier von
 # vorhin wird auflösbar") -- dieselbe Disziplin wie beim "warum?"-Nachfrage-Fix: ein kleiner,
 # geschlossener Signalsatz statt allgemeiner Koreferenz-Auflösung (ein echt schwereres Problem).
 # GENUS erfindet keine Wort-Ersetzung ("das Tier" -> "der Igel") -- es beantwortet ehrlich die

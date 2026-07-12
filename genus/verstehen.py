@@ -178,7 +178,9 @@ def gbnf_grammatik(blaetter=None) -> str:
     einkompilierten Alternativen -- eine NICHT existierende Kategorie ist damit strukturell
     unmöglich, nicht bloß per Few-Shot erhofft. "unklar" (der ehrliche Ausgang) ist immer
     Teil der Grenze; ob das Modell ihn richtig WÄHLT, bleibt Modell-Qualität (die Grammatik
-    garantiert wohlgeformt-im-Raum, nicht richtig -- Naht 2, docs/GENUS_ARCHITEKTUR.md §8).
+    garantiert wohlgeformt-im-Raum, nicht richtig -- aktueller Vertrag:
+    docs/ARCHITECTURE.md §5; historische Herkunft: Naht 2 in
+    docs/history/TARGET_ARCHITECTURE_2026-07-04.md §8).
 
     Abgeleitet aus dem lebenden Angebot (``leaf_kinds(conn)``, vom Aufrufer übergeben);
     ohne Angebot aus ``RASTER_SEED``. Wächst die Hülle, wächst die Grenze mit -- kein

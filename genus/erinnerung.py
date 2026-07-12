@@ -1,4 +1,4 @@
-"""Erinnerungen als echte Episoden -- Punkt 1+2 des Gedächtnis-Konzepts (docs/GENUS_GEDAECHTNIS.md).
+"""Erinnerungen als echte Episoden -- Punkt 1+2 des Gedächtnis-Konzepts (docs/design/MEMORY.md).
 
 Tulving (1972): episodisches Gedächtnis (an Zeit/Sprecher gebundene Ereignisse) ist etwas
 anderes als semantisches Gedächtnis (zeitloses Allgemeinwissen, der Wissensgraph). Bisher
@@ -227,6 +227,6 @@ def migriere_notizen(conn) -> int:
         merke(conn, row["object"], quelle=row["source"], datum=datum)
         reactors.retract_relation(
             conn, "genus:notizen", "notiz", row["object"], source=row["source"],
-            reason="Migration auf Episoden (docs/GENUS_GEDAECHTNIS.md, Punkt 1)",
+            reason="Migration auf Episoden (docs/design/MEMORY.md, Punkt 1)",
         )
     return len(rows)

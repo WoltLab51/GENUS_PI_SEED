@@ -1,4 +1,4 @@
-"""Rechenfähigkeit -- die erste echte Aufgabenart des Abitur-Ziels (docs/GENUS_ABITUR.md).
+"""Rechenfähigkeit -- die erste echte Aufgabenart des Abitur-Ziels (docs/research/ABITUR.md).
 
 Ronny, klar: "GENUS soll die Aufgaben einer Abiturprüfung schaffen" -- nicht nur die Wörter
 kennen. Eine Fachliste (Wortschatz) beantwortet "was ist eine Ableitung?", aber nicht "bestimme
@@ -19,7 +19,7 @@ ist der exakte Kern (dieses Modul). Die AUSGABE folgt der gewohnten deutschen Sc
 Aufgabe) und Extremstellen (baut direkt auf der Ableitung auf -- kritische Punkte über f'=0,
 klassifiziert über f'', ehrlich "unklar", wenn der Test selbst nichts hergibt, z.B. bei x³/x⁴
 in 0). Weitere Aufgabenarten (Integrale, Kurvendiskussion als Komposition, Vektorrechnung,
-Wahrscheinlichkeit) sind benannte, nicht gebaute nächste Schritte -- siehe docs/GENUS_ABITUR.md.
+Wahrscheinlichkeit) sind benannte, nicht gebaute nächste Schritte -- siehe docs/research/ABITUR.md.
 """
 from __future__ import annotations
 
@@ -204,7 +204,7 @@ def integral(term: str, untere_grenze: str, obere_grenze: str, variable: str = "
     Flächeninhalt unter dem Graphen MIT Vorzeichen (Fläche unterhalb der x-Achse zählt negativ,
     wie in der Schulrechnung üblich; der reine Betrags-Flächeninhalt bräuchte vorher die
     Nullstellen im Intervall -- eine eigene, hier noch nicht gebaute Aufgabenart, siehe
-    docs/GENUS_ABITUR.md). Grenzen dürfen Zahlen oder Konstanten wie "pi" sein, keine Variablen."""
+    docs/research/ABITUR.md). Grenzen dürfen Zahlen oder Konstanten wie "pi" sein, keine Variablen."""
     for stueck in (term, untere_grenze, obere_grenze):
         unbekannt = _unbekanntes_wort(stueck, variable)
         if unbekannt is not None:

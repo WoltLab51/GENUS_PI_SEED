@@ -210,6 +210,7 @@ def test_ledger_anchor_cli_stdout_env_file_dir_and_verify(
     conn,
 ):
     monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
+    monkeypatch.setattr(cli, "get_diagnostic_conn", lambda: cli_conn)
     runner = CliRunner()
     _fill_sealed(conn, 1)
 

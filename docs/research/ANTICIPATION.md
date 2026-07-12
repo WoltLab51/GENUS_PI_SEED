@@ -1,5 +1,7 @@
 # GENUS ANTIZIPATION
 
+> **Status:** Forschung / datierter Denkstand · **Autorität:** nicht kanonisch. Aktuelle Orientierung: [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > Die Fähigkeit, eine Situation mit offenem Ausgang einzuschätzen,
 > eine Vorhersage zu treffen und an der Realität zu messen.
 > Der Kern des Trading-Use-Cases — und eine eigene Erkenntnisform.
@@ -83,7 +85,7 @@ Sein Wert ist **kalibrierte Ehrlichkeit**: zu wissen, wann es nichts weiß.
 Brier-getrackte Trefferquoten, ehrliche Confidence, Herkunft jeder
 Einschätzung. Ein System, das vor der eigenen Überkonfidenz schützt, ist mehr
 wert als eines, das Gewinne verspricht. Genau dafür ist die noch fehlende
-Erkenntnisform *"Erkennen des Unwissbaren"* (siehe `GENUS_PHYSIK.md`) die
+Erkenntnisform *"Erkennen des Unwissbaren"* (siehe [Epistemische Physik](EPISTEMIC_PHYSICS.md)) die
 wichtigste — beim Trading entscheidet sie alles.
 
 Die eingelösten Vorhersagen liefern nebenbei das erste **objektive

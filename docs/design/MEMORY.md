@@ -1,5 +1,9 @@
 # GENUS-Gedächtnis — das Konzept
 
+> **Status:** Aktiver Entwurf · **Autorität:** dem aktuellen Kanon nachgeordnet
+> **Stand:** Scheiben 1–4 geliefert; Semantisierung bleibt offen. Maßgeblich sind
+> [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 **Nachricht rein → GENUS → Nachricht raus: was muss intern passieren?**
 Ronnys Leitfragen (2026-07-03), die dieses Konzept beantwortet:
 
@@ -18,11 +22,13 @@ herauskommt — sonst füllen wir einen Speicher, den das Gespräch nie anfasst.
 
 ---
 
-## 1 · Der Ist-Zustand, ehrlich
+## 1 · Historische Ausgangslage am 2026-07-03
 
-Was heute mit einer Telegram-Nachricht passiert, Station für Station:
+Was zu Beginn dieses Entwurfs mit einer Telegram-Nachricht geschah, Station für
+Station. Diese Tabelle erklärt die damalige Lücke; der aktuelle Lieferstand steht in
+[Abschnitt 8](#8--der-weg-scheiben-und-die-offenen-entscheidungen).
 
-| # | Station | Existiert? | Wo Wissen/Erinnerung einfließt |
+| # | Station | Damaliger Stand | Wo Wissen/Erinnerung einfloss |
 |---|---------|-----------|-------------------------------|
 | 1 | **Ankommen** (Membran, `telegram_bot.py`) | ✅ | Session-Zustand: NUR der letzte Zug (`last_question`, `last_answer`), im Prozess, weg beim Neustart |
 | 2 | **Einordnen** (Zwicky-Würfel: Rituale → Muster → Deuter-Segmente) | ✅ | das Absichts-Raster selbst IST Wissen (Teilgraph `absicht:*`/`zelle:*`); das Blatt-Angebot an den Deuter kommt aus dem Graphen |
@@ -34,7 +40,7 @@ Was heute mit einer Telegram-Nachricht passiert, Station für Station:
 | 8 | **Mitschreiben** (Tagespuffer) | ❌ | existiert nicht — nach dem Zug ist das Gespräch weg |
 | 9 | **Konsolidieren** (nachts) | ❌ | existiert nicht |
 
-**Die ehrlichen Lücken:**
+**Die damaligen ehrlichen Lücken:**
 
 - **Kein echter Abruf.** GENUS beantwortet jede Frage isoliert. Sein Wissen fließt nur ein,
   wenn die Frage *direkt* danach fragt („Was ist ein Hund?") — es bringt nie von sich aus
@@ -246,12 +252,17 @@ Jede Scheibe klein, einzeln testbar, einzeln live nachweisbar:
    FRÜHERE Frage noch einmal (sichtbar als Retrace benannt, „Bezogen auf deine frühere Frage
    „…"") — bewusst kein Wort-Ersatz/keine allgemeine Koreferenz, dieselbe Enge wie beim
    „warum?"-Nachfrage-Fix.
-4. **Tagespuffer + Nacht-Konsolidierung** — inkl. Vergessen und der Treffer-Quote-Kennzahl.
-5. **Semantisierung** — wiederkehrende Episoden → Wissens-Kandidaten → Korroboration/Inquiry.
+4. **Tagespuffer + Nacht-Konsolidierung — ✅ geliefert (2026-07-04).** Rohtext bleibt
+   in der selbstlöschenden Membran; die Nacht liest ihn einmal, destilliert Themen und
+   Warum-Folgen und leert ihn anschließend. Der Morgen-Push sendet im konfigurierten
+   Zeitfenster genau einmal pro Tag eine warme, nie leere Nachricht.
+5. **Semantisierung — offen.** Wiederkehrende Episoden → Wissens-Kandidaten →
+   Korroboration/Inquiry.
 
 Das Fachwissen-Ziel dockt am Wissensgraphen an (Lerner gezielt auf ein Gebiet ansetzen) und ist
 von diesen Scheiben unabhängig startbar — aber erst Scheibe 2 macht es im Gespräch ERLEBBAR.
-Empfehlung daher: ① und ② zuerst, dann Fachwissen einfüllen, dann ③–⑤.
+Die Scheiben ①–④ sind geliefert; die nächste offene Gedächtnisfrage ist ⑤. Ihre
+Priorität richtet sich nach [NOW](../NOW.md), nicht nach der ursprünglichen Baufolge hier.
 
 **Infrastruktur bereit, Inhalt offen (2026-07-03).** `deploy/pi_learn.sh` hat jetzt eine dritte,
 vorrangige Priorität (`learn_fach`, vor der allgemeinen Breite `learn_next`): eine über
@@ -268,5 +279,6 @@ entschieden) — das ist keine Infrastruktur-, sondern eine echte Inhalts-Entsch
 - **(B) Konsolidierungs-Stil: still merken, morgens berichten** — nächtliche Funde werden
   gedeckelt gespeichert (wie tatsache-Notizen); GENUS erzählt morgens, was hängengeblieben
   ist, und Ronny korrigiert bei Bedarf (Rücknahme = bestehende retract-Maschinerie).
-- **(C) Morgen-Push: JA, genau eine Nachricht** — der erste bewusste Push-Anlass für die
-  bisher rein reaktive Membran; nur wenn die Nacht tatsächlich etwas ergab.
+- **(C) Morgen-Push: JA, genau eine nie leere Nachricht pro Tag** — der erste bewusste
+  Push-Anlass für die bisher rein reaktive Membran. Wenn die Nacht kein Thema ergab,
+  berichtet GENUS ehrlich anderes frisches Material oder wünscht einen guten Start.

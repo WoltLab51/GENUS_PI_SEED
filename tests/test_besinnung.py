@@ -1,5 +1,5 @@
 """Die Besinnung — der innere Loop, dem der Druck sein Gefälle gibt (Ronny 2026-07-05,
-docs/GENUS_INTELLIGENZ.md §9). Sie liest das Druck-Gefälle, tut den EINEN erlaubten
+docs/research/INTELLIGENCE.md §9). Sie liest das Druck-Gefälle, tut den EINEN erlaubten
 inwendigen Schritt (die drängendste unausgesprochene Lücke aussprechen, gegated) und kettet
 — ein Gedanke zieht den nächsten. Bewegt den Geist, nie die Hand."""
 from genus import besinnung, ziele, verstehen

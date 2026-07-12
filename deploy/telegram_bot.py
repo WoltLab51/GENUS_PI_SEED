@@ -5,7 +5,7 @@ Long-polls Telegram's Bot API (outbound HTTPS only; no inbound port, no public s
 and answers each allowed message with `genus.companion.respond_with_deuter` -- the
 Verstehens-Würfel (Rituale -> Muster-Zellen -> offene Deuter-Lesart aufs Absichts-Raster ->
 Wort-Lesart), aware of a bounded WINDOW of previous turns in the same chat (Mehr-Zug-
-Arbeitsgedächtnis, docs/GENUS_GEDAECHTNIS.md Punkt 4) -- a bare "warum?"/"woher weißt du das?"
+Arbeitsgedächtnis, docs/design/MEMORY.md Punkt 4) -- a bare "warum?"/"woher weißt du das?"
 retraces the last turn, and "... von vorhin"/"... von eben" can reach further back, instead of
 failing (per-chat state lives here in the membrane, in-process only -- the ledger stays the
 source of epistemic truth, this is UX plumbing, not knowledge).
@@ -73,7 +73,7 @@ NEUSTART_DATEI = os.environ.get(
     os.path.join(GENUS_USER_HOME, ".genus", "telegram_bot.neustart"),
 )
 
-# Der TAGESPUFFER (docs/GENUS_GEDAECHTNIS.md, Punkt ④): jeder Zug wird mitgeschrieben --
+# Der TAGESPUFFER (docs/design/MEMORY.md, Punkt ④): jeder Zug wird mitgeschrieben --
 # Rohtext NUR hier in der Membran (Ledger ≠ Memory), bis die Nacht-Konsolidierung ihn
 # EINMAL liest, Struktur destilliert und den Puffer leert. Vergessen ist Funktion.
 TAGESPUFFER = os.environ.get(
@@ -466,7 +466,7 @@ def handle_update(
 
     ``sessions`` (optional), keyed by chat_id, holds a bounded LIST of that conversation's last
     turns (``[{"question": ..., "answer": ...}, ...]``, oldest first, capped at
-    :data:`_VERLAUF_MAX`) -- Mehr-Zug-Arbeitsgedächtnis (docs/GENUS_GEDAECHTNIS.md, Punkt 4):
+    :data:`_VERLAUF_MAX`) -- Mehr-Zug-Arbeitsgedächtnis (docs/design/MEMORY.md, Punkt 4):
     a bare follow-up ("warum?", "kürzer", "nochmal", ...) reads against the LAST turn as before;
     a "... von vorhin"/"... von eben" question can additionally reach further back
     (``companion.is_backreference``). In-process only, forgotten on a restart -- an honest,

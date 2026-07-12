@@ -1,6 +1,7 @@
 """Selbst-Codieren Stufe 1 (genus/umsetzung.py): ein genehmigtes Proposal wird umgesetzt —
 der Kreis „spüren → vorschlagen → fragen → BAUEN" endet nicht mehr an der Freigabe.
-Die Gate-Politik (docs/GENUS_ARCHITEKTUR.md §8) ist strukturell verankert: ohne Freigabe
+Die Gate-Politik (aktueller Vertrag: docs/ARCHITECTURE.md §8; historische Herkunft:
+docs/history/TARGET_ARCHITECTURE_2026-07-04.md §8) ist strukturell verankert: ohne Freigabe
 keine Ausführung, nie doppelt, nur registrierte Graph-Wissen-Arten."""
 import json
 import sqlite3

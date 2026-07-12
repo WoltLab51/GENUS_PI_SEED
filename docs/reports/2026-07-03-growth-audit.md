@@ -1,5 +1,7 @@
 # GENUS AUDIT 2026-07 — Sackgasse oder Weg?
 
+> **Status:** Historischer Snapshot vom 2026-07-03 · **Autorität:** nicht kanonisch. Für den aktuellen Stand gelten [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > Anlass (Ronny, 2026-07-03): *„Sind wir auf einem guten Weg? Ich glaube eher, wir stecken in
 > einer Sackgasse. Am liebsten würde ich den Kern nehmen und neu beginnen. Aber viele Lehren
 > stecken drin! Nur was sollte anders sein? Wie wird GENUS so intelligent, wie ich es mir
@@ -374,7 +376,7 @@ Ronny hat die Gabeln aus Abschnitt 10 entschieden — und die Studie in zwei Pun
 - **Gabel 1+2 (Richtung + Einstieg): bestätigt.** Erster Schritt = Ziele in den Graphen —
   geliefert (`genus/ziele.py`, `deploy/seed_ziele.sh`). Als Nächstes: Selbst-Codieren Stufe 0.
 - **Schärfung 1 — das Abitur fiel als Gate** (Ronnys eigene Nachfrage): Kategorienfehler +
-  Goodhart; umgewidmet zum Thermometer. Details in `GENUS_ABITUR.md` §5.
+  Goodhart; umgewidmet zum Thermometer. Details in der [Abitur-Studie](../research/ABITUR.md) §5.
 - **Schärfung 2 — die echten Ziele liegen jetzt vor**: sieben Punkte (Begleiter für
   Einzelne/Familien · Selbst-Entwicklung mit Erlaubnis-Frage · Trading hinter konservativsten
   Gates · Unterhaltung/Spiele · private Generierung aus eigenem Modell · sich und die Umwelt

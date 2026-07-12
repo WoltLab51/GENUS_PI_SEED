@@ -1,3 +1,22 @@
+# GENUS · Baujournal
+
+> [!IMPORTANT]
+> **Status: historischer Stand – keine aktuelle Roadmap.** Dieses Dokument bewahrt die
+> ursprüngliche Baufolge, Zwischenstände, Entscheidungen und damaligen
+> Zukunftsbilder. Zahlen und offene Etappen spiegeln jeweils ihren damaligen
+> Schreibzeitpunkt und dürfen nicht als heutiger Systemzustand gelesen werden.
+>
+> - **Jetzt:** [../NOW.md](../NOW.md)
+> - **Zukunft und Definition of Done:** [../ROADMAP.md](../ROADMAP.md)
+> - **Aktuelle Kernregeln:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
+> - **Aktuelle Ereignisverträge:** [../EVENT_CONTRACT.md](../EVENT_CONTRACT.md)
+>
+> Das frühere Dokument beginnt unverändert unterhalb dieses Banners. Es bleibt
+> erhalten, weil die Begründungen und Lernwege nicht aus dem Code rekonstruierbar
+> sind.
+
+---
+
 # GENUS ROADMAP
 
 > Vom heutigen Stand bis zum Zielsystem der Architektur-Karte. Ein **Bau-Instrument**, keine
@@ -1185,7 +1204,7 @@ DER GEIST ERWACHT (Selbst-Reflexion, deterministisch · ungeplant gewachsen)
 
 ## Harte Leitplanken — was auf keinem Schritt passieren darf
 
-> *Wie* wir bauen, damit diese Leitplanken halten: [GENUS_QUALITY.md](GENUS_QUALITY.md)
+> *Wie* wir bauen, damit diese Leitplanken halten: [aktueller Qualitätsvertrag](../QUALITY.md)
 > — die Qualitäts-Charta (Plan-Disziplin + Bau-Gates, an jeder Scheibe abgehakt).
 
 Diese gelten über alle Versionen, ohne Ausnahme:

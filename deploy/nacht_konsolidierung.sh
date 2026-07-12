@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Die NACHT-KONSOLIDIERUNG (docs/GENUS_GEDAECHTNIS.md, Punkt ④): liest den Tagespuffer
+# Die NACHT-KONSOLIDIERUNG (docs/design/MEMORY.md, Punkt ④): liest den Tagespuffer
 # EINMAL, destilliert Struktur (Themen als gedeckelte Episoden, Quelle model:nacht;
 # Warum-Folgen-Kennzahl), legt den Morgen-Bericht für die 06:00-Nachricht ab -- und
 # VERGISST den Rest (der Puffer wird geleert; Rohtext hat den Ledger nie berührt).

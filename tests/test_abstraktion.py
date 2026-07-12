@@ -1,6 +1,6 @@
 """faehigkeit:abstrahieren, Scheibe 1 (genus/abstraktion.py): GENUS findet noch UNBENANNTE
 Merkmal-Buendel unter Geschwistern im eigenen Graphen -- rein lesend, modellfrei, mit dem
-Ueberraschungs-Test gegen die Tautologie (docs/GENUS_INTELLIGENZ.md: Verdichtung, widerlegbar)."""
+Ueberraschungs-Test gegen die Tautologie (docs/research/INTELLIGENCE.md: Verdichtung, widerlegbar)."""
 import sqlite3
 
 from genus import abstraktion, reactors, sources

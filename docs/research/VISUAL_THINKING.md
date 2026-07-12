@@ -1,5 +1,7 @@
 # GENUS VISUAL THINKING
 
+> **Status:** Forschung / datierter Denkstand · **Autorität:** nicht kanonisch. Aktuelle Orientierung: [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > Verwahrte Vision — wann und wie GENUS visuell denken sollte.
 > Gehört zum LLM-Querschnitt / den späteren Schichten, nicht in den frühen Bau.
 

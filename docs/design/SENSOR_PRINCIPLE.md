@@ -1,5 +1,7 @@
 # GENUS SENSOR PRINCIPLE
 
+> **Status:** Aktiver Entwurf · **Autorität:** dem aktuellen Kanon nachgeordnet. Maßgeblich sind [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > Der Vertrag für jeden Sensor, den GENUS je bekommt — lokal oder extern.
 > Er bewahrt die DNA, gerade wenn GENUS nach außen wächst.
 
@@ -110,15 +112,18 @@ dieses Sensor-Prinzip, angewandt auf andere Kerne.
 genus/                ← der denkende Kern. grep bleibt hier für immer leer
                         (kein HTTP, kein LLM). denkt offline und rein.
 
-genus_sensors_ext/    ← der wahrnehmende Rand. HIER darf HTTP.
-                        jeder Sensor tut genau eine Sache:
-                        holen → säubern → observation_created → fertig.
+genus/sensor.py       ← kleine lokale psutil-Leser und reine Reading-Former.
+
+deploy/observe_*      ← der externe wahrnehmende Rand. HIER darf HTTP.
+                        holen → säubern → Reading an den Kern → fertig.
 ```
 
-Lokale Sensoren (CPU, Memory, Disk …) schreiben direkt Observations in den
-Kern, weil sie nichts aus dem Netz brauchen. Externe Sensoren (Fahrplan,
-Markt, Wetter …) leben im Rand, berühren das Netz, und reichen nur fertiges
-Material nach innen.
+Lokale Sensoren (CPU, Memory, Disk …) werden derzeit synchron über
+`genus/sensor.py` gelesen; CLI und Reaktoren machen daraus belegte Events. Das ist eine
+bewusst benannte Quellbaum-Naht: deterministischer Replay beginnt beim gespeicherten
+Event, nicht beim erneuten Auslesen des Betriebssystems. Externe Sensoren (Fahrplan,
+Markt, Wetter …) leben als Membranen unter `deploy/`, berühren das Netz und reichen nur
+bereinigtes, bequelltes Material nach innen.
 
 Damit bleibt die wichtigste Aussage über GENUS erhalten, egal wie weit es nach
 außen wächst: **Der Teil, der denkt, ist offline und rein. Nur der Teil, der

@@ -1,4 +1,4 @@
-"""Nacht-Konsolidierung + Morgen-Nachricht (docs/GENUS_GEDAECHTNIS.md Punkt ④, Ronnys
+"""Nacht-Konsolidierung + Morgen-Nachricht (docs/design/MEMORY.md Punkt ④, Ronnys
 Entscheidungen 2026-07-04): Themen deterministisch, Episoden gedeckelt (model:nacht),
 die eine Nachricht warm und nativ — nie kryptisch, nie leer."""
 from genus import inquiries, konsolidierung, proposals, reactors, sources, ziele

@@ -1,5 +1,7 @@
 # GENUS PHYSIK
 
+> **Status:** Forschung / datierter Denkstand · **Autorität:** nicht kanonisch. Aktuelle Orientierung: [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > Landkarte der Erkenntnisformen, die GENUS beherrscht — und derer, die ihm
 > noch fehlen. **Ausdrücklich unvollständig und wachsend.** Kein Katalog,
 > sondern eine Karte, die ihre eigenen weißen Ränder zeigt.

@@ -17,7 +17,9 @@ Zwei Mengen, beide ausdrücklich:
   zur Lesezeit frisch berechnet -- z.B. Prognosen; oder reine Protokoll-Marker). Ohne
   diese Menge wäre "vergessen zu registrieren" von "bewusst roh" nicht unterscheidbar --
   genau die Lücke, die der Replay-Determinismus-Test allein NICHT fängt (beide Seiten
-  wären sich einig und grün; Naht 3 in docs/GENUS_ARCHITEKTUR.md §8).
+  wären sich einig und grün; aktueller Vertrag: docs/EVENT_CONTRACT.md;
+  historische Entwurfsherkunft: Naht 3 in
+  docs/history/TARGET_ARCHITECTURE_2026-07-04.md §8).
 
 Der Vertragstest erzwingt: jeder je geschriebene Event-Typ steht in GENAU EINER der
 beiden Mengen. Ein neuer Event-Typ ohne Entscheidung (projiziert oder roh?) bricht CI.
@@ -49,7 +51,8 @@ def _mit_source_event(fn: Callable) -> Callable:
     return wrapped
 
 
-# Das Kern-Register: der fixe Bootstrap-Satz (docs/GENUS_ARCHITEKTUR.md §4) -- diese
+# Das Kern-Register (aktueller Vertrag: docs/ARCHITECTURE.md §3; historische
+# Entwurfsherkunft: docs/history/TARGET_ARCHITECTURE_2026-07-04.md §4) -- diese
 # Projektoren müssen stehen, BEVOR ein Replay laufen kann; alles Weitere registriert sich
 # über registriere_projektor.
 PROJEKTOREN: dict[str, Callable] = {

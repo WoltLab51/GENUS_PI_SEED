@@ -1,5 +1,10 @@
 # GENUS_PI_SEED_v0 — CPU Belief Loop Spec
 
+> **Status:** archived · **Build-Autorität:** keine · **Snapshot:** v0.7.0
+> Diese Ursprungsspezifikation erklärt die Herkunft des Projekts. Für den
+> heutigen Stand gelten der [Dokumentationsindex](../README.md), die
+> [Architektur](../ARCHITECTURE.md) und der [Event-Vertrag](../EVENT_CONTRACT.md).
+
 > Version: 0.7.0
 > Target: Raspberry Pi 5 / ThinkPad X1, Python 3.11+
 > Purpose: Prove GENUS is real. Not a demo. A working epistemological system.

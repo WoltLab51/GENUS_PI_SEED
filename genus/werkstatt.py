@@ -1,7 +1,7 @@
 """Selbst-Codieren Stufe 2, Scheibe 1: die WERKSTATT — wo Code-Entwürfe entstehen,
 geprüft werden und auf den menschlichen Merge warten.
 
-Die Leitplanke (docs/GENUS_ROADMAP.md) ist hier Gesetz, nicht Konvention: **kein
+Die Leitplanke (docs/ARCHITECTURE.md §8) ist hier Gesetz, nicht Konvention: **kein
 selbstmodifizierender Code außerhalb einer Sandbox mit menschlichem Merge.** Strukturell
 verankert:
 

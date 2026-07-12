@@ -183,7 +183,8 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         zeilen.append(f"{titel}:")
         zeilen += [f"  - {b}: {_ERKLAERUNGEN[b]}" for b in vorhanden if b in _ERKLAERUNGEN]
         gezeigt.update(vorhanden)
-    # Auffangnetz gegen die Membran-Drift (Naht 5, docs/GENUS_ARCHITEKTUR.md §8): ein im
+    # Auffangnetz an der Membrangrenze (docs/ARCHITECTURE.md §5–6; historische
+    # Entwurfsherkunft: docs/history/TARGET_ARCHITECTURE_2026-07-04.md, Naht 5 in §8): ein im
     # Graphen gesätes Blatt, das dieser Spiegel (noch) keiner Gruppe zuordnet, wurde bisher
     # STILL aus dem Prompt verschluckt -- das Modell konnte es nie wählen (live so passiert:
     # "berechnen" war gesät, aber nie im Angebot). Das lebende Angebot ist autoritativ:

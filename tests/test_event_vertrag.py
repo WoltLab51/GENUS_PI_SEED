@@ -1,5 +1,6 @@
-"""Der Registry-Vertragstest -- der echte Wächter der Router-Migration (Naht 3,
-docs/GENUS_ARCHITEKTUR.md §8).
+"""Der Registry-Vertragstest -- der echte Wächter des aktuellen Event-Vertrags
+(docs/EVENT_CONTRACT.md; historische Herkunft: Naht 3 in
+docs/history/TARGET_ARCHITECTURE_2026-07-04.md §8).
 
 Der Replay-Determinismus-Test (test_integrity) fängt eine VERPFUSCHTE Migration: weicht
 das Register vom alten Verhalten ab, wird er rot. Aber eine später VERGESSENE

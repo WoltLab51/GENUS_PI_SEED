@@ -1,4 +1,4 @@
-"""Die erste Denkweise: juristische Subsumtion (Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §4).
+"""Die erste Denkweise: juristische Subsumtion (Ronny 2026-07-05, docs/research/INTELLIGENCE.md §4).
 Norm = Bauplan (braucht/bewirkt), Subsumtion = Verallgemeinerung der is_a-Inferenz, Vertrauen
 = schwächste Prämisse = Beweislast-Radar, Wertung = ehrlicher Mensch-Slot. Read-time, gläsern."""
 from genus import reactors, recht, sources

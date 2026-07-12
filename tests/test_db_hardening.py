@@ -118,3 +118,18 @@ def test_readonly_diagnostic_commands_fail_without_creating_database(
     assert result.exit_code != 0
     assert "database does not exist" in result.output
     assert not path.exists()
+
+
+def test_anchor_verify_fails_without_creating_database(monkeypatch, tmp_path):
+    path = tmp_path / "missing.sqlite3"
+    artifact = tmp_path / "anchor.json"
+    artifact.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GENUS_DB_PATH", str(path))
+
+    result = CliRunner().invoke(
+        cli.main, ["ledger", "anchor", "verify", str(artifact)]
+    )
+
+    assert result.exit_code != 0
+    assert "database does not exist" in result.output
+    assert not path.exists()

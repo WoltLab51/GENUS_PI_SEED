@@ -1,10 +1,12 @@
 # GENUS — Der Material-Entwurf
 
+> **Status:** Forschung / datierter Denkstand · **Autorität:** nicht kanonisch. Aktuelle Orientierung: [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > **ENTWURF, Stand 2026-07-05 — mit WENDE (noch am selben Tag).** Ronny: „was vor allem
 > in GENUS fehlt ist Material." Dieser Entwurf beantwortet, wie Material gespeichert wird
 > und was das richtige ist. **Aber:** Ronnys Einwand auf den ersten Wurf („das hieße
 > GENUS wird so ein schlaues Wikipedia? das kommt mir flach vor") führte zur
-> Intelligenz-Betrachtung ([GENUS_INTELLIGENZ.md](GENUS_INTELLIGENZ.md)) und ihrer
+> Intelligenz-Betrachtung ([INTELLIGENCE.md](INTELLIGENCE.md)) und ihrer
 > Kern-Wende: **Material ist der Boden, nicht der Motor — es wird nur noch im Dienst
 > einer OPERATION geholt, nie um seiner selbst willen.** Die Analyse hier (Speicherform,
 > Breite-ohne-Tiefe-Diagnose, Pipeline) bleibt gültig; die Priorisierung in §7 ist durch

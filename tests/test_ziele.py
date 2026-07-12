@@ -1,5 +1,5 @@
 """Der Ziel-Graph (genus.ziele): Ronnys Ziele als provenanctes Wissen -- Inversion ④ des
-Audits (docs/GENUS_AUDIT_2026_07.md). GENUS weiß damit zum ersten Mal, DASS es Ziele hat,
+Audits (docs/reports/2026-07-03-growth-audit.md). GENUS weiß damit zum ersten Mal, DASS es Ziele hat,
 und kann selbst benennen, was ihm dafür fehlt."""
 import sqlite3
 
@@ -72,7 +72,7 @@ def test_fehlende_faehigkeiten_lists_each_gap_once():
 
 
 def test_die_operations_luecken_der_intelligenz_betrachtung_sind_wissen():
-    # docs/GENUS_INTELLIGENZ.md (2026-07-05): Intelligenz = Operationen auf Material --
+    # docs/research/INTELLIGENCE.md (2026-07-05): Intelligenz = Operationen auf Material --
     # die ehrlich fehlenden Kern-Operationen stehen im Ziel-Graphen, GENUS benennt sie selbst
     conn = _gesaet()
     ids = {f["id"] for f in ziele.fehlende_faehigkeiten(conn)}

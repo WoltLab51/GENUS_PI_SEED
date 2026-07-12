@@ -1,11 +1,11 @@
-"""Membrane purity — the structural guarantee that the deterministic core never
-imports the outside world.
+"""Membrane import gate — reject known network, process, and model dependencies.
 
 GENUS's core (`genus/`) knows by *record*, not by reaching out: HTTP, sockets,
 process spawning, and model/LLM SDKs belong to the membrane (the shell scripts in
-`deploy/`), never to `genus/`. That rule used to be a hand-run grep — a convention
-that depends on someone remembering. This test makes it a *gate*: the moment any
-core module imports across the membrane, CI goes red.
+`deploy/`), never to `genus/`. The named local seam in `genus/sensor.py` reads
+host metrics through psutil; replay does not call it. This AST denylist turns the
+main import boundary into a regression gate, not a complete capability sandbox:
+dynamic access paths and dependencies absent from the list still need review.
 
 It parses the AST of every file under `genus/` (recursively, so new subpackages are
 covered automatically) and checks the top-level module of each import.

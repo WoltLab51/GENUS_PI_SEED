@@ -1,4 +1,4 @@
-"""Ziele als Wissen im Graphen -- Inversion ④ des Audits (docs/GENUS_AUDIT_2026_07.md).
+"""Ziele als Wissen im Graphen -- Inversion ④ des Audits (docs/reports/2026-07-03-growth-audit.md).
 
 Bis heute lebten GENUS' Ziele in Dokumenten und Commit-Nachrichten -- GENUS selbst wusste
 nicht, DASS es Ziele hat. Für „sich selbständig weiterentwickeln, hinspüren wo eine Lücke
@@ -90,7 +90,7 @@ FAEHIGKEIT_SEED: tuple[tuple[str, str, str], ...] = (
     ("faehigkeit:selbst-bild",
      "Kennt eigenen Zustand, eigene Regeln, offene Fragen (live), eigene Ziele (dieser "
      "Schnitt). Versteht eigenen Code: fehlt.", "teilweise"),
-    # Die Intelligenz-Betrachtung (Ronny + Claude, 2026-07-05, docs/GENUS_INTELLIGENZ.md):
+    # Die Intelligenz-Betrachtung (Ronny + Claude, 2026-07-05, docs/research/INTELLIGENCE.md):
     # Intelligenz = Operationen auf Material, nicht das Archiv. Die ehrlich fehlenden
     # Kern-Operationen werden hier Wissen -- GENUS benennt sie fortan selbst.
     ("faehigkeit:denkweisen",

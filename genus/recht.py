@@ -1,4 +1,4 @@
-"""Die erste DENKWEISE: juristische Subsumtion (Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §4).
+"""Die erste DENKWEISE: juristische Subsumtion (Ronny 2026-07-05, docs/research/INTELLIGENCE.md §4).
 
 Eine Denkweise = ein Satz Operationen + ihr Material + ihr Beweismaßstab. Die juristische
 Methode ist selbst eine Glaskasten-Methode (erfunden, damit Denken auditierbar wird), darum

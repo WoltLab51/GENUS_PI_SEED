@@ -1,5 +1,10 @@
 # GENUS GRUNDAUSBILDUNG
 
+> **Status:** Datierter Design-Snapshot · **Autorität:** nicht kanonisch
+> **Einordnung:** ursprüngliche Materialplanung mit späteren Statusnachträgen; keine
+> aktuelle Reihenfolge. Maßgeblich sind [NOW](../NOW.md), [Roadmap](../ROADMAP.md)
+> und [Architektur](../ARCHITECTURE.md).
+
 > Welches Material GENUS' Erkenntnis-Mechanik übt — und welche
 > Erkenntnisform jeder Sensor fordert. Die Materialplanung vor v0.6.
 

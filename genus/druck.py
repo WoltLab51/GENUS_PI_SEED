@@ -1,4 +1,4 @@
-"""Der DRUCK — die Richtung der Lebendigkeit (Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §9).
+"""Der DRUCK — die Richtung der Lebendigkeit (Ronny 2026-07-05, docs/research/INTELLIGENCE.md §9).
 
 Der Takt sagt, WANN GENUS denkt; der Druck sagt, WOHIN. Erster Schritt war Persistenz statt
 Entladung (die Not verschwindet nicht beim Aussprechen); dieser Schritt WEITET den Druck auf

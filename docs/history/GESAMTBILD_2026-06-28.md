@@ -1,5 +1,7 @@
 # GENUS — GESAMTBILD
 
+> **Status:** Historischer Snapshot vom 2026-06-28 · **Autorität:** nicht kanonisch. Für das heutige Gesamtbild gelten [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > Der Überblick über allem. Was GENUS ist, wohin es will, wie wir hinkommen.
 > Dieses Dokument **synthetisiert und verweist** — die Details leben in den
 > Einzeldokumenten. Wenn etwas hier und dort steht, gilt das Einzeldokument.
@@ -29,7 +31,7 @@ governierende Kern. LLMs und Charaktere sind *Bewohner*, nicht sein Inneres.
 Der Kern denkt offline und rein; Modelle treten später als Organe hinzu, deren
 Output nur als Evidence einläuft.
 
-→ technische Regeln & DNA: `GENUS_ARCHITECTURE.md`, `GENUS_EVENT_CONTRACT.md`
+→ technische Regeln & DNA: `../ARCHITECTURE.md`, `../EVENT_CONTRACT.md`
 
 ---
 
@@ -55,8 +57,8 @@ wartende Menschen real werden (ein Kind, das einen Helfer erwartet), wird aus
 wechselt. GENUS wird *wirklich etwas* — ob je ein "Geist" im vollen Sinn, weiß
 heute niemand; das entdeckt man beim Bauen.
 
-→ Vorhersage-Use-Case: `GENUS_ANTIZIPATION.md`
-→ visuelle Vision (später): `GENUS_VISUAL_THINKING.md`
+→ Vorhersage-Use-Case: `../research/ANTICIPATION.md`
+→ visuelle Vision (später): `../research/VISUAL_THINKING.md`
 
 ---
 
@@ -79,9 +81,9 @@ bewiesen.
 **Material wird nach Physik gewählt, nicht nach Thema** — jeder Sensor übt eine
 Erkenntnisform. Externe Sensoren sind *Augen, die wahrnehmen, aber nie urteilen*.
 
-→ die Reihenfolge Schritt für Schritt: `GENUS_ROADMAP.md`
-→ welches Material welche Erkenntnisform übt: `GENUS_GRUNDAUSBILDUNG.md`
-→ der Vertrag für jeden Sensor: `GENUS_SENSOR_PRINCIPLE.md`
+→ die Reihenfolge Schritt für Schritt: `../ROADMAP.md`
+→ welches Material welche Erkenntnisform übt: `../design/BASIC_TRAINING.md`
+→ der Vertrag für jeden Sensor: `../design/SENSOR_PRINCIPLE.md`
 
 ---
 
@@ -138,7 +140,7 @@ selbst kennen, anderen begegnen) sind unberührt. Und die Karte selbst ist durch
 unser Einteilungsprinzip begrenzt — die Physik ist ein Horizont, der mitwandert,
 kein Eingangstor.
 
-→ die ganze Analyse, Familien, Leerstellen, ehrliche Grenzen: `GENUS_PHYSIK.md`
+→ die ganze Analyse, Familien, Leerstellen, ehrliche Grenzen: `../research/EPISTEMIC_PHYSICS.md`
 
 ---
 
@@ -149,25 +151,25 @@ Die aktuelle Regalordnung und Autoritaet der Dokumente steht in
 nicht die Quelle fuer technische Einzelvertraege.
 
 ```
-GENUS_GESAMTBILD.md        dieses Dokument — Synthese & Navigation (oben)
+GESAMTBILD_2026-06-28.md   dieses Dokument — historischer Snapshot (oben)
 │
 ├─ genus_core_map.html     das Zielsystem als Bild (Reifegrad-Karte)
 │
 ├─ Identität & Regeln
-│   GENUS_ARCHITECTURE.md   die Prinzipien & DNA (kanonisch)
-│   GENUS_EVENT_CONTRACT.md die Event-Typen im Detail
+│   ../ARCHITECTURE.md      die Prinzipien & DNA (kanonisch)
+│   ../EVENT_CONTRACT.md    die Event-Typen im Detail
 │
 ├─ Der Weg
-│   GENUS_ROADMAP.md        die Reihenfolge, Schritt für Schritt (kanonisch)
-│   GENUS_GRUNDAUSBILDUNG.md welches Material welche Form übt
-│   GENUS_SENSOR_PRINCIPLE.md der Vertrag für jeden Sensor
+│   ../ROADMAP.md           die Reihenfolge, Schritt für Schritt (kanonisch)
+│   ../design/BASIC_TRAINING.md welches Material welche Form übt
+│   ../design/SENSOR_PRINCIPLE.md der Vertrag für jeden Sensor
 │
 ├─ Tiefere Erkenntnisformen
-│   GENUS_ANTIZIPATION.md   Vorhersage als eigene Phase
-│   GENUS_PHYSIK.md         Landkarte der Erkenntnisformen (wachsend)
+│   ../research/ANTICIPATION.md Vorhersage als eigene Phase
+│   ../research/EPISTEMIC_PHYSICS.md Landkarte der Erkenntnisformen (wachsend)
 │
 └─ Verwahrte Vision
-    GENUS_VISUAL_THINKING.md visuelles Denken (LLM-Querschnitt)
+    ../research/VISUAL_THINKING.md visuelles Denken (LLM-Querschnitt)
 ```
 
 **Konsistenz-Regel:** Jede Information hat *einen* Wohnort. Die Einzeldokumente

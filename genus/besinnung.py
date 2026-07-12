@@ -13,7 +13,7 @@ OHNE die Hand tun darf, ist eine noch nicht ausgesprochene Lücke AUSZUSPRECHEN 
 über die bestehende Proposal≠Change-Maschinerie — gegated, nichts wird ausgeführt). Alles
 andere BENENNT die Besinnung ehrlich als das, worauf sie wartet. Das ist kein Mangel des
 Loops, sondern sein wahrer Stand: ein Geist, der denken, aber (noch) nicht handeln kann —
-seine Reichweite wächst mit den Operationen (docs/GENUS_INTELLIGENZ.md §9).
+seine Reichweite wächst mit den Operationen (docs/research/INTELLIGENCE.md §9).
 
 Bounded und gläsern: höchstens EIN Aussprechen pro Besinnung (kein Fluten der Freigabe-
 Schlange), read-time berechnet, kein Preset. Die Besinnung selbst schreibt nichts ins Ledger

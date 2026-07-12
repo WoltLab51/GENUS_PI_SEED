@@ -1,404 +1,167 @@
-# GENUS_PI_SEED
+# GENUS
 
-GENUS PI SEED is a deterministic, ledger-first system belief loop:
+> Ein gläsernes Erkenntnissystem, das aus Erfahrung lernt, Unsicherheit ehrlich trägt
+> und neue Fähigkeiten nur durch belegte, menschlich freigegebene Schritte verdient.
 
-- observations and evidence are separate immutable ledger events
-- beliefs are derived projections, not source-of-truth rows
-- confidence is calculated at read time and never stored
-- proposals are suggestions only and default to `pending`
-- no LLM, no HTTP, no worker, no web interface
+GENUS läuft als deterministischer Python-/SQLite-Kern auf einem Raspberry Pi. Das
+Ledger hält fest, **was geschah**; Projektionen zeigen, **was GENUS daraus aktuell
+glaubt**. Modelle, Netzwerk und Betriebssystemzugriffe leben in begrenzten Membranen
+außerhalb des Wahrheitskerns.
 
-## Documentation
+## In zwei Minuten orientiert
 
-The project documentation lives in `docs/`.
+| Ich möchte … | Hier entlang |
+|---|---|
+| das Zielbild verstehen | [Charter](docs/CHARTER.md) |
+| den heutigen Stand sehen | [NOW](docs/NOW.md) |
+| wissen, was als Nächstes kommt | [Roadmap](docs/ROADMAP.md) |
+| den Kern technisch verstehen | [Architektur](docs/ARCHITECTURE.md) |
+| Ereignisse und Pflichtfelder nachschlagen | [Event-Vertrag](docs/EVENT_CONTRACT.md) |
+| Sicherheitsgrenzen prüfen | [Security-Modell](docs/SECURITY_MODEL.md) |
+| auf dem Pi deployen oder diagnostizieren | [Pi-Runbook](deploy/README.md) |
+| stöbern und Zusammenhänge sehen | [Dokumentationskarte](docs/README.md) · [Visual Atlas](docs/visual/ATLAS.html) |
 
-- `docs/README.md` explains which documents are canonical, supporting,
-  future-facing, parked, or archived.
-- `docs/GENUS_GESAMTBILD.md` is the navigation document for the overall goal.
-- `docs/GENUS_ROADMAP.md`, `docs/GENUS_ARCHITECTURE.md`,
-  `docs/GENUS_EVENT_CONTRACT.md`, and `docs/GENUS_LEDGER_AUDIT.md` are the
-  current build contracts.
-- `docs/GENUS_ARCHITECTURE.md#change-trust` defines how GENUS treats updates:
-  a change earns trust only after deterministic gates and observed runtime.
+## Wie GENUS denkt
 
-## Commands
-
-```bash
-genus observe-cpu
-genus observe-memory
-genus observe-disk
-genus observe-activity
-genus observe-temperature
-genus observe-all
-genus observe-weather --temp-outside 14.2 --source open-meteo
-genus doctor
-genus atlas-facts
-genus ask "was glaubst du"
-genus ask "status"
-genus explain belief 1
-genus explain experience 1
-genus explain state 1
-genus explain rule 1
-genus why proposal 1
-genus why decision 1
-genus beliefs show
-genus calibration
-genus surprisal
-genus learning
-genus sources
-genus resolve weather.temp_outside
-genus teach weather.temp_outside 18.5
-genus relate system.thermal correlates_with system.load
-genus relations
-genus experience scan
-genus experience show
-genus state refresh
-genus state show
-genus maturation scan
-genus rules list
-genus rules activate 2
-genus proposals list
-genus proposals list --all
-genus proposals review 1 --accept --note "makes sense"
-genus proposals review 1 --accept --override --note "override under pressure"
-genus governance list
-genus governance list --target proposal:1
-genus operation network-check --status ok --target 192.168.178.1
-genus operation recovery-result --recovery-id 1 --result succeeded
-genus operation list
-genus inquiries list
-genus inquiries resolve 1 --answer "Backup lief"
-genus inquiries reconcile --dry-run
-genus inquiries reconcile
-genus inquiries reconcile --repair-cycles
-genus replay
-genus integrity check
-genus ledger tail --n 20
-genus ledger seal-init
-genus ledger head
-genus ledger verify
-genus ledger anchor create --core-id pi-core
-genus ledger anchor verify /path/to/genus-anchor-pi-core-3-abc123def456.json
+```mermaid
+flowchart LR
+    O["Beobachtung"] --> E["Evidence"]
+    E --> B["Belief"]
+    B --> S["State"]
+    E --> X["Widerspruch / Überraschung"]
+    X --> I["Inquiry"]
+    B --> XP["Experience"]
+    XP --> P["Proposal"]
+    P --> H["Menschliches Gate"]
+    H --> R["Regel / Fähigkeit"]
+    R --> O
+    L[("append-only Event-Ledger")] --- O
+    L --- E
+    L --- B
+    L --- H
 ```
 
-The default SQLite database is `genus.sqlite3`. Override it with:
+Die wichtigen Trennungen sind absichtlich hart:
 
-```bash
-GENUS_DB_PATH=/path/to/genus.sqlite3 genus replay
-```
+- Beobachtung ist nicht Wahrheit.
+- Belief ist nicht Tatsache.
+- Inquiry ist nicht Handlung.
+- Proposal ist nicht Entscheidung.
+- Review ist nicht Aktivierung.
+- Modelloutput ist Evidence, niemals Autorität.
 
-## Habitat Sensors
+## Kern und Membranen
 
-v0.6 extends the local, offline habitat with disk, activity, and temperature
-observations. Disk and temperature currently use the same threshold/revision
-mechanic as CPU and memory. Activity is binary and creates or supersedes a
-belief immediately without waiting for the three-reading threshold window.
+| Deterministischer Kern (`genus/`) | Begrenzte Membranen (`deploy/`, Dienste) |
+|---|---|
+| Ledger, Replay, Projektionen | HTTP- und Datenquellen |
+| Confidence, Beliefs, Inquiries | Telegram-Brücke |
+| Inferenz und Graphregeln | lokale Modelle und Stimme |
+| Governance und harte Constraints | systemd, Cron, Netzwerk-Recovery |
+| keine LLM-/HTTP-/subprocess-Imports | dürfen den Kern füttern, nie ersetzen |
 
-## Confidence Decay
+Eine benannte Quellbaum-Naht bleibt sichtbar: `genus/sensor.py` liest lokale
+Systemwerte synchron über `psutil`. Der deterministische Wahrheits- und Replaypfad
+beginnt beim gespeicherten Event; Netzwerk- und Modellbeschaffung bleibt in `deploy/`.
 
-v1.5 changes confidence from raw event counts plus a latest-evidence decay gate
-to time-weighted evidence counting. Each supporting or contradicting evidence
-event contributes `2^(-age / H)` at read time, using a per-claim halflife. This
-keeps long-running beliefs from becoming sticky only because old confirmations
-accumulated. Confidence is still never stored in the database.
+Die genaue Entscheidung steht in
+[ADR-0001: Kern und Membranen](docs/decisions/ADR-0001-CORE-AND-MEMBRANES.md).
 
-## Query Layer
-
-v0.7 adds deterministic read-only queries. Query commands explain current state
-from projections and ledger events; they do not write events.
-
-- `genus ask "was glaubst du"` lists active beliefs.
-- `genus ask "status"` summarizes event and projection counts.
-- `genus explain belief <id>` shows supporting and contradicting evidence.
-- `genus why proposal <id>` shows the source event and source belief chain.
-
-Active projections also expose an epistemic state: `supported`, `contested`, or
-`uncertain`. A contested or uncertain belief remains honest history, but cannot
-support the derived system-pressure state until evidence again dominates uncertainty.
-
-## Proposal And Inquiry Lifecycle
-
-v0.8 adds the first event-backed human governance actions:
-
-- `genus proposals review <id> --accept|--reject [--note "..."]`
-- `genus inquiries resolve <id> --answer "..."`
-
-Reviews and resolutions are terminal. A second review or resolve attempt fails.
-Accepting a proposal does not execute anything; `Proposal != Change` is still a
-hard rule. Existing databases get the new projection columns automatically on
-startup; run `genus replay` after upgrading to rebuild projections from the
-ledger.
-
-`genus inquiries reconcile` is the bounded maintenance path for mechanically
-provable cases: false acyclicity alarms on non-hierarchical predicates and
-superseded duplicate stability questions. It writes one sealed, replayable batch
-event and never resolves genuine source disagreements or hierarchy cycles.
-With the explicit `--repair-cycles` flag it retracts the historically accepted
-edge that closed each proven hierarchy ring before resolving that inquiry.
-
-## Experience Core
-
-v0.9 adds deterministic first learning from the ledger. `genus experience scan`
-aggregates existing `event_log` evidence and records contrasted activity hours
-as an `ActivityDailyRhythm` experience.
-
-- `experience_recorded` is the durable event.
-- `experience_log` is a rebuildable projection.
-- `genus experience show` lists recorded experiences.
-- `genus explain experience <id>` shows the source event, supporting evidence,
-  and any review-only `ExperienceProposal`.
-- `genus ask "welche muster"` exposes the same records through the query layer.
-
-## State Core
-
-v0.10 adds the first deterministic state vector. `genus state refresh` derives
-`system.pressure` from active beliefs and records a `state_changed` event only
-when the vector changes.
-
-- `state_changed` is the durable event.
-- `state_projection` is a rebuildable projection.
-- `genus state show` lists active states.
-- `genus explain state <id>` shows the state event and supporting beliefs.
-- `genus ask "zustand"` exposes active states through the query layer.
-
-## Governance v1
-
-v0.11 adds event-backed governance for proposal review. Kernel constraints are
-hard and never overrideable; policies can block a decision unless an explicit
-human override is supplied.
-
-- `constraint_checked` records non-overrideable kernel checks.
-- `policy_evaluated` records overrideable policy checks.
-- `governance_decision` is the durable allowed/blocked decision event.
-- `governance_log` is a rebuildable projection of decision events only.
-- `policy:pressure_guard_v1` blocks accepting a proposal while
-  `system.pressure=elevated`, unless `--override` is passed.
-- Inquiry resolution is deliberately ungoverned in v0.11.
-
-Blocked reviews still commit their governance audit events and leave the
-proposal pending. Accepted proposals remain review decisions only:
-`Proposal != Change`.
-
-## Maturation v1
-
-v1.0 closes the first deterministic metabolism loop. `genus maturation scan`
-turns confirmed `ActivityDailyRhythm` experiences into pending `RuleProposal`
-records. Accepting that proposal still activates nothing. A second, governed
-human act is required:
-
-- `rule_proposed` records the learned deterministic rule candidate.
-- `rule_activated` records the second human gate and projects an active rule.
-- `rule_projection` is rebuildable from `rule_activated` events.
-- `genus rules activate <proposal_id>` requires an accepted `RuleProposal`.
-- Active `activity_expectation_v1` rules only create `ExpectationInquiry`
-  records on deviations; they never change beliefs or execute actions.
-- `genus explain rule <id>` shows the active rule, source proposal,
-  `rule_proposed` event, and source experience.
-
-This keeps `Proposal != Change` hard at the exact point where GENUS starts
-compiling experience into behavior.
-
-## Ledger Sealing
-
-v1.1 adds local ledger sealing. `genus ledger seal-init` appends one
-`ledger_epoch_opened` event with a genesis digest over the legacy prefix. From
-that point on, new events carry `prev_seal` and `seal` in `event_log`.
-
-- `genus ledger head` prints the current seal head for later external anchoring.
-- `genus ledger verify` recomputes the local chain.
-- `genus integrity check` includes the same seal verification.
-- Existing events are not updated or backfilled.
-
-This detects accidental corruption and lazy tampering. A fully adaptive local
-attacker can still rewrite and re-seal without an external anchor; that boundary
-is documented in `docs/GENUS_LEDGER_AUDIT.md`.
-
-## External Ledger Anchors
-
-v1.2 adds offline JSON anchors for the current seal head. Creating an anchor is
-read-only: it writes no event, does not commit anything to the database, and
-does not call Git, GitHub, HTTP, or any external API.
-
-```bash
-GENUS_CORE_ID=pi-core genus ledger anchor create
-GENUS_CORE_ID=pi-core genus ledger anchor create --out /safe/place/anchors/
-GENUS_CORE_ID=pi-core genus ledger anchor verify /safe/place/anchors/genus-anchor-pi-core-3-abc123def456.json
-```
-
-`--core-id` can be used instead of `GENUS_CORE_ID`. The `core_id` is required so
-long-lived anchor files say which GENUS core they describe. If `--out` points to
-an existing directory, GENUS writes
-`genus-anchor-{core_id}-{head_event_id}-{head_prefix}.json`.
-
-An anchor protects the ledger prefix up to its `head_event_id`. Later events are
-valid local history, but they are not externally witnessed until the next anchor.
-To check a directory of anchors, run `genus ledger anchor verify` for each file.
-
-## Self-Operation And Recovery
-
-v1.3/v1.4 add deterministic self-operation checks and governed recovery. The
-first supported check is `network.gateway`, projected into `operation_log` and
-the normal belief `system.network=healthy|unstable`.
-
-```bash
-genus operation network-check --status ok --target 192.168.178.1
-genus operation network-check --status fail --target 192.168.178.1 --failures 1 --action restart_network
-genus operation recovery-result --recovery-id 1 --result succeeded
-genus operation list
-genus ask "betrieb"
-```
-
-Recovery is policy-gated before the operating system does anything.
-`restart_network` is allowed after a failed gateway check; `reboot` is blocked
-until at least three consecutive failures and no prior reboot recovery attempt
-is inside the governance cooldown window.
-
-## Structure Material, New Forms, and Self-Calibration
-
-v1.6 opens Phase 2: GENUS observes more than the machine, and learns its own
-norms instead of being told them.
-
-- **Clock-sync self-check** (`clock.sync` -> `system.clock`), with a one-day
-  inert confidence half-life for the slow (disk-class) beliefs.
-- **Structure material** — the first sensor of *your work*, measured off-device
-  on the workstation and fed in over SSH (counts only, never contents):
-  `repo.commits_per_day` -> `repo.activity` and `repo.lines_changed_per_day` ->
-  `repo.churn`. See `deploy/observe_repo_from_x1.sh`.
-- **New epistemic forms beyond threshold/binary:** `disk.trend`
-  (rising/stable/falling) and `system.thermal` (temperature-vs-CPU correlation).
-- **Self-calibration:** these thresholds are no longer preset. `repo.churn`,
-  `disk.trend`, and `system.thermal` judge against this core's *own* lived
-  distribution at read time, and withhold judgment until they have enough
-  history. The only remaining preset magnitudes are the confidence half-lives.
-
-All deterministic, replay-stable, no new event types, no LLM.
-
-## Self-Reflection And Learning
-
-GENUS watches the reliability of its own mind and runs deliberate learning programs.
-All three commands are read-time and add no stored magnitude; the core stays
-deterministic and model-free.
-
-- `genus calibration` — are GENUS's own "stable" judgments borne out? It reports the
-  accuracy of those judgments (a held-rate) and whether they discriminate stable from
-  volatile beliefs. The seed of "does GENUS know that it knows."
-- `genus surprisal` — how many bits a flip of each belief would carry
-  (`-log2(p_flip)`, Shannon). A rock-stable belief flipping is shocking; a volatile
-  one flipping is expected. Ranks where a surprise would teach the most.
-- `genus learning` — the learning-program engine. For each configured metric GENUS
-  forecasts the next observation from a self-calibrated cycle mean (hour-of-day or
-  weekday, found from the metric's own cadence), scores it when the value arrives, and
-  reports each path's **forecast skill** (`1 - model/naive error`, Murphy's skill score):
-  `> 0` learned real structure, `~ 0` the signal is too flat to learn, `< 0` worse than
-  naive. `forecast_made`/`forecast_scored` are raw facts
-  (not projected; replay-stable). It runs on the crons that observe each metric, so
-  the Pi learns 24/7 — currently weather, the Pi's own temperature, disk, and the
-  repo work rhythm.
-- `genus sources` — the first slice of the Knowledge & Source-Trust layer. Every
-  observation now carries its `source`, and GENUS learns **which sources to trust**
-  read-time: a source earns trust by agreeing with other sources where their claims
-  overlap, and is held at an unproven seed until it does — never a preset.
-- `genus resolve <claim>` — the general form: *given a claim, what is its current
-  value?* It resolves the candidate assertions (latest per source) by **trust ×
-  freshness** — a stale source fades (recency, self-calibrated from the claim's own
-  cadence) and a distrusted one is outweighed — and flags a **contradiction** only
-  among the live candidates. The same shape later carries other criteria (a chess
-  move's evaluation, a sentence's grounding): resolve always *chooses* among
-  candidates, never *generates* them. `assertion_recorded` is a raw fact (not
-  projected; replay-stable); trust and the resolution are never stored.
-- `genus teach <claim> <value>` — the teacher-loop. When trusted sources disagree, GENUS
-  raises a `SourceContradiction` inquiry; your answer enters as a `human` source (no
-  preset trust) and settles it. It governs naturally — the disagreeing machine sources
-  have driven each other's trust to ~0, so your seed trust outranks them and `resolve`
-  picks your value; the source that agreed with you then earns trust back.
-- `genus relate <s> <p> <o>` / `genus relations [s]` — the structure pillar: networked
-  knowledge as provenanced `(subject, predicate, object)` triples (`relation_asserted`,
-  a raw replay-stable fact), read back as a graph.
-- `genus infer <s> <predicate>` — the first reasoning primitive: derive new, justified
-  relations from known ones (transitive `is_a`/`part_of`, symmetric `synonym`/`antonym`).
-  Derived edges aren't stored — each carries its premise chain and a trust equal to its
-  weakest premise. Read-time, glass-box, bounded.
-- **Two-layer knowledge (multilingual).** Language rides on the *word*, meaning on the
-  *concept*. A lexeme is keyed `form@lang` (`Hund@de`) and `expresses` a language-neutral
-  concept (`Canis`); the `is_a` hierarchy and all reasoning live at the concept level
-  (Latin-keyed for natural kinds: `Canis → Mammalia → Animalia`). `genus infer Hund is_a
-  --lang de` maps word→concept, reasons **sense-coherently** (no cross-sense drift), and
-  renders the answer back into German. One concept graph serves every language — English
-  and French slot in by adding `expresses` edges; translation and cross-lingual reasoning
-  fall out for free. A loan-word is just a form with lexemes in several languages
-  (`Community@de` + `Community@en`), one concept.
-
-## Automatic Collection With Cron
-
-GENUS does not need a daemon for the first Pi loop. Install the marked user
-crontab block from the repository:
-
-```bash
-cd /home/pi/GENUS_PI_SEED
-GENUS_CORE_ID=pi-core ./deploy/pi_install_cron.sh
-```
-
-That block runs:
-
-- `genus observe-all` every 5 minutes
-- `genus state refresh` every 5 minutes, one minute later
-- `genus experience scan` daily
-- `genus doctor` daily
-
-Logs are written to `/home/pi/.genus/logs/cron.log` and
-`/home/pi/.genus/logs/doctor.log`.
-
-For headless Pi resilience, install the optional systemd network watchdog:
+## Lokal loslegen
 
 ```powershell
-.\deploy\install_pi_network_watchdog.cmd -HostName ronny@Pi -CoreId pi-core
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The privileged watchdog runs only from a root-owned copy under
-`/usr/local/libexec/genus` and logs to the system journal (`journalctl -u
-genus-network-watchdog.service`). It records operation events in GENUS,
-restarts the network stack on early failures, and reboots only after the
-governed repeated-failure threshold.
-Repeated reboots are rate-limited by the core governance policy, not only by the
-shell script.
-
-For off-device exchange, `deploy/pi_publish_status.sh` can publish anchors and
-a minimal public health summary to `WoltLab51/GENUS_PI_STATUS`. It never uploads
-the SQLite database, local paths, raw doctor output, or recent event timelines.
-
-## Pi Deployment
-
-Use the scripts in `deploy/` to update a Raspberry Pi without logging in and
-typing the full sequence by hand:
-
-```powershell
-.\deploy\deploy_to_pi.ps1 -HostName pi@pi.local -CoreId pi-core -InstallCron
-```
-
-The remote script fast-forwards `main`, installs the package, runs tests,
-checks integrity, verifies ledger sealing, exports an optional offline anchor,
-prints a final `genus doctor` report, and refuses dirty working trees. See
-`deploy/README.md`.
-
-## Quality Checks
+Linux/Pi:
 
 ```bash
-python -m pytest
-ruff check genus deploy tests
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pytest -q
+```
+
+Für die folgenden Kurzbefehle aktiviere die Umgebung einmal mit
+`.\.venv\Scripts\Activate.ps1` in PowerShell beziehungsweise
+`source .venv/bin/activate` unter Linux. Ohne Aktivierung verwendest du den
+jeweiligen vollständigen Pfad zur `genus`-Datei.
+
+Ein **neuer** Ledger wird bewusst mit seiner ersten Beobachtung angelegt. PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.genus" | Out-Null
+$env:GENUS_DB_PATH = "$HOME\.genus\genus.sqlite3"
+$env:GENUS_CORE_ID = "mein-kern"
+.\.venv\Scripts\genus.exe observe-all
+.\.venv\Scripts\genus.exe doctor
+```
+
+Linux/Pi:
+
+```bash
+mkdir -p "$HOME/.genus"
+export GENUS_DB_PATH="$HOME/.genus/genus.sqlite3"
+export GENUS_CORE_ID="mein-kern"
+.venv/bin/genus observe-all
+.venv/bin/genus doctor
+```
+
+Für einen **vorhandenen** Ledger setzt du nur `GENUS_DB_PATH` und rufst direkt
+`doctor` auf. Diagnosebefehle erzeugen bei einem Tippfehler absichtlich keine Datenbank.
+
+## Nützliche Türen
+
+```bash
+genus doctor                         # Gesundheit und Integrität
+genus ask "was glaubst du"           # aus dem aktuellen Zustand antworten
+genus beliefs show                   # Beliefs mit read-time Confidence
+genus inquiries list                 # benannte Unsicherheit
+genus knowledge                      # Wissensgraph und Strukturkonflikte
+genus skills                         # Fähigkeits-Thermometer
+genus replay                         # Projektionen deterministisch rekonstruieren
+genus integrity check                # Verträge und Projektionen prüfen
+genus ledger verify                  # Seal-Kette prüfen
+genus why answer                     # Herkunft einer Antwort zeigen
+```
+
+Die vollständige CLI ist bewusst nicht nochmals als statische Liste dokumentiert:
+`genus --help` und `genus <befehl> --help` sind die aktuelle Quelle.
+
+## Qualitätsgate
+
+```bash
+python -m pytest -q
+ruff check .
+python -m compileall -q genus deploy tests
 python -m pip check
 pip-audit --local --skip-editable
 bash -n deploy/*.sh
-genus doctor
-genus replay
-genus integrity check
-genus ledger seal-init
-genus ledger head
-genus ledger verify
-GENUS_CORE_ID=ci-core genus ledger anchor create --out /tmp/genus-anchor.json
-GENUS_CORE_ID=ci-core genus ledger anchor verify /tmp/genus-anchor.json
-genus operation network-check --status ok --target 192.168.178.1
-grep -R -n -E --include='*.py' "anthropic|openai|ollama" genus/
-grep -R -n -E --include='*.py' "requests|httpx|aiohttp|urllib.request" genus/
 ```
 
-GitHub Actions runs the same quality gate on `main` and pull requests.
+Eine Änderung ist erst vertrauenswürdig, wenn zusätzlich Replay, Integrität, Seal und
+der beobachtete Betrieb stimmen. Siehe [Quality](docs/QUALITY.md) und
+[ADR-0002: Change Trust](docs/decisions/ADR-0002-CHANGE-TRUST.md).
+
+## Raspberry Pi
+
+Der produktive Kern läuft unter dem normalen GENUS-Benutzer. Nur der kleine
+Netzwerk-Watchdog und seine Reparaturhelfer liegen root-owned unter
+`/usr/local/libexec/genus`. Produktdaten, Dienste und Deploypfad werden explizit
+gepinnt; Root führt niemals Code direkt aus dem beschreibbaren Checkout aus.
+
+Installation, Fast-Forward-Deploy, Cron, systemd und Recovery stehen im
+[Pi-Runbook](deploy/README.md). Der aktuelle Betriebszustand steht in [NOW](docs/NOW.md).
+
+## Dokumentationsprinzip
+
+Jede Aussage hat genau einen autoritativen Wohnort. Historie bleibt erhalten, trägt
+aber keinen gegenwärtigen Vertrag. Der vollständige Bibliotheksplan, Statusstufen und
+Lesepfade stehen in [docs/README.md](docs/README.md).
+
+---
+
+**Kurz gesagt:** GENUS soll nicht möglichst viel behaupten. Es soll nachvollziehbar
+lernen, wann es etwas weiß, wann es zweifeln muss und wie es den nächsten Schritt
+verdient.

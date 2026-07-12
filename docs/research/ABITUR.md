@@ -1,8 +1,10 @@
 # GENUS und das Abitur
 
+> **Status:** Forschung / datierter Denkstand · **Autorität:** nicht kanonisch. Aktuelle Orientierung: [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 ## 1 · Das Ziel, in Ronnys eigenen Worten (2026-07-03)
 
-Nach dem Fachwissen-Fahrplan aus `docs/GENUS_GEDAECHTNIS.md` (Punkt 3) begann ich einen
+Nach dem Fachwissen-Fahrplan im [Gedächtnis-Entwurf](../design/MEMORY.md) (Punkt 3) begann ich einen
 Fachwortschatz zu bauen — Ronny stoppte das sofort:
 
 > "ich meine nicht die Wörter kennen. GENUS soll die Aufgaben einer Abiturprüfung schaffen.
@@ -117,7 +119,7 @@ sinnvoll?") hat dieses Ziel neu gefasst — und die Antwort war ehrlich: **nein,
   fast nur unseren Aufgaben-Parser messen.
 - **Goodhart's Law:** eine Messgröße, die zum Ziel wird, hört auf zu messen. „Besteht das Abi"
   als Gate erzwingt Erkennungs-Shims pro Klausur-Format — exakt die Hand-Aufzählung, die das
-  Audit (docs/GENUS_AUDIT_2026_07.md) als Sackgasse benannt hat.
+  [Wachstumsaudit](../reports/2026-07-03-growth-audit.md) als Sackgasse benannt hat.
 - **Begleiter-Wert ≠ Zeugnis:** niemand schätzt seinen Begleiter fürs Abitur; „Berufe/Studium"
   sind Credentialing-Strukturen für den menschlichen Arbeitsmarkt.
 

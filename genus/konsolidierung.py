@@ -1,4 +1,4 @@
-"""Nacht-Konsolidierung + Morgen-Nachricht (docs/GENUS_GEDAECHTNIS.md, Punkt ④ — Ronnys
+"""Nacht-Konsolidierung + Morgen-Nachricht (docs/design/MEMORY.md, Punkt ④ — Ronnys
 Entscheidungen 2026-07-03/04: Tagespuffer ja · nachts still merken, morgens berichten ·
 genau EINE Morgen-Nachricht, 06:00, nie leer, warm und nativ formuliert).
 

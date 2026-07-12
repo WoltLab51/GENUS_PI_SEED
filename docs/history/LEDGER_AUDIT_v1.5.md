@@ -1,5 +1,14 @@
 # GENUS Ledger Audit
 
+> [!NOTE]
+> **Status: historischer Snapshot (v1.5).** Dieses Dokument bewahrt den damaligen
+> Entwurfs- und Prüfstand. Es ist keine aktuelle Betriebsanweisung. Das
+> kanonische Modell für Ledger, Siegel, Anchors sowie die heutigen
+> Root-/Nutzer- und Dienstgrenzen steht im
+> [aktuellen Sicherheitsmodell](../SECURITY_MODEL.md). Der verifizierte Pi-Stand ist
+> im [`Härtungsaudit vom 12. Juli 2026`](../reports/2026-07-12-hardening-audit.md)
+> dokumentiert.
+
 Stand: v1.5
 
 ## Ergebnis

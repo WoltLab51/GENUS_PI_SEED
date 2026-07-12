@@ -8,7 +8,7 @@ Kern-Werkzeug kennt seinen Konsumenten nicht). Diese Datei darf beide kennen, we
 einziger Zweck das Verbinden ist -- genau wie deploy/seed_ziele.sh nur verbindet, nicht rechnet.
 
 Die vier Mathe-Werkzeuge laufen NEBEN dem bestehenden Muster-Pfad in companion.py her
-(Strangler, nicht Ersatz -- docs/GENUS_AUDIT_2026_07.md §9): die Regex-Schnellspur bleibt die
+(Strangler, nicht Ersatz -- docs/reports/2026-07-03-growth-audit.md §9): die Regex-Schnellspur bleibt die
 ms-schnelle Antwort für die vier festen Formulierungen, die Registry macht sie zusätzlich für
 einen künftigen Planer sichtbar und beweisbar korrekt verdrahtet (wortlautfest kann hier nicht
 vergessen werden, anders als beim Muster-Pfad, wo es einmal genau das passierte)."""

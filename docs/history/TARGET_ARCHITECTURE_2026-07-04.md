@@ -1,7 +1,9 @@
 # GENUS — Ziel-Architektur & Stand-Audit
 
+> **Status:** Historischer Snapshot vom 2026-07-04 · **Autorität:** nicht kanonisch. Die aktuelle Architektur und Einordnung stehen im [Dokumentationsindex](../README.md), in [NOW](../NOW.md), der [Roadmap](../ROADMAP.md) und der [Architektur](../ARCHITECTURE.md).
+
 Stand: 2026-07-04, Version 2. Abgeleitet aus: der vollständigen Mechanismus-Analyse
-aller 45 Quelldateien, dem Audit (`GENUS_AUDIT_2026_07.md`), zehn Angriffs-Runden
+aller 45 Quelldateien, dem Audit (`../reports/2026-07-03-growth-audit.md`), zehn Angriffs-Runden
 gegen den ersten Entwurf (drei Revisionen haben überlebt, siehe §2–§4), zwei
 geprüften Ideen von Ronny (die Grenze §5, der Lernkreis §6) und einer ehrlichen
 Nähte-Inventur (§8). Kein Rewrite-Plan — das konsequente Zu-Ende-Denken des

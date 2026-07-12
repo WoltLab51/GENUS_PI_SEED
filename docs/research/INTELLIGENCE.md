@@ -1,7 +1,9 @@
 # GENUS — Die Intelligenz-Betrachtung
 
+> **Status:** Forschung / datierter Denkstand · **Autorität:** nicht kanonisch. Aktuelle Orientierung: [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 > *Studie vom 2026-07-05, gemeinsam mit Ronny. Auslöser: der Material-Entwurf
-> (GENUS_MATERIAL.md) und Ronnys Einwand — „das hieße GENUS wird so ein schlaues
+> ([Material-Entwurf](MATERIAL.md)) und Ronnys Einwand — „das hieße GENUS wird so ein schlaues
 > Wikipedia? das kommt mir ein bisschen flach vor. Ich frage mich, wie wird GENUS
 > wirklich intelligent." Diese Studie hält fest, was dabei herauskam. Sie ist
 > Richtungs-Wissen, kein Bauplan; die Fähigkeiten daraus sind in den Ziel-Graphen
@@ -41,7 +43,7 @@ beim Wissen.
 
 **Die Material-Wende:** Material wird nur noch **im Dienst einer Operation** geholt, nie
 um seiner selbst willen. `part_of`-Kanten sind wertvoll, weil sie eine neue *Art zu
-schließen* freischalten — nicht weil „mehr Fakten gut". (Korrektur zu GENUS_MATERIAL.md §7.)
+schließen* freischalten — nicht weil „mehr Fakten gut". (Korrektur zum [Material-Entwurf](MATERIAL.md) §7.)
 
 ## 3 · Relationen als Denk-Treibstoff
 
@@ -333,7 +335,7 @@ Beweistext-Fehler in der Kausalrichtung fand, bevor er den Pi erreichte.)
   `denkweisen` (fehlt), `abstrahieren` (fehlt), `analogie` (fehlt), `weltmodell`
   (teilweise), `lese-sinn` (fehlt), `gezaehmte-kreativitaet` (teilweise); Gedächtnis-Stand
   aktualisiert (Tagespuffer/Nacht/Morgen: live). GENUS benennt diese Lücken jetzt selbst.
-- **GENUS_MATERIAL.md**: um die Wende korrigiert (Material folgt der Operation).
+- **[Material-Entwurf](MATERIAL.md)**: um die Wende korrigiert (Material folgt der Operation).
 - Der erste Kandidat, wenn gebaut wird: **eine echte Anspruchsnorm als Bauplan +
   Subsumtion als Verallgemeinerung der is_a-Inferenz** — die erste Denkweise, an der
   sich zeigt, ob die Verwandtschaft trägt.

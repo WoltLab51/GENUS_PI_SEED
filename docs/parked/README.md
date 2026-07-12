@@ -1,4 +1,6 @@
-# docs/parked/ - Ideas, Not Contracts
+# Geparkte Ideen
+
+> **Status:** Ideenparkplatz · **Build-Autorität:** keine
 
 This folder is a parking place for sketches, prompts, reviews, and future ideas
 that should not yet drive implementation.
@@ -14,10 +16,10 @@ Everything in `docs/parked/` is explicitly non-canonical:
 
 The canonical sources remain:
 
-- `../GENUS_ROADMAP.md`
-- `../GENUS_ARCHITECTURE.md`
-- `../GENUS_EVENT_CONTRACT.md`
-- `../GENUS_LEDGER_AUDIT.md`
+- [Roadmap](../ROADMAP.md)
+- [Architektur](../ARCHITECTURE.md)
+- [Event-Vertrag](../EVENT_CONTRACT.md)
+- [Sicherheitsmodell](../SECURITY_MODEL.md)
 
 ## Why This Exists
 
@@ -55,3 +57,7 @@ When that happens:
 - Anything a test or implementation must obey today.
 
 Those belong in the canonical docs or in code.
+
+## Inhalt
+
+- [GENUS Next Ideas](GENUS_NEXT_IDEAS.md)

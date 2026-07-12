@@ -8,7 +8,8 @@ registrierte Umsetzungs-Art aus. Das Register (``UMSETZUNGEN``) ist dasselbe
 Kern-Primitiv wie überall: registrieren → nachschlagen — eine neue Art wird
 registriert, nicht in eine if-Kette geschrieben.
 
-Die Gate-Politik (docs/GENUS_ARCHITEKTUR.md §8, Ronnys „entwickelt sich") ist hier
+Die Gate-Politik (aktueller Vertrag: docs/ARCHITECTURE.md §8; historische Herkunft:
+docs/history/TARGET_ARCHITECTURE_2026-07-04.md §8, Ronnys „entwickelt sich") ist hier
 STRUKTURELL verankert, nicht per Konvention:
 - Freigabe pro Stück: :func:`umsetzen` weigert sich bei allem außer einem
   AKZEPTIERTEN Proposal — die menschliche Freigabe über die bestehende

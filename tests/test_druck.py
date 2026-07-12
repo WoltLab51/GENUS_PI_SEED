@@ -1,5 +1,5 @@
 """Der Druck — die Richtung der Lebendigkeit, erster Schritt: Persistenz statt Entladung
-(Ronny 2026-07-05, docs/GENUS_INTELLIGENZ.md §9). Der Druck einer ungestillten Lücke bleibt,
+(Ronny 2026-07-05, docs/research/INTELLIGENCE.md §9). Der Druck einer ungestillten Lücke bleibt,
 solange die Not besteht, und STEIGT, wenn nach dem Aussprechen weitere Nachfrage kommt —
 statt sich beim Aussprechen (dem Proposal) zu entladen. Read-time, keine Handlung."""
 from genus import companion, druck, experience, inquiries, verstehen

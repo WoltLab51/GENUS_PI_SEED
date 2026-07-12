@@ -1,4 +1,4 @@
-"""Episoden statt flacher Notizen (genus.erinnerung, Punkt 1+2 von docs/GENUS_GEDAECHTNIS.md).
+"""Episoden statt flacher Notizen (genus.erinnerung, Punkt 1+2 von docs/design/MEMORY.md).
 
 Bewusst NICHT mit "Hund" getestet (live-Feedback 2026-07-03: dieselbe Beispielwahl in jedem
 Test/jeder Live-Probe der ganzen Sitzung deckt echte Schwächen nicht auf, weil sie nie eine

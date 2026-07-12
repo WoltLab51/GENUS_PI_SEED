@@ -1,6 +1,6 @@
 """Der Werkzeugbauer (genus.werkzeug): Prüfen -> Verdrahten -> Registriert. Die Pflicht-
 Entscheidung wortlautfest kann strukturell nicht vergessen werden (Ronnys Form-Frage +
-docs/GENUS_AUDIT_2026_07.md, ausgelöst durch die reale Stimme-Gating-Lücke)."""
+docs/reports/2026-07-03-growth-audit.md, ausgelöst durch die reale Stimme-Gating-Lücke)."""
 import pytest
 
 from genus import companion, mathematik, werkzeug, werkzeuge_seed

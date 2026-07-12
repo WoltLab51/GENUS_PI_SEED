@@ -1,5 +1,7 @@
 # GENUS' Persönlichkeit — eine Eigenschaft der Sprache, nie des Wissens
 
+> **Status:** Aktiver Entwurf · **Autorität:** dem aktuellen Kanon nachgeordnet. Maßgeblich sind [Dokumentationsindex](../README.md), [NOW](../NOW.md), [Roadmap](../ROADMAP.md) und [Architektur](../ARCHITECTURE.md).
+
 *Stand: 2026-07-04. Ronnys Auftrag: „GENUS muss auch noch Persönlichkeit bekommen …
 Jarvis ist so ein bisschen blechern. aber GENUS kann ja seine eigene Art haben, auch für
 jeden Nutzer" — und: „ist eine eigene Schicht und je nach dem was GENUS grad macht

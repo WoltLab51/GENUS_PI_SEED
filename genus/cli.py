@@ -706,7 +706,7 @@ def gender_rule_command() -> None:
 @click.option("--ordnung", default=1, show_default=True, type=int, help="1=erste, 2=zweite, ...")
 def ableitung_command(term: str, variable: str, ordnung: int) -> None:
     """Die Ableitung eines Funktionsterms -- exakt über sympy, nie geraten (Abitur-Ziel,
-    erste Aufgabenart: docs/GENUS_ROADMAP.md). Beispiel: genus ableitung "3x^2 + 2x" """
+    erste Aufgabenart: docs/research/ABITUR.md). Beispiel: genus ableitung "3x^2 + 2x" """
     r = mathematik.ableitung(term, variable, ordnung)
     if not r["ok"]:
         click.echo(f"[MATH] {r['fehler']}")
@@ -917,7 +917,7 @@ def kurvendiskussion_command(term: str, variable: str) -> None:
               help="freie Fallschilderung -- das Sprachmodell liest sie in Merkmale "
                    "(Fakt→Merkmal, an der Grenze gehalten), der Kern rechnet die Subsumtion")
 def subsumtion_command(norm: str, erfuellt: tuple[str, ...], text: str | None) -> None:
-    """Die erste Denkweise: juristische Subsumtion (docs/GENUS_INTELLIGENZ.md §4). Prüft eine
+    """Die erste Denkweise: juristische Subsumtion (docs/research/INTELLIGENCE.md §4). Prüft eine
     Anspruchsnorm (Bauplan im Graphen) gegen einen Sachverhalt und rendert den Beweisbaum
     inkl. Beweislast-Radar. Entweder --erfuellt (Merkmal=Quelle, exakt) ODER --text (freie
     Schilderung, vom Modell gelesen). Read-only; kein Anwalt."""
@@ -958,7 +958,7 @@ def subsumtion_command(norm: str, erfuellt: tuple[str, ...], text: str | None) -
 @click.option("--tick", is_flag=True,
               help="die eine offene Top-Vermutung als gedeckelte Kante aussprechen (Proposal≠Change)")
 def hypothese_command(subjekt: str, tick: bool) -> None:
-    """Die Denkweise HYPOTHESE (docs/GENUS_INTELLIGENZ.md): GENUS VERMUTET per Geschwister-Analogie
+    """Die Denkweise HYPOTHESE (docs/research/INTELLIGENCE.md): GENUS VERMUTET per Geschwister-Analogie
     eine neue Beziehung und PRÜFT sie mit der Inferenz (bestätigt/widerlegt/offen) — der aktive
     Halbkreis, der den Methoden-Bogen schließt. Ohne --tick wird KEINE VERMUTUNG geschrieben (das
     Reflektieren ist schreibfrei; nur das geerdete Disjunktheits-Weltwissen wird einmalig gesät,
@@ -1004,7 +1004,7 @@ def hypothese_command(subjekt: str, tick: bool) -> None:
 def abstraktion_command(limit: int, unter: str | None, tick: bool, pruefe: bool) -> None:
     """Die Operation ABSTRAHIEREN (faehigkeit:abstrahieren): GENUS findet Gruppen von Geschwistern,
     die ein noch UNBENANNTES Merkmal-Bündel teilen UND eine weitere Eigenschaft vorhersagen — der
-    Keim eines eigenen Begriffs (docs/GENUS_INTELLIGENZ.md: Verdichtung, kürzer als die Fakten).
+    Keim eines eigenen Begriffs (docs/research/INTELLIGENCE.md: Verdichtung, kürzer als die Fakten).
     Ohne --tick REIN LESEND (zeigt nur, was GENUS abstrahieren würde; schreibt nichts, ruft kein
     Modell). --tick PRÄGT den stärksten Kandidaten als gedeckelten Knoten (Quelle model:abstraktion,
     Trust ≤ 0.25 — überstimmt nie Geerdetes); der Mensch bestätigt (teach) oder verwirft (retract)."""
@@ -1080,7 +1080,7 @@ def gedanken_push_command() -> None:
 @click.option("--gegeben", "gegeben", multiple=True, metavar="atom=quelle",
               help="ein als gegeben angenommener Fakt mit seiner Quelle, mehrfach")
 def beweise_command(ziel: str, gegeben: tuple[str, ...]) -> None:
-    """Der allgemeine Deduktions-Schließer (Rückwärtsverkettung, docs/GENUS_INTELLIGENZ.md):
+    """Der allgemeine Deduktions-Schließer (Rückwärtsverkettung, docs/research/INTELLIGENCE.md):
     „beweise mir ZIEL" — sucht eine Regel (braucht/bewirkt-Bauplan im Graphen), die das Ziel
     bewirkt, und zeigt den gläsernen Beweis inkl. schwächster Prämisse. Domänenfrei, read-only."""
     conn = get_conn()
@@ -1105,7 +1105,7 @@ def beweise_command(ziel: str, gegeben: tuple[str, ...]) -> None:
               "Zug: die drängendste unausgesprochene Lücke aussprechen)")
 def besinnung_command(tick: bool) -> None:
     """Der innere Loop, dem der Druck sein Gefälle gibt: GENUS' gerichtete Agenda aus dem
-    Druck-Gefälle (docs/GENUS_INTELLIGENZ.md §9). Ohne --tick rein lesend (nichts wird
+    Druck-Gefälle (docs/research/INTELLIGENCE.md §9). Ohne --tick rein lesend (nichts wird
     getan); mit --tick der EINE erlaubte inwendige Schritt (gegatetes Proposal, Proposal≠
     Change) -- bewegt den Geist, nie die Hand."""
     conn = get_conn()
@@ -1131,7 +1131,7 @@ def besinnung_command(tick: bool) -> None:
 @main.command("werkzeuge")
 def werkzeuge_command() -> None:
     """Alle beim Werkzeugbauer registrierten Werkzeuge -- das, was ein Planer sehen würde
-    (Ronnys Frage: "woraus besteht ein Werkzeug eigentlich genau?", docs/GENUS_AUDIT_2026_07.md).
+    (Ronnys Frage: "woraus besteht ein Werkzeug eigentlich genau?", docs/reports/2026-07-03-growth-audit.md).
     Protokolliert dabei jede noch nicht im Ledger stehende Registrierungs-ENTSCHEIDUNG
     (Phase 3 Scheibe 2: die Hülle hat Herkunft -- dedupliziert, ein zweiter Aufruf schreibt
     nichts)."""
@@ -2023,7 +2023,9 @@ def ledger_anchor_create(core_id: str | None, out_path: Path | None) -> None:
 @click.argument("path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--core-id", envvar="GENUS_CORE_ID")
 def ledger_anchor_verify(path: Path, core_id: str | None) -> None:
-    conn = get_conn()
+    # Verification is diagnostic: a typo in GENUS_DB_PATH must never create a
+    # fresh scatter database or migrate an existing ledger as a side effect.
+    conn = get_diagnostic_conn()
     try:
         try:
             artifact = json.loads(path.read_text(encoding="utf-8"))

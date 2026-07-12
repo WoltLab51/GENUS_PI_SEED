@@ -9,11 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_atlas_facts_file_is_current():
-    # docs/genus_atlas_facts.md is a projection of the code; if it drifts (a new
+    # docs/generated/ATLAS_FACTS.md is a projection of the code; if it drifts (a new
     # sensor/reactor/detector/threshold was added without regenerating), fail.
-    committed = (ROOT / "docs" / "genus_atlas_facts.md").read_text(encoding="utf-8")
+    committed = (ROOT / "docs" / "generated" / "ATLAS_FACTS.md").read_text(encoding="utf-8")
     assert _atlas_facts().strip() == committed.strip(), (
-        "docs/genus_atlas_facts.md is stale — regenerate with `genus atlas-facts`"
+        "docs/generated/ATLAS_FACTS.md is stale — regenerate with `genus atlas-facts`"
     )
 
 

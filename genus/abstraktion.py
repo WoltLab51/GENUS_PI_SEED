@@ -6,7 +6,7 @@ Das Rohmaterial ist dasselbe wie in :func:`genus.hypothese.vermute` (die Träger
 Geschwister trägt welches Merkmal"), nur ANDERSHERUM gelesen: nicht „was fehlt EINEM Anker",
 sondern „was teilt eine GANZE Gruppe, ohne dass es dafür schon einen Namen gibt".
 
-Der Ehrlichkeits-Test (docs/GENUS_INTELLIGENZ.md: ein Begriff ist eine VERDICHTUNG — kürzer als die
+Der Ehrlichkeits-Test (docs/research/INTELLIGENCE.md: ein Begriff ist eine VERDICHTUNG — kürzer als die
 Fakten und MÄCHTIGER; §9d: „man darf nur dort vermuten, wo man auch falsch liegen kann"): eine
 Bündel-Definition ist über ihre eigene Auswahl TAUTOLOGISCH. Darum zählt ein Kandidat NUR, wenn die
 Gruppe eine WEITERE geteilte Eigenschaft VORHERSAGT, auf die nicht ausgewählt wurde — die
@@ -38,7 +38,7 @@ MERKMAL_PRAEDIKATE = ("part_of", "has_part", "made_of", "used_for", "causes", "c
 MIN_MITGLIEDER = 3   # unter 3 gemeinsamen Dingen ist es ein Zufall zu zweit, kein Begriff.
 MIN_MERKMALE = 3     # ein Begriff braucht ein BÜNDEL von >=3 UNTERSCHEIDENDEN Merkmalen: zwei würden
                      # genügen, die Gruppe zu benennen -- dass sie ALLE drei (oder mehr) teilen, ist
-                     # die Überraschung/Verdichtung (docs/GENUS_INTELLIGENZ.md), kein Tautologie-Paar.
+                     # die Überraschung/Verdichtung (docs/research/INTELLIGENCE.md), kein Tautologie-Paar.
 
 # Ein Naben-Knoten (»Objekt«, »Entität«) hat Tausende Kinder -- zu grob für einen scharfen
 # unbenannten Begriff und teuer im Paar-Durchlauf. entdecke() überspringt solche Naben; ihre

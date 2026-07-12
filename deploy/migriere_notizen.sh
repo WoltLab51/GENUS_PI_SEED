@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Einmalige, idempotente Migration (Punkt 1 von docs/GENUS_GEDAECHTNIS.md, 2026-07-03): die
+# Einmalige, idempotente Migration (Punkt 1 von docs/design/MEMORY.md, 2026-07-03): die
 # alten flachen Notizen (genus:notizen -notiz-> "<Text>") werden zu echten, vernetzten Episoden
 # (genus.erinnerung) und danach zurückgenommen -- kein Duplikat, kein stiller Doppel-Stand.
 # Re-running findet beim zweiten Mal keine genus:notizen-Kanten mehr und tut nichts.

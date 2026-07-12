@@ -1,4 +1,4 @@
-"""Der Werkzeugbauer -- Inversion ② des Audits (docs/GENUS_AUDIT_2026_07.md), verdrahtet aus
+"""Der Werkzeugbauer -- Inversion ② des Audits (docs/reports/2026-07-03-growth-audit.md), verdrahtet aus
 Ronnys eigener Form-Frage vom 2026-07-03 ("woraus besteht ein Werkzeug eigentlich genau?").
 
 Ein Werkzeug zerfällt in zwei Teile:
@@ -26,7 +26,9 @@ Stufe 2, nicht hier). Stattdessen: ein Vertrags-Test (tests/test_werkzeug.py), d
 GESAMTE Registry läuft, wie test_membrane_purity.py es für Membranen schon tut -- dieselbe
 CI-Gate-Disziplin, keine neue Maschinerie.
 
-"Registriert" hat zwei Ebenen (Phase 3 Scheibe 2, docs/GENUS_ARCHITEKTUR.md §4): die
+"Registriert" hat zwei Ebenen (aktueller Vertrag: docs/ARCHITECTURE.md §5;
+historische Herkunft: Phase 3 Scheibe 2 in
+docs/history/TARGET_ARCHITECTURE_2026-07-04.md §4): die
 LAUFZEIT-Registry wird bei jedem Start aus Code neu aufgebaut (wie RULES/DETECTORS/
 REACTORS -- der Code ist die Quelle, kein dynamisches Laden). Die ENTSCHEIDUNG aber, dass
 ein Werkzeug mit diesem Vertrag Teil der Hülle ist, wird als ``werkzeug_registriert``-Event
