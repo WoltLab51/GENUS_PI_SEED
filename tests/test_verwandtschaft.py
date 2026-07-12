@@ -41,14 +41,14 @@ def _tier_taxonomie(conn):
 
 
 def test_concept_desc_ist_label_plus_eltern():
-    conn = _tier_taxonomie(_fresh())
-    assert verwandtschaft.concept_desc(conn, "Q144") == "Hund · Säugetier"
-    assert verwandtschaft.concept_desc(conn, "Qxxx") is None      # kein deutsches Label
+    netz = verwandtschaft.lade_netz(_tier_taxonomie(_fresh()))
+    assert verwandtschaft.concept_desc(netz, "Q144") == "Hund · Säugetier"
+    assert verwandtschaft.concept_desc(netz, "Qxxx") is None      # kein deutsches Label
 
 
 def test_kandidaten_sind_geschwister_und_cousins():
-    conn = _tier_taxonomie(_fresh())
-    kand = set(verwandtschaft.kandidaten(conn, "Q144"))
+    netz = verwandtschaft.lade_netz(_tier_taxonomie(_fresh()))
+    kand = set(verwandtschaft.kandidaten(netz, "Q144"))
     assert "Q18498" in kand and "Q146" in kand        # Geschwister unter Säugetier
     assert "Q123599" in kand                          # Cousin (über Großeltern Tier)
     assert "Q144" not in kand                         # nie sich selbst
@@ -57,7 +57,7 @@ def test_kandidaten_sind_geschwister_und_cousins():
 def test_kandidaten_ohne_eltern_ist_leer():
     conn = _fresh()
     reactors.observe_relation(conn, "Solo@de", "expresses", "Qsolo", "wikidata")
-    assert verwandtschaft.kandidaten(conn, "Qsolo") == []
+    assert verwandtschaft.kandidaten(verwandtschaft.lade_netz(conn), "Qsolo") == []
 
 
 def test_ueberbreite_kategorie_wird_uebersprungen(monkeypatch):
@@ -71,7 +71,7 @@ def test_ueberbreite_kategorie_wird_uebersprungen(monkeypatch):
     for i in range(6):   # Qartefakt hat 6 Kinder > MAX_FANOUT 3 -> übersprungen
         reactors.observe_relation(conn, f"Qkrimskram{i}", "is_a", "Qartefakt", "wikidata")
     reactors.observe_relation(conn, "Qdolch", "is_a", "Qstichwaffe", "wikidata")   # echtes Geschwister
-    kand = set(verwandtschaft.kandidaten(conn, "Qmesser"))
+    kand = set(verwandtschaft.kandidaten(verwandtschaft.lade_netz(conn), "Qmesser"))
     assert "Qdolch" in kand                       # aus der engen „Stichwaffe"
     assert not any(k.startswith("Qkrimskram") for k in kand)   # NICHT aus dem breiten „Artefakt"
 
