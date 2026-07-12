@@ -3,9 +3,10 @@ set -Eeuo pipefail
 
 # Install the Telegram bridge as a long-lived systemd service. Unlike the background learner
 # (deliberately idle-priority, defers to everything), this answers a human directly, so it runs
-# at NORMAL priority -- it should feel responsive. The bot token and allow-list are secrets: kept
-# in files outside the repo with restrictive permissions (0600), never in the world-readable
-# systemd unit file (0644) and never committed to git.
+# at NORMAL priority -- it should feel responsive. The bot token is a credential and stays in its
+# own 0600 file. The strictly numeric allow-list is also kept in a user file for user-level helper
+# scripts, but PID 1 must never read that user-controlled file: only its validated value is embedded
+# in the root-owned unit. Telegram user IDs are authorization selectors, not authentication secrets.
 #
 # Usage: deploy/pi_install_telegram_bot.sh [BOT_TOKEN] <ALLOWED_TELEGRAM_USER_ID> [MORE_IDS...]
 #   The token is OPTIONAL here if you've already placed it yourself in the token file -- the most
@@ -115,12 +116,12 @@ Group=$GENUS_GROUP
 WorkingDirectory=$REPO_DIR
 Restart=on-failure
 RestartSec=15
-EnvironmentFile=-$ENV_FILE
 Environment=HOME=$GENUS_HOME
 Environment=GENUS_DB_PATH=$DB_PATH
 Environment=GENUS_LOG_DIR=$LOG_DIR
 Environment=GENUS_TELEGRAM_TOKEN_FILE=$TOKEN_FILE
 Environment=GENUS_TELEGRAM_LOCK_FILE=$LOCK_FILE
+Environment=GENUS_TELEGRAM_ALLOWED_IDS=$ALLOWED_IDS
 # Die Stimme ist reine Stil-Glättung und würde ein zweites 1.5B-Modell dauerhaft laden.
 # Die verifizierte Template-Antwort bleibt ohne sie vollständig; ein Opt-in braucht bewusst
 # zusätzlich einen höheren MemoryMax-Override, statt den Pi versehentlich wieder zu verdrängen.

@@ -277,10 +277,9 @@ def observe_relation(
                          "objects": contra["objects"], "review_recommended": True},
             )
             events.append({"event_type": "inquiry_created"})
-        # Rule self-check: for a (learned-)transitive predicate, a new edge that closes a ring
-        # violates ACYCLICITY -- transitivity would derive `subject is_a subject` and collapse the
-        # hierarchy. A structural self-contradiction in GENUS's own reasoning, not a fact. Surprise
-        # -> inquiry, exactly like the value/source contradictions above (Phase B ①c).
+        # Rule self-check: for an explicitly acyclic hierarchy predicate, a new edge that closes a
+        # ring violates ACYCLICITY and collapses the hierarchy. A structural self-contradiction in
+        # GENUS's own reasoning, not a fact.
         from genus import inference  # local: reactors is imported broadly; avoid an import cycle
         cyc_key = f"{subject}|{predicate}|{object_}|acyclic"
         if inference.closes_cycle(conn, subject, predicate, object_):

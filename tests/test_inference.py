@@ -209,6 +209,71 @@ def test_acyclic_hierarchy_has_no_cycles():
     conn.close()
 
 
+def test_detects_legacy_cycle_beyond_the_historical_depth_guard():
+    conn = _fresh()
+    nodes = [f"L{i:03d}" for i in range(128)]
+    for subject, object_ in zip(nodes, nodes[1:] + nodes[:1]):
+        _legacy_rel(conn, subject, "is_a", object_)
+
+    rings = inference.cycles(conn, "is_a")
+
+    assert len(rings) == 1
+    assert len(rings[0]) == len(nodes)
+    assert set(rings[0]) == set(nodes)
+
+
+def test_long_legacy_hierarchy_dag_has_no_cycle_witness():
+    conn = _fresh()
+    nodes = [f"D{i:03d}" for i in range(128)]
+    for subject, object_ in zip(nodes, nodes[1:]):
+        _legacy_rel(conn, subject, "is_a", object_)
+
+    assert inference.cycles(conn, "is_a") == []
+
+
+def test_cycle_witnesses_match_all_directed_three_node_graphs():
+    nodes = ["A", "B", "C"]
+    possible_edges = [(subject, object_) for subject in nodes for object_ in nodes]
+
+    for mask in range(1 << len(possible_edges)):
+        adjacency = {node: [] for node in nodes}
+        for bit, (subject, object_) in enumerate(possible_edges):
+            if mask & (1 << bit):
+                adjacency[subject].append(object_)
+
+        reachable = {node: set(adjacency[node]) for node in nodes}
+        for through in nodes:
+            for start in nodes:
+                if through in reachable[start]:
+                    reachable[start].update(reachable[through])
+
+        remaining = {node for node in nodes if node in reachable[node]}
+        expected_components = []
+        while remaining:
+            root = min(remaining)
+            component = {
+                node for node in remaining
+                if node in reachable[root] and root in reachable[node]
+            }
+            expected_components.append(component)
+            remaining -= component
+        expected_components.sort(key=min)
+
+        edges = {
+            subject: [(object_, "src") for object_ in objects]
+            for subject, objects in adjacency.items()
+        }
+        witnesses = inference.cycles(None, "is_a", edges=edges)
+
+        assert len(witnesses) == len(expected_components)
+        for witness, component in zip(witnesses, expected_components):
+            assert witness[0] == min(component)
+            assert set(witness).issubset(component)
+            assert len(witness) == len(set(witness))
+            for subject, object_ in zip(witness, witness[1:] + witness[:1]):
+                assert object_ in adjacency[subject]
+
+
 def test_knowledge_report_surfaces_is_a_cycles(monkeypatch):
     conn = _fresh()  # the live shape: one source (Wikidata) asserting an is_a cycle both ways
     _legacy_rel(conn, "Suppe", "is_a", "minestra", "wikidata")
@@ -219,7 +284,7 @@ def test_knowledge_report_surfaces_is_a_cycles(monkeypatch):
     monkeypatch.setattr(cli, "get_conn", lambda: conn)
     result = CliRunner().invoke(cli.main, ["knowledge"])
     assert result.exit_code == 0, result.output
-    assert "1 is_a cycle(s)" in result.output
+    assert "1 is_a cyclic component(s)" in result.output
 
 
 def test_infer_uses_learned_rule_not_only_the_seed():
@@ -251,6 +316,39 @@ def test_closes_cycle_only_for_a_transitive_predicate():
     assert inference.closes_cycle(conn, "C", "friend", "A") is False
     _rel(conn, "X", "is_a", "Y"); _rel(conn, "Y", "is_a", "Z")       # is_a is (seed-)transitive
     assert inference.closes_cycle(conn, "Z", "is_a", "X") is True
+
+
+def test_closes_cycle_is_not_limited_by_inference_depth():
+    conn = _fresh()
+    # Deliberately exceed both MAX_DEPTH and the historical 64-hop diagnostic
+    # guard: write-time acyclicity is a semantic invariant, not a UI budget.
+    nodes = [f"N{i:03d}" for i in range(80)]
+    for subject, object_ in zip(nodes, nodes[1:]):
+        _rel(conn, subject, "is_a", object_)
+
+    # The path back to the proposed subject is longer than the read-time
+    # inference bound.  A bounded check used to miss this ring.
+    assert inference.reaches(
+        conn, nodes[0], nodes[-1], "is_a", max_depth=inference.MAX_DEPTH,
+    ) is False
+    assert inference.closes_cycle(conn, nodes[-1], "is_a", nodes[0]) is True
+
+
+def test_observe_relation_retracts_cycle_beyond_inference_depth():
+    conn = _fresh()
+    nodes = [f"N{i:03d}" for i in range(80)]
+    for subject, object_ in zip(nodes, nodes[1:]):
+        _rel(conn, subject, "is_a", object_)
+
+    result = reactors.observe_relation(conn, nodes[-1], "is_a", nodes[0], "src")
+
+    assert [event["event_type"] for event in result["events"]][-2:] == [
+        "contradiction_detected", "relation_retracted",
+    ]
+    assert sources.relations(
+        conn, subject=nodes[-1], predicate="is_a", object=nodes[0],
+    ) == []
+    assert inference.cycles(conn, "is_a") == []
 
 
 def test_learned_transitivity_does_not_imply_acyclicity_for_symmetric_relation():

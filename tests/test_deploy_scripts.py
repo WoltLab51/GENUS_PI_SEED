@@ -742,10 +742,13 @@ def test_gender_backfill_is_resumable_and_skips_already_known():
 
 def test_telegram_bot_installer_keeps_the_token_out_of_the_unit_file():
     script = (ROOT / "deploy" / "pi_install_telegram_bot.sh").read_text(encoding="utf-8")
-    # secrets live in their own 0600 files, never inline in the world-readable systemd unit
+    # The credential lives in its own 0600 file, never inline in the world-readable systemd unit.
+    # PID 1 must not load a user-replaceable EnvironmentFile before dropping to User=ronny;
+    # only the installer-validated numeric allow-list may be embedded in the root-owned unit.
     assert "chmod 600" in script
     assert "TOKEN_FILE" in script
-    assert "GENUS_TELEGRAM_ALLOWED_IDS" in script
+    assert "Environment=GENUS_TELEGRAM_ALLOWED_IDS=$ALLOWED_IDS" in script
+    assert "EnvironmentFile=" not in script
     assert "$BOT_TOKEN" not in script.split("ExecStart=")[1].split("\n")[0]  # not in ExecStart line
     # normal priority (responsive), unlike the deliberately idle-priority learner
     assert "CPUSchedulingPolicy=idle" not in script
@@ -813,8 +816,20 @@ def test_privileged_watchdog_repairs_service_identity_and_hardening_drift():
     assert "pi_install_learner.sh" in learner_fn
     assert "root scatter ledger detected" in learner_fn
 
-    assert "Environment=GENUS_TELEGRAM_STIMME=0" in bot_fn
-    assert "MemoryMax=3G" in bot_fn
+    assert "genus-telegram-bot.service -p Environment" in bot_fn
+    assert 'unit_environment_has_exact "$unit_env" "GENUS_DB_PATH=$DB_PATH"' in bot_fn
+    assert 'unit_environment_has_exact "$unit_env" "GENUS_TELEGRAM_ALLOWED_IDS=$allowed_ids"' in bot_fn
+    assert 'unit_environment_has_exact "$unit_env" "GENUS_TELEGRAM_STIMME=0"' in bot_fn
+    assert 'case " $environment " in' in script
+    assert '*" $assignment "*)' in script
+    assert "genus-telegram-bot.service -p EnvironmentFiles" in bot_fn
+    assert '"$unit_env_files"' in bot_fn
+    assert "genus-telegram-bot.service -p MemoryMax" in bot_fn
+    assert '"$unit_memory_max" != "3221225472"' in bot_fn
+    assert "genus-telegram-bot.service -p TasksMax" in bot_fn
+    assert '"$unit_tasks_max" != "64"' in bot_fn
+    assert "genus-telegram-bot.service -p NoNewPrivileges" in bot_fn
+    assert '"$unit_nnp" != "yes"' in bot_fn
     assert "genus-telegram-bot.service -p StandardOutput" in bot_fn
     assert '"$unit_stdout" != "journal"' in bot_fn
     assert '"$PRIVILEGED_DIR/pi_install_telegram_bot.sh"' in bot_fn

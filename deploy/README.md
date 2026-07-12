@@ -13,11 +13,14 @@ No daemon, no web API, no automatic remote execution by GENUS itself:
 The learner and Telegram services are pinned to the intended GENUS user, home,
 and ledger path even when installed through `sudo`. The Telegram membrane uses
 one process lock, keeps the optional second voice model disabled by default, and
-applies systemd memory, swap, and privilege limits. Re-run the corresponding
-installer after upgrades so changed unit properties take effect immediately.
+applies systemd memory, swap, and privilege limits. Its numeric allow-list is
+validated before being embedded in the root-owned unit; PID 1 never loads a
+user-replaceable `EnvironmentFile`. Re-run the corresponding installer after
+upgrades so changed unit properties take effect immediately.
 The privileged network watchdog also verifies those installed unit invariants on
-each tick and re-runs the idempotent installers when user, ledger path, memory
-limits, or Telegram model policy drift from the repository contract.
+each tick and re-runs the idempotent installers when effective user, ledger path,
+allow-list, journal, memory, task, privilege, or environment-file policy drifts
+from the repository contract.
 All three service installers refuse a silent `GENUS_USER=root` installation;
 an exceptional root-owned core requires the explicit `GENUS_ALLOW_ROOT=1`
 opt-in.

@@ -214,6 +214,15 @@ ensure_learner() {
 # read as the GENUS user, capped at 4 KiB, and accepted only in one canonical form; it is never
 # sourced or executed. Read-only
 # companion; deliberately NOT gated on pause (it responds on demand, it is not autonomous work).
+unit_environment_has_exact() {
+    local environment="$1"
+    local assignment="$2"
+    case " $environment " in
+        *" $assignment "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 ensure_telegram_bot() {
     local bot="$REPO_DIR/deploy/telegram_bot.py"
     local token_file="$GENUS_HOME/.genus/telegram_bot_token"
@@ -232,18 +241,46 @@ ensure_telegram_bot() {
     # frühere direkte systemd-run-Fallback konnte während Boot/Deploy neben ihr starten und
     # Telegram-HTTP-409 erzeugen. Existiert die Unit, startet der Watchdog ausschließlich sie.
     if systemctl cat genus-telegram-bot.service >/dev/null 2>&1; then
-        local unit_text unit_user unit_stdout unit_stderr
-        unit_text="$(systemctl cat genus-telegram-bot.service 2>/dev/null || true)"
+        local unit_user unit_env unit_env_files unit_stdout unit_stderr
+        local unit_memory_high unit_memory_max unit_memory_swap_max unit_tasks_max unit_nnp
         unit_user="$(systemctl show genus-telegram-bot.service -p User --value 2>/dev/null || true)"
+        unit_env="$(
+            systemctl show genus-telegram-bot.service -p Environment --value 2>/dev/null || true
+        )"
+        unit_env_files="$(
+            systemctl show genus-telegram-bot.service -p EnvironmentFiles --value 2>/dev/null || true
+        )"
         unit_stdout="$(
             systemctl show genus-telegram-bot.service -p StandardOutput --value 2>/dev/null || true
         )"
         unit_stderr="$(
             systemctl show genus-telegram-bot.service -p StandardError --value 2>/dev/null || true
         )"
+        unit_memory_high="$(
+            systemctl show genus-telegram-bot.service -p MemoryHigh --value 2>/dev/null || true
+        )"
+        unit_memory_max="$(
+            systemctl show genus-telegram-bot.service -p MemoryMax --value 2>/dev/null || true
+        )"
+        unit_memory_swap_max="$(
+            systemctl show genus-telegram-bot.service -p MemorySwapMax --value 2>/dev/null || true
+        )"
+        unit_tasks_max="$(
+            systemctl show genus-telegram-bot.service -p TasksMax --value 2>/dev/null || true
+        )"
+        unit_nnp="$(
+            systemctl show genus-telegram-bot.service -p NoNewPrivileges --value 2>/dev/null || true
+        )"
         if [ "$unit_user" != "$GENUS_USER" ] \
-           || ! grep -Fq "Environment=GENUS_TELEGRAM_STIMME=0" <<<"$unit_text" \
-           || ! grep -Fq "MemoryMax=3G" <<<"$unit_text" \
+           || ! unit_environment_has_exact "$unit_env" "GENUS_DB_PATH=$DB_PATH" \
+           || ! unit_environment_has_exact "$unit_env" "GENUS_TELEGRAM_ALLOWED_IDS=$allowed_ids" \
+           || ! unit_environment_has_exact "$unit_env" "GENUS_TELEGRAM_STIMME=0" \
+           || [ -n "$unit_env_files" ] \
+           || [ "$unit_memory_high" != "2621440000" ] \
+           || [ "$unit_memory_max" != "3221225472" ] \
+           || [ "$unit_memory_swap_max" != "536870912" ] \
+           || [ "$unit_tasks_max" != "64" ] \
+           || [ "$unit_nnp" != "yes" ] \
            || [ "$unit_stdout" != "journal" ] \
            || [ "$unit_stderr" != "journal" ]; then
             local ids

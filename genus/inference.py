@@ -450,52 +450,131 @@ def is_symmetric(conn, predicate: str, edges=None, rate: float | None = None) ->
 # transitive predicate must be ACYCLIC; a cycle is a self-contradiction in GENUS's own reasoning,
 # not a fact. `symmetry_evidence` only ever meets 2-cycles (mirrored pairs) as a by-product of
 # asking "is this symmetric?"; a real hierarchy can hide longer rings (A->B->C->A) it cannot see.
-# This is the honest, complete check -- cycles of ANY length. Read-time and glass-box: each cycle
-# is returned as its node ring so the contradiction can be shown and, where a direction is clearly
-# wrong, the offending edge retracted (`reactors.retract_relation`).
+# This is the honest, complete check -- cycles of ANY length. Read-time and glass-box: one
+# deterministic witness ring is returned for every cyclic strongly connected component so the
+# contradiction can be shown and, where a direction is clearly wrong, the offending edge retracted
+# (`reactors.retract_relation`). Enumerating every simple ring is exponential and unnecessary for
+# deciding acyclicity; iterative SCC discovery is linear and has no recursion/depth escape hatch.
 
-# A hierarchy cycle longer than this is inconceivable; a recursion guard, not a semantic limit.
-_MAX_CYCLE_LEN = 64
+
+def _strongly_connected_components(adj: dict[str, list[str]]) -> list[set[str]]:
+    """Return directed SCCs with iterative Kosaraju passes (no recursion limit)."""
+    nodes = set(adj)
+    reverse: dict[str, list[str]] = {}
+    for subject, objects in adj.items():
+        for object_ in objects:
+            nodes.add(object_)
+            reverse.setdefault(object_, []).append(subject)
+    for objects in reverse.values():
+        objects.sort()
+
+    seen: set[str] = set()
+    finish_order: list[str] = []
+    for root in sorted(nodes):
+        if root in seen:
+            continue
+        stack: list[tuple[str, bool]] = [(root, False)]
+        while stack:
+            node, finished = stack.pop()
+            if finished:
+                finish_order.append(node)
+                continue
+            if node in seen:
+                continue
+            seen.add(node)
+            stack.append((node, True))
+            for nxt in reversed(adj.get(node, ())):
+                if nxt not in seen:
+                    stack.append((nxt, False))
+
+    assigned: set[str] = set()
+    components: list[set[str]] = []
+    for root in reversed(finish_order):
+        if root in assigned:
+            continue
+        component = {root}
+        assigned.add(root)
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            for nxt in reverse.get(node, ()):
+                if nxt not in assigned:
+                    assigned.add(nxt)
+                    component.add(nxt)
+                    stack.append(nxt)
+        components.append(component)
+    return components
+
+
+def _cycle_witness(adj: dict[str, list[str]], component: set[str]) -> list[str]:
+    """Return one deterministic simple ring from a known cyclic component."""
+    start = min(component)
+    if start in adj.get(start, ()):
+        return [start]
+
+    for first in adj.get(start, ()):
+        if first not in component:
+            continue
+        parents: dict[str, str | None] = {first: None}
+        queue = deque([first])
+        while queue:
+            node = queue.popleft()
+            for nxt in adj.get(node, ()):
+                if nxt not in component:
+                    continue
+                if nxt == start:
+                    tail: list[str] = []
+                    cursor: str | None = node
+                    while cursor is not None:
+                        tail.append(cursor)
+                        cursor = parents[cursor]
+                    return [start, *reversed(tail)]
+                if nxt not in parents:
+                    parents[nxt] = node
+                    queue.append(nxt)
+    raise RuntimeError("cyclic component did not yield a cycle witness")
 
 
 def cycles(conn, predicate: str, edges=None, limit: int = 100) -> list[list[str]]:
-    """Every simple cycle in the ``predicate`` graph -- the acyclicity self-check. Each cycle is a
-    list of nodes ``[a, b, c]`` meaning ``a->b->c->a``, rotated to start at its smallest node so a
-    ring is reported exactly once (never once per rotation). Empty for an acyclic graph (a DAG --
-    the healthy case). Bounded by ``limit`` cycles so the read stays cheap on a large graph; the
-    ``> start`` pruning means each ring is enumerated only from its minimum node."""
+    """Cycle witnesses for the ``predicate`` graph -- the acyclicity self-check.
+
+    Returns one simple node ring ``[a, b, c]`` (meaning ``a->b->c->a``) for every cyclic strongly
+    connected component, ordered by its smallest node and bounded by ``limit`` witnesses. This is
+    complete for detecting acyclicity violations of *any* finite length while avoiding exponential
+    enumeration of every simple cycle. Empty means the graph is a DAG (the healthy case).
+    """
+    if limit <= 0:
+        return []
     if edges is None:
         edges = _edges(conn, predicate)
     adj = {subj: sorted({obj for obj, _ in objs}) for subj, objs in edges.items()}
-    found: list[list[str]] = []
-
-    def walk(start: str, node: str, path: list[str], seen: set[str]) -> None:
-        if len(found) >= limit or len(path) > _MAX_CYCLE_LEN:
-            return
-        for nxt in adj.get(node, ()):
-            if nxt == start:              # closed the ring back to its minimum node
-                found.append(list(path))
-                if len(found) >= limit:
-                    return
-            elif nxt > start and nxt not in seen:  # only nodes above the root -> each ring once
-                walk(start, nxt, path + [nxt], seen | {nxt})
-
-    for start in sorted(adj):
-        if len(found) >= limit:
-            break
-        walk(start, start, [start], {start})
-    return found
+    cyclic = [
+        component
+        for component in _strongly_connected_components(adj)
+        if len(component) > 1 or any(node in adj.get(node, ()) for node in component)
+    ]
+    cyclic.sort(key=min)
+    return [_cycle_witness(adj, component) for component in cyclic[:limit]]
 
 
-def reaches(conn, start: str, target: str, predicate: str, max_depth: int = MAX_DEPTH) -> bool:
-    """Does ``start`` reach ``target`` via ``predicate`` (start ->* target)? A bounded BFS over
-    indexed per-node lookups, so it touches only the path -- cheap enough to run at assertion time,
-    unlike building the whole adjacency. The depth bound matches the closure's."""
+def reaches(
+    conn, start: str, target: str, predicate: str, max_depth: int | None = None,
+) -> bool:
+    """Does ``start`` reach ``target`` via ``predicate`` (start ->* target)?
+
+    The default is exhaustive: this helper protects the hard hierarchy-acyclicity
+    invariant, so the inference engine's presentation bound (:data:`MAX_DEPTH`)
+    must never become a semantic escape hatch for a longer cycle.  ``max_depth``
+    remains available to explicitly bounded diagnostic callers.  The visited set
+    guarantees termination even when legacy data already contains a cycle, and
+    indexed per-subject lookups restrict work to the reachable component.
+    """
     if start == target:
         return True
     seen = {start}
     frontier = [start]
-    for _ in range(max_depth):
+    depth = 0
+    while frontier and (max_depth is None or depth < max_depth):
         nxt: list[str] = []
         for node in frontier:
             for row in sources.relations(conn, subject=node, predicate=predicate):
@@ -508,17 +587,21 @@ def reaches(conn, start: str, target: str, predicate: str, max_depth: int = MAX_
         if not nxt:
             break
         frontier = nxt
+        depth += 1
     return False
 
 
 def closes_cycle(conn, subject: str, predicate: str, object_: str) -> bool:
-    """Would asserting ``subject -predicate-> object_`` close a ring? True iff ``object_`` already
-    reaches ``subject`` AND the predicate is (learned) transitive -- then subject→object→…→subject
-    derives ``subject is_a subject`` and the hierarchy collapses: a self-contradiction, not a fact.
-    Reachability is checked first (cheap, targeted); the transitivity decision only when a ring
-    actually formed (rare), so the common assertion stays fast."""
+    """Would asserting ``subject -predicate-> object_`` violate explicit acyclicity?
+
+    True iff ``predicate`` belongs to :data:`ACYCLIC_PREDICATES` and ``object_`` already reaches
+    ``subject``. Then ``subject→object→…→subject`` collapses the hierarchy: a structural
+    self-contradiction, not a fact. Non-hierarchy predicates may legitimately contain rings.
+    """
     if predicate not in ACYCLIC_PREDICATES:
         return False
-    if not reaches(conn, object_, subject, predicate):
+    # Exhaustive reachability is deliberate.  ``MAX_DEPTH`` bounds read-time
+    # inference output; it cannot weaken this write-time structural invariant.
+    if not reaches(conn, object_, subject, predicate, max_depth=None):
         return False
     return True
