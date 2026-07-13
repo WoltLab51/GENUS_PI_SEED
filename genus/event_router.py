@@ -27,6 +27,7 @@ beiden Mengen. Ein neuer Event-Typ ohne Entscheidung (projiziert oder roh?) bric
 from __future__ import annotations
 
 import json
+from functools import wraps
 from typing import Callable
 
 from genus import (
@@ -45,6 +46,7 @@ def _mit_source_event(fn: Callable) -> Callable:
     """Adapter für die operation-Projektoren, die historisch ``_source_event`` erwarten
     (der Live-Schreibpfad setzt es auf die echte Event-Id; beim Replay ist das
     ``_event_id``). Verhalten-erhaltend aus der alten Kette übernommen."""
+    @wraps(fn)
     def wrapped(conn, payload: dict) -> None:
         payload["_source_event"] = payload["_event_id"]
         fn(conn, payload)
@@ -79,6 +81,47 @@ PROJEKTOREN: dict[str, Callable] = {
     "inquiries_reconciled": inquiries.apply_inquiries_reconciled,
 }
 
+# Maschinenlesbarer Wirkungsvertrag: Ein Event ist erst dann vollständig kartiert,
+# wenn neben seinem Replay-Projektor auch die persistierte Zielsicht benannt ist.
+# Die Reihenfolge der Ziele ist absichtlich irrelevant; die Replay-Reihenfolge unten
+# bleibt separat und explizit, weil Löschreihenfolgen ein Betriebsdetail sind.
+PROJEKTIONSZIELE: dict[str, frozenset[str]] = {
+    "evidence_recorded": frozenset({"value_projection"}),
+    "assertion_recorded": frozenset({"value_projection"}),
+    "belief_created": frozenset({"belief_projection"}),
+    "belief_confirmed": frozenset({"belief_projection"}),
+    "belief_weakened": frozenset({"belief_projection"}),
+    "belief_superseded": frozenset({"belief_projection"}),
+    "relation_asserted": frozenset({"relation_projection"}),
+    "relation_retracted": frozenset({"relation_projection"}),
+    "proposal_created": frozenset({"proposal_log"}),
+    "proposal_reviewed": frozenset({"proposal_log"}),
+    "experience_recorded": frozenset({"experience_log"}),
+    "experience_recharacterized": frozenset({"experience_log"}),
+    "state_changed": frozenset({"state_projection"}),
+    "governance_decision": frozenset({"governance_log"}),
+    "operation_check_recorded": frozenset({"operation_log"}),
+    "operation_recovery_attempted": frozenset({"operation_log"}),
+    "operation_recovery_result": frozenset({"operation_log"}),
+    "rule_activated": frozenset({"rule_projection"}),
+    "inquiry_created": frozenset({"inquiry_log"}),
+    "inquiry_resolved": frozenset({"inquiry_log"}),
+    "inquiries_reconciled": frozenset({"inquiry_log"}),
+}
+
+REPLAY_PROJEKTIONSTABELLEN: tuple[str, ...] = (
+    "rule_projection",
+    "governance_log",
+    "operation_log",
+    "inquiry_log",
+    "proposal_log",
+    "experience_log",
+    "state_projection",
+    "belief_projection",
+    "relation_projection",
+    "value_projection",
+)
+
 # Bewusst OHNE Projektion -- jede Zeile mit ihrem Grund:
 BEWUSST_ROH: frozenset[str] = frozenset({
     "observation_created",     # roher Beobachtungs-Marker; Werte leben in value_projection
@@ -102,10 +145,26 @@ BEWUSST_ROH: frozenset[str] = frozenset({
 })
 
 
-def registriere_projektor(event_type: str, fn: Callable) -> None:
-    """Trägt einen Projektor ins Register ein -- die eine Tür für neue Event-Typen.
-    Idempotent für dieselbe Funktion; ein ABWEICHENDER Eintrag für einen belegten Typ
-    ist ein Konstruktionsfehler und schlägt laut fehl (kein stilles Überschreiben)."""
+def registriere_projektor(
+    event_type: str,
+    fn: Callable,
+    *,
+    targets: frozenset[str],
+) -> None:
+    """Trägt Projektor UND persistierte Ziele atomar in den Wirkungsvertrag ein.
+
+    Idempotent für dieselbe Funktion und dieselben Ziele; ein abweichender Eintrag ist
+    ein Konstruktionsfehler. Neue Zieltabellen müssen zuerst Teil der expliziten
+    Replay-Leerliste werden -- sonst wäre der neue Projektor nicht replaybar.
+    """
+    if not targets:
+        raise ValueError(f"Projektor für '{event_type}' braucht mindestens ein Projektionsziel")
+    unbekannte_ziele = targets - set(REPLAY_PROJEKTIONSTABELLEN)
+    if unbekannte_ziele:
+        raise ValueError(
+            f"Projektionsziele für '{event_type}' fehlen in der Replay-Leerliste: "
+            f"{sorted(unbekannte_ziele)}"
+        )
     bestehend = PROJEKTOREN.get(event_type)
     if bestehend is not None and bestehend is not fn:
         raise ValueError(
@@ -117,7 +176,14 @@ def registriere_projektor(event_type: str, fn: Callable) -> None:
             f"'{event_type}' ist als bewusst-roh deklariert -- erst dort austragen, "
             f"dann registrieren (eine Entscheidung, nicht zwei halbe)"
         )
+    bestehende_ziele = PROJEKTIONSZIELE.get(event_type)
+    if bestehende_ziele is not None and bestehende_ziele != targets:
+        raise ValueError(
+            f"Projektionsziele für '{event_type}' sind schon registriert: "
+            f"{sorted(bestehende_ziele)}"
+        )
     PROJEKTOREN[event_type] = fn
+    PROJEKTIONSZIELE[event_type] = targets
 
 
 def replay(conn, *, commit: bool = True) -> dict:
@@ -129,16 +195,8 @@ def replay(conn, *, commit: bool = True) -> dict:
     into the tiny gaps and create a false ``state changed after replay`` failure.
     """
     events = conn.execute("SELECT * FROM event_log ORDER BY id").fetchall()
-    conn.execute("DELETE FROM rule_projection")
-    conn.execute("DELETE FROM governance_log")
-    conn.execute("DELETE FROM operation_log")
-    conn.execute("DELETE FROM inquiry_log")
-    conn.execute("DELETE FROM proposal_log")
-    conn.execute("DELETE FROM experience_log")
-    conn.execute("DELETE FROM state_projection")
-    conn.execute("DELETE FROM belief_projection")
-    conn.execute("DELETE FROM relation_projection")
-    conn.execute("DELETE FROM value_projection")
+    for table in REPLAY_PROJEKTIONSTABELLEN:
+        conn.execute(f"DELETE FROM {table}")
     conn.execute(
         """
         DELETE FROM sqlite_sequence

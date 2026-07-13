@@ -6,42 +6,23 @@ Der Replay-Determinismus-Test (test_integrity) fängt eine VERPFUSCHTE Migration
 das Register vom alten Verhalten ab, wird er rot. Aber eine später VERGESSENE
 Registrierung fehlt auf beiden Seiten des Vergleichs -- beide einig, grün, obwohl falsch.
 Dieser Test schließt genau die Lücke: er liest aus dem QUELLTEXT, welche Event-Typen
-irgendwo im Kern je geschrieben werden (``ledger.append``-Literale, konstanten-aufgelöst,
+irgendwo im Kern je geschrieben werden (rekursiver AST-Scanner für ``ledger.append``,
+Konstanten aufgelöst,
 plus der eine bewusste Direkt-INSERT der Siegel-Epoche), und erzwingt, dass jeder davon
 in GENAU EINER der beiden Router-Mengen steht: ``PROJEKTOREN`` (projiziert) oder
 ``BEWUSST_ROH`` (mit Absicht und dokumentiertem Grund roh). Ein neuer Event-Typ ohne
 diese Entscheidung bricht CI -- und ein Tippfehler in einem Register-Schlüssel auch
 (er entspräche keinem je geschriebenen Typ).
 """
-import re
-from pathlib import Path
-
 import pytest
 
-from genus import event_router, integrity
-
-ROOT = Path(__file__).resolve().parents[1]
-
-_LITERAL = re.compile(r'ledger\.append\(\s*conn,\s*"([a-z_]+)"')
-_KONSTANTE = re.compile(r"ledger\.append\(\s*conn,\s*([A-Z][A-Z_]*)\b")
+from genus import event_router, integrity, kartografie
 
 
 def _geschriebene_event_typen() -> set[str]:
-    typen: set[str] = set()
-    for py in sorted((ROOT / "genus").glob("*.py")):
-        text = py.read_text(encoding="utf-8")
-        typen.update(_LITERAL.findall(text))
-        for name in _KONSTANTE.findall(text):
-            wert = re.search(rf'^{name} = "([a-z_]+)"', text, re.MULTILINE)
-            assert wert is not None, (
-                f"{py.name}: ledger.append mit Konstante {name}, deren Wert dieser Test "
-                f"nicht auflösen kann -- Konstante im selben Modul als NAME = \"...\" definieren"
-            )
-            typen.add(wert.group(1))
-    # Der eine bewusste Weg an ledger.append vorbei: sealing.open_epoch schreibt den
-    # Epochen-Marker direkt (die Versiegelung IST der Mechanismus unter dem Ledger).
-    typen.add("ledger_epoch_opened")
-    return typen
+    # Produktiver AST-Scanner: rekursiv, lazy/eager-importfähig und gemeinsam mit der
+    # Kartografie. Der eine bewusste Direkt-INSERT der Siegel-Epoche ist dort deklariert.
+    return set(kartografie.written_event_types())
 
 
 def test_jeder_geschriebene_event_typ_ist_entschieden():
@@ -83,18 +64,29 @@ def test_registrierung_ist_die_eine_tuer():
         pass
 
     # idempotent für dieselbe Funktion
-    event_router.registriere_projektor("test_nur_hier", fake_projektor)
+    targets = frozenset({"value_projection"})
+    event_router.registriere_projektor("test_nur_hier", fake_projektor, targets=targets)
     try:
-        event_router.registriere_projektor("test_nur_hier", fake_projektor)
+        event_router.registriere_projektor("test_nur_hier", fake_projektor, targets=targets)
+        assert event_router.PROJEKTIONSZIELE["test_nur_hier"] == targets
         # ein ABWEICHENDER Eintrag für einen belegten Typ schlägt laut fehl
         with pytest.raises(ValueError, match="schon registriert"):
-            event_router.registriere_projektor("test_nur_hier", lambda conn, payload: None)
+            event_router.registriere_projektor(
+                "test_nur_hier", lambda conn, payload: None, targets=targets
+            )
+        with pytest.raises(ValueError, match="schon registriert"):
+            event_router.registriere_projektor(
+                "test_nur_hier",
+                fake_projektor,
+                targets=frozenset({"relation_projection"}),
+            )
     finally:
         del event_router.PROJEKTOREN["test_nur_hier"]
+        del event_router.PROJEKTIONSZIELE["test_nur_hier"]
 
     # ein bewusst-roher Typ lässt sich nicht nebenbei projizieren
     with pytest.raises(ValueError, match="bewusst-roh"):
-        event_router.registriere_projektor("forecast_made", fake_projektor)
+        event_router.registriere_projektor("forecast_made", fake_projektor, targets=targets)
 
 
 def test_apply_event_schlaegt_im_register_nach(conn):

@@ -600,6 +600,22 @@ def snapshot_event_log(conn) -> list[dict]:
     ]
 
 
+# Der Snapshot benennt seine Tabellen ausdrücklich, damit Router-Ziele, Replay-Clear-Liste
+# und Integritätsvergleich maschinenlesbar gegeneinander geprüft werden können.
+SNAPSHOT_PROJEKTIONSTABELLEN: dict[str, str] = {
+    "beliefs": "belief_projection",
+    "proposals": "proposal_log",
+    "inquiries": "inquiry_log",
+    "experiences": "experience_log",
+    "states": "state_projection",
+    "governance": "governance_log",
+    "operations": "operation_log",
+    "rules": "rule_projection",
+    "relations": "relation_projection",
+    "values": "value_projection",
+}
+
+
 def snapshot_projections(conn) -> dict:
     beliefs = [
         dict(row)

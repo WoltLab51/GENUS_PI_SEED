@@ -104,7 +104,8 @@ der Event-Vertrag und seine Tests verhindern anschließend stille Drift.
 
 Der Event-Router besitzt eine explizite Registry. Jeder Eventtyp ist entweder:
 
-- **projiziert** — mit genau benanntem Projektor, oder
+- **projiziert** — mit genau benanntem Projektor und persistiertem Ziel in
+  `event_router.PROJEKTIONSZIELE`, oder
 - **bewusst roh** — bleibt ausschließlich im Ledger.
 
 Ein unbekannter Typ oder ein Typ ohne erklärte Route ist ein Fehler. Der vollständige,
@@ -252,6 +253,17 @@ deploy membranes and services
 
 Zyklen zwischen Fachmodulen sind ein Signal, gemeinsam genutzte Mechanik nach unten zu
 ziehen oder eine Registry-/Vertragsgrenze einzuführen.
+
+Die operationalisierte Abhängigkeitssicht wird nicht von Hand nachgezeichnet:
+[GENUS-Kartografie](visual/GENUS_KARTOGRAFIE.html) und
+[Maschinendaten](generated/GENUS_KARTOGRAFIE.json) werden aus dem rekursiven Python-AST,
+dem SQL-Schema, Event-/Projektionsregistern und wenigen quellengebundenen Wirkungskanten
+erzeugt. Python-Module und -Imports werden vollständig rekursiv gescannt; dynamisches SQL
+wird als Analysegrenze ausgewiesen, wenn kein Tabellenziel belegbar ist. Shell-, systemd-
+und Cronpfade sind quellengebundene Runtime-Verträge, kein vorgetäuschter vollständiger
+Shell-AST. `genus kartografie check` verhindert Repo- und Artefaktdrift, verbindet sich aber
+nicht live mit dem Pi. Eager und lazy Imports bleiben getrennt sichtbar; ein Laufzeitzyklus
+ist ein Architekturhinweis, nicht automatisch ein Defekt.
 
 ## 10. Bewusste Grenzen
 

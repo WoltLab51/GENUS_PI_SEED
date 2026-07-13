@@ -78,9 +78,9 @@ def observe_assertion(
 
     The value is fetched by the membrane (a second weather provider, an almanac, later
     you or a model) and handed in; only ``(claim, source, value)`` crosses. The core
-    stays pure -- no fetch here. ``assertion_recorded`` is a raw fact (not projected),
-    so it is replay-stable; source trust and consensus over the candidates are computed
-    read-time in ``genus/sources.py``.
+    stays pure -- no fetch here. ``assertion_recorded`` is projected into
+    ``value_projection`` and is replay-stable; source trust and consensus over the
+    candidates are computed read-time in ``genus/sources.py``.
     """
     try:
         payload = {
@@ -214,9 +214,10 @@ def observe_relation(
     """Record a relation between two entities -- networked knowledge, not just a value.
 
     The structure pillar of the WISSEN layer: a ``(subject, predicate, object)`` triple
-    asserted by a source, e.g. ``(system.thermal, correlates_with, system.load)``. A raw
-    fact (not projected -> replay-stable); read as a graph via ``genus relations``. The
-    same source-trust applies, so a relation from a distrusted source is held lightly.
+    asserted by a source, e.g. ``(system.thermal, correlates_with, system.load)``. The
+    fact is projected into ``relation_projection`` and is replay-stable; it is read as a
+    graph via ``genus relations``. The same source-trust applies, so a relation from a
+    distrusted source is held lightly.
 
     ``commit=False`` defers the commit to the caller -- for a bulk apply (tausende Kanten, z.B.
     der Verwandtschafts-Nachtlauf) hält der Aufrufer EINE Transaktion offen und committet
@@ -340,9 +341,9 @@ def retract_relation(
     conn, subject: str, predicate: str, object_: str, source: str | None = None, reason: str | None = None
 ) -> dict:
     """Take a relation back -- the honest counterpart to acquiring one. A source can be
-    wrong (a mis-resolved word, a corrected mapping); ``relation_retracted`` is a raw fact
-    that removes the edge from the graph on replay. With ``source`` only that source's edge
-    goes; without it the triple is removed for every source.
+    wrong (a mis-resolved word, a corrected mapping); ``relation_retracted`` is projected
+    by removing the edge from ``relation_projection`` on replay. With ``source`` only that
+    source's edge goes; without it the triple is removed for every source.
     """
     try:
         subject, object_ = relation_semantics.canonical_pair(subject, predicate, object_)

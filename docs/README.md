@@ -14,10 +14,10 @@ wertvollen **Entstehungsgeschichte**.
 |---|---|---|
 | GENUS zum ersten Mal siehst | [Charter](CHARTER.md) | [NOW](NOW.md) |
 | heute weiterbauen willst | [NOW](NOW.md) | [Roadmap](ROADMAP.md) · [Quality](QUALITY.md) |
-| einen Kernvertrag änderst | [Architektur](ARCHITECTURE.md) | [Event-Vertrag](EVENT_CONTRACT.md) · [Security](SECURITY_MODEL.md) |
+| einen Kernvertrag änderst | [Architektur](ARCHITECTURE.md) | [GENUS-Kartografie](visual/GENUS_KARTOGRAFIE.html) · [Event-Vertrag](EVENT_CONTRACT.md) |
 | eine frühere Entscheidung verstehen willst | [Decisions](decisions/README.md) | [Baujournal](history/BUILD_JOURNAL.md) |
 | den Pi betreibst | [Operations](operations/README.md) | [Deploy-Runbook](../deploy/README.md) |
-| nach Ideen und Tiefe suchst | [Research](#research--offene-denkräume) | [Visual Atlas](visual/ATLAS.html) |
+| nach Ideen und Tiefe suchst | [Research](#research--offene-denkräume) | [historischer Visual Atlas](visual/ATLAS.html) |
 
 ## Was darf was bestimmen?
 
@@ -48,6 +48,10 @@ wertvollen **Entstehungsgeschichte**.
 - [NOW.md](NOW.md) — der kurze, überprüfbare Ist-Stand und genau die nächsten Prioritäten.
 - [ROADMAP.md](ROADMAP.md) — nur Zukunft, Abhängigkeiten und Definition of Done.
 - [generated/ATLAS_FACTS.md](generated/ATLAS_FACTS.md) — maschinell erzeugte aktuelle Fakten.
+- [generated/GENUS_KARTOGRAFIE.md](generated/GENUS_KARTOGRAFIE.md) — Modul-, Event-,
+  Lernwirkungs- und Pi-Abhängigkeiten, mit Quellen und Drift-Gate.
+- [visual/GENUS_KARTOGRAFIE.html](visual/GENUS_KARTOGRAFIE.html) — dieselbe Karte
+  interaktiv nach Wirkung, Events, Lernen, Modulen und Betrieb erkunden.
 
 Live-Zahlen gehören in `NOW` nur als datierter Beleg oder in eine generierte Projektion.
 Sie gehören nicht in zeitlose Verträge.
@@ -89,6 +93,7 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [Kern-/Pi-Härtungs-Audit vom 2026-07-12](reports/2026-07-12-hardening-audit.md)
 - [Systemaudit, Morphologie und SWOT vom 2026-07-12](reports/2026-07-12-system-audit.md)
 - [H0.1-Vorabprofil und Messdesign vom 2026-07-13](reports/2026-07-13-h0-1-baseline/report.html)
+- [Runtime-Kartografie und Pi-Audit vom 2026-07-13](reports/2026-07-13-cartography-runtime-audit.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 
@@ -98,11 +103,14 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
 - [Frühere Gesamtansicht](history/GESAMTBILD_2026-06-28.md)
 - [Zielarchitektur-Snapshot v2](history/TARGET_ARCHITECTURE_2026-07-04.md)
 - [Ledger-Audit v1.5](history/LEDGER_AUDIT_v1.5.md)
-- [Core Map](visual/CORE_MAP.html) · [Visual Atlas](visual/ATLAS.html)
+- [Aktuelle GENUS-Kartografie](visual/GENUS_KARTOGRAFIE.html)
+- [Historischer Core Map](visual/CORE_MAP.html) · [historischer Visual Atlas](visual/ATLAS.html)
 - [Parked](parked/README.md) — sichtbar, aber nicht entschieden.
 - [Archive](archive/README.md) — superseded Specs und Prompts.
 
-Visualisierungen erklären Verträge; sie sind selbst keine Build-Autorität.
+Historische Visualisierungen erklären frühere Verträge; sie sind selbst keine
+Build-Autorität. Die aktuelle GENUS-Kartografie ist eine generierte Projektion und wird
+über `genus kartografie check` gegen Code, Eventregister und Quellenfundstellen geprüft.
 
 ## Operations und Security Reporting
 

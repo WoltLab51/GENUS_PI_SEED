@@ -159,6 +159,9 @@ Die kurze Checkliste – wenn alle fünf Haken sitzen, bleibt der Kern rund:
 - [ ] `REQUIRED_EVENT_KEYS` enthält den Typ und seine minimalen Pflichtfelder.
 - [ ] Der Typ steht **genau einmal** im Router: als Projektor oder mit begründetem
   Eintrag in `BEWUSST_ROH`.
+- [ ] Ein projizierter Typ registriert Projektor **und** persistierte Ziele atomar über
+  `registriere_projektor(..., targets=...)`; jedes Ziel steht in Replay-Leerliste und
+  Integritätssnapshot.
 - [ ] Diese Katalogtabelle enthält exakt dieselben Pflichtfelder und die richtige
   Route; der Drift-Test ist grün.
 - [ ] Für projizierte Events beweist ein Test: Snapshot vor Replay = Snapshot

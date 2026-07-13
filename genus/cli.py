@@ -48,7 +48,7 @@ from genus import (
     werkzeug,
     werkzeuge_seed,
 )
-from genus import cli_betriebsprofil, cli_inquiries, cli_relations
+from genus import cli_betriebsprofil, cli_inquiries, cli_kartografie, cli_relations
 from genus.cli_format import (
     _print_active_belief_summary,
     _print_ask_response,
@@ -90,6 +90,7 @@ def main() -> None:
 cli_inquiries.register(main, lambda: get_conn())
 cli_relations.register(main, lambda: get_conn())
 cli_betriebsprofil.register(main)
+cli_kartografie.register(main)
 
 
 @main.command("doctor")

@@ -19,7 +19,8 @@ außerhalb des Wahrheitskerns.
 | Ereignisse und Pflichtfelder nachschlagen | [Event-Vertrag](docs/EVENT_CONTRACT.md) |
 | Sicherheitsgrenzen prüfen | [Security-Modell](docs/SECURITY_MODEL.md) |
 | auf dem Pi deployen oder diagnostizieren | [Pi-Runbook](deploy/README.md) |
-| stöbern und Zusammenhänge sehen | [Dokumentationskarte](docs/README.md) · [Visual Atlas](docs/visual/ATLAS.html) |
+| Abhängigkeiten und Wirkungen prüfen | [GENUS-Kartografie](docs/visual/GENUS_KARTOGRAFIE.html) · [maschinelle Daten](docs/generated/GENUS_KARTOGRAFIE.json) |
+| stöbern und Entstehung sehen | [Dokumentationskarte](docs/README.md) · [historischer Visual Atlas](docs/visual/ATLAS.html) |
 
 ## Wie GENUS denkt
 
@@ -121,6 +122,7 @@ genus inquiries list                 # benannte Unsicherheit
 genus knowledge                      # Wissensgraph und Strukturkonflikte
 genus skills                         # Fähigkeits-Thermometer
 genus betriebsprofil status          # private 24/48/72-Messreihe prüfen
+genus kartografie check              # Modul-, Event-, Wirkungs- und Pi-Karte prüfen
 genus replay                         # Projektionen deterministisch rekonstruieren
 genus integrity check                # Verträge und Projektionen prüfen
 genus ledger verify                  # Seal-Kette prüfen
