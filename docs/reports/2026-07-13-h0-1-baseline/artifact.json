@@ -3,8 +3,8 @@
   "manifest": {
     "version": 1,
     "surface": "report",
-    "title": "GENUS H0.1 – Vorab-Baseline des Ereignisflusses",
-    "description": "Technische Vorab-Baseline für das 24/48/72-Stunden-Betriebs- und Ereignisprofil von GENUS.",
+    "title": "GENUS H0.1 – Vorab-Analyse und Live-Startbeleg",
+    "description": "Technische Vorab-Analyse und verifizierter Startbeleg für das laufende 24/48/72-Stunden-Betriebs- und Ereignisprofil von GENUS.",
     "generatedAt": "2026-07-13T07:11:46.185Z",
     "charts": [
       {
@@ -353,6 +353,11 @@
         "path": "docs/reports/2026-07-13-h0-1-baseline/pre-fix-comparison.json"
       },
       {
+        "id": "live_baseline_receipt_file",
+        "label": "GENUS Pi – verifizierter H0.1-Live-Startbeleg",
+        "path": "docs/reports/2026-07-13-h0-1-baseline/live-baseline-receipt.json"
+      },
+      {
         "id": "filesystem_snapshot_file",
         "label": "GENUS Pi – datierte Main/WAL/SHM-Dateisystemprobe",
         "path": "docs/reports/2026-07-13-h0-1-baseline/filesystem-snapshot.json"
@@ -414,18 +419,30 @@
       {
         "id": "title",
         "type": "markdown",
-        "body": "# GENUS H0.1 – Vorab-Baseline des Ereignisflusses"
+        "body": "# GENUS H0.1 – Vorab-Analyse und Live-Startbeleg"
       },
       {
         "id": "technical_summary",
         "type": "markdown",
-        "body": "## Technischer Kurzbefund\n\nDie Vorab-Baseline zeigt eine historische Vor-Fix-Belastung: einen kurzen, sehr großen Ereignis-Burst, eine Similarity-Kandidatenquote von 34,9 % und danach wieder niedrigen stündlichen Hintergrundfluss. Die geprüfte Ledger-Struktur ist sauber. Commit `772aad0` dokumentiert mit seinem Betreff die Härtung zum Begrenzen des Graphwachstums und des privilegierten Runtime-Pfads.\n\n**Entscheidung für H0.1:** Das Ledger selbst ist kein Wachstumsziel. Der 24/48/72-Stunden-Lauf soll jetzt Post-Fix-Nichtwiederkehr und Wirkung belegen: weniger vermeidbare Wiederholung bei mindestens gleich guter Evidenz und mehr belegbarem Können pro gespeichertem Ereignis. Mit dieser Vorab-Baseline ist das noch nicht abgeschlossen."
+        "body": "## Technischer Kurzbefund\n\nDie Vorab-Analyse zeigt eine historische Vor-Fix-Belastung: einen kurzen, sehr großen Ereignis-Burst, eine Similarity-Kandidatenquote von 34,9 % und danach wieder niedrigen stündlichen Hintergrundfluss. Die geprüfte Ledger-Struktur ist sauber. Commit `772aad0` dokumentiert mit seinem Betreff die Härtung zum Begrenzen des Graphwachstums und des privilegierten Runtime-Pfads.\n\nDer formale H0.1-Lauf ist inzwischen verifiziert gestartet. Er besitzt **eine Baseline-Capture**; h24, h48 und h72 sind noch offen. Das Ledger selbst bleibt kein Wachstumsziel: Der Lauf soll Post-Fix-Nichtwiederkehr und Wirkung belegen – weniger vermeidbare Wiederholung bei mindestens gleich guter Evidenz und mehr belegbarem Können pro gespeichertem Ereignis."
+      },
+      {
+        "id": "live_run_status",
+        "type": "markdown",
+        "sourceId": "live_baseline_receipt_file",
+        "body": "## Der echte 24/48/72-Stunden-Lauf läuft – er ist nicht fertig\n\nDeployment-Commit `068f0ca` bestand auf dem Pi **1.318 Linux-Tests**. Lauf `h0-1-20260713T085546Z` startete am **13. Juli um 08:55:46 UTC** und erfasste seine Baseline bei **Head 938.616** mit **160.986 Ereignissen** im rollierenden 24-Stunden-Fenster. Die Capture lag nur **0,001 Sekunden** hinter ihrem Sollzeitpunkt; die Kontinuität wurde über das vollständige ID-Präfix belegt.\n\n- **Status:** `running`\n- **Captures:** 1 von 4\n- **Nächster Punkt:** h24\n- **Nächster Fälligkeitstermin:** 14. Juli, 08:55:46 UTC\n\n**Offen bleiben h24, h48 und h72.** Erst nach diesen drei disjunkten Intervallen ist H0.1 auswertbar."
+      },
+      {
+        "id": "live_run_verification",
+        "type": "markdown",
+        "sourceId": "live_baseline_receipt_file",
+        "body": "**Privater Laufzustand verifiziert.** Die Baseline-Erfassung dauerte beobachtet **46,7 Sekunden**. Das Profilverzeichnis ist eigentümerprivat mit Modus `0700`; Baseline, Manifest und Lockdatei besitzen jeweils Modus `0600` und Linkanzahl 1. Ihre Größen betragen **9.806**, **1.341** und **1 Byte**. Der stündliche Cron läuft zur Minute 23 über die verifizierte System-Bash; der exakte No-op-Aufruf endete mit Code 0 und blieb auf Standardausgabe und Standardfehler still. Die Evidenzquelle speichert weder Pfade noch Zugangsdaten."
       },
       {
         "id": "baseline_scale",
         "type": "markdown",
         "sourceId": "ledger_summary_sql",
-        "body": "## Der Fixpunkt ist groß, aber nicht der Erfolgsmaßstab\n\nAm 13. Juli um 07:11:46 UTC lag der fixierte Kopf bei **938.171 Ereignissen**. Im davorliegenden rollierenden 24-Stunden-Fenster wurden **161.086 Ereignisse** gezählt; die bis zum Snapshot erst elf Minuten alte laufende Stunde enthielt **72 Ereignisse** und wird deshalb nicht in der 48-Stunden-Linie verwendet.\n\nDiese Werte beschreiben Last und Speicherbedarf. Sie belegen für sich allein weder Lernen noch Reife."
+        "body": "## Der historische Vorab-Fixpunkt ist groß, aber nicht der Laufanker\n\nAm 13. Juli um 07:11:46 UTC lag der fixierte **Vorab-Snapshot** bei Head **938.171**. Im davorliegenden rollierenden 24-Stunden-Fenster wurden **161.086 Ereignisse** gezählt; die bis zum Snapshot erst elf Minuten alte laufende Stunde enthielt **72 Ereignisse** und wird deshalb nicht in der 48-Stunden-Linie verwendet.\n\nDieser Snapshot trägt ausschließlich die historische Analyse. Der getrennt dokumentierte formale Live-Laufanker darf mit ihm nicht vermischt werden."
       },
       {
         "id": "ledger_exact",
@@ -490,7 +507,7 @@
       {
         "id": "scope_definitions",
         "type": "markdown",
-        "body": "## Was diese Vorab-Baseline misst\n\n- **Kohorte:** alle Ledger-Ereignisse bis einschließlich Event-ID 938.171.\n- **Stundenlinie:** 48 vollständige UTC-Stunden von 11. Juli 07:00 bis 13. Juli 07:00; fehlende Stunden werden explizit mit null gefüllt.\n- **24-Stunden-Fenster:** rollierend rückwärts ab dem Snapshotzeitpunkt, nicht nach Kalendertagen.\n- **Ereignis:** eine Zeile in `event_log`; dies ist kein Synonym für Erkenntnis oder Fähigkeit.\n- **Payload-Bytes:** `length(CAST(payload AS BLOB))`, also gespeicherte SQLite-Bytes statt Textzeichenzahl.\n- **Similarity-Wiederholung:** Intervallereignis, dessen kanonische Kante mit gleicher Derivation bereits bei einer kleineren Event-ID im Ledger vorkam.\n- **Vergleichsbasis:** noch keine Längsschnitt-Baseline. Der spätere H0.1-Lauf vergleicht disjunkte Event-ID-Intervalle bei 24, 48 und 72 Stunden."
+        "body": "## Welche zwei Messanker dieser Bericht verwendet\n\n- **Vorab-Snapshot:** Head 938.171 um 07:11:46 UTC; Grundlage der historischen 48-Stunden-, Burst- und Similarity-Analyse.\n- **Live-Laufbaseline:** Head 938.616 um 08:55:46 UTC; formaler Anker des laufenden Profils mit Run-ID `h0-1-20260713T085546Z`.\n- **Stundenlinie:** 48 vollständige UTC-Stunden von 11. Juli 07:00 bis 13. Juli 07:00; fehlende Stunden werden explizit mit null gefüllt.\n- **24-Stunden-Fenster:** jeweils rollierend rückwärts ab dem zugehörigen Snapshotzeitpunkt, nicht nach Kalendertagen.\n- **Ereignis:** eine Zeile in `event_log`; dies ist kein Synonym für Erkenntnis oder Fähigkeit.\n- **Payload-Bytes:** `length(CAST(payload AS BLOB))`, also gespeicherte SQLite-Bytes statt Textzeichenzahl.\n- **Similarity-Wiederholung:** Intervallereignis, dessen kanonische Kante mit gleicher Derivation bereits bei einer kleineren Event-ID im Ledger vorkam.\n- **Längsschnitt:** Erst h24, h48 und h72 liefern die drei disjunkten Post-Baseline-Intervalle."
       },
       {
         "id": "storage_finding",
@@ -530,12 +547,12 @@
       {
         "id": "limitations",
         "type": "markdown",
-        "body": "## Was diese Vorab-Baseline noch nicht beweist\n\n- Der vierstündige Vor-Fix-Burst ist beschrieben, aber in diesem Report noch keinem Prozess eindeutig kausal zugeordnet.\n- Die historische Vorher-Baseline beweist noch nicht, dass Commit `772aad0` wirkt; dafür braucht es die disjunkten Post-Fix-Intervalle.\n- Produzentenfamilien im H0.1-Profiler sind statische Ereignistyp-Proxys, keine beobachteten Prozessidentitäten.\n- Die Similarity-Regel erkennt eine enge Form semantischer Wiederholung; andere Wiederholungen bleiben ungezählt, legitime erneute Evidenz kann enthalten sein.\n- Ein einzelner Snapshot erlaubt keine Aussage über 24-, 48- oder 72-Stunden-Stabilität.\n- Projektionsgrößen messen Bestand. Ob daraus bessere Antworten oder belastbares neues Können entstehen, braucht separate Qualitätsproben."
+        "body": "## Was der laufende Status noch nicht beweist\n\n- Der vierstündige Vor-Fix-Burst ist beschrieben, aber in diesem Report noch keinem Prozess eindeutig kausal zugeordnet.\n- Die historische Vorher-Baseline und der erfolgreiche Live-Start beweisen noch nicht, dass Commit `772aad0` im Dauerbetrieb wirkt; dafür braucht es h24, h48 und h72.\n- Produzentenfamilien im H0.1-Profiler sind statische Ereignistyp-Proxys, keine beobachteten Prozessidentitäten.\n- Die Similarity-Regel erkennt eine enge Form semantischer Wiederholung; andere Wiederholungen bleiben ungezählt, legitime erneute Evidenz kann enthalten sein.\n- Der echte Lauf besitzt bislang nur seine Baseline und noch kein abgeschlossenes Post-Baseline-Intervall.\n- Projektionsgrößen messen Bestand. Ob daraus bessere Antworten oder belastbares neues Können entstehen, braucht separate Qualitätsproben."
       },
       {
         "id": "next_steps",
         "type": "markdown",
-        "body": "## Nächste Messpunkte\n\n1. Den privaten Profiler starten und die echte `baseline` mit diesem Vorab-Snapshot eng abgleichen.\n2. Bei 24, 48 und 72 Stunden ausschließlich den jeweils fälligen, disjunkten Post-Fix-Event-ID-Abschnitt erfassen.\n3. Prüfen, ob der Vier-Stunden-Burst und die historische Similarity-Kandidatenquote von 34,9 % nach Commit `772aad0` nicht wiederkehren beziehungsweise deutlich sinken.\n4. Nur bei einer Wiederkehr Produzent und Ursache gezielt diagnostizieren; weitere Kernänderungen benötigen neue Post-Fix-Evidenz.\n5. Nach 72 Stunden ein Ereignisbudget aus Wirkung ableiten: Zielgröße ist mehr belegbares Können pro gespeichertem Ereignis, nicht ein kleiner oder großer Ledger um seiner selbst willen."
+        "body": "## Nächste Messpunkte\n\n1. Am 14. Juli um 08:55:46 UTC die fällige h24-Capture und ihre Kontinuität verifizieren.\n2. Danach h48 und h72 als jeweils disjunkte Event-ID-Abschnitte erfassen; der Lauf bleibt bis h72 `running`.\n3. Prüfen, ob der Vier-Stunden-Burst und die historische Similarity-Kandidatenquote von 34,9 % in den Post-Baseline-Intervallen nicht wiederkehren beziehungsweise deutlich sinken.\n4. Nur bei einer Wiederkehr Produzent und Ursache gezielt diagnostizieren; weitere Kernänderungen benötigen neue Post-Fix-Evidenz.\n5. Nach h72 ein Ereignisbudget aus Wirkung ableiten: Zielgröße ist mehr belegbares Können pro gespeichertem Ereignis, nicht ein kleiner oder großer Ledger um seiner selbst willen."
       },
       {
         "id": "further_questions",
@@ -585,6 +602,25 @@
           "value": 72,
           "unit": "Ereignisse",
           "scope": "07:00:00–07:11:46 UTC; nicht hochgerechnet"
+        }
+      ],
+      "live_baseline_receipt": [
+        {
+          "deployed_commit": "068f0ca36f1fbd7d6cfc4c1df63e329ef13fb602",
+          "pi_linux_tests_passed": 1318,
+          "run_id": "h0-1-20260713T085546Z",
+          "status": "running",
+          "started_at": "2026-07-13T08:55:46.194Z",
+          "baseline_head_event_id": 938616,
+          "rolling_24h_event_count": 160986,
+          "late_by_seconds": 0.001,
+          "continuity_basis": "full_prefix",
+          "captures": 1,
+          "next_label": "h24",
+          "next_due_at": "2026-07-14T08:55:46.194Z",
+          "files_verified": true,
+          "observed_capture_wall_seconds": 46.7,
+          "source_id": "live_baseline_receipt_file"
         }
       ],
       "hourly_48h": [
@@ -811,6 +847,11 @@
       "id": "pre_fix_comparison_file",
       "label": "GENUS – kombinierter Vor-Fix-Ereignis-/Commit-Vergleich",
       "path": "docs/reports/2026-07-13-h0-1-baseline/pre-fix-comparison.json"
+    },
+    {
+      "id": "live_baseline_receipt_file",
+      "label": "GENUS Pi – verifizierter H0.1-Live-Startbeleg",
+      "path": "docs/reports/2026-07-13-h0-1-baseline/live-baseline-receipt.json"
     },
     {
       "id": "filesystem_snapshot_file",

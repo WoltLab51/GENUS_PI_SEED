@@ -1,0 +1,76 @@
+{
+  "schema_version": "genus-h0-1-live-baseline-receipt-v1",
+  "deployed_commit": "068f0ca36f1fbd7d6cfc4c1df63e329ef13fb602",
+  "pi_linux_tests": {
+    "passed": 1318
+  },
+  "run": {
+    "run_id": "h0-1-20260713T085546Z",
+    "status": "running",
+    "started_at": "2026-07-13T08:55:46.194Z",
+    "captures": 1,
+    "planned_captures": 4,
+    "remaining_labels": [
+      "h24",
+      "h48",
+      "h72"
+    ],
+    "next_label": "h24",
+    "next_due_at": "2026-07-14T08:55:46.194Z"
+  },
+  "baseline": {
+    "label": "baseline",
+    "due_at": "2026-07-13T08:55:46.194Z",
+    "head_event_id": 938616,
+    "rolling_24h_event_count": 160986,
+    "late_by_seconds": 0.001,
+    "continuity_basis": "full_prefix",
+    "observed_capture_wall_seconds": 46.7
+  },
+  "verification": {
+    "files_verified": true,
+    "profile_directory": {
+      "mode": "0700",
+      "owner_private": true
+    },
+    "files": [
+      {
+        "role": "baseline.json",
+        "mode": "0600",
+        "nlink": 1,
+        "size_bytes": 9806
+      },
+      {
+        "role": "manifest.json",
+        "mode": "0600",
+        "nlink": 1,
+        "size_bytes": 1341
+      },
+      {
+        "role": "run.lock",
+        "mode": "0600",
+        "nlink": 1,
+        "size_bytes": 1
+      }
+    ],
+    "schedule": {
+      "kind": "cron",
+      "cadence": "hourly",
+      "minute": 23,
+      "shell": "bash",
+      "absolute_system_shell_verified": true,
+      "shell_path_persisted": false
+    },
+    "exact_cron_no_op": {
+      "exit_code": 0,
+      "stdout_silent": true,
+      "stderr_silent": true
+    }
+  },
+  "privacy": {
+    "credentials_persisted": false,
+    "filesystem_paths_persisted": false,
+    "payload_content_persisted": false,
+    "entity_values_persisted": false
+  }
+}

@@ -2,9 +2,9 @@
 
 > **Status:** aktueller Arbeitsstand
 >
-> **Stand:** 12. Juli 2026
+> **Stand:** 13. Juli 2026
 >
-> **Verifizierte Funktionsbasis:** `8f8c577`
+> **Verifizierte Funktionsbasis:** `068f0ca`
 >
 > **Zweck:** in zwei Minuten verstehen, wo GENUS steht und worauf der nächste
 > saubere Schritt zielt
@@ -25,8 +25,8 @@ kontrolliert **verdient**.
 | Bereich | Stand |
 |---|---|
 | Kern | gehärtet; Herkunft, Projektionen, Replay und Unsicherheit bleiben getrennt |
-| Linux-Nachweis | 1.284 Tests auf dem Pi bestanden |
-| Produkt-Ledger | 935.122 Ereignisse im Abnahme-Snapshot; Integrität und Siegelkette intakt |
+| Linux-Nachweis | 1.318 Tests auf dem Pi bestanden |
+| Produkt-Ledger | 938.614 Ereignisse bei der Deploy-Abnahme; Integrität und Siegelkette intakt |
 | Betrieb | Learner, Telegram und Watchdog aktiv; Root-/User-Grenze gehärtet |
 | Streudaten | historisches Root-Ledger read-only geprüft und quarantänisiert |
 | Graph | Hierarchiezyklen abgewehrt; deterministische Relationen idempotent |
@@ -53,6 +53,15 @@ Ein read-only 24/48/72-Stunden-Profil soll zeigen, welche Prozesse Ereignisse an
 Ereignisse neue Evidenz, notwendige Betriebsspur oder vermeidbare Wiederholung sind, ob die
 behobene Relationsflut wirklich aus dem Messfenster fällt und welches tägliche Budget im
 Normalbetrieb realistisch ist. Ein größeres Ledger ist dabei **kein** Erfolgskriterium.
+
+**Der Lauf ist aktiv.** Die private Baseline wurde am 13. Juli 2026 um
+08:55:46 UTC (10:55:46 CEST) bei Event-ID 938.616 aufgenommen: 160.986
+Ereignisse lagen im rollierenden 24-Stunden-Fenster. Der vollständige
+Präfixanker wurde gebildet, Dateien und Manifest sind geprüft und der Capture
+lief read-only. Der nächste Messpunkt `h24` ist am 14. Juli um 08:55:46 UTC
+fällig; `h48` und `h72` folgen disjunkt. Der fixierte Vorbefund und die
+Messmethodik stehen im
+[H0.1-Baseline-Report](reports/2026-07-13-h0-1-baseline/report.html).
 
 **Fertig, wenn:** drei vergleichbare Messpunkte, Verursacher je Ereignistyp,
 WAL-Kontext und ein begründetes Betriebsbudget dokumentiert sind – mit dem Leitmaß
@@ -124,5 +133,6 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** zuerst das 24-Stunden-Betriebs- und Ereignisprofil. Es liefert die erste
-neue Evidenz, ohne den Kern zu verändern.
+**Nächster Blick:** der fällige `h24`-Messpunkt am 14. Juli 2026. Bis dahin
+schreibt der Profiler nichts ins Ledger und bleibt zwischen den Messpunkten
+still.
