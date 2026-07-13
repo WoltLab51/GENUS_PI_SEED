@@ -5,7 +5,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from genus import cli, event_router, integrity, kartografie, kartografie_render
+from genus import alltagsprobe, cli, event_router, integrity, kartografie, kartografie_render
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -145,6 +145,12 @@ def test_map_distinguishes_replay_raw_learning_and_missing_answer_contracts():
     assert semantic["h1:dialogue_frame"]["status"] == "active_pilot"
     assert semantic["h1:outcome"]["status"] == "active_delivered_only"
     assert semantic["h1:feedback"]["status"] == "active_explicit_gated"
+    alltag = semantic["h1:alltagsprobe"]
+    assert alltag["status"] == "hard_gate_active_human_review_open"
+    assert alltag["synthetic_cases"] == len(alltagsprobe.ALLTAGSFAELLE) == 17
+    assert alltag["hard_gate"] == "active"
+    assert alltag["human_review"] == "open_hash_bound"
+    assert alltag["review_binding"] == "case_fingerprint+response_sha256"
 
     missing = {
         node["id"]
@@ -187,6 +193,26 @@ def test_map_distinguishes_replay_raw_learning_and_missing_answer_contracts():
         "h1:feedback",
         "links_explicit_feedback",
     ) in edge_keys
+    assert (
+        "flow:composer",
+        "h1:alltagsprobe",
+        "exercises_contract_suite",
+    ) in edge_keys
+    assert (
+        "h1:alltagsprobe",
+        "h1:evaluation",
+        "supplies_hard_gate",
+    ) in edge_keys
+    assert (
+        "h1:alltagsprobe",
+        "h1:evaluation",
+        "awaits_hash_bound_human_review",
+    ) in edge_keys
+    assert not any(
+        edge["from"] == "h1:feedback"
+        and "strateg" in f"{edge['to']} {edge['type']}".casefold()
+        for edge in data["edges"]
+    )
     assert data["analysis_limits"]["dynamic_sql_calls"]
 
 
@@ -214,6 +240,12 @@ def test_generated_artifacts_are_current_and_self_contained():
     assert "GENUS-Kartografie" in html_text
     assert "Wirkungskette" in html_text
     assert "Pi-Betrieb" in html_text
+    assert "hartes Gate aktiv, Humanreview offen" in html_text
+    markdown_text = kartografie_render.MARKDOWN_PATH.read_text(encoding="utf-8")
+    assert "Alltagsprobe mit 17 synthetischen Fällen" in markdown_text
+    assert "fall- und antwort-hashgebunden" in markdown_text
+    assert "`h1:evaluation` bleibt deshalb `missing_h1`" in markdown_text
+    assert "Feedback wählt keine Strategie" in markdown_text
     for forbidden in ("fetch(", "XMLHttpRequest", "WebSocket("):
         assert forbidden not in html_text
     assert "innerHTML" not in html_text

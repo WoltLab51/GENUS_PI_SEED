@@ -299,6 +299,18 @@ SEMANTIC_NODES: tuple[dict[str, Any], ...] = (
         "source": ("deploy/telegram_bot.py", "_explizites_feedback"),
     },
     {
+        "id": "h1:alltagsprobe",
+        "type": "evaluation_gate",
+        "label": "Alltagsprobe: 17 synthetische Fälle",
+        "status": "hard_gate_active_human_review_open",
+        "stage": 12,
+        "synthetic_cases": 17,
+        "hard_gate": "active",
+        "human_review": "open_hash_bound",
+        "review_binding": "case_fingerprint+response_sha256",
+        "source": ("genus/alltagsprobe.py", "run_suite"),
+    },
+    {
         "id": "h1:discourse",
         "type": "missing_composer",
         "label": "Diskursplan + treuer Renderer",
@@ -350,6 +362,9 @@ SEMANTIC_EDGES: tuple[dict[str, Any], ...] = (
     {"from": "h1:outcome", "to": "flow:session6", "type": "confirms_turn"},
     {"from": "h1:outcome", "to": "h1:feedback", "type": "links_explicit_feedback"},
     {"from": "h1:feedback", "to": "h1:evaluation", "type": "h1_evidence"},
+    {"from": "flow:composer", "to": "h1:alltagsprobe", "type": "exercises_contract_suite"},
+    {"from": "h1:alltagsprobe", "to": "h1:evaluation", "type": "supplies_hard_gate"},
+    {"from": "h1:alltagsprobe", "to": "h1:evaluation", "type": "awaits_hash_bound_human_review"},
 )
 
 
@@ -1427,10 +1442,11 @@ def build_map() -> dict[str, Any]:
             {
                 "id": "answer-quality-bottleneck",
                 "severity": "medium",
-                "statement": "Der H1-Pilot strukturiert Definitionen und Beziehungen als AnswerDraft, bildet einen DialogueFrame und schließt den zugestellten Outcome-/Feedbackkreis. Die übrigen Handler liefern weiter fertige Strings; aus Feedback folgt noch keine gegatete Strategieänderung.",
+                "statement": "Die Alltagsprobe hält 17 synthetische Fälle als hartes, reproduzierbares Vertragsgate fest. Ton und Nutzen brauchen weiterhin fall- und antwort-hashgebundene Humanreviews; die Wirkungsbewertung ist deshalb offen. AnswerDraft deckt nur Definitionen und Beziehungen ab, die übrigen Handler liefern Strings, und aus Feedback folgt keine Strategiewahl.",
                 "sources": [
+                    source("genus/alltagsprobe.py", "ALLTAGSFAELLE"),
+                    source("genus/alltagsprobe.py", "_human_status"),
                     source("genus/antwort.py", "AnswerDraft"),
-                    source("genus/companion.py", "wende_renderer_an"),
                     source("genus/response_outcomes.py", "record_feedback"),
                 ],
             },

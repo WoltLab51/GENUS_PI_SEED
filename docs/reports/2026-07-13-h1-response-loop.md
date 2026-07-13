@@ -21,6 +21,8 @@ ResponseOutcome + stabile Response-ID ← explizites Feedback
                                              ↓
                                replaybare Messfläche
                                keine automatische Selbstbelohnung
+
+synthetische In-Memory-Fälle → 85 harte Verträge → menschliche Hash-Abnahme
 ```
 
 ## Was der Pilot wirklich schließt
@@ -33,6 +35,7 @@ ResponseOutcome + stabile Response-ID ← explizites Feedback
 | Messung | `answered`, `invalid_slots`, `understood_unknown`, `fallback`, Lesarten und Modus sind replaybar. | Es werden keine Qualitätsurteile aus einer gelesenen Absicht geraten. |
 | Feedback | Reine 👍-/👎-Nachrichten und enge Korrektur-Cues verweisen auf eine feedbackfähige Response-ID. | Freies, nur modellgedeutetes Lob/Kritik ist kein Feedbacksignal. |
 | Lernen | Intent-Korrekturen können weiterhin über die gedeckelte Edge-Datei den Deuter-Prompt stützen. | Positiv/negativ gewichtet keine Strategie und trainiert kein Modell. |
+| Abnahme | `genus alltagsprobe` reproduziert 17 synthetische Dialogfälle mit 85 harten Verträgen. | Ton und Nutzen bleiben eine menschliche Entscheidung; die Probe ist kein Live-Pi-Test. |
 
 ## Datenschutzvertrag
 
@@ -71,6 +74,38 @@ Die ausführbaren Nachweise liegen in `tests/test_antwort.py`,
 `tests/test_response_outcomes.py`, `tests/test_telegram_bot.py`,
 `tests/test_event_contract_docs.py` und `tests/test_kartografie.py`.
 
+## Alltagsprobe v1: grün und trotzdem ehrlich offen
+
+Die hermetische Abnahmefläche prüft 17 synthetische Alltagssituationen: Gruß,
+Definitionen mit unterschiedlicher Evidenz, direkte und transitive Beziehungen, offene Welt,
+Nichtverstehen, fehlende Pflichtslots, freie Deutung, noch nicht beherrschte Bitten,
+Rückbezüge, Anschlussangebote, Mehrsegment-Nachrichten und eine enge Korrektur.
+
+| Fläche | Ergebnis | Bedeutung |
+|---|---:|---|
+| Harte Verträge | **85/85** | Treue, Ehrlichkeit, Provenienz, Transparenz, Dialoganschluss, Komposition, Alltagsform und Datensparsamkeit halten. |
+| Menschlich akzeptiert | **0/17** | Ton und Nutzen wurden noch für keinen exakten Wortlaut freigegeben. |
+
+Das zweite Ergebnis wird nicht in Grün umgedeutet. Der normale Aufruf
+`genus alltagsprobe` endet deshalb mit Exitcode 2. Für das rein automatische Gate bestätigt
+`genus alltagsprobe --contracts-only` die 85 harten Verträge mit Exitcode 0.
+`--details` zeigt die synthetischen Fragen und Antworten; `--markdown` und `--json-output`
+erzeugen die vollständigen Berichte.
+
+Die Probe verwendet für jeden Fall eine neue In-Memory-Datenbank, synthetische Relationen
+und fest eingespeiste Lesarten. Sie berührt weder Live-Ledger noch Chatverlauf, Netzwerk oder
+Modell. Ein LLM richtet also nicht über ein anderes LLM. Ebenso gibt es keine Gesamtnote und
+keine Rückkopplung von Reviews auf Strategie oder Modellgewichte.
+
+Ronnys Einzelwertungen liegen in der
+[Reviewdatei](../reviews/ALLTAGSPROBE_V1.json). Ton und Nutzen werden getrennt als `traegt`,
+`holprig` oder `unbrauchbar` bewertet. Jede Wertung trägt den Fingerprint des Falls und den
+SHA-256-Hash seiner Antwort. Schon eine geänderte Fixture oder Formulierung macht die alte
+Wertung `review_stale`; Zustimmung klebt damit nie an einer neuen Antwort. Der vollständige
+Ablauf steht im [Designvertrag zur Antwortqualität](../design/ANSWER_QUALITY.md); die
+[generierte Einzelansicht](../generated/ANTWORTQUALITAET.md) liefert für jeden Fall eine
+ausfüllbare Vorlage mit den vollständigen Hashes.
+
 ## Bekannte Pilotgrenzen
 
 - **Edge-Outbox fehlt:** Ist Telegram bereits zugestellt und scheitert danach
@@ -88,7 +123,8 @@ wurde.
 
 ## Nächste Reife, in dieser Reihenfolge
 
-1. Alltagstestset mit klaren Qualitätsdimensionen und menschlicher Abnahme aufbauen.
+1. die 17 exakten Probeantworten menschlich bewerten und jeden `holprig`- oder
+   `unbrauchbar`-Befund gezielt schärfen,
 2. weitere wissenshaltige Handler auf `AnswerDraft` migrieren.
 3. Diskursplan ergänzen, ohne Modelltext zur Evidenz zu machen.
 4. löschbare Telegram-Edge-Outbox samt Response-Bezug über Neustarts bauen.

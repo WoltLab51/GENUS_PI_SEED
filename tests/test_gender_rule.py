@@ -202,13 +202,14 @@ def test_respond_routes_gender_question():
     assert "maskulin" in companion.respond(conn, "Welches Geschlecht hat Hund?")
 
 
-def test_respond_routes_word_definition_with_concept_hint():
+def test_respond_routes_word_definition_without_cli_hint_in_the_conversation():
     from genus import companion
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier, Vorfahre der Wolf", "dbnary")
     s = companion.respond(conn, "Was ist ein Hund?")
-    assert "Wolf" in s and "genus concept Q144" in s
+    assert "Wolf" in s
+    assert "genus concept" not in s and "genus why" not in s
 
 
 def test_respond_falls_back_to_help_when_nothing_matches():

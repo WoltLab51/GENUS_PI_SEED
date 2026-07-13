@@ -407,8 +407,6 @@ def _wort_antwort(conn, question: str, waage=None) -> str | None:
 
     if _antwort.belegung(conn, "plausch")["knappheit"] == "ausfuehrlich":
         text += "".join(f" {satz}" for satz in vertiefung(conn, a))
-    if a.get("concept"):
-        text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
     return _antwort.AnswerText(text, _antwort.entwurf_definition(a, text))
 
 
@@ -696,9 +694,9 @@ _UNKNOWN_FALLBACK = (   # query.ask's stable "nothing recognized" sentinel -- ke
 # Deuter-Lauf, der explizit nichts findet, ist ein stärkeres Signal als "kein Deuter da" --
 # nur DANN (deuter(question) gibt None, nicht bloß eine leere Liste) bleibt der Wort-Lookup
 # ein legitimer letzter Versuch.
-_NICHT_VERSTANDEN = "Das habe ich nicht verstanden — magst du es anders sagen?"
+_NICHT_VERSTANDEN = ("Das habe ich nicht sicher verstanden. Sag mir bitte kurz, worum es geht "
+                     "und was du von mir brauchst.")
 _DEUTED = " (Frage vom Sprachmodell gedeutet.)"
-
 # German voice for cells GENUS can read but not yet act on -- honest capability naming. Nur
 # noch Blätter, die tatsächlich bis zum ehrlichen Lücken-Satz durchfallen können (die anderen
 # lösen sich entweder direkt oder klettern zu einer Zelle mit eigenem Fallback -- z.B.
@@ -1008,8 +1006,7 @@ def _zelle_gruss(conn, guess, question, last_question, last_answer, stimme=None)
     # Persönlichkeit wirkt an der SPRACHE: Variante + Beiwerk wählt der Antwort-Würfel
     # (genus.antwort, EINE Stelle) -- Fakten/Ehrlichkeit bleiben unberührt.
     from genus import antwort
-
-    return antwort.floskel(conn, "gruss")
+    return antwort.floskel(conn, "gruss", mit_beiwerk=not bool(guess.get("_mehrsegment")))
 
 
 def _zelle_dank(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1333,6 +1330,8 @@ def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
     outcomes: list[str] = []
     anchor = question
     for segment in segmente:
+        if len(segmente) > 1 and isinstance(segment, dict):
+            segment = {**segment, "_mehrsegment": True}
         gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
                                    stimme=stimme, quelle=quelle, waage=waage,
                                    renderer=renderer,
@@ -1404,8 +1403,9 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
             # der Transparenz-Hinweis gilt NUR für eine echte Modell-Deutung -- eine
             # deterministisch gelesene Gebärde (quelle="gebaerde") bekommt keinen "vom
             # Sprachmodell gedeutet"-Zusatz, das wäre schlicht falsch
-            marker = _DEUTED if (quelle == "model:deuter"
-                                 and step not in ("tatsache", "merken")) else ""
+            marker = _DEUTED if (quelle == "model:deuter" and step not in (
+                "tatsache", "merken", "gruss", "dank", "lob", "kritik", "abschied",
+            )) else ""
             anchor = last_question if step in _ANCHOR_BLEIBT else question
             from genus import antwort as _antwort
             text, draft = _antwort.wende_renderer_an(
@@ -1427,7 +1427,9 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                     "outcome": draft.resolution if draft else "answered"}
     if hatte_handler:
         if renderer is not None:
-            return {"text": "", "question": question, "kind": kind,
+            from genus import antwort as _antwort
+            return {"text": _antwort.klaerung_fuer_slots(kind, guess) or "",
+                    "question": question, "kind": kind,
                     "outcome": "invalid_slots"}
         return None   # compatibility path: no H1 outcome contract requested
     # known cell, no capability anywhere up the chain: say so, honestly -- and count it,

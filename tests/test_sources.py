@@ -861,8 +861,8 @@ def test_narrate_relation_warm_ist_voice_eins_mit_festem_kern():
     warm = companion.narrate_relation(conn, r, _WARM)
     assert warm.startswith("Ja, klar —")                 # der warme Rahmen
     assert "»Hund« zählt zu »Haustier«" in warm          # der Kern
-    assert "0.50" in warm                                # die Vertrauens-Zahl überlebt wortgleich
-    assert "Wissensnetz" in warm and "nicht behauptet" in warm
+    assert "0.50" not in warm                            # Routinevertrauen bleibt im Hintergrund
+    assert "Wissensnetz" not in warm and "nicht behauptet" not in warm
 
 
 def test_narrate_relation_warm_richtung_kann_nicht_kippen():
@@ -1990,14 +1990,16 @@ def test_deuter_segments_are_resolved_independently_and_composed():
     assert "Gern geschehen" in result["text"]
 
 
-def test_deuter_composition_deduplicates_the_repeated_disclosure_tag():
-    # jedes Segment traegt seinen eigenen "(Frage vom Sprachmodell gedeutet.)"-Hinweis --
-    # zusammengesetzt soll er nur EINMAL erscheinen, nicht dreimal hintereinander
+def test_reine_sozialgesten_bleiben_ohne_modellhinweis_und_gegenfrage():
+    # Bei Gruß/Dank/Abschied ist die Modell-Lesart keine Sachgrundlage. Der technische
+    # Nachspann würde die feste soziale Antwort nur künstlich und unruhig machen.
     from genus import companion
     conn = _isa_graph()
     deuter = lambda q: [{"absicht": "gruss"}, {"absicht": "dank"}, {"absicht": "abschied"}]
     result = companion.respond_with_deuter(conn, "Hallo, danke, tschüss", deuter=deuter)
-    assert result["text"].count("Frage vom Sprachmodell gedeutet") == 1
+    assert "Frage vom Sprachmodell gedeutet" not in result["text"]
+    assert "Was beschäftigt dich gerade?" not in result["text"]
+    assert all(teil in result["text"] for teil in ("Hallo", "Gern geschehen", "Bis bald"))
 
 
 def test_sozialgeste_word_limit_judges_the_segments_own_text_not_the_whole_message():

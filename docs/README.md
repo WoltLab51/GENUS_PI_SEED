@@ -14,6 +14,7 @@ wertvollen **Entstehungsgeschichte**.
 |---|---|---|
 | GENUS zum ersten Mal siehst | [Charter](CHARTER.md) | [NOW](NOW.md) |
 | heute weiterbauen willst | [NOW](NOW.md) | [Roadmap](ROADMAP.md) · [Quality](QUALITY.md) |
+| GENUS' Antworten prüfen willst | [Antwortqualität](design/ANSWER_QUALITY.md) | [generierte Alltagsprobe](generated/ANTWORTQUALITAET.md) · [Reviews](reviews/ALLTAGSPROBE_V1.json) |
 | einen Kernvertrag änderst | [Architektur](ARCHITECTURE.md) | [GENUS-Kartografie](visual/GENUS_KARTOGRAFIE.html) · [Event-Vertrag](EVENT_CONTRACT.md) |
 | eine frühere Entscheidung verstehen willst | [Decisions](decisions/README.md) | [Baujournal](history/BUILD_JOURNAL.md) |
 | den Pi betreibst | [Operations](operations/README.md) | [Deploy-Runbook](../deploy/README.md) |
@@ -67,6 +68,7 @@ Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.
 
 ## Design – Teilmodelle und Entwürfe
 
+- [Antwortqualität und Alltagsprobe](design/ANSWER_QUALITY.md)
 - [Gedächtnis](design/MEMORY.md)
 - [Persönlichkeit](design/PERSONALITY.md)
 - [Sensor-Prinzip](design/SENSOR_PRINCIPLE.md)
@@ -94,8 +96,18 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [Systemaudit, Morphologie und SWOT vom 2026-07-12](reports/2026-07-12-system-audit.md)
 - [H0.1-Vorabprofil und Messdesign vom 2026-07-13](reports/2026-07-13-h0-1-baseline/report.html)
 - [Runtime-Kartografie und Pi-Audit vom 2026-07-13](reports/2026-07-13-cartography-runtime-audit.md)
+- [H1-Pilot und erster geschlossener Antwortkreis vom 2026-07-13](reports/2026-07-13-h1-response-loop.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
+
+## Reviews – menschliche Abnahme
+
+- [Alltagsprobe v1](reviews/ALLTAGSPROBE_V1.json) — hashgebundene Einzelwertungen für Ton
+  und Nutzen; ein leerer Reviewbestand ist ein ehrlicher offener Status, kein Fehler im
+  Dokument.
+
+Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
+exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.
 
 ## Geschichte, Visuals und Ablage
 

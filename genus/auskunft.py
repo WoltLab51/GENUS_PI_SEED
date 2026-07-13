@@ -468,12 +468,10 @@ def _sicher(trust: float) -> str:
 def narrate_relation(conn, r: dict, bel: dict | None = None) -> str:
     """Fluent, deterministic German for a relational answer -- glass-box: the path is shown.
 
-    „Rahmen frei, Kern fest" (Scheibe 1 der Antwort-Seele, Ronny 2026-07-10): mit einer Belegung
-    mit Wärme ≥ „warm" (der Antwort-Würfel steuert -- Persönlichkeit wirkt an der Sprache) wird
-    Voice 1 („warm & direkt") gewählt. Die geschützten KERN-Marken -- die Begriffe in »«, die
-    Vertrauens-Zahl, die Richtung Subjekt→Objekt -- stehen in JEDEM Ton wortgleich und an fester
-    Stelle (deterministisch platziert, die Richtung kann nicht kippen); nur der Rahmen wechselt
-    den Ton. Ohne Belegung (CLI/why) bleibt der nüchterne Wortlaut byte-genau wie zuvor."""
+    „Rahmen frei, Kern fest" (Scheibe 1 der Antwort-Seele): Im Gespräch stehen Richtung und
+    lesbarer Pfad, während Zahlen und Auditjargon erst die Warum-Spur zeigt. Schwaches Vertrauen
+    bleibt samt Zahl sichtbar, damit eine Stimme die Unsicherheit nicht wegformulieren kann.
+    Ohne Belegung (CLI/why) bleibt der nüchterne Glasbox-Wortlaut erhalten."""
     x, y = r["subject"], r["object"]
     warm = bool(bel) and bel.get("waerme") in ("warm", "herzlich")
     if r["verdict"] == "yes":
@@ -482,8 +480,10 @@ def narrate_relation(conn, r: dict, bel: dict | None = None) -> str:
             s = f"Ja, klar — »{x}« zählt zu »{y}«."
             if len(path) > 2:
                 s += f" Der Weg dahin: {' → '.join(f'»{p}«' for p in path)}."
-            return (s + f" {_sicher(r['trust'])} ({r['trust']:.2f}), und hergeleitet aus meinem "
-                        f"Wissensnetz — nicht behauptet.")
+            if r["trust"] < 0.5:
+                s += (f" Ganz sicher bin ich mir da nicht (Vertrauen {r['trust']:.2f}); "
+                      "mein Wissensnetz stützt die Verbindung bisher nur schwach.")
+            return s
         s = f"Ja. »{x}« zählt zu »{y}«."
         if len(path) > 2:
             # jedes Zwischenglied in Guillemets -- derselbe Stimme-Anker-Schutz wie in narrate()

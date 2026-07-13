@@ -142,12 +142,20 @@ Renderer. Telegram erzeugt erst nach belegter Zustellung ein typisiertes
 `ResponseOutcome`; reine 👍-/👎-Nachrichten und enge Intent-Korrekturen werden über die
 Response-ID replaybar verknüpft.
 
+Die hermetische [`alltagsprobe`](design/ANSWER_QUALITY.md) macht die nächste Reifestufe
+wiederholbar: 17 synthetische Alltagssituationen prüfen derzeit 85 harte Verträge für
+Treue, Ehrlichkeit, Provenienz, Transparenz, Dialog, Komposition, Alltagsform und
+Datensparsamkeit. Alle 85 stehen grün. Die menschliche Abnahme bleibt mit 0/17 bewusst
+offen; Fall- und Antwort-Hashes verhindern, dass eine alte Zustimmung nach einer Änderung
+unbemerkt weitergilt.
+
 Das ist bewusst noch nicht H1-fertig: Die übrigen Handler liefern weiter Legacy-Strings,
 ein vollständiger Diskursplan fehlt, Feedback ändert keine Strategie automatisch und der
 Telegram-Bezug zur letzten Response-ID überlebt keinen Prozessneustart. Der löschbare
 Memory-Vault bleibt Teil von H1.1. Ebenso fehlt noch eine löschbare Edge-Outbox: Scheitert
 die Outcome-Persistenz erst nach einer belegten Zustellung, bleibt diese Antwort im Pilot
-zugestellt, aber ungemessen.
+zugestellt, aber ungemessen. Die synthetische Probe ersetzt außerdem weder Ronnys Urteil
+über Ton und Nutzen noch die spätere Abnahme auf dem echten Pi.
 
 **Definition of Done für H1**
 
@@ -245,6 +253,7 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** H1.2 vom Vertikalschnitt zum kuratierten Alltagstest reifen.
+**Aktive Baulinie:** H1.2 die 17 exakten Probeantworten menschlich abnehmen, holprige Fälle
+schärfen und jede neue Fassung erneut hashgebunden prüfen.
 Die read-only H0.1-Messreihe darf nach Regel 1 parallel weiterlaufen; sie öffnet keinen
 zweiten verändernden Produktpfad.

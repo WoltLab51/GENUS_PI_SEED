@@ -1,7 +1,7 @@
 # GENUS Quality
 
 > **Status:** canonical
-> **Zuletzt verifiziert:** 2026-07-12
+> **Zuletzt verifiziert:** 2026-07-13
 > **Besitzt:** Plan-, Bau-, Abnahme-, Dokumentations- und Laufzeitgates
 
 Qualität bedeutet bei GENUS nicht „viele grüne Tests“. Qualität heißt: Die Behauptung
@@ -73,6 +73,31 @@ Für neue Fähigkeiten zusätzlich:
 - Property-/Differenzialtest, wenn eine endliche Zustandsmaschine oder Graphinvariante
   unabhängig prüfbar ist.
 
+### Antwortqualität braucht zwei Schlüssel
+
+Eine Antwort darf weder allein von automatischen Tests noch allein vom Bauchgefühl
+freigegeben werden. Die hermetische [`alltagsprobe`](design/ANSWER_QUALITY.md) trennt deshalb
+zwei Fragen:
+
+1. **Ist die Antwort strukturell treu?** Harte Verträge prüfen Faktenrichtung, ehrliches
+   Nichtwissen, Provenienz, Modelltransparenz, Dialoganschluss, Komposition,
+   Alltagsreibungen und Datensparsamkeit.
+2. **Trägt sie als Gespräch?** Ronny bewertet den exakten Wortlaut getrennt nach Ton und
+   Nutzen. Kein Modell bewertet ein anderes Modell, und aus den Einzelwertungen entsteht
+   keine künstliche Gesamtnote.
+
+Die erste Suite umfasst **17 synthetische Alltagssituationen und 85 harte Verträge**. Der
+aktuelle Ausgangspunkt ist ehrlich zweigeteilt: **85/85 Verträge bestanden**, aber
+**0/17 Antworten menschlich akzeptiert**. Darum beendet `genus alltagsprobe` den Lauf
+derzeit mit Exitcode 2. `genus alltagsprobe --contracts-only` bestätigt ausschließlich die
+harte Seite und endet bei diesem Stand mit Exitcode 0.
+
+Menschliche Reviews wohnen in
+[`reviews/ALLTAGSPROBE_V1.json`](reviews/ALLTAGSPROBE_V1.json). Sie sind an Fall- und
+Antwort-Hash gebunden. Ändert sich Fixture oder Wortlaut, wird eine alte Zustimmung
+`review_stale` statt still weiterzugelten. Die Probe nutzt nur synthetische
+In-Memory-Daten: kein Live-Ledger, kein Chat-Export, kein Netzwerk und kein LLM-Richter.
+
 ## Dokumentations-Gate
 
 Ein Dokumentationschange ist Teil der Implementierung, wenn sich ein Vertrag ändert.
@@ -108,6 +133,8 @@ Eine Änderung ist fertig, wenn:
 
 - der ursprüngliche Fehler nicht mehr reproduzierbar ist,
 - alle relevanten Tests und Verträge grün sind,
+- geänderte Gesprächsantworten die Alltagsprobe durchlaufen haben und veraltete oder offene
+  menschliche Reviews sichtbar aufgelöst sind,
 - keine ungeklärte Datenmigration oder zweite Wahrheit verbleibt,
 - der reale Zielbetrieb die erwarteten Werte zeigt,
 - historische Artefakte erhalten oder bewusst quarantänisiert sind,

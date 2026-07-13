@@ -154,7 +154,32 @@ def test_beziehungs_entwurf_bewahrt_richtung_pfad_und_vertrauen(conn):
     assert {e.source for e in draft.claims[0].evidence} == {"wikidata"}
     text = antwort.rendere(draft, _frame("Ist ein Hund ein Säugetier?", "beziehung"))
     assert draft.verbatim_core in text
-    assert f"{result['trust']:.2f}" in text
+    assert f"{result['trust']:.2f}" not in text   # ab 0.5 bleibt die Routineantwort direkt
+
+
+def test_schwache_beziehung_verschweigt_unsicherheit_und_vertrauenszahl_nie():
+    result = {
+        "relational": True,
+        "verdict": "yes",
+        "subject": "Hund",
+        "object": "Säugetier",
+        "trust": 0.2,
+        "chain": [{
+            "subject": "Q144",
+            "predicate": "is_a",
+            "object": "Q7377",
+            "source": "model:bridge",
+            "trust": 0.2,
+        }],
+    }
+    fallback = "Ja. »Hund« zählt zu »Säugetier«. (Vertrauen 0.20.)"
+    draft = antwort.entwurf_beziehung(result, fallback)
+
+    text = antwort.rendere(draft, _frame("Ist ein Hund ein Säugetier?", "beziehung"))
+
+    assert draft.verbatim_core in text
+    assert "unsicher" in text and "schwach" in text
+    assert "0.20" in text
 
 
 def test_mehrstufige_beziehung_bewahrt_die_vollstaendige_herleitung(conn):

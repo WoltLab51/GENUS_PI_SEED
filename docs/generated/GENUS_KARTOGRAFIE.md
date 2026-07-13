@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `f4bce00ac86f5a6b` · Regeneration: `genus kartografie build`
+> **Inhalt:** `379ba697fb28fb27` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,23 +14,26 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 254 | 674 | 90 | 39 | 23 / 16 | 12 | 3 | 16 |
+| 257 | 686 | 92 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
 GENUS lernt bereits symbolisch: Fakten, Relationen, Episoden, Einstellungen und
-enge Intent-Korrekturen werden dauerhaft wirksam. Der erste H1-Antwortkreis ist
-geschlossen: Definitionen und Beziehungen tragen strukturierte Drafts in einen
-treuen Renderer; erst ein belegter Telegram-Zustellbeleg erzeugt ResponseOutcome
-und Response-ID. Eindeutiges Feedback wird daran replaybar verknüpft.
-Der verbleibende Engpass liegt in den übrigen String-Handlern, dem fehlenden
-vollständigen Diskursplan und der noch nicht gebauten Strategieauswertung.
+enge Intent-Korrekturen werden dauerhaft wirksam. Der technische H1-Pilot trägt
+Definitionen und Beziehungen als strukturierte Drafts in einen treuen Renderer;
+ResponseOutcome und Response-ID entstehen erst nach belegter Telegram-Zustellung.
+17 synthetische Alltagsszenarien bilden dafür nun ein aktives hartes Vertragsgate.
+Ton und Nutzen bleiben jedoch durch fall- und antwort-hashgebundene Humanreviews
+offen. H1 ist damit nicht abgeschlossen: vollständiger Diskursplan, übrige String-
+Handler und gegatete Wirkungsbewertung fehlen; Feedback wählt keine Strategie.
 
 ```text
 Wissen → Handler → AnswerDraft-Pilot + DialogueFrame → treuer Renderer → Ausgabe
             └→ übrige terminale Strings                            ↓ Zustellbeleg
                                       Messung ← Feedback ← ResponseOutcome
-                                                └→ keine automatische Gewichtung
+Alltagsprobe (17 Fälle) ── hartes Gate ───────────┐
+hashgebundene Humanreviews ── offen ──────────────┴→ Wirkungsbewertung (fehlt)
+                                                        └→ keine Strategiewahl
 ```
 
 ## Event → Projektor → Tabelle
@@ -78,25 +81,31 @@ zeichnet `raw_fold`, `audit_trigger`, `audit_trace` und `audit_only` getrennt.
 | Intent-Lesungen | relation_projection | Thermometer und Lückendetektor | keine | Zählt Verständnis, verbessert aber keine Formulierung und keinen Inhalt. | [genus/verstehen.py:232](../../genus/verstehen.py) |
 | Enge Intent-Korrektur | response_feedback_log + korrekturen.jsonl | Deuter-Prompt + Qualitätsmessung | indirekt | Ist mit der Response-ID replaybar belegt; nur das begrenzte Edge-Beispiel kann die spätere Intentwahl verbessern. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) · [deploy/deuter.py:159](../../deploy/deuter.py) |
 | Persönliche Episode | append-only Ledger | Erinnerungsabruf | direkt, begrenzt | Wird auf Abruf und über einen engen Konzeptbezug eingebunden. | [genus/erinnerung.py:113](../../genus/erinnerung.py) |
-| Persönlichkeitseinstellung | art:* Relationen | Antwort-Belegung | direkt, begrenzt | Ändert wenige Floskeln, Länge, Beiwerk und optionale Stimme. | [genus/antwort.py:566](../../genus/antwort.py) |
+| Persönlichkeitseinstellung | art:* Relationen | Antwort-Belegung | direkt, begrenzt | Ändert wenige Floskeln, Länge, Beiwerk und optionale Stimme. | [genus/antwort.py:562](../../genus/antwort.py) |
 | Forecasts und Fehler | rohe Ledger-Events | learning CLI und Kurven | keine | Kalibrierung sichtbar, aber kein normaler Dialogverbraucher. | [genus/learning.py:97](../../genus/learning.py) |
 | Explizites Antwortfeedback (👍/👎) | response_feedback_log | replaybare Qualitätsmessung | keine | Ist sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) |
-| Modellgedeutetes Lob oder Kritik | nur Lesarten-Zählung | fester Handler | keine | Wird ohne eindeutige Gebärde oder Korrektur nicht als Qualitätsfeedback gespeichert. | [genus/companion.py:1029](../../genus/companion.py) |
+| Modellgedeutetes Lob oder Kritik | nur Lesarten-Zählung | fester Handler | keine | Wird ohne eindeutige Gebärde oder Korrektur nicht als Qualitätsfeedback gespeichert. | [genus/companion.py:1026](../../genus/companion.py) |
 | Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:95](../../deploy/telegram_bot.py) |
 | Modellgewichte | statische GGUF-Dateien | Deuter, Stimme, Waage | keine | GENUS aktualisiert oder trainiert diese Gewichte nicht. | [deploy/deuter.py:269](../../deploy/deuter.py) |
 
 ## H1-Pilot und nächste Kanten
 
 Aktiv im Pilot: `AnswerDraft` und `DialogueFrame` für Definitionen und Beziehungen,
-ein delivery-only `ResponseOutcome` sowie explizites Feedback mit Response-ID.
-Frage, Antwort und Telegram-Kennungen bleiben aus Outcome und Feedback heraus.
+ein delivery-only `ResponseOutcome`, explizites Feedback mit Response-ID und die
+Alltagsprobe mit 17 synthetischen Fällen als hartes Vertragsgate. Frage, Antwort
+und Telegram-Kennungen bleiben aus Outcome und Feedback heraus.
+Die menschliche Prüfung von Ton und Nutzen ist fall- und antwort-hashgebunden:
+geänderte Antworten machen alte Reviews automatisch ungültig. Diese Abnahme ist
+noch offen; `h1:evaluation` bleibt deshalb `missing_h1`. Ein grünes synthetisches
+Gate und gespeichertes Feedback wählen ausdrücklich noch keine Antwortstrategie.
 
-1. die übrigen Handler schrittweise auf belegte Drafts migrieren.
-2. einen vollständigen Diskursplan vor dem treuen Renderer ergänzen.
-3. persönliche Episoden in einen physisch löschbaren `MemoryVault` migrieren.
-4. eine löschbare Telegram-Edge-Outbox für Outcome-Retry und Feedbackbezug
+1. die hashgebundene menschliche Abnahme der 17 Alltagsfälle durchführen.
+2. die übrigen Handler schrittweise auf belegte Drafts migrieren.
+3. einen vollständigen Diskursplan vor dem treuen Renderer ergänzen.
+4. persönliche Episoden in einen physisch löschbaren `MemoryVault` migrieren.
+5. eine löschbare Telegram-Edge-Outbox für Outcome-Retry und Feedbackbezug
    über Neustarts bauen.
-5. Feedback erst nach kuratierter Abnahme auf Strategien wirken lassen.
+6. Feedback erst nach kuratierter Abnahme gegatet auf Strategien wirken lassen.
 
 ## Modulringe
 
@@ -110,13 +119,13 @@ Runtime-Verträge und keine behauptete vollständige Shell-Sprachanalyse.
 | Ring | Module |
 |---|---:|
 | `antwort` | 9 |
-| `domaene` | 31 |
+| `domaene` | 32 |
 | `fundament` | 5 |
 | `lernen` | 8 |
 | `membranen` | 13 |
 | `projektionen` | 8 |
 | `querschnitt` | 2 |
-| `schnittstellen` | 11 |
+| `schnittstellen` | 12 |
 | `wahrheitsmechanik` | 3 |
 
 ### Sichtbare Importzyklen

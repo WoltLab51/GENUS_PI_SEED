@@ -436,20 +436,14 @@ def _rendere_beziehung(draft: AnswerDraft, frame: DialogueFrame) -> str:
     claim = draft.claims[0]
     if predicate != "is_a" or draft.verbatim_core is None:
         return draft.fallback_text
-    if len(claim.evidence) > 1:
+    if sum(evidence.predicate == "is_a" for evidence in claim.evidence) > 1:
         return draft.fallback_text
     einstieg = "Ja —" if frame.waerme in ("warm", "herzlich") else "Ja."
     saetze = [f"{einstieg} {draft.verbatim_core}."]
-    if claim.confidence is not None:
-        if claim.confidence >= 0.75:
-            sicherheit = "Da bin ich mir ziemlich sicher"
-        elif claim.confidence >= 0.5:
-            sicherheit = "Da bin ich mir recht sicher"
-        else:
-            sicherheit = "Ganz sicher bin ich mir da noch nicht"
+    if claim.confidence is not None and claim.confidence < 0.5:
         saetze.append(
-            f"{sicherheit} ({claim.confidence:.2f}); die Verbindung ist aus meinem "
-            "Wissensnetz hergeleitet, nicht bloß behauptet."
+            f"Da bin ich noch unsicher (Vertrauen {claim.confidence:.2f}): "
+            "Mein Wissensnetz stützt diese Verbindung bisher nur schwach."
         )
     quellen = _quellen(draft.claims)
     if frame.knappheit == "ausfuehrlich" and quellen:
@@ -479,8 +473,10 @@ def _render_treu(draft: AnswerDraft, text: str) -> bool:
     if any(supplement not in text for supplement in draft.supplements):
         return False
     for claim in draft.claims:
-        if draft.kind == "beziehung" and claim.confidence is not None:
-            if f"{claim.confidence:.2f}" not in text or "hergeleitet" not in text:
+        if (draft.kind == "beziehung" and claim.confidence is not None
+                and claim.confidence < 0.5):
+            if ("unsicher" not in text and "schwach" not in text) or (
+                    f"{claim.confidence:.2f}" not in text):
                 return False
         if claim.predicate == "defined_as":
             quellen = {e.source for e in claim.evidence}
@@ -620,11 +616,28 @@ _GRUSS_RUECKFRAGE = " Was beschäftigt dich gerade?"
 _GRUSS_HINWEIS = " Frag mich etwas, oder sag „was weißt du?“."
 
 
-def floskel(conn, zelle: str, rolle: str = "plausch") -> str:
+def floskel(conn, zelle: str, rolle: str = "plausch", *, mit_beiwerk: bool = True) -> str:
     """Die passende Floskel-Variante zur aktuellen Belegung; der Gruß trägt sein Beiwerk
     (die neugierige Rückfrage bzw. den Einstiegs-Hinweis) gemäß Kreuz-Konsistenz."""
     bel = belegung(conn, rolle)
     text = FLOSKELN[zelle].get(bel["waerme"], FLOSKELN[zelle]["neutral"])
-    if zelle == "gruss":
+    if zelle == "gruss" and mit_beiwerk:
         text += _GRUSS_RUECKFRAGE if bel["beiwerk_rueckfrage"] else _GRUSS_HINWEIS
     return text
+
+
+def klaerung_fuer_slots(kind: str, guess: Mapping[str, object]) -> str | None:
+    """Eine konkrete Rueckfrage fuer sicher erkannte, aber unvollstaendige Lesarten."""
+    if kind != "beziehung":
+        return None
+    subject = str(guess.get("subject") or "").strip()
+    object_ = str(guess.get("object") or "").strip()
+    if subject and not object_:
+        return (f"Ich habe verstanden, dass es um eine Beziehung mit »{subject}« geht, "
+                f"aber mir fehlt das Ziel. Wozu möchtest du »{subject}« in Beziehung setzen?")
+    if object_ and not subject:
+        return (f"Ich habe das Ziel »{object_}« verstanden, aber mir fehlt der Ausgangspunkt. "
+                "Wovon möchtest du die Beziehung prüfen?")
+    if not subject and not object_:
+        return "Welche beiden Dinge möchtest du miteinander in Beziehung setzen?"
+    return None
