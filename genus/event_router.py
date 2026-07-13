@@ -38,6 +38,7 @@ from genus import (
     operation,
     projection,
     proposals,
+    response_outcomes,
     state,
 )
 
@@ -79,6 +80,8 @@ PROJEKTOREN: dict[str, Callable] = {
     "inquiry_created": inquiries.apply_inquiry_created,
     "inquiry_resolved": inquiries.apply_inquiry_resolved,
     "inquiries_reconciled": inquiries.apply_inquiries_reconciled,
+    "response_outcome_recorded": response_outcomes.apply_response_outcome_recorded,
+    "response_feedback_recorded": response_outcomes.apply_response_feedback_recorded,
 }
 
 # Maschinenlesbarer Wirkungsvertrag: Ein Event ist erst dann vollständig kartiert,
@@ -107,9 +110,14 @@ PROJEKTIONSZIELE: dict[str, frozenset[str]] = {
     "inquiry_created": frozenset({"inquiry_log"}),
     "inquiry_resolved": frozenset({"inquiry_log"}),
     "inquiries_reconciled": frozenset({"inquiry_log"}),
+    "response_outcome_recorded": frozenset({"response_outcome_log"}),
+    "response_feedback_recorded": frozenset({"response_feedback_log"}),
 }
 
 REPLAY_PROJEKTIONSTABELLEN: tuple[str, ...] = (
+    # Child before parent: feedback has a foreign key to its response outcome.
+    "response_feedback_log",
+    "response_outcome_log",
     "rule_projection",
     "governance_log",
     "operation_log",
@@ -241,6 +249,12 @@ def replay(conn, *, commit: bool = True) -> dict:
     active_rule_count = conn.execute(
         "SELECT COUNT(*) AS count FROM rule_projection WHERE status = 'active'"
     ).fetchone()["count"]
+    response_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM response_outcome_log"
+    ).fetchone()["count"]
+    feedback_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM response_feedback_log"
+    ).fetchone()["count"]
     if commit:
         conn.commit()
     return {
@@ -253,6 +267,8 @@ def replay(conn, *, commit: bool = True) -> dict:
         "governance_decisions": int(governance_count),
         "operations": int(operation_count),
         "active_rules": int(active_rule_count),
+        "response_outcomes": int(response_count),
+        "response_feedback": int(feedback_count),
     }
 
 

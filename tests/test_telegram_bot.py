@@ -172,6 +172,310 @@ def test_session_turn_history_is_capped_not_unbounded():
     assert len(sessions[42]) == telegram_bot._VERLAUF_MAX
 
 
+def test_pending_session_turn_waits_for_a_transport_neutral_response_id():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier", "dbnary")
+    sessions: dict = {}
+    pending: dict = {}
+
+    result = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions,
+        pending=pending,
+    )
+
+    assert result is not None and sessions == {}
+    assert pending["chat_id"] == 42
+    assert pending["zug"]["question"] == "Was ist ein Hund?"
+    assert "response_id" not in pending["zug"]
+    assert telegram_bot._finalisiere_pending_zug(sessions, pending, response_id=117) is True
+    assert pending == {}
+    assert sessions[42][-1]["response_id"] == 117
+    assert sessions[42][-1]["answer"] == result[1]
+
+
+def test_delivered_answer_gets_a_privacy_sparse_outcome_and_the_new_renderer():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier", "dbnary")
+    sessions: dict = {}
+    pending: dict = {}
+
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions,
+        pending=pending,
+    )
+
+    assert answer.startswith("»Hund« bedeutet hier: Haustier.")
+    assert sessions == {}
+    assert conn.execute("SELECT COUNT(*) FROM response_outcome_log").fetchone()[0] == 0
+
+    response_id = telegram_bot._bestaetige_zustellung(
+        conn, sessions, pending, message_id=77,
+    )
+
+    assert isinstance(response_id, int) and response_id != 77
+    assert sessions[42][-1]["response_id"] == response_id
+    row = conn.execute(
+        "SELECT * FROM response_outcome_log WHERE response_id = ?", (response_id,),
+    ).fetchone()
+    assert dict(row) == {
+        "response_id": response_id,
+        "channel": "telegram",
+        "outcome": "answered",
+        "readings": '["definition"]',
+        "answer_mode": "core",
+        "feedback_eligible": 1,
+        "created_at": row["created_at"],
+    }
+    event_payload = conn.execute(
+        "SELECT payload FROM event_log WHERE id = ?", (response_id,),
+    ).fetchone()[0]
+    assert set(__import__("json").loads(event_payload)) == {
+        "channel", "outcome", "readings", "answer_mode", "feedback_eligible",
+    }
+    assert all(token not in event_payload for token in ("Hund", "Haustier", "42", "77"))
+
+
+def test_missing_transport_receipt_creates_neither_outcome_nor_session_turn():
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions=sessions, pending=pending,
+    )
+
+    assert telegram_bot._bestaetige_zustellung(
+        conn, sessions, pending, message_id=None,
+    ) is None
+    assert pending == {} and sessions == {}
+    assert conn.execute("SELECT COUNT(*) FROM response_outcome_log").fetchone()[0] == 0
+
+
+def test_explicit_thumb_feedback_links_to_last_eligible_delivered_answer():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier", "dbnary")
+    sessions: dict = {}
+    pending: dict = {}
+
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions,
+        pending=pending,
+    )
+    ziel_id = telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=71)
+
+    _, ack = telegram_bot.handle_update(
+        conn, _msg(2, 42, "👍"), allowed={42}, sessions=sessions, pending=pending,
+    )
+    assert ack and pending["outcome"]["answer_mode"] == "feedback_ack"
+    assert pending["outcome"]["feedback_eligible"] is False
+    feedback = conn.execute(
+        "SELECT response_id, signal, corrected_intent, source FROM response_feedback_log"
+    ).fetchone()
+    assert tuple(feedback) == (ziel_id, "positive", None, "owner_explicit")
+
+    ack_id = telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=72)
+    assert sessions[42][-1]["response_id"] == ack_id
+    assert sessions[42][-1]["feedback_eligible"] is False
+
+    # Ein weiteres Signal darf nicht auf den Bestätigungs-Ack kippen: der ist explizit
+    # ausgeschlossen; Ziel bleibt die letzte echte Antwort.
+    telegram_bot.handle_update(
+        conn, _msg(3, 42, "👍"), allowed={42}, sessions=sessions, pending=pending,
+    )
+    links = conn.execute(
+        "SELECT response_id, signal FROM response_feedback_log ORDER BY feedback_event_id"
+    ).fetchall()
+    assert [tuple(row) for row in links] == [(ziel_id, "positive"), (ziel_id, "positive")]
+
+
+@pytest.mark.parametrize("regung", ["❤️", "😊", "🔥", "🎉", "💪"])
+def test_social_emoji_is_not_misread_as_answer_quality_feedback(regung):
+    assert telegram_bot._explizites_feedback(regung) is None
+
+
+def test_feedback_stops_at_a_delivered_edge_ritual_barrier():
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions=sessions, pending=pending,
+    )
+    telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=73)
+    telegram_bot.handle_update(
+        conn, _msg(2, 42, "stell den Push auf 6:45"), allowed={42}, sessions=sessions,
+        pending=pending,
+    )
+    telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=74)
+    assert sessions[42][-1]["answer_mode"] == "edge_ritual"
+
+    telegram_bot.handle_update(
+        conn, _msg(3, 42, "👍"), allowed={42}, sessions=sessions, pending=pending,
+    )
+
+    assert conn.execute("SELECT COUNT(*) FROM response_feedback_log").fetchone()[0] == 0
+
+
+def test_textual_model_lob_is_not_promoted_to_explicit_feedback(monkeypatch):
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions=sessions, pending=pending,
+    )
+    telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=81)
+    monkeypatch.setattr(
+        deuter, "interpret",
+        lambda *a, **k: {"absicht": "lob", "subject": None, "object": None},
+    )
+
+    telegram_bot.handle_update(
+        conn, _msg(2, 42, "Das war wirklich erfreulich formuliert"), allowed={42},
+        sessions=sessions, pending=pending,
+    )
+
+    assert conn.execute("SELECT COUNT(*) FROM response_feedback_log").fetchone()[0] == 0
+    assert pending["outcome"]["answer_mode"] == "core"
+    assert pending["outcome"]["feedback_eligible"] is True
+
+
+def test_explicit_intent_correction_links_structurally_without_chat_text():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Haustier", "dbnary")
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist ein Hund?"), allowed={42}, sessions=sessions,
+        pending=pending,
+    )
+    ziel_id = telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=91)
+
+    telegram_bot.handle_update(
+        conn, _msg(2, 42, "falsch verstanden: definition"), allowed={42},
+        sessions=sessions, pending=pending,
+    )
+
+    feedback = conn.execute(
+        "SELECT response_id, signal, corrected_intent, source FROM response_feedback_log"
+    ).fetchone()
+    assert tuple(feedback) == (ziel_id, "intent_correction", "definition", "owner_explicit")
+    payload = conn.execute(
+        "SELECT payload FROM event_log WHERE event_type = 'response_feedback_recorded'"
+    ).fetchone()[0]
+    assert "Hund" not in payload and "falsch verstanden" not in payload
+    assert pending["outcome"]["answer_mode"] == "feedback_ack"
+
+
+def test_unknown_correction_token_never_crosses_the_ledger_privacy_boundary():
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions=sessions, pending=pending,
+    )
+    ziel_id = telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=92)
+
+    telegram_bot.handle_update(
+        conn, _msg(2, 42, "falsch verstanden: ronnygeheim"), allowed={42},
+        sessions=sessions, pending=pending,
+    )
+
+    row = conn.execute(
+        "SELECT response_id, corrected_intent FROM response_feedback_log"
+    ).fetchone()
+    assert tuple(row) == (ziel_id, None)
+    payload = conn.execute(
+        "SELECT payload FROM event_log WHERE event_type = 'response_feedback_recorded'"
+    ).fetchone()[0]
+    assert "ronnygeheim" not in payload
+
+
+def test_answer_exception_is_a_delivered_non_feedbackable_error_outcome(monkeypatch):
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    from genus import companion
+
+    monkeypatch.setattr(
+        companion, "respond_with_deuter",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Irgendetwas"), allowed={42}, sessions=sessions,
+        pending=pending,
+    )
+    assert "schiefgelaufen" in answer
+
+    response_id = telegram_bot._bestaetige_zustellung(
+        conn, sessions, pending, message_id=101,
+    )
+    row = conn.execute(
+        "SELECT outcome, answer_mode, feedback_eligible FROM response_outcome_log "
+        "WHERE response_id = ?", (response_id,),
+    ).fetchone()
+    assert tuple(row) == ("fallback", "error", 0)
+    assert sessions[42][-1]["answer_mode"] == "error"
+    assert sessions[42][-1]["feedback_eligible"] is False
+
+
+def test_session_contains_exactly_the_text_telegram_can_deliver(monkeypatch):
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    from genus import companion
+
+    monkeypatch.setattr(
+        companion, "respond_with_deuter",
+        lambda *a, **k: {
+            "text": "x" * (telegram_bot._TELEGRAM_TEXT_MAX + 500),
+            "question": "lang",
+            "gelesen": ["definition"],
+            "outcome": "answered",
+        },
+    )
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "lang"), allowed={42}, sessions=sessions, pending=pending,
+    )
+
+    assert len(answer) == telegram_bot._TELEGRAM_TEXT_MAX
+    assert pending["zug"]["answer"] == answer
+
+
+@pytest.mark.parametrize("response_id", [None, 0, -1, True, "117"])
+def test_pending_session_turn_is_discarded_without_a_valid_response_id(response_id):
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions=sessions, pending=pending,
+    )
+
+    assert pending
+    assert telegram_bot._finalisiere_pending_zug(sessions, pending, response_id) is False
+    assert pending == {} and sessions == {}
+
+
+def test_pending_session_turn_cannot_reuse_an_existing_response_id():
+    sessions = {42: [{"question": "alt", "answer": "alt", "response_id": 7}]}
+    pending = {"chat_id": 42, "zug": {"question": "neu", "answer": "neu"}}
+
+    assert telegram_bot._finalisiere_pending_zug(sessions, pending, response_id=7) is False
+    assert pending == {}
+    assert [z["question"] for z in sessions[42]] == ["alt"]
+
+
+def test_an_ignored_update_clears_a_stale_pending_turn_fail_closed():
+    conn = _fresh()
+    pending = {"chat_id": 42, "zug": {"question": "alt", "answer": "alt"}}
+
+    assert telegram_bot.handle_update(
+        conn, _msg(2, 999, "Hallo!"), allowed={42}, sessions={}, pending=pending,
+    ) is None
+    assert pending == {}
+
+
 def test_without_sessions_behaves_exactly_as_before():
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
@@ -1067,9 +1371,10 @@ def test_antwortmelder_sendet_dann_editiert(monkeypatch):
     m = telegram_bot._AntwortMelder("tok")
     m.melde(42, "🤔 Ich denke nach …")
     m.melde(42, "✍️ Ich formuliere …")
-    m.abschliessen(42, "Die Antwort.")
+    message_id = m.abschliessen(42, "Die Antwort.")
     assert [r[0] for r in rufe] == ["sendMessage", "editMessageText", "editMessageText"]
     assert rufe[1][1]["message_id"] == 77 and rufe[2][1]["text"] == "Die Antwort."
+    assert message_id == 77
     assert 42 not in m._nachricht   # abgeschlossen -> vergessen (kein Geister-Edit spaeter)
 
 
@@ -1079,8 +1384,63 @@ def test_antwortmelder_ohne_meldung_sendet_schlicht(monkeypatch):
         telegram_bot, "_api",
         lambda t, meth, p, timeout: (rufe.append(meth), {"ok": True, "result": {"message_id": 1}})[1])
     m = telegram_bot._AntwortMelder("tok")
-    m.abschliessen(42, "Direkte Antwort.")   # schneller Pfad hatte nie einen Status
+    message_id = m.abschliessen(42, "Direkte Antwort.")   # schneller Pfad hatte nie einen Status
     assert rufe == ["sendMessage"]
+    assert message_id == 1
+
+
+def test_antwortmelder_returns_the_fallback_message_id_when_editing_fails(monkeypatch):
+    rufe: list = []
+
+    def fake_api(token, method, params, timeout):
+        rufe.append(method)
+        if method == "editMessageText":
+            raise OSError("Editieren gescheitert")
+        message_id = 9 if len(rufe) == 1 else 10
+        return {"ok": True, "result": {"message_id": message_id}}
+
+    monkeypatch.setattr(telegram_bot, "_api", fake_api)
+    m = telegram_bot._AntwortMelder("tok")
+    m.melde(42, "🤔 Ich denke nach …")
+
+    assert m.abschliessen(42, "Die Antwort.") == 10
+    assert rufe == ["sendMessage", "editMessageText", "sendMessage"]
+
+
+def test_antwortmelder_rejects_a_malformed_edit_receipt_and_sends_fresh(monkeypatch):
+    rufe: list = []
+
+    def fake_api(token, method, params, timeout):
+        rufe.append(method)
+        if method == "editMessageText":
+            return {"ok": True}  # kein Message-Objekt, also kein Beleg für den finalen Text
+        message_id = 9 if len(rufe) == 1 else 10
+        return {"ok": True, "result": {"message_id": message_id}}
+
+    monkeypatch.setattr(telegram_bot, "_api", fake_api)
+    m = telegram_bot._AntwortMelder("tok")
+    m.melde(42, "🤔 Ich denke nach …")
+
+    assert m.abschliessen(42, "Die Antwort.") == 10
+    assert rufe == ["sendMessage", "editMessageText", "sendMessage"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"ok": False},
+        {"ok": True},
+        {"ok": True, "result": {}},
+        {"ok": True, "result": True},
+        {"ok": True, "result": {"message_id": True}},
+        {"ok": True, "result": {"message_id": "7"}},
+        None,
+    ],
+)
+def test_send_message_without_an_integer_receipt_returns_none(monkeypatch, body):
+    monkeypatch.setattr(telegram_bot, "_api", lambda *a, **k: body)
+
+    assert telegram_bot._send_message("tok", 42, "Antwort") is None
 
 
 def test_antwortmelder_meldung_ist_fail_silent(monkeypatch):

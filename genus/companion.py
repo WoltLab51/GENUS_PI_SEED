@@ -357,7 +357,9 @@ def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, 
     bleibt der nüchterne Wortlaut; die Gesprächs-Einstiege reichen sie durch."""
     rel = relate(conn, question)
     if rel.get("relational"):
-        return narrate_relation(conn, rel, bel), "beziehung"
+        from genus import antwort as _antwort
+        text = narrate_relation(conn, rel, bel)
+        return _antwort.AnswerText(text, _antwort.entwurf_beziehung(rel, text)), "beziehung"
     kau = relate_kausal(conn, question)
     if kau.get("kausal_q"):
         return narrate_kausal(conn, kau, bel), "beziehung"
@@ -407,7 +409,7 @@ def _wort_antwort(conn, question: str, waage=None) -> str | None:
         text += "".join(f" {satz}" for satz in vertiefung(conn, a))
     if a.get("concept"):
         text += f" (Mehr Herkunft: „genus concept {a['concept']}\" oder „genus why answer …\".)"
-    return text
+    return _antwort.AnswerText(text, _antwort.entwurf_definition(a, text))
 
 
 def respond(conn, question: str, bel: dict | None = None, waage=None) -> str:
@@ -748,7 +750,8 @@ def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=N
     bel = _antwort.belegung(conn, "plausch")   # Voice 1 (Scheibe 1) -- Wärme aus dem Antwort-Würfel
     r = werkzeuge_auskunft.relate_geplant(conn, guess["subject"], guess["object"])
     if r["relational"] and r["verdict"] == "yes":
-        return narrate_relation(conn, r, bel)   # eine echte is_a-Einordnung -- die stärkste Antwort
+        text = narrate_relation(conn, r, bel)
+        return _antwort.AnswerText(text, _antwort.entwurf_beziehung(r, text))
     # keine POSITIVE is_a-Beziehung? -> dieselbe Zelle trägt auch die GERICHTETE Kausal-Beziehung
     # („Verursacht X Y?", „Führt X zu Y?" -- Formulierungen, die die festen Muster von
     # _muster_antwort verfehlen, der Deuter aber als beziehung liest). Wichtig: „beide bekannt,
@@ -758,7 +761,10 @@ def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=N
     k = _kausal_zwischen(conn, guess["subject"], guess["object"])
     if k["kausal_q"] and k["art"] == "ja":
         return narrate_kausal(conn, k, bel)
-    return narrate_relation(conn, r, bel) if r["relational"] else None
+    if not r["relational"]:
+        return None
+    text = narrate_relation(conn, r, bel)
+    return _antwort.AnswerText(text, _antwort.entwurf_beziehung(r, text))
 
 
 def _zelle_ursache(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1315,7 +1321,8 @@ _ANCHOR_BLEIBT = {   # cells that reformat/retrace the EXISTING topic, never int
 
 
 def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
-                     last_answer: str | None, stimme, quelle: str, waage=None):
+                     last_answer: str | None, stimme, quelle: str, waage=None,
+                     renderer=None, previous_response_id: int | None = None):
     """Löst eine Liste von Segment-Lesarten (aus dem Deuter ODER der Gebärden-Schnellspur) über
     :func:`_deuter_antwort` und sammelt die Teil-Antworten. Rückgabe ``(teile, gelesen, anchor)``
     -- ``teile`` sind die Segment-Antworten (für :func:`_komponiere`), ``gelesen`` die erkannten
@@ -1323,21 +1330,30 @@ def _segmente_loesen(conn, segmente, question: str, last_question: str | None,
     ``quelle`` wird für die ehrliche Herkunft der Belegung durchgereicht."""
     teile: list[str] = []
     gelesen: list[str] = []
+    outcomes: list[str] = []
     anchor = question
     for segment in segmente:
         gedeutet = _deuter_antwort(conn, segment, question, last_question, last_answer,
-                                   stimme=stimme, quelle=quelle, waage=waage)
-        if gedeutet is not None:
-            teile.append(gedeutet["text"])
+                                   stimme=stimme, quelle=quelle, waage=waage,
+                                   renderer=renderer,
+                                   previous_response_id=previous_response_id)
+        if gedeutet is None:
+            outcomes.append("fallback")
+        else:
+            if gedeutet["text"]:
+                teile.append(gedeutet["text"])
+            outcomes.append(gedeutet.get("outcome", "answered"))
             anchor = gedeutet["question"]
             if gedeutet.get("kind"):
                 gelesen.append(gedeutet["kind"])
-    return teile, gelesen, anchor
+    from genus import antwort
+    return teile, gelesen, anchor, antwort.gesamt_outcome(outcomes)
 
 
 def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                      last_answer: str | None = None, stimme=None,
-                     quelle: str = "model:deuter", waage=None) -> dict | None:
+                     quelle: str = "model:deuter", waage=None, renderer=None,
+                     previous_response_id: int | None = None) -> dict | None:
     """Map an OPEN reading onto the Absichts-Raster and act from the known cell -- or
     climb ONE step to its Zwicky-Zelle (Blatt -> Zelle, nie tiefer -- eine Zelle ist schon die
     gröbste sinnvolle Einheit) -- or name honestly what GENUS read but cannot do yet. ``None``
@@ -1391,6 +1407,13 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
             marker = _DEUTED if (quelle == "model:deuter"
                                  and step not in ("tatsache", "merken")) else ""
             anchor = last_question if step in _ANCHOR_BLEIBT else question
+            from genus import antwort as _antwort
+            text, draft = _antwort.wende_renderer_an(
+                conn, text, question=question, anchor_question=anchor, intent=kind,
+                renderer=renderer, reading_source=quelle,
+                previous_response_id=previous_response_id,
+                is_followup=step in _ANCHOR_BLEIBT,
+            )
             if not zellen_werkzeug.wortlautfest:
                 # Stimme-Eignung folgt strukturell aus der Spec (Phase 3) -- keine zweite,
                 # separat zu pflegende Menge mehr. Gerichtete Zelle -> Verbatim-Insel (Scheibe 2).
@@ -1400,16 +1423,20 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
                 # die Meta-Zellen bauen auf last_answer auf, das oft schon einen Hinweis trägt
                 # (Nochmal/Ausführlicher wiederholen ihn wörtlich mit) -- nie doppelt anhängen
                 text = text + marker
-            return {"text": text, "question": anchor, "kind": kind}
+            return {"text": text, "question": anchor, "kind": kind,
+                    "outcome": draft.resolution if draft else "answered"}
     if hatte_handler:
-        return None   # capability exists but nothing resolved here -- fail safe, never claim inability
+        if renderer is not None:
+            return {"text": "", "question": question, "kind": kind,
+                    "outcome": "invalid_slots"}
+        return None   # compatibility path: no H1 outcome contract requested
     # known cell, no capability anywhere up the chain: say so, honestly -- and count it,
     # because exactly these counts prioritise what gets built next
     _record_still(verstehen.record_reading, conn, kind, quelle)
     label = _ZELLEN_LABELS.get(kind, f"„{kind}“")
     return {"text": f"Ich lese das als {label} — das kann ich noch nicht. Ich habe es mir "
                     f"als Lücke gemerkt." + _luecken_vorschlag_hinweis(conn),
-            "question": question, "kind": kind}
+            "question": question, "kind": kind, "outcome": "understood_unknown"}
 
 
 def _luecken_vorschlag_hinweis(conn) -> str:
@@ -1432,18 +1459,9 @@ def _luecken_vorschlag_hinweis(conn) -> str:
 
 
 def _komponiere(teile: list[str]) -> str:
-    """Mehrere Segment-Antworten zu EINER Antwort -- der erste, bewusst einfache Auftritt des
-    Antwort-Würfels (Ronnys Weiterdenken vom Verstehens-Würfel aus). Heute nur aneinandergereiht,
-    keine stilistische Verschmelzung -- ein kleiner, ehrlicher erster Schritt, kein Anspruch auf
-    das letzte Wort in Sachen Formulierung. Ein Transparenz-Hinweis (Deuter/Stimme), den JEDES
-    Segment einzeln trägt, muss in der zusammengesetzten Antwort nicht mehrfach auftauchen --
-    einmal am Ende genügt, um "nie stillschweigend" einzulösen, ohne redundant zu wirken."""
-    text = " ".join(t for t in teile if t)
-    for marker in (_DEUTED, _STIMME_TAG):
-        n = text.count(marker)
-        if n > 1:
-            text = text.replace(marker, "", n - 1)
-    return text
+    """Kompatibler Einstieg in den Komponierer des Antwort-Würfels."""
+    from genus import antwort
+    return antwort.komponiere(teile, (_DEUTED, _STIMME_TAG))
 
 
 def _anschluss_beiwerk(conn, question: str, aktiv: bool) -> tuple[str, str | None]:
@@ -1512,57 +1530,19 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                          deuter=None, stimme=None, last_answer: str | None = None,
                          verlauf: list[dict] | None = None,
                          letzte_lesarten: list[str] | None = None,
-                         letzter_anschluss: str | None = None, waage=None) -> dict:
-    """The full Verstehens-Würfel for the conversational channel: Rituale -> Muster-Zellen ->
-    offene Deuter-SEGMENTIERUNG (eine Nachricht kann mehrere Sprechhandlungen enthalten, ISO
-    24617-2 -- jedes Segment aufs Raster abgebildet, is_a-Fallback GENAU einen Schritt,
-    ehrliche Benennung) -> letzte Wort-Lesart -> ehrlicher Rest. The Deuter now runs BEFORE the
-    greedy word reading (the 2026-07-02 bug class); the word reading remains as the final
-    reading when the model is absent or reads nothing actionable. Known-cell readings are
-    recorded as pure structure (Belegungs-Kennzahl); the user's words are never stored.
+                         letzter_anschluss: str | None = None, waage=None,
+                         renderer=None, previous_response_id: int | None = None) -> dict:
+    """Der vollständige Gesprächspfad: sichere Rituale und Muster, segmentierte Deutung,
+    Wort-Lesart, dann ehrlicher Rest. Deuter-Lesarten werden als reine Struktur gezählt;
+    Nutzertext wird dadurch nicht im Ledger gespeichert.
 
-    ``deuter(question)`` gibt eine LISTE von Segment-Lesarten zurück (ein bare dict wird
-    grosszügig als Ein-Segment-Liste behandelt, für Aufrufer/Tests, die noch die alte Form
-    nutzen). Jedes Segment wird einzeln über :func:`_deuter_antwort` gelöst; die Teil-Antworten
-    werden über :func:`_komponiere` zu einer zusammengefügt.
-
-    When a ``stimme`` callable is given, every narrate-style factual answer -- Muster/Wort AND
-    the Deuter-driven cells whose Werkzeug-Spec says ``wortlautfest=False`` (definition/
-    beziehung/vergleich/grammatik/frage-begriff; a plain "Was ist ein Hund?" reaches the Deuter
-    now that it runs before the word reading, so it must be covered too) -- is offered to it
-    for a more natural rephrase (:func:`_stimme_versucht`), always safe to fall back, never
-    required. The SAME
-    answers, on the conversational path only (``deuter is not None``), are also offered a
-    Notiz-Bezug (:func:`_notiz_bezug`, Personen-Gedächtnis Scheibe 2) -- a personal note woven
-    in beiläufig when its text shares a word with the question. Multi-line/structured answers
-    (Nachfrage-Herleitung, Erinnerungen, offene Fragen) are deliberately left alone by both.
-
-    ``last_answer`` (optional, the EXACT text ``respond_with_deuter`` returned last turn) feeds
-    the Antwort-Würfel's Meta-Zellen (kuerzer/ausfuehrlicher/anders-erklaeren/wiederholen) --
-    a caller threads ``result["text"]`` forward the same way it threads ``result["question"]``
-    forward as the next call's ``last_question``.
-
-    ``deuter=None``/``stimme=None`` degrades to the deterministic Würfel half and behaves
-    exactly like ``respond_in_conversation`` (as long as ``verlauf`` is also omitted).
-
-    ``verlauf`` (optional, Mehr-Zug-Arbeitsgedächtnis): turns BEFORE the immediately previous
-    one (that one stays reachable via ``last_question``/``last_answer`` as always). A question
-    containing „von vorhin"/„von eben" (:func:`is_backreference`) re-answers the most recent
-    earlier question GENUS can still answer, named honestly as a retrace -- never a guessed
-    word-substitution.
-
-    ``letzte_lesarten`` (optional, der Korrektur-Kanal): die Raster-Lesarten, auf die der
-    LETZTE Zug gehandelt hat (der Aufrufer fädelt ``result["gelesen"]`` genauso weiter wie
-    question/answer). Ein exaktes „falsch verstanden" hält sie als Fehlgriff fest --
-    deterministisch, VOR jeder Deutung, damit die Korrektur nie selbst durch den
-    Klassifikator muss, der eben danebengriff (Naht 1).
-
-    ``letzter_anschluss`` (optional, die Antizipation): die im LETZTEN Zug angebotene, schon
-    verifizierte Anschlussfrage (der Aufrufer fädelt ``result["anschluss"]`` genauso weiter
-    wie question/gelesen). Kommt jetzt eine knappe Zustimmung (:func:`_ist_zustimmung`), wird
-    genau diese Frage beantwortet -- VOR jeder Deutung, damit ein „ja" nie durch den
-    Klassifikator muss. Eine Konzept-Antwort trägt umgekehrt ihr eigenes Angebot in
-    ``result["anschluss"]`` (:func:`_anschluss_beiwerk`, kalibriert über ``antwort.belegung``)."""
+    ``last_*``, ``verlauf``, ``letzte_lesarten`` und ``letzter_anschluss`` bilden den kleinen
+    In-Process-Dialograhmen für Rückfragen, Meta-Zellen, Korrektur und Antizipation. Ein
+    injizierter ``renderer`` liest einen strukturierten AnswerDraft vor jeder String-
+    Komposition; ``previous_response_id`` bindet den Rahmen ausschließlich strukturell an
+    die zuletzt zugestellte Antwort. Stimme, Notiz und Anschluss bleiben nachgelagerte,
+    treue Optionen. Ohne injizierte Randorgane bleibt der deterministische Pfad kompatibel.
+    """
     from genus import verstehen
 
     ist_korrektur, richtig = korrektur_cue(question)
@@ -1570,10 +1550,11 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         if letzte_lesarten:
             text = _korrektur_antwort(conn, letzte_lesarten, richtig)
             anchor = last_question or question
-            return {"text": text, "question": anchor, "gelesen": []}
+            return {"text": text, "question": anchor, "gelesen": [],
+                    "outcome": "answered"}
         return {"text": "Da war keine letzte Deutung, die ich korrigieren könnte — "
                         "die Korrektur bezieht sich immer auf meine vorige Antwort.",
-                "question": question, "gelesen": []}
+                "question": question, "gelesen": [], "outcome": "invalid_slots"}
     # Die ANTIZIPATION eingelöst: stand im letzten Zug ein Anschluss-Angebot aus und kommt
     # jetzt eine knappe Zustimmung, wird GENAU diese verifizierte Frage beantwortet -- vor
     # jeder Deutung, damit ein „ja" nie durch den Klassifikator muss (und nie ins Leere läuft).
@@ -1604,15 +1585,20 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         # niemand kann die Eignung mehr an einer zweiten Stelle vergessen
         registriere_zellen()
         from genus import werkzeug as _werkzeug
+        text, draft = _antwort.wende_renderer_an(
+            conn, muster[0], question=question, anchor_question=question,
+            intent=muster[1], renderer=renderer, reading_source="muster",
+            previous_response_id=previous_response_id,
+        )
         if _werkzeug.stimme_geeignet(f"{ZELLE_PREFIX}{muster[1]}"):
             # gerichtete Zelle -> ihr Fakt-Satz ist eine Verbatim-Insel (Richtung kann nicht kippen)
-            kern = _kern_span(muster[0]) if muster[1] in _GERICHTETE_ZELLEN else None
-            text = _stimme_versucht(conn, muster[0], stimme, kern=kern)
-        else:
-            text = muster[0]
+            kern = ((draft.verbatim_core if draft else None) or _kern_span(text)
+                    if muster[1] in _GERICHTETE_ZELLEN else None)
+            text = _stimme_versucht(conn, text, stimme, kern=kern)
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
-        return {"text": text, "question": question, "gelesen": [muster[1]]}
+        return {"text": text, "question": question, "gelesen": [muster[1]],
+                "outcome": draft.resolution if draft else "answered"}
     if deuter is not None:
         # DIE GEBÄRDEN-SCHNELLSPUR (Proposal #14): eine reine Emoji-Nachricht wird gläsern und
         # modellfrei gelesen, VOR dem Deuter -- ein 👍 ist eindeutiger als jeder Modell-Tipp.
@@ -1621,21 +1607,25 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         from genus import gebaerde
         gesten = gebaerde.lies(question)
         if gesten is not None:
-            teile, gelesen, anchor = _segmente_loesen(
+            teile, gelesen, anchor, outcome = _segmente_loesen(
                 conn, gesten, question, last_question, last_answer, stimme, "gebaerde",
-                waage=waage)
+                waage=waage, renderer=renderer,
+                previous_response_id=previous_response_id)
             if teile:
-                return {"text": _komponiere(teile), "question": anchor, "gelesen": gelesen}
+                return {"text": _komponiere(teile), "question": anchor,
+                        "gelesen": gelesen, "outcome": outcome}
         segmente = deuter(question)
         if isinstance(segmente, dict):
             segmente = [segmente]
         if segmente is not None:   # der Deuter LIEF -- auch eine leere Liste zählt als Lauf
-            teile, gelesen, anchor = _segmente_loesen(
+            teile, gelesen, anchor, outcome = _segmente_loesen(
                 conn, segmente, question, last_question, last_answer, stimme, "model:deuter",
-                waage=waage)
+                waage=waage, renderer=renderer,
+                previous_response_id=previous_response_id)
             if teile:
                 bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
-                res = {"text": _komponiere(teile) + bei, "question": anchor, "gelesen": gelesen}
+                res = {"text": _komponiere(teile) + bei, "question": anchor,
+                       "gelesen": gelesen, "outcome": outcome}
                 if anschluss:   # der Schlüssel erscheint nur, wenn es wirklich ein Angebot gibt
                     res["anschluss"] = anschluss
                 return res
@@ -1645,18 +1635,29 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             if not segmente:
                 _record_still(verstehen.record_reading, conn, "unklar", "model:deuter")
             return {"text": _NICHT_VERSTANDEN + _luecken_vorschlag_hinweis(conn),
-                    "question": question}
+                    "question": question, "gelesen": gelesen,
+                    "outcome": outcome if outcome != "answered" else "fallback"}
     text = _wort_antwort(conn, question, waage=waage)
     if text is not None:
+        text, draft = _antwort.wende_renderer_an(
+            conn, text, question=question, anchor_question=question,
+            intent="definition", renderer=renderer, reading_source="wort",
+            previous_response_id=previous_response_id,
+        )
         text = _stimme_versucht(conn, text, stimme)
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
         bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
         res = {"text": text + bei, "question": question}
+        if renderer is not None:
+            res.update(gelesen=["definition"], outcome=draft.resolution)
         if anschluss:
             res["anschluss"] = anschluss
         return res
-    return {"text": _UNKNOWN_FALLBACK, "question": question}
+    res = {"text": _UNKNOWN_FALLBACK, "question": question}
+    if renderer is not None:
+        res["outcome"] = "fallback"
+    return res
 
 
 # --- the provenance trace ("genus why") ------------------------------------------------

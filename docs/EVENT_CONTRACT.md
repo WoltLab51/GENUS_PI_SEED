@@ -67,6 +67,8 @@ darauffolgenden Abschnitt.
 | `inquiry_created` | `claim_key`, `inquiry_id`, `inquiry_type`, `payload`, `question_key`, `source_belief`, `source_event`, `state` | `projected` | Legt eine offene Frage in `inquiry_log` an. |
 | `inquiry_resolved` | `answer`, `inquiry_id` | `projected` | Schließt genau eine Frage in `inquiry_log`. |
 | `inquiries_reconciled` | `answer`, `inquiry_ids` | `projected` | Schließt einen mechanisch belegten Fragenstapel in `inquiry_log`. |
+| `response_outcome_recorded` | `answer_mode`, `channel`, `feedback_eligible`, `outcome`, `readings` | `projected` | Legt genau eine nach Zustellbeleg bestätigte, inhaltsfreie Antwortwirkung in `response_outcome_log` an; ihre Event-ID ist die Response-ID. |
+| `response_feedback_recorded` | `corrected_intent`, `response_id`, `signal`, `source` | `projected` | Verknüpft ein explizites Qualitätssignal replaybar mit einer feedbackfähigen Antwort in `response_feedback_log`. |
 | `forecast_made` | `method`, `metric_key`, `predicted_value`, `support` | `raw` | Prognosebeleg; Auswertungen lesen ihn direkt aus dem Ledger. |
 | `forecast_scored` | `actual_value`, `error`, `forecast_event`, `metric_key`, `predicted_value` | `raw` | Bewerteter Prognosebeleg; Lernkurven entstehen zur Lesezeit. |
 | `ledger_epoch_opened` | `algo`, `genesis_digest`, `prefix_count`, `prefix_max_id` | `raw` | Keine fachliche Projektion; eröffnet die lokal versiegelte Ledger-Epoche. |
@@ -104,20 +106,40 @@ zur bloßen Anwesenheit der Pflichtfelder erzwungen.
 | `proposal_reviewed` | `decision` ist `accepted` oder `rejected`; je `proposal_id` ist höchstens ein Review zulässig. |
 | `inquiry_resolved` | `answer` ist nicht leer; je `inquiry_id` ist höchstens eine Auflösung zulässig. |
 | `inquiries_reconciled` | `inquiry_ids` ist eine nicht leere Liste ohne Duplikate; `answer` ist nicht leer; bereits einzeln oder in einem früheren Stapel aufgelöste IDs dürfen nicht erneut aufgelöst werden. |
+| `response_outcome_recorded` | Der Payload besitzt **exakt** die fünf Pflichtfelder, keine Inhalts- oder Transportfelder. `channel` ist `telegram`; `outcome` ist `answered`, `invalid_slots`, `understood_unknown` oder `fallback`; `answer_mode` ist `core`, `voice`, `edge_ritual`, `feedback_ack` oder `error`. `feedback_eligible` ist boolesch und bei Ack/Fehler immer falsch. `readings` enthält höchstens 32 eindeutige, strukturelle Intent-Tokens. |
+| `response_feedback_recorded` | Der Payload besitzt **exakt** die vier Pflichtfelder. `response_id` verweist auf ein früheres feedbackfähiges Outcome; `signal` ist `positive`, `negative` oder `intent_correction`; `source` ist `owner_explicit`. `corrected_intent` ist nur beim Korrektursignal zulässig. |
 
 Wichtig: Wo diese Tabelle keine weitere Form- oder Wertregel nennt, garantiert
 die Integritätsprüfung derzeit **Schlüsselanwesenheit**, nicht automatisch Typ,
 Nicht-Leerheit oder fachliche Plausibilität. Produzenten dürfen strengere
 Vorbedingungen besitzen; diese sind dann Teil ihres Modulvertrags.
 
+### Datenschutzgrenze des Antwortkreises
+
+Der Outcome-Produzent läuft **nach** einem belegten Telegram-Send/Edit. Ein fehlender
+oder ungültiger Zustellbeleg erzeugt weder Response-ID noch Session-Zug. Im Kern werden
+nur Kanal, typisierte Wirkung, strukturelle Lesarten, Antwortmodus und
+Feedback-Fähigkeit gespeichert. Frage, Antwort, Slots, Chat-/Nutzer-ID und Telegram-
+`message_id` sind in diesen Payloads ausdrücklich verboten.
+
+Explizites Feedback bedeutet im Pilot eine Nachricht, die — abgesehen von Leerraum und
+Emoji-Varianten — vollständig aus 👍 oder vollständig aus 👎 besteht, oder den engen
+Korrektur-Cue. Beim Korrektur-Cue übernimmt die Telegram-Membran nur bekannte
+Raster-Absichten; ein freier Nutzer-Token wird nicht ins Ledger geschrieben.
+Modellgedeutetes allgemeines Lob oder Kritik wird nicht still zu Qualitätsevidenz
+erhoben. Die Projektion macht Feedback messbar und replaybar; sie ändert keine
+Antwortstrategie automatisch.
+
 ## Replay-Vertrag
 
 `event_router.replay()` baut die Gegenwart deterministisch aus der vollständigen,
 nach `id` sortierten Historie neu auf:
 
-1. Es leert `rule_projection`, `governance_log`, `operation_log`, `inquiry_log`,
-   `proposal_log`, `experience_log`, `state_projection`, `belief_projection`,
-   `relation_projection` und `value_projection`.
+1. Es leert `response_feedback_log`, `response_outcome_log`, `rule_projection`,
+   `governance_log`, `operation_log`, `inquiry_log`, `proposal_log`,
+   `experience_log`, `state_projection`, `belief_projection`,
+   `relation_projection` und `value_projection`. Feedback wird wegen seines
+   Fremdschlüssels vor dem zugehörigen Outcome geleert.
 2. Es setzt die zugehörigen SQLite-Sequenzen zurück.
 3. Es führt jedes Event in Ledger-Reihenfolge durch `apply_event()`.
 4. Der Router ergänzt nur für die Projektion die flüchtigen Felder `_event_id`

@@ -2,7 +2,7 @@
 
 > **Status:** aktuelle Zukunftsplanung
 >
-> **Stand:** 12. Juli 2026
+> **Stand:** 13. Juli 2026
 >
 > **Enthält:** Reihenfolge, Abhängigkeiten und Definition of Done – keine
 > Bauchronik und keine flüchtigen Live-Zahlen
@@ -134,6 +134,21 @@ epistemischen Grenzen zu verwischen.
 - Persönlichkeit als kontrollierte Darstellungsschicht halten
 - Modellformulierungen niemals als neue Evidenz zurückschreiben
 
+**Pilotstand:** Der erste geschlossene Vertikalschnitt ist gebaut. Definitionen und
+Beziehungen tragen `AnswerDraft` mit Claims und vorhandener Provenienz; ein kleiner
+`DialogueFrame` führt Absicht, strukturelle Ankerkontinuität und kontrollierte
+Würfel-Belegung in den treuen
+Renderer. Telegram erzeugt erst nach belegter Zustellung ein typisiertes
+`ResponseOutcome`; reine 👍-/👎-Nachrichten und enge Intent-Korrekturen werden über die
+Response-ID replaybar verknüpft.
+
+Das ist bewusst noch nicht H1-fertig: Die übrigen Handler liefern weiter Legacy-Strings,
+ein vollständiger Diskursplan fehlt, Feedback ändert keine Strategie automatisch und der
+Telegram-Bezug zur letzten Response-ID überlebt keinen Prozessneustart. Der löschbare
+Memory-Vault bleibt Teil von H1.1. Ebenso fehlt noch eine löschbare Edge-Outbox: Scheitert
+die Outcome-Persistenz erst nach einer belegten Zustellung, bleibt diese Antwort im Pilot
+zugestellt, aber ungemessen.
+
 **Definition of Done für H1**
 
 - ein kuratiertes Set realer Alltagssituationen ist wiederholbar bewertet
@@ -230,5 +245,6 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Startlinie:** H0.1. Erst messen, dann die nächste Wachstumsentscheidung
-treffen.
+**Aktive Baulinie:** H1.2 vom Vertikalschnitt zum kuratierten Alltagstest reifen.
+Die read-only H0.1-Messreihe darf nach Regel 1 parallel weiterlaufen; sie öffnet keinen
+zweiten verändernden Produktpfad.

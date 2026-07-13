@@ -43,10 +43,10 @@ def test_map_is_deterministic_complete_and_source_bound():
     first = kartografie.build_map()
     second = kartografie.build_map()
     assert first == second
-    assert first["summary"]["event_types"] == 37
-    assert first["summary"]["projected_events"] == 21
+    assert first["summary"]["event_types"] == 39
+    assert first["summary"]["projected_events"] == 23
     assert first["summary"]["raw_events"] == 16
-    assert first["summary"]["projection_tables"] == 10
+    assert first["summary"]["projection_tables"] == 12
     assert first["summary"]["modules"] == len(
         list((ROOT / "genus").rglob("*.py")) + list((ROOT / "deploy").rglob("*.py"))
     )
@@ -136,8 +136,15 @@ def test_map_distinguishes_replay_raw_learning_and_missing_answer_contracts():
     impact = {item["signal"]: item["impact"] for item in data["learning_impact"]}
     assert impact["Fakten und Relationen"] == "direct"
     assert impact["Intent-Lesungen"] == "none"
-    assert impact["Allgemeine Kritik oder Lob"] == "none"
+    assert impact["Explizites Antwortfeedback (👍/👎)"] == "none"
+    assert impact["Modellgedeutetes Lob oder Kritik"] == "none"
     assert impact["Modellgewichte"] == "none"
+
+    semantic = {node["id"]: node for node in data["nodes"]}
+    assert semantic["h1:answer_draft"]["status"] == "active_pilot"
+    assert semantic["h1:dialogue_frame"]["status"] == "active_pilot"
+    assert semantic["h1:outcome"]["status"] == "active_delivered_only"
+    assert semantic["h1:feedback"]["status"] == "active_explicit_gated"
 
     missing = {
         node["id"]
@@ -145,11 +152,7 @@ def test_map_distinguishes_replay_raw_learning_and_missing_answer_contracts():
         if node.get("status") == "missing_h1"
     }
     assert {
-        "h1:answer_draft",
-        "h1:dialogue_frame",
-        "h1:outcome",
         "h1:memory_vault",
-        "h1:feedback",
         "h1:discourse",
         "h1:evaluation",
     } == missing
@@ -164,6 +167,26 @@ def test_map_distinguishes_replay_raw_learning_and_missing_answer_contracts():
         "reads_table",
     ) in edge_keys
     assert ("module:genus.db", "table:event_log", "initializes_schema") in edge_keys
+    assert (
+        "flow:telegram_send",
+        "h1:outcome",
+        "records_after_receipt",
+    ) in edge_keys
+    assert (
+        "h1:answer_draft",
+        "flow:composer",
+        "renders_pilot",
+    ) in edge_keys
+    assert (
+        "h1:dialogue_frame",
+        "flow:composer",
+        "frames_pilot",
+    ) in edge_keys
+    assert (
+        "h1:outcome",
+        "h1:feedback",
+        "links_explicit_feedback",
+    ) in edge_keys
     assert data["analysis_limits"]["dynamic_sql_calls"]
 
 

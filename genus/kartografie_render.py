@@ -102,14 +102,18 @@ def render_markdown(data: dict[str, Any] | None = None) -> str:
         "## Kausales Urteil",
         "",
         "GENUS lernt bereits symbolisch: Fakten, Relationen, Episoden, Einstellungen und",
-        "enge Intent-Korrekturen werden dauerhaft wirksam. Der Engpass liegt danach:",
-        "Deuter klassifiziert, Handler erzeugen fertige Einzelsätze, `_komponiere` verbindet",
-        "sie nur und ein Antwort-Outcome mit Feedbackbezug fehlt. Deshalb wächst Wissen",
-        "heute deutlich schneller als Gesprächsqualität.",
+        "enge Intent-Korrekturen werden dauerhaft wirksam. Der erste H1-Antwortkreis ist",
+        "geschlossen: Definitionen und Beziehungen tragen strukturierte Drafts in einen",
+        "treuen Renderer; erst ein belegter Telegram-Zustellbeleg erzeugt ResponseOutcome",
+        "und Response-ID. Eindeutiges Feedback wird daran replaybar verknüpft.",
+        "Der verbleibende Engpass liegt in den übrigen String-Handlern, dem fehlenden",
+        "vollständigen Diskursplan und der noch nicht gebauten Strategieauswertung.",
         "",
         "```text",
-        "Wissensquelle → Event → Projektion → Handler → terminale Strings → Ausgabe",
-        "                                   ↘ kein AnswerDraft / DialogFrame / Outcome-Kreis",
+        "Wissen → Handler → AnswerDraft-Pilot + DialogueFrame → treuer Renderer → Ausgabe",
+        "            └→ übrige terminale Strings                            ↓ Zustellbeleg",
+        "                                      Messung ← Feedback ← ResponseOutcome",
+        "                                                └→ keine automatische Gewichtung",
         "```",
         "",
         "## Event → Projektor → Tabelle",
@@ -158,14 +162,18 @@ def render_markdown(data: dict[str, Any] | None = None) -> str:
     lines.extend(
         [
             "",
-            "## Fehlende H1-Kanten in sinnvoller Reihenfolge",
+            "## H1-Pilot und nächste Kanten",
             "",
-            "1. `ResponseOutcome` samt Response-ID direkt nach dem Dispatch erfassen.",
-            "2. Handler auf `AnswerDraft` mit Claims, Provenienz und Unsicherheit umstellen.",
-            "3. Aus Session und relevantem Kontext einen `DialogueFrame` bilden.",
-            "4. persönliche Episoden in einen physisch löschbaren `MemoryVault` migrieren.",
-            "5. `AnswerDraft + DialogueFrame` über einen treuen Diskursrenderer formulieren.",
-            "6. explizites Feedback gegatet in eine kuratierte Wirkungsbewertung führen.",
+            "Aktiv im Pilot: `AnswerDraft` und `DialogueFrame` für Definitionen und Beziehungen,",
+            "ein delivery-only `ResponseOutcome` sowie explizites Feedback mit Response-ID.",
+            "Frage, Antwort und Telegram-Kennungen bleiben aus Outcome und Feedback heraus.",
+            "",
+            "1. die übrigen Handler schrittweise auf belegte Drafts migrieren.",
+            "2. einen vollständigen Diskursplan vor dem treuen Renderer ergänzen.",
+            "3. persönliche Episoden in einen physisch löschbaren `MemoryVault` migrieren.",
+            "4. eine löschbare Telegram-Edge-Outbox für Outcome-Retry und Feedbackbezug",
+            "   über Neustarts bauen.",
+            "5. Feedback erst nach kuratierter Abnahme auf Strategien wirken lassen.",
             "",
             "## Modulringe",
             "",
@@ -339,7 +347,7 @@ button[aria-pressed="true"], button.selected {{ background: var(--primary); colo
   const labels = [['Module', data.summary.modules], ['Events', data.summary.event_types], ['Kanten', data.summary.edges]];
   labels.forEach(([label, value]) => {{ const el=document.createElement('div'); el.className='stat'; const strong=document.createElement('strong'); strong.textContent=String(value); const span=document.createElement('span'); span.textContent=label; el.append(strong,span); stats.appendChild(el); }});
   let activeView=null;
-  const statusLabels={{missing_h1:'fehlt in H1',active_voice_off:'aktiv, Stimme aus',no_weight_learning:'kein Gewichtstraining',known_bottleneck:'bekannter Engpass',terminal_strings:'terminale Strings',direct:'direkt',direct_limited:'direkt, begrenzt',indirect:'indirekt',none:'keine',potential:'potenziell'}};
+  const statusLabels={{missing_h1:'fehlt in H1',active_voice_off:'aktiv, Stimme aus',no_weight_learning:'kein Gewichtstraining',legacy_strings_with_draft_pilot:'Legacy-Strings + Draft-Pilot',draft_composition_pilot:'Draft-Komposition im Pilot',active_pilot:'aktiver Pilot',active_delivered_only:'aktiv nach Zustellbeleg',active_explicit_gated:'aktiv, nur explizit',direct:'direkt',direct_limited:'direkt, begrenzt',indirect:'indirekt',none:'keine',potential:'potenziell'}};
   const pretty = value => statusLabels[value] || String(value||'').replaceAll('_',' ');
   function appendSources(parent, refs) {{
     (refs||[]).forEach((s,index)=>{{ if(index) parent.append(' · '); const a=document.createElement('a'); a.href='../../'+s.file+'#L'+s.line; a.textContent=s.file+':'+s.line; parent.appendChild(a); }});

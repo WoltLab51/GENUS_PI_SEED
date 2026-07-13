@@ -54,6 +54,7 @@ INSTANCE_LOCK_FILE = os.environ.get(
 UA = "GENUS-PI/0.1 (personal companion bridge)"
 _CTX = ssl.create_default_context()
 _VERLAUF_MAX = 6   # Mehr-Zug-Arbeitsgedächtnis: wie viele Züge pro Chat im Blick bleiben
+_TELEGRAM_TEXT_MAX = 4000  # eine Wahrheit für Transport UND zugestellten Session-Text
 _RESTART_EXIT_CODE = 75  # EX_TEMPFAIL: Restart=on-failure startet nach einem Deploy-Flag neu
 
 # Der Lernkreis v1 (Naht 4): korrigierte Beispiele sind MEMBRAN-Wissen -- eine Edge-Datei
@@ -433,9 +434,18 @@ def _get_updates(token: str, offset: int) -> list[dict]:
     return body.get("result", []) if body.get("ok") else []
 
 
-def _send_message(token: str, chat_id: int, text: str) -> None:
+def _send_message(token: str, chat_id: int, text: str) -> int | None:
+    """Sendet eine Antwort und gibt nur einen belegten Telegram-``message_id`` zurück.
+
+    Eine formal erfolgreiche HTTP-Antwort ohne ``ok`` oder ohne ganzzahlige Message-ID ist
+    kein Zustellbeleg. Der Aufrufer kann dadurch fail-closed entscheiden, ob der zugehörige
+    Session-Zug wirklich Gesprächswahrheit werden darf.
+    """
     # Telegram caps a message at 4096 chars; a companion answer never gets close, but stay safe.
-    _api(token, "sendMessage", {"chat_id": chat_id, "text": text[:4000]}, timeout=15)
+    body = _api(token, "sendMessage", {"chat_id": chat_id, "text": text[:_TELEGRAM_TEXT_MAX]}, timeout=15)
+    result = body.get("result") if isinstance(body, dict) and body.get("ok") else None
+    message_id = result.get("message_id") if isinstance(result, dict) else None
+    return message_id if isinstance(message_id, int) and not isinstance(message_id, bool) else None
 
 
 class _AntwortMelder:
@@ -465,18 +475,27 @@ class _AntwortMelder:
         except Exception:
             pass   # Status bricht nie eine Antwort
 
-    def abschliessen(self, chat_id: int, antwort: str) -> None:
-        """Die Status-Nachricht wird zur Antwort -- ohne Status: normal senden."""
+    def abschliessen(self, chat_id: int, antwort: str) -> int | None:
+        """Die Status-Nachricht wird zur Antwort und liefert ihren Zustellbeleg.
+
+        Ohne Status wird normal gesendet. Scheitert ein Edit, wird wie bisher eine neue
+        Nachricht gesendet; deren ID ist dann der maßgebliche Beleg.
+        """
         mid = self._nachricht.pop(chat_id, None)
         if mid is not None:
             try:
-                _api(self._token, "editMessageText",
-                     {"chat_id": chat_id, "message_id": mid, "text": antwort[:4000]},
-                     timeout=15)
-                return
+                body = _api(self._token, "editMessageText",
+                            {"chat_id": chat_id, "message_id": mid,
+                             "text": antwort[:_TELEGRAM_TEXT_MAX]},
+                            timeout=15)
+                result = body.get("result") if isinstance(body, dict) and body.get("ok") else None
+                bestaetigt = result.get("message_id") if isinstance(result, dict) else None
+                if (isinstance(bestaetigt, int) and not isinstance(bestaetigt, bool)
+                        and bestaetigt == mid):
+                    return mid
             except Exception:
                 pass   # Editieren gescheitert -> ehrlich neu senden
-        _send_message(self._token, chat_id, antwort)
+        return _send_message(self._token, chat_id, antwort)
 
     def raeume_auf(self, text: str) -> None:
         """Hängengebliebene Status-Nachrichten (Absturz NACH der Meldung) ehrlich auflösen --
@@ -498,9 +517,128 @@ def _save_offset(offset: int) -> None:
         f.write(str(offset))
 
 
+def _finalisiere_pending_zug(
+    sessions: dict[int, list[dict]], pending: dict, response_id: int | None,
+) -> bool:
+    """Übernimmt genau einen vorbereiteten Zug erst mit belegter ``response_id``.
+
+    Der Helfer macht keinerlei I/O. Er leert ``pending`` auf jedem Pfad, damit ein fehlender,
+    ungültiger oder doppelt verwendeter Zustellbeleg nie versehentlich beim nächsten Update
+    einen alten Zug bestätigt. ``True`` bedeutet: der Zug wurde in die gedeckelte Session
+    übernommen; ``False`` bedeutet: fail-closed verworfen.
+    """
+    vorbereitet = dict(pending)
+    pending.clear()
+    if (not isinstance(response_id, int) or isinstance(response_id, bool)
+            or response_id <= 0):
+        return False
+    chat_id = vorbereitet.get("chat_id")
+    zug = vorbereitet.get("zug")
+    if (not isinstance(chat_id, int) or isinstance(chat_id, bool)
+            or not isinstance(zug, dict)):
+        return False
+    zuege = sessions.get(chat_id) or []
+    if any(z.get("response_id") == response_id for z in zuege):
+        return False
+    bestaetigt = dict(zug)
+    bestaetigt["response_id"] = response_id
+    sessions[chat_id] = (zuege + [bestaetigt])[-_VERLAUF_MAX:]
+    return True
+
+
+def _explizites_feedback(question: str) -> tuple[str, str | None] | None:
+    """Nur deutungsfreie Qualitätssignale: enger Korrektur-Cue oder reine 👍/👎-Gebärde."""
+    from genus import companion
+
+    ist_korrektur, richtig = companion.korrektur_cue(question)
+    if ist_korrektur:
+        return "intent_correction", richtig
+    modifier = {chr(0xFE0F), chr(0x200D)} | {chr(c) for c in range(0x1F3FB, 0x1F400)}
+    kern = "".join(ch for ch in question if not ch.isspace() and ch not in modifier)
+    if kern and set(kern) == {"👍"}:
+        return "positive", None
+    if kern and set(kern) == {"👎"}:
+        return "negative", None
+    return None
+
+
+def _letztes_feedbackziel(zuege: list[dict]) -> dict | None:
+    """Letzte echte Antwort; Acks überspringen, an Ritual-/Fehlerbarrieren stoppen."""
+    for zug in reversed(zuege):
+        response_id = zug.get("response_id")
+        if not (isinstance(response_id, int) and not isinstance(response_id, bool)
+                and response_id > 0):
+            continue
+        if zug.get("feedback_eligible", True):
+            return zug
+        if zug.get("answer_mode") != "feedback_ack":
+            return None
+    return None
+
+
+def _bereite_outcome(
+    pending: dict | None,
+    chat_id: int,
+    zug: dict | None,
+    *,
+    outcome: str,
+    readings: list[str],
+    answer_mode: str,
+    feedback_eligible: bool,
+) -> None:
+    if pending is None:
+        return
+    pending.clear()
+    pending.update({
+        "chat_id": chat_id,
+        "zug": zug,
+        "outcome": {
+            "channel": "telegram",
+            "outcome": outcome,
+            "readings": list(dict.fromkeys(readings)),
+            "answer_mode": answer_mode,
+            "feedback_eligible": feedback_eligible,
+        },
+    })
+
+
+def _bestaetige_zustellung(
+    conn,
+    sessions: dict[int, list[dict]],
+    pending: dict,
+    message_id: int | None,
+) -> int | None:
+    """Persistiert Outcome und Session erst nach einem belegten Telegram-Send/Edit.
+
+    ``message_id`` beweist die Zustellung nur an dieser flüchtigen Kante und wird weder im
+    Ledger noch in der Projektion gespeichert.
+    """
+    if (not isinstance(message_id, int) or isinstance(message_id, bool)
+            or message_id <= 0):
+        pending.clear()
+        return None
+    outcome = pending.get("outcome")
+    if not isinstance(outcome, dict):
+        pending.clear()
+        return None
+    from genus import response_outcomes
+
+    try:
+        response_id = response_outcomes.record_outcome(conn, **outcome)
+    except Exception:
+        pending.clear()
+        raise
+    if pending.get("zug") is None:
+        pending.clear()
+        return response_id
+    if not _finalisiere_pending_zug(sessions, pending, response_id):
+        return None
+    return response_id
+
+
 def handle_update(
     conn, update: dict, allowed: set[int], sessions: dict[int, list[dict]] | None = None,
-    status=None,
+    status=None, pending: dict | None = None,
 ) -> tuple[int, str] | None:
     """Pure logic, no network: given one Telegram update + the allow-list, decide whether to
     answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer.
@@ -518,11 +656,18 @@ def handle_update(
     ``status`` (optional): ein injizierter Callback ``status(chat_id, text)`` -- dasselbe
     Muster wie ``deuter``/``stimme``: OHNE ihn bleibt diese Funktion pur (kein Netz, testbar
     wie bisher); MIT ihm meldet sie ehrlich die zwei Phasen, die wirklich Zeit kosten
-    (Deuten, Formulieren -- beides Modell; die Graph-Arbeit ist ms und bekommt keine Show)."""
+    (Deuten, Formulieren -- beides Modell; die Graph-Arbeit ist ms und bekommt keine Show).
+
+    ``pending`` (optional) hält den neu erzeugten Session-Zug zunächst zurück. Der Aufrufer
+    bestätigt ihn nach erfolgreichem Transport über :func:`_finalisiere_pending_zug` mit der
+    transportneutralen Response-ID. Ohne ``pending`` bleibt das bisherige sofortige
+    Session-Verhalten vollständig kompatibel."""
     from genus import companion, verstehen
     import deuter
     import waage
 
+    if pending is not None:
+        pending.clear()   # ein ignoriertes/fehlgeschlagenes Update darf nie einen alten Zug erben
     message = update.get("message") or update.get("edited_message")
     if not message or "text" not in message:
         return None
@@ -543,6 +688,12 @@ def handle_update(
         # Membran (Datei, die morgen_push.sh liest), kein Wissen -- der Kern sieht sie nie.
         morgen = _morgenzeit_antwort(question)
         if morgen is not None:
+            _bereite_outcome(
+                pending, chat_id,
+                {"feedback_eligible": False, "answer_mode": "edge_ritual"},
+                outcome="answered", readings=[],
+                answer_mode="edge_ritual", feedback_eligible=False,
+            )
             return chat_id, morgen
         # die erste HAND: „erinnere mich …" wird eine bestätigte Hand (der Cron sendet sie fällig).
         # Auch ein Membran-Ritual vor dem Kern; der Kern hält das Gate, die Membran sendet später.
@@ -551,6 +702,12 @@ def handle_update(
         # nach handle_update gespeichert wird). Der Kern rollt die Transaktion sauber zurück.
         erinnerung = _erinnerung_ritual(conn, question)
         if erinnerung is not None:
+            _bereite_outcome(
+                pending, chat_id,
+                {"feedback_eligible": False, "answer_mode": "edge_ritual"},
+                outcome="answered", readings=[],
+                answer_mode="edge_ritual", feedback_eligible=False,
+            )
             return chat_id, erinnerung
         if sessions is None:
             answer = companion.respond(conn, question, waage=waage.artikel_organ())
@@ -570,6 +727,15 @@ def handle_update(
             # verdrängen den Cache und machten den nächsten Deuter-Aufruf gemessen 26s langsam.
             zuege = sessions.get(chat_id) or []
             vorher = zuege[-1] if zuege else {}
+            explizites_feedback = _explizites_feedback(question)
+            feedback_ziel = (
+                _letztes_feedbackziel(zuege) if explizites_feedback is not None else None
+            )
+            # Eine Bestätigungs-Antwort ist selbst absichtlich nicht feedbackfähig. Folgt
+            # darauf noch eine Korrektur oder reine 👍/👎-Gebärde, bleibt deshalb die
+            # letzte echte Antwort der Bezug — nicht der Ack. Das ist nur flüchtiger Dialogkontext;
+            # ins Ledger gelangt später ausschließlich dessen transportneutrale response_id.
+            bezug = feedback_ziel or vorher
             hinweise = _korrektur_hinweise(conn)   # Lernkreis-Rückfluss, frisch berechnet
             sprich = None
             if status is not None:
@@ -581,39 +747,86 @@ def handle_update(
                     def sprich(text, **kw):   # die zweite ehrliche Modell-Phase: Formulieren
                         status(chat_id, "✍️ Ich formuliere …")
                         return stimme.formuliere(text, **kw)
+            from genus import antwort as antwort_wuerfel
+
             result = companion.respond_with_deuter(
-                conn, question, vorher.get("question"),
+                conn, question, bezug.get("question"),
                 deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze,
                                                   korrekturen=hinweise),
                 stimme=sprich,
-                last_answer=vorher.get("answer"),
+                last_answer=bezug.get("answer"),
                 verlauf=zuege[:-1],
-                letzte_lesarten=vorher.get("gelesen"),
-                letzter_anschluss=vorher.get("anschluss"),
+                letzte_lesarten=bezug.get("gelesen"),
+                letzter_anschluss=bezug.get("anschluss"),
                 # das Wiege-Organ der Formwahl-Kette: liest nur, handelt nur über seiner
                 # Blind-Proben-Schwelle; ohne Kalibrierung (~/.genus/waage_kalibrierung.json)
                 # ist es None und die Kette bleibt rein deterministisch
                 waage=waage.artikel_organ(),
+                renderer=antwort_wuerfel.rendere,
+                previous_response_id=bezug.get("response_id"),
             )
-            answer = result["text"]
+            answer = result["text"][:_TELEGRAM_TEXT_MAX]
+            if explizites_feedback is not None and feedback_ziel is not None:
+                from genus import response_outcomes
+
+                signal, corrected_intent = explizites_feedback
+                bekannte_absichten = set(
+                    angebot or (leaf for leaf, _ in verstehen.RASTER_SEED)
+                )
+                if corrected_intent not in bekannte_absichten:
+                    corrected_intent = None
+                try:
+                    response_outcomes.record_feedback(
+                        conn,
+                        response_id=feedback_ziel["response_id"],
+                        signal=signal,
+                        corrected_intent=corrected_intent,
+                    )
+                except Exception as exc:
+                    # Feedback ist ein nachgelagerter Messpunkt, niemals der Preis der Antwort.
+                    # Der Fehler bleibt ohne Rohtext im Journal sichtbar; der Ack darf trotzdem
+                    # zugestellt werden und wird selbst nicht feedbackfähig.
+                    _log(f"explicit feedback could not be recorded ({type(exc).__name__})")
             # Lernkreis v1: eine angenommene Korrektur wird als Beispiel-Paar in der
             # Edge-Datei festgehalten (Text wohnt NUR an der Membran, nie im Ledger)
             ist_korrektur, richtig = companion.korrektur_cue(question)
-            if ist_korrektur and vorher.get("gelesen") and vorher.get("question"):
-                _merke_korrektur(vorher["question"], vorher["gelesen"], richtig)
+            if ist_korrektur and bezug.get("gelesen") and bezug.get("question"):
+                _merke_korrektur(bezug["question"], bezug["gelesen"], richtig)
             # "gelesen" wandert mit durch die Session (Korrektur-Kanal, Naht 1): ein
             # exaktes "falsch verstanden" im nächsten Zug weiß dann, WELCHE Lesart(en)
             # es korrigiert -- Struktur, nie der Nutzer-Text
             # "anschluss" wandert mit durch die Session (Antizipation): ein "ja" im nächsten
             # Zug löst das im letzten Zug gemachte, verifizierte Anschluss-Angebot ein
+            feedback_ack = explizites_feedback is not None
+            answer_mode = (
+                "feedback_ack" if feedback_ack
+                else "voice" if companion._STIMME_TAG in answer
+                else "core"
+            )
             neuer_zug = {"question": result["question"], "answer": answer,
                          "gelesen": result.get("gelesen") or [],
-                         "anschluss": result.get("anschluss")}
-            sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
+                         "anschluss": result.get("anschluss"),
+                         "feedback_eligible": not feedback_ack,
+                         "answer_mode": answer_mode}
+            if pending is None:
+                sessions[chat_id] = (zuege + [neuer_zug])[-_VERLAUF_MAX:]
+            else:
+                _bereite_outcome(
+                    pending, chat_id, neuer_zug,
+                    outcome=result.get("outcome", "answered"),
+                    readings=result.get("gelesen") or [],
+                    answer_mode=answer_mode,
+                    feedback_eligible=not feedback_ack,
+                )
             _schreibe_tagespuffer(conn, question, result.get("gelesen") or [])
     except Exception as exc:  # a bug in answering must never take the bridge down
         _log(f"error answering message ({type(exc).__name__})")
         answer = "Da ist etwas schiefgelaufen — GENUS konnte diese Frage gerade nicht beantworten."
+        _bereite_outcome(
+            pending, chat_id, {"feedback_eligible": False, "answer_mode": "error"},
+            outcome="fallback", readings=[],
+            answer_mode="error", feedback_eligible=False,
+        )
     # Vokabel-bei-Begegnung: GENUS spürt (Kern, rein lesend), welche Wörter der Nachricht es
     # nicht kennt, und legt sie in die Lern-Warteschlange (Membran) -- der Lerner holt sie vor
     # den Frequenzlisten. Nach der Antwort, nie sie kostend (still bei jedem Fehler).
@@ -663,6 +876,7 @@ def main() -> int:
     offset = _load_offset()
     start_zeit = time.time()
     sessions: dict[int, list[dict]] = {}   # chat_id -> turn list; in-process only, see handle_update
+    pending: dict = {}                     # genau ein noch nicht zugestellter Antwort-Zug
     melder = _AntwortMelder(token)          # die „GENUS denkt …"-Statuszeile (fail-silent)
     while True:
         if _neustart_angefordert(start_zeit):
@@ -696,18 +910,34 @@ def main() -> int:
             # dennoch je etwas durchschlagen, wird der Offset trotzdem gespeichert (unten) —
             # kein erneutes Zustellen derselben Nachricht, keine Neustart-Schleife.
             try:
-                result = handle_update(conn, update, allowed, sessions, status=melder.melde)
+                result = handle_update(
+                    conn, update, allowed, sessions, status=melder.melde, pending=pending,
+                )
             except Exception as exc:
                 _log(f"handle_update crashed ({type(exc).__name__})")
                 result = None
+                pending.clear()
                 # nie ein ewiges „Ich denke nach …" stehen lassen
                 melder.raeume_auf("Da ist etwas schiefgelaufen — magst du es nochmal versuchen?")
             if result is not None:
                 chat_id, answer = result
                 try:
-                    melder.abschliessen(chat_id, answer)   # Status-Nachricht WIRD die Antwort
+                    message_id = melder.abschliessen(
+                        chat_id, answer,
+                    )   # Status-Nachricht WIRD die Antwort
+                    response_id = _bestaetige_zustellung(
+                        conn, sessions, pending, message_id,
+                    )
+                    if message_id is None:
+                        _log("answer transport returned no delivery receipt; outcome discarded")
+                    elif response_id is None:
+                        _log("delivered answer could not be linked to a response outcome")
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                    pending.clear()
                     _log(f"sendMessage failed ({type(exc).__name__})")
+                except Exception as exc:
+                    pending.clear()
+                    _log(f"response outcome could not be persisted ({type(exc).__name__})")
             _save_offset(offset)
 
 

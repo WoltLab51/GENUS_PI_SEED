@@ -106,3 +106,27 @@ der gewünschte lokale beziehungsweise UTC-Vertrag sollten im Runbook explizit w
 - Backup: `deploy/backup_ledger_to_sd.sh`
 - Status: `deploy/pi_publish_status.sh`
 - Betriebsprofil: `deploy/pi_betriebsprofil_capture.sh`
+
+## Repo-Nachtrag: H1-Antwortpilot
+
+Nach diesem read-only Pi-Snapshot wurde im Repo der erste geschlossene H1-
+Vertikalschnitt ergänzt. Dieser Nachtrag verändert die historischen Laufzeitbeobachtungen
+oben nicht und behauptet insbesondere keine rückwirkende Pi-Evidenz.
+
+- Definitionen und Beziehungen können als `AnswerDraft` mit Claims, vorhandener
+  Provenienz, Unsicherheit und treuem Fallback gerendert werden.
+- Ein `DialogueFrame` bindet Absicht, strukturelle Ankerkontinuität, Follow-up und
+  kontrollierte Persönlichkeitseinstellung für genau diese Darstellung — ohne Rohtext.
+- Erst ein gültiger Telegram-Zustellbeleg erzeugt `response_outcome_recorded`; seine
+  Event-ID ist die Response-ID und bestätigt zugleich den RAM-Session-Zug.
+- Reine 👍-/👎-Nachrichten und enge Korrektur-Cues werden als explizites
+  `response_feedback_recorded` an eine feedbackfähige Response-ID gebunden.
+- Beide neuen Events sind projiziert und replaybar. Damit umfasst der Eventvertrag nun
+  39 Typen: 23 projiziert, 16 bewusst roh; die Replayfläche umfasst 12 Tabellen.
+
+Offen bleiben der löschbare Memory-Vault, die Migration der übrigen String-Handler, ein
+vollständiger Diskursplan, ein Neustart-fester löschbarer Telegram-Randindex und jede
+automatische Strategiegewichtung aus Feedback. Auch eine Edge-Outbox für den seltenen
+Fehler nach Zustellung, aber vor Outcome-Persistenz fehlt. Der technische und
+datenschutzbezogene Vertrag steht im
+[H1-Response-Loop-Report](2026-07-13-h1-response-loop.md).

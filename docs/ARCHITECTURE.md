@@ -2,7 +2,7 @@
 
 > **Status:** canonical
 > **Owner:** Kernvertrag
-> **Zuletzt verifiziert:** 2026-07-12
+> **Zuletzt verifiziert:** 2026-07-13
 > **Besitzt:** Systemgrenzen, Schichten, Abhängigkeiten und technische Invarianten
 
 ## Ein Satz
@@ -54,8 +54,8 @@ lassen. Revision, Supersession und Retraction sind neue Ereignisse.
 ### Projektionen
 
 Beliefs, Relationsgraph, State, Inquiries, Experiences, Proposals, Governance,
-Operationen und aktive Regeln sind Ansichten über das Ledger. Sie dürfen gelöscht und
-durch Replay rekonstruiert werden.
+Operationen, aktive Regeln sowie Antwort-Outcomes und explizite Feedbacklinks sind
+Ansichten über das Ledger. Sie dürfen gelöscht und durch Replay rekonstruiert werden.
 
 Eine Tabelle ist keine zweite Wahrheit, wenn ihr Inhalt vollständig aus dem Ledger
 ableitbar ist und Replay dies testet.
@@ -110,6 +110,42 @@ Der Event-Router besitzt eine explizite Registry. Jeder Eventtyp ist entweder:
 
 Ein unbekannter Typ oder ein Typ ohne erklärte Route ist ein Fehler. Der vollständige,
 maschinell gegengeprüfte Katalog steht in [EVENT_CONTRACT.md](EVENT_CONTRACT.md).
+
+### Antwort- und Feedbackkreis (H1-Pilot)
+
+Der erste H1-Vertikalschnitt hält Antwortsubstanz, Darstellung, Zustellung und Wirkung
+auseinander:
+
+```text
+Read-Model → AnswerDraft → DialogueFrame + treuer Renderer → Telegram
+                                                        ↓ gültiger Send/Edit-Beleg
+                              response_outcome_recorded → Response-ID
+                                                        ↓ eindeutiges Owner-Feedback
+                              response_feedback_recorded
+```
+
+- `AnswerDraft` trägt für Definitionen und Beziehungen Claims, vorhandene Belege,
+  Unsicherheit und einen unveränderten Fallback. `understood_unknown` darf keinen
+  negativen Claim erfinden.
+- `DialogueFrame` trägt Absicht, strukturelle Ankerkontinuität und den flüchtigen
+  Darstellungsrahmen für genau eine Antwort — weder Frage noch vorige Antwort. Die
+  Persönlichkeit bleibt kontrollierte Darstellung, kein Wahrheitsinput.
+- Eine Response-ID entsteht erst nach einem gültigen Zustellbeleg und ist die Event-ID
+  des `response_outcome_recorded`-Events. Erst danach wird der RAM-Session-Zug bestätigt.
+- Outcome und Feedback sind datensparsame, replaybare Strukturprojektionen. Frage,
+  Antwort, Slots, Telegram-`message_id`, Chat- und Nutzerkennung sind dort verboten.
+- Als Feedback gelten nur reine 👍-/👎-Nachrichten und der enge Korrektur-Cue. Die
+  Membran lässt als korrigierten Intent nur eine bekannte Raster-Absicht durch. Ein Modell
+  darf allgemeines Lob oder Kritik nicht zur Qualitätsevidenz hochstufen. Feedback-Acks
+  werden beim Rückbezug übersprungen; Ritual- und Fehlerantworten stoppen ihn.
+
+Dieser Schnitt ist ein Pilot, kein abgeschlossenes H1: Die übrigen Handler liefern noch
+fertige Strings, ein vollständiger Diskursplan und eine kuratierte Wirkungsbewertung fehlen.
+Feedback verändert weder Modellgewichte noch Antwortstrategie automatisch. Die Response-ID
+lebt an der Telegram-Kante nur in der RAM-Session; ein löschbarer Randindex für Neustarts
+ist noch nicht gebaut. Auch für den schmalen Fehlerkorridor „Telegram zugestellt,
+Outcome-Persistenz fehlgeschlagen“ gibt es noch keine Edge-Outbox; der Update-Offset wird
+weitergeführt und diese Antwort bleibt ungemessen.
 
 ## 4. Wissensgraph und Relationsemantik
 

@@ -1,7 +1,287 @@
 """Der Antwort-Würfel (genus.antwort): die Zwicky-Symmetrie an der Membran — der
 Verstehens-Würfel zerlegt, was reinkommt; dieser setzt zusammen, was rausgeht. Die Wahl
 ist immer deterministisch; das Modell (Stimme) formuliert nur innerhalb der Zelle."""
-from genus import antwort, companion, persoenlichkeit, reactors
+import pytest
+
+from genus import antwort, companion, persoenlichkeit, reactors, verstehen
+
+
+# --- der isolierte Antwortvertrag: Claims -> Frame -> treuer Text -------------------------
+
+def _frame(frage: str, intent: str = "definition", knappheit: str = "mittel"):
+    return antwort.dialograhmen(
+        frage,
+        intent=intent,
+        belegung={
+            "waerme": "warm",
+            "knappheit": knappheit,
+            "beiwerk_notiz": True,
+            "beiwerk_rueckfrage": True,
+        },
+    )
+
+
+def test_answer_text_bleibt_ein_echter_string_und_traegt_seinen_draft():
+    claim = antwort.Claim("Hund", "defined_as", "ein Haustier")
+    draft = antwort.AnswerDraft(
+        kind="definition",
+        resolution="answered",
+        focus=("Hund", "defined_as", "ein Haustier"),
+        claims=(claim,),
+        fallback_text="Unter »Hund« versteht GENUS: ein Haustier.",
+        anchors=("Hund",),
+    )
+    text = antwort.AnswerText(draft.fallback_text, draft)
+    assert isinstance(text, str)
+    assert text == draft.fallback_text and "Haustier" in text
+    assert " ".join([text, "Gut."]).endswith("Gut.")
+    assert text.draft is draft
+
+
+def test_definition_entwurf_traegt_claims_quellen_und_natuerlichen_fallback(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q_haustier", "wikidata")
+    reactors.observe_relation(conn, "Haustier@de", "expresses", "Q_haustier", "wikidata")
+
+    material = companion.answer(conn, "Was ist ein Hund?")
+    fallback = companion.narrate(material)
+    draft = antwort.entwurf_definition(material, fallback, reading_source="model:deuter")
+
+    bedeutung = next(c for c in draft.claims if c.predicate == "defined_as")
+    eltern = [c for c in draft.claims if c.predicate == "is_a"]
+    assert bedeutung.object == "ein Haustier"
+    assert {e.source for e in bedeutung.evidence} == {"dbnary"}
+    assert eltern and eltern[0].object == "Haustier"
+    assert {e.source for e in eltern[0].evidence} == {"wikidata"}
+    assert draft.reading_source == "model:deuter"
+
+    text = antwort.rendere(draft, _frame("Was ist ein Hund?"))
+    assert isinstance(text, antwort.AnswerText) and text.draft is draft
+    assert text.startswith("»Hund« bedeutet hier: ein Haustier.")
+    assert "zählt »Hund« zu »Haustier«" in text
+
+
+def test_definition_renderer_zeigt_schwache_bedeutung_ohne_sie_aufzublasen():
+    material = {
+        "found": True,
+        "word": "Quux",
+        "meaning": ["ein kaum belegter Begriff"],
+        "meaning_confidence": 0.2,
+        "meaning_evidence": [{
+            "subject": "Quux@de",
+            "predicate": "primary_gloss",
+            "object": "ein kaum belegter Begriff",
+            "source": "model:bridge",
+            "trust": 0.2,
+        }],
+        "is_a": [],
+    }
+    draft = antwort.entwurf_definition(
+        material, "Unter »Quux« versteht GENUS: ein kaum belegter Begriff."
+    )
+    text = antwort.rendere(draft, _frame("Was ist Quux?"))
+    assert "noch vorsichtig" in text and "schwach belegt" in text
+    assert "model:bridge" not in text   # Quellenname erst bei ausdrücklicher Ausführlichkeit
+
+    knapp = antwort.rendere(draft, _frame("Was ist Quux?", knappheit="knapp"))
+    assert "schwach belegt" in knapp   # Knappheit darf Ehrlichkeit nie wegkürzen.
+
+
+def test_definition_renderer_nutzt_dieselbe_bereinigte_sprechglosse_wie_narrate(conn):
+    reactors.observe_relation(
+        conn, "Ferien@de", "primary_gloss", "ohne Plural: arbeitsfreie Tage", "dbnary"
+    )
+    material = companion.answer(conn, "Was ist Ferien?")
+    fallback = companion.narrate(material)
+    draft = antwort.entwurf_definition(material, fallback)
+    text = antwort.rendere(draft, _frame("Was ist Ferien?"))
+    assert material["spoken_meaning"] == ["arbeitsfreie Tage"]
+    assert "arbeitsfreie Tage" in text and "ohne Plural" not in text
+
+
+def test_definition_renderer_bewahrt_wortart_sprachen_eltern_und_zusatzmaterial():
+    material = {
+        "found": True,
+        "word": "Hund",
+        "meaning": ["ein Haustier"],
+        "spoken_meaning": ["ein Haustier"],
+        "is_a": ["Säugetier", "Tier", "Lebewesen", "Organismus"],
+        "languages": ["dog", "chien"],
+        "pos": ["noun"],
+    }
+    basis = companion.narrate(material)
+    fallback = basis + " Ein bewahrter, graphgestützter Zusatz."
+    draft = antwort.entwurf_definition(material, fallback)
+
+    text = antwort.rendere(draft, _frame("Was ist ein Hund?"))
+
+    for bestandteil in (
+        "Substantiv", "ein Haustier", "Säugetier", "Tier", "Lebewesen", "Organismus",
+        "dog", "chien", "Ein bewahrter, graphgestützter Zusatz.",
+    ):
+        assert bestandteil in text
+
+
+def test_definition_renderer_faellt_zurueck_wenn_ein_claim_verloren_geht(monkeypatch):
+    material = {
+        "found": True,
+        "word": "Hund",
+        "meaning": ["ein Haustier"],
+        "is_a": ["Säugetier"],
+        "languages": ["dog"],
+        "pos": ["noun"],
+    }
+    fallback = companion.narrate(material)
+    draft = antwort.entwurf_definition(material, fallback)
+    monkeypatch.setattr(
+        antwort, "_rendere_definition", lambda d, f: "»Hund« bedeutet hier: ein Haustier.",
+    )
+
+    assert antwort.rendere(draft, _frame("Was ist ein Hund?")) == fallback
+
+
+def test_beziehungs_entwurf_bewahrt_richtung_pfad_und_vertrauen(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Säugetier@de", "expresses", "Q7377", "wikidata")
+    reactors.observe_relation(conn, "Q144", "is_a", "Q7377", "wikidata")
+    result = companion.relate(conn, "Ist ein Hund ein Säugetier?")
+    fallback = companion.narrate_relation(conn, result)
+    draft = antwort.entwurf_beziehung(result, fallback)
+
+    assert draft.verbatim_core == "»Hund« zählt zu »Säugetier«"
+    assert draft.claims[0].confidence == result["trust"]
+    assert {e.source for e in draft.claims[0].evidence} == {"wikidata"}
+    text = antwort.rendere(draft, _frame("Ist ein Hund ein Säugetier?", "beziehung"))
+    assert draft.verbatim_core in text
+    assert f"{result['trust']:.2f}" in text
+
+
+def test_mehrstufige_beziehung_bewahrt_die_vollstaendige_herleitung(conn):
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q_hund", "wikidata")
+    reactors.observe_relation(conn, "Säugetier@de", "expresses", "Q_saeuger", "wikidata")
+    reactors.observe_relation(conn, "Tier@de", "expresses", "Q_tier", "wikidata")
+    reactors.observe_relation(conn, "Q_hund", "is_a", "Q_saeuger", "wikidata")
+    reactors.observe_relation(conn, "Q_saeuger", "is_a", "Q_tier", "wikidata")
+    result = companion.relate(conn, "Ist ein Hund ein Tier?")
+    fallback = companion.narrate_relation(conn, result, {"waerme": "warm"})
+    draft = antwort.entwurf_beziehung(result, fallback)
+
+    text = antwort.rendere(draft, _frame("Ist ein Hund ein Tier?", "beziehung"))
+
+    assert text == fallback
+    assert "Hund" in text and "Säugetier" in text and "Tier" in text
+
+
+def test_no_path_ist_understood_unknown_und_nie_ein_negativer_claim():
+    result = {
+        "relational": True,
+        "verdict": "no_path",
+        "subject": "Rauch",
+        "object": "Feuer",
+    }
+    fallback = ("Nach allem, was GENUS weiß, nicht: es findet keine is_a-Verbindung von "
+                "»Rauch« zu »Feuer«. (Das heißt: unbekannt, nicht widerlegt.)")
+    draft = antwort.entwurf_beziehung(result, fallback)
+    assert draft.resolution == "understood_unknown" and draft.claims == ()
+    text = antwort.rendere(draft, _frame("Zählt Rauch zu Feuer?", "beziehung"))
+    assert "unbekannt, nicht widerlegt" in text
+    assert text.index("Rauch") < text.index("Feuer")
+
+
+def test_unknown_mit_claim_wird_vom_vertrag_abgelehnt():
+    with pytest.raises(ValueError, match="keinen negativen Claim"):
+        antwort.AnswerDraft(
+            kind="beziehung",
+            resolution="understood_unknown",
+            focus=("Rauch", "is_a", "Feuer"),
+            claims=(antwort.Claim("Rauch", "is_a", "Feuer"),),
+            fallback_text="Unbekannt.",
+        )
+
+
+def test_renderer_faellt_bei_ankerbruch_auf_den_bewaehrten_text(monkeypatch):
+    result = {
+        "relational": True,
+        "verdict": "yes",
+        "subject": "Hund",
+        "object": "Tier",
+        "trust": 0.5,
+        "chain": [{
+            "subject": "Q144", "predicate": "is_a", "object": "Q_tier",
+            "source": "wikidata",
+        }],
+    }
+    fallback = "Ja. »Hund« zählt zu »Tier«."
+    draft = antwort.entwurf_beziehung(result, fallback)
+    monkeypatch.setattr(antwort, "_rendere_beziehung", lambda d, f: "Ja. Tier umfasst Hund.")
+    text = antwort.rendere(draft, _frame("Ist ein Hund ein Tier?", "beziehung"))
+    assert text == fallback and text.draft is draft
+
+
+def test_dialograhmen_enthaelt_nur_entschiedene_registerdaten():
+    frame = antwort.dialograhmen(
+        "Und warum?",
+        anchor_question="Ist ein Hund ein Tier?",
+        intent="warum-herkunft",
+        belegung={
+            "waerme": "herzlich",
+            "knappheit": "knapp",
+            "beiwerk_notiz": False,
+            "beiwerk_rueckfrage": False,
+        },
+        is_followup=True,
+        previous_response_id=41,
+    )
+    assert frame.continues_anchor and frame.is_followup
+    assert frame.waerme == "herzlich" and frame.knappheit == "knapp"
+    assert not frame.allow_note and not frame.allow_followup
+    assert frame.previous_response_id == 41
+    assert not hasattr(frame, "last_answer")
+    assert not hasattr(frame, "question") and not hasattr(frame, "anchor_question")
+
+
+def test_pos_allein_ist_keine_beantwortete_definition():
+    material = {
+        "found": True,
+        "word": "Quux",
+        "meaning": [],
+        "is_a": [],
+        "languages": [],
+        "pos": ["noun"],
+    }
+    fallback = "»Quux« (Substantiv) kennt GENUS, aber eine Bedeutung ist noch nicht erschlossen."
+
+    draft = antwort.entwurf_definition(material, fallback)
+
+    assert draft.resolution == "understood_unknown" and draft.claims == ()
+    assert antwort.rendere(draft, _frame("Was ist Quux?")) == fallback
+
+
+def test_segment_outcome_verliert_einen_unaufgeloesten_teil_nicht(conn):
+    verstehen.seed_raster(conn)
+
+    result = companion.respond_with_deuter(
+        conn,
+        "Hallo, ist Hund?",
+        deuter=lambda q: [
+            {"absicht": "gruss", "subject": None, "object": None},
+            {"absicht": "beziehung", "subject": "Hund", "object": None},
+        ],
+        renderer=antwort.rendere,
+    )
+
+    assert "Hallo" in result["text"]
+    assert result["outcome"] == "invalid_slots"
+
+    nur_luecke = companion.respond_with_deuter(
+        conn,
+        "Ist Hund?",
+        deuter=lambda q: {"absicht": "beziehung", "subject": "Hund", "object": None},
+        renderer=antwort.rendere,
+    )
+    assert nur_luecke["outcome"] == "invalid_slots"
+    assert nur_luecke["gelesen"] == ["beziehung"]
 
 
 # --- die Belegung: Register + Kreuz-Konsistenz an EINER Stelle ---------------------------

@@ -28,6 +28,18 @@ from genus.wortgraph import (
 )
 
 
+def _relation_evidence(conn, subject: str, predicate: str, object_: str) -> dict:
+    """Additiver, JSON-artiger Belegvertrag für einen bereits gelesenen Relationswert."""
+    confidence = sources.relation_confidence(conn, subject, predicate, object_)
+    return {
+        "subject": subject,
+        "predicate": predicate,
+        "object": object_,
+        "confidence": confidence["confidence"],
+        "sources": confidence["sources"],
+    }
+
+
 def answer(conn, question: str, waage=None) -> dict:
     """Answer a question about a word GENUS knows; ``{found: False}`` if it knows no word in it.
 
@@ -53,12 +65,20 @@ def answer(conn, question: str, waage=None) -> dict:
         langs = list(dict.fromkeys(  # other-language forms, order-preserving dedup
             w.rsplit("@", 1)[0] for w in c["words"] if not w.endswith("@de")))
         is_a = [sources.display(conn, p) for p in c["is_a"]]
+        is_a_evidence = [
+            {**_relation_evidence(conn, qid, "is_a", parent),
+             "label": sources.display(conn, parent)}
+            for parent in c["is_a"]
+        ]
         return {**base, "concept": qid, "label": c["label"], "meaning": c["meaning"],
+                "spoken_meaning": [_sprechgloss(gloss) for gloss in c["meaning"]],
                 "is_a": is_a, "languages": langs[:6], "artikel": _artikel_der_eltern(conn, is_a, waage),
+                "is_a_evidence": is_a_evidence,
                 **_meaning_grounding(conn, found, qid, c["meaning"])}
     # word-level (e.g. a verb): its own glosses + part of speech, no concept node yet
     meaning = _objects(conn, found, "primary_gloss") or _objects(conn, found, "defined_as")
-    return {**base, "concept": None, "label": found, "meaning": meaning, "is_a": [],
+    return {**base, "concept": None, "label": found, "meaning": meaning,
+            "spoken_meaning": [_sprechgloss(gloss) for gloss in meaning], "is_a": [],
             **_meaning_grounding(conn, found, None, meaning)}
 
 
@@ -94,7 +114,21 @@ def _meaning_grounding(conn, word: str, qid: str | None, meaning) -> dict:
             best = c
     if best is None:
         return {}
-    return {"meaning_confidence": best["confidence"], "meaning_sources": best["n_sources"]}
+    evidence = [
+        {
+            "subject": best["subject"],
+            "predicate": best["predicate"],
+            "object": best["object"],
+            "source": contribution["source"],
+            "trust": contribution["trust"],
+        }
+        for contribution in best["sources"]
+    ]
+    return {
+        "meaning_confidence": best["confidence"],
+        "meaning_sources": best["n_sources"],
+        "meaning_evidence": evidence,
+    }
 
 _POS_DE = {"noun": "Substantiv", "verb": "Verb", "adjective": "Adjektiv", "adverb": "Adverb"}
 _LABEL = re.compile(r"^Q\d+\s*\((.*)\)$")

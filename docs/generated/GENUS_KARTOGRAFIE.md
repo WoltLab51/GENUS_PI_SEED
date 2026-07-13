@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `2e39d26cf02118d9` · Regeneration: `genus kartografie build`
+> **Inhalt:** `f4bce00ac86f5a6b` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,19 +14,23 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 245 | 646 | 89 | 37 | 21 / 16 | 10 | 7 | 16 |
+| 254 | 674 | 90 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
 GENUS lernt bereits symbolisch: Fakten, Relationen, Episoden, Einstellungen und
-enge Intent-Korrekturen werden dauerhaft wirksam. Der Engpass liegt danach:
-Deuter klassifiziert, Handler erzeugen fertige Einzelsätze, `_komponiere` verbindet
-sie nur und ein Antwort-Outcome mit Feedbackbezug fehlt. Deshalb wächst Wissen
-heute deutlich schneller als Gesprächsqualität.
+enge Intent-Korrekturen werden dauerhaft wirksam. Der erste H1-Antwortkreis ist
+geschlossen: Definitionen und Beziehungen tragen strukturierte Drafts in einen
+treuen Renderer; erst ein belegter Telegram-Zustellbeleg erzeugt ResponseOutcome
+und Response-ID. Eindeutiges Feedback wird daran replaybar verknüpft.
+Der verbleibende Engpass liegt in den übrigen String-Handlern, dem fehlenden
+vollständigen Diskursplan und der noch nicht gebauten Strategieauswertung.
 
 ```text
-Wissensquelle → Event → Projektion → Handler → terminale Strings → Ausgabe
-                                   ↘ kein AnswerDraft / DialogFrame / Outcome-Kreis
+Wissen → Handler → AnswerDraft-Pilot + DialogueFrame → treuer Renderer → Ausgabe
+            └→ übrige terminale Strings                            ↓ Zustellbeleg
+                                      Messung ← Feedback ← ResponseOutcome
+                                                └→ keine automatische Gewichtung
 ```
 
 ## Event → Projektor → Tabelle
@@ -53,6 +57,8 @@ denselben Effekt beim Replay. Diese Kanten sind in JSON getrennt.
 | `proposal_reviewed` | `genus.proposals.apply_proposal_reviewed` | `proposal_log` |
 | `relation_asserted` | `genus.projection.apply_relation_asserted` | `relation_projection` |
 | `relation_retracted` | `genus.projection.apply_relation_retracted` | `relation_projection` |
+| `response_feedback_recorded` | `genus.response_outcomes.apply_response_feedback_recorded` | `response_feedback_log` |
+| `response_outcome_recorded` | `genus.response_outcomes.apply_response_outcome_recorded` | `response_outcome_log` |
 | `rule_activated` | `genus.maturation.apply_rule_activated` | `rule_projection` |
 | `state_changed` | `genus.state.apply_state_changed` | `state_projection` |
 | `assertion_recorded` | `genus.projection.apply_assertion_recorded` | `value_projection` |
@@ -70,22 +76,27 @@ zeichnet `raw_fold`, `audit_trigger`, `audit_trace` und `audit_only` getrennt.
 | Fakten und Relationen | event_log + relation/value_projection | sources, auskunft, Wortgraph | direkt | Mehr erkannte Begriffe, Definitionen, Relationen und Quellenbelege. | [genus/sources.py:395](../../genus/sources.py) |
 | Quellenvertrauen und Übereinstimmung | Read-time Confidence | Narratoren | indirekt | Auswahl, Unsicherheits- und Mehrfachbelegsätze ändern sich. | [genus/sources.py:293](../../genus/sources.py) |
 | Intent-Lesungen | relation_projection | Thermometer und Lückendetektor | keine | Zählt Verständnis, verbessert aber keine Formulierung und keinen Inhalt. | [genus/verstehen.py:232](../../genus/verstehen.py) |
-| Enge Intent-Korrektur | Ledger + korrekturen.jsonl | Deuter-Prompt | indirekt | Kann die spätere Intentwahl verbessern; nicht Fakt, Relevanz oder Stil. | [deploy/deuter.py:159](../../deploy/deuter.py) |
+| Enge Intent-Korrektur | response_feedback_log + korrekturen.jsonl | Deuter-Prompt + Qualitätsmessung | indirekt | Ist mit der Response-ID replaybar belegt; nur das begrenzte Edge-Beispiel kann die spätere Intentwahl verbessern. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) · [deploy/deuter.py:159](../../deploy/deuter.py) |
 | Persönliche Episode | append-only Ledger | Erinnerungsabruf | direkt, begrenzt | Wird auf Abruf und über einen engen Konzeptbezug eingebunden. | [genus/erinnerung.py:113](../../genus/erinnerung.py) |
-| Persönlichkeitseinstellung | art:* Relationen | Antwort-Belegung | direkt, begrenzt | Ändert wenige Floskeln, Länge, Beiwerk und optionale Stimme. | [genus/antwort.py:29](../../genus/antwort.py) |
+| Persönlichkeitseinstellung | art:* Relationen | Antwort-Belegung | direkt, begrenzt | Ändert wenige Floskeln, Länge, Beiwerk und optionale Stimme. | [genus/antwort.py:566](../../genus/antwort.py) |
 | Forecasts und Fehler | rohe Ledger-Events | learning CLI und Kurven | keine | Kalibrierung sichtbar, aber kein normaler Dialogverbraucher. | [genus/learning.py:97](../../genus/learning.py) |
-| Allgemeine Kritik oder Lob | nur Lesarten-Zählung | fester Handler | keine | Keine Antwort-ID, Qualitätsdimension oder Verbesserungswirkung. | [genus/companion.py:1023](../../genus/companion.py) |
-| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:94](../../deploy/telegram_bot.py) |
+| Explizites Antwortfeedback (👍/👎) | response_feedback_log | replaybare Qualitätsmessung | keine | Ist sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) |
+| Modellgedeutetes Lob oder Kritik | nur Lesarten-Zählung | fester Handler | keine | Wird ohne eindeutige Gebärde oder Korrektur nicht als Qualitätsfeedback gespeichert. | [genus/companion.py:1029](../../genus/companion.py) |
+| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:95](../../deploy/telegram_bot.py) |
 | Modellgewichte | statische GGUF-Dateien | Deuter, Stimme, Waage | keine | GENUS aktualisiert oder trainiert diese Gewichte nicht. | [deploy/deuter.py:269](../../deploy/deuter.py) |
 
-## Fehlende H1-Kanten in sinnvoller Reihenfolge
+## H1-Pilot und nächste Kanten
 
-1. `ResponseOutcome` samt Response-ID direkt nach dem Dispatch erfassen.
-2. Handler auf `AnswerDraft` mit Claims, Provenienz und Unsicherheit umstellen.
-3. Aus Session und relevantem Kontext einen `DialogueFrame` bilden.
-4. persönliche Episoden in einen physisch löschbaren `MemoryVault` migrieren.
-5. `AnswerDraft + DialogueFrame` über einen treuen Diskursrenderer formulieren.
-6. explizites Feedback gegatet in eine kuratierte Wirkungsbewertung führen.
+Aktiv im Pilot: `AnswerDraft` und `DialogueFrame` für Definitionen und Beziehungen,
+ein delivery-only `ResponseOutcome` sowie explizites Feedback mit Response-ID.
+Frage, Antwort und Telegram-Kennungen bleiben aus Outcome und Feedback heraus.
+
+1. die übrigen Handler schrittweise auf belegte Drafts migrieren.
+2. einen vollständigen Diskursplan vor dem treuen Renderer ergänzen.
+3. persönliche Episoden in einen physisch löschbaren `MemoryVault` migrieren.
+4. eine löschbare Telegram-Edge-Outbox für Outcome-Retry und Feedbackbezug
+   über Neustarts bauen.
+5. Feedback erst nach kuratierter Abnahme auf Strategien wirken lassen.
 
 ## Modulringe
 
@@ -99,7 +110,7 @@ Runtime-Verträge und keine behauptete vollständige Shell-Sprachanalyse.
 | Ring | Module |
 |---|---:|
 | `antwort` | 9 |
-| `domaene` | 30 |
+| `domaene` | 31 |
 | `fundament` | 5 |
 | `lernen` | 8 |
 | `membranen` | 13 |

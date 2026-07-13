@@ -191,3 +191,34 @@ CREATE TABLE IF NOT EXISTS governance_log (
 
 CREATE INDEX IF NOT EXISTS idx_governance_log_target
 ON governance_log(target_type, target_id);
+
+-- Privacy-sparse delivery outcomes. The primary key is the id of the originating
+-- response_outcome_recorded event; no question, answer, slot or transport/user id
+-- is stored here. Readings are fixed intent tokens encoded as a compact JSON list.
+CREATE TABLE IF NOT EXISTS response_outcome_log (
+    response_id       INTEGER PRIMARY KEY REFERENCES event_log(id),
+    channel           TEXT    NOT NULL,
+    outcome           TEXT    NOT NULL,
+    readings          TEXT    NOT NULL DEFAULT '[]',
+    answer_mode       TEXT    NOT NULL,
+    feedback_eligible INTEGER NOT NULL CHECK (feedback_eligible IN (0, 1)),
+    created_at        TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_outcome_channel_created
+ON response_outcome_log(channel, created_at);
+
+-- Explicit feedback is a separate immutable observation. The current Telegram
+-- message_id is used only as an in-process delivery receipt and discarded; it never
+-- enters this core projection. A restart-safe deletable edge index remains future work.
+CREATE TABLE IF NOT EXISTS response_feedback_log (
+    feedback_event_id INTEGER PRIMARY KEY REFERENCES event_log(id),
+    response_id       INTEGER NOT NULL REFERENCES response_outcome_log(response_id),
+    signal            TEXT    NOT NULL,
+    corrected_intent  TEXT,
+    source            TEXT    NOT NULL,
+    created_at        TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_feedback_response
+ON response_feedback_log(response_id);

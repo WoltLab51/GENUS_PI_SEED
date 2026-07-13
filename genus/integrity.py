@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from genus import event_router, sealing
+from genus import event_router, response_outcomes, sealing
 from genus.db import init_schema
 
 
@@ -154,6 +154,8 @@ REQUIRED_EVENT_KEYS = {
     },
     "inquiry_resolved": {"inquiry_id", "answer"},
     "inquiries_reconciled": {"inquiry_ids", "answer"},
+    response_outcomes.OUTCOME_EVENT: set(response_outcomes.OUTCOME_PAYLOAD_KEYS),
+    response_outcomes.FEEDBACK_EVENT: set(response_outcomes.FEEDBACK_PAYLOAD_KEYS),
     "forecast_made": {"metric_key", "predicted_value", "method", "support"},
     "forecast_scored": {
         "forecast_event",
@@ -205,10 +207,35 @@ REQUIRED_EVENT_KEYS = {
 }
 
 
+def _projection_summary(events: list[dict], projections: dict) -> dict:
+    """Keep the diagnostic result shaped even when an invalid event blocks replay."""
+    return {
+        "events": len(events),
+        "active_beliefs": sum(
+            1 for row in projections["beliefs"] if row["state"] == "active"
+        ),
+        "proposals": len(projections["proposals"]),
+        "inquiries": len(projections["inquiries"]),
+        "experiences": len(projections["experiences"]),
+        "active_states": sum(
+            1 for row in projections["states"] if row["status"] == "active"
+        ),
+        "governance_decisions": len(projections["governance"]),
+        "operations": len(projections["operations"]),
+        "active_rules": sum(
+            1 for row in projections["rules"] if row["status"] == "active"
+        ),
+        "response_outcomes": len(projections["response_outcomes"]),
+        "response_feedback": len(projections["response_feedback"]),
+    }
+
+
 def check(conn) -> dict:
     issues = []
-    issues.extend(validate_schema(conn))
-    issues.extend(validate_event_contract(conn))
+    schema_issues = validate_schema(conn)
+    event_issues = validate_event_contract(conn)
+    issues.extend(schema_issues)
+    issues.extend(event_issues)
     issues.extend(sealing.verify_chain(conn))
 
     # Take a CONSISTENT point-in-time snapshot of events + projections in one read
@@ -226,13 +253,25 @@ def check(conn) -> dict:
         if not in_txn:
             conn.execute("COMMIT")
 
-    replay_conn = replay_connection_from_events(event_log_snapshot)
-    replay_summary = event_router.replay(replay_conn)
-    projection_after = snapshot_projections(replay_conn)
-    replay_conn.close()
-
-    if projection_after != projection_before:
-        issues.append("projection state changed after replay")
+    replay_summary = _projection_summary(event_log_snapshot, projection_before)
+    # A structurally invalid event must make the check red, never crash the
+    # diagnostic through a projector/FK exception.  Once the event contract is
+    # valid, replay still runs and any unexpected projector failure is reported
+    # as its own integrity issue rather than escaping.
+    if not event_issues:
+        replay_conn = None
+        try:
+            replay_conn = replay_connection_from_events(event_log_snapshot)
+            replay_summary = event_router.replay(replay_conn)
+            projection_after = snapshot_projections(replay_conn)
+        except Exception as exc:  # diagnostic boundary: report, never hide a red ledger
+            issues.append(f"projection replay failed ({type(exc).__name__})")
+        else:
+            if projection_after != projection_before:
+                issues.append("projection state changed after replay")
+        finally:
+            if replay_conn is not None:
+                replay_conn.close()
 
     return {
         "ok": not issues,
@@ -246,6 +285,8 @@ def check(conn) -> dict:
         "governance_decisions": replay_summary["governance_decisions"],
         "operations": replay_summary["operations"],
         "active_rules": replay_summary["active_rules"],
+        "response_outcomes": replay_summary["response_outcomes"],
+        "response_feedback": replay_summary["response_feedback"],
     }
 
 
@@ -301,6 +342,14 @@ def validate_schema(conn) -> list[str]:
     rule_columns = [
         row["name"]
         for row in conn.execute("PRAGMA table_info(rule_projection)").fetchall()
+    ]
+    response_outcome_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(response_outcome_log)").fetchall()
+    ]
+    response_feedback_columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(response_feedback_log)").fetchall()
     ]
     if not {"prev_seal", "seal"}.issubset(event_columns):
         issues.append("event_log missing sealing columns")
@@ -372,6 +421,54 @@ def validate_schema(conn) -> list[str]:
     if "confidence" in rule_columns:
         issues.append("rule_projection must not store confidence")
 
+    expected_outcome_columns = {
+        "response_id",
+        "channel",
+        "outcome",
+        "readings",
+        "answer_mode",
+        "feedback_eligible",
+        "created_at",
+    }
+    expected_feedback_columns = {
+        "feedback_event_id",
+        "response_id",
+        "signal",
+        "corrected_intent",
+        "source",
+        "created_at",
+    }
+    if set(response_outcome_columns) != expected_outcome_columns:
+        issues.append("response_outcome_log violates its exact privacy-safe schema")
+    if set(response_feedback_columns) != expected_feedback_columns:
+        issues.append("response_feedback_log violates its exact privacy-safe schema")
+    outcome_table_row = conn.execute(
+        "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'response_outcome_log'"
+    ).fetchone()
+    outcome_table_sql = (
+        " ".join(str(outcome_table_row["sql"]).casefold().split())
+        if outcome_table_row is not None
+        else ""
+    )
+    if "check (feedback_eligible in (0, 1))" not in outcome_table_sql:
+        issues.append("response_outcome_log must constrain feedback_eligible to 0/1")
+
+    outcome_foreign_keys = {
+        (row["from"], row["table"], row["to"])
+        for row in conn.execute("PRAGMA foreign_key_list(response_outcome_log)").fetchall()
+    }
+    feedback_foreign_keys = {
+        (row["from"], row["table"], row["to"])
+        for row in conn.execute("PRAGMA foreign_key_list(response_feedback_log)").fetchall()
+    }
+    if ("response_id", "event_log", "id") not in outcome_foreign_keys:
+        issues.append("response_outcome_log must link response_id to event_log.id")
+    if not {
+        ("feedback_event_id", "event_log", "id"),
+        ("response_id", "response_outcome_log", "response_id"),
+    }.issubset(feedback_foreign_keys):
+        issues.append("response_feedback_log has an incomplete response/event link")
+
     empty_derivations = conn.execute(
         """
         SELECT COUNT(*) AS count
@@ -429,6 +526,7 @@ def validate_event_contract(conn) -> list[str]:
     reviewed_proposals = set()
     resolved_inquiries = set()
     activated_rule_keys = set()
+    response_eligibility: dict[int, bool] = {}
 
     for row in rows:
         event_type = row["event_type"]
@@ -436,6 +534,9 @@ def validate_event_contract(conn) -> list[str]:
             payload = json.loads(row["payload"])
         except json.JSONDecodeError:
             issues.append(f"event {row['id']} payload is not valid JSON")
+            continue
+        if not isinstance(payload, dict):
+            issues.append(f"event {row['id']} payload must be a JSON object")
             continue
 
         required = REQUIRED_EVENT_KEYS.get(event_type)
@@ -448,6 +549,35 @@ def validate_event_contract(conn) -> list[str]:
             issues.append(
                 f"event {row['id']} {event_type} missing keys: {', '.join(missing)}"
             )
+
+        if event_type == response_outcomes.OUTCOME_EVENT:
+            payload_issues = response_outcomes.outcome_payload_issues(payload)
+            issues.extend(
+                f"event {row['id']} {event_type} {issue}" for issue in payload_issues
+            )
+            if not payload_issues:
+                response_eligibility[int(row["id"])] = bool(payload["feedback_eligible"])
+            continue
+
+        if event_type == response_outcomes.FEEDBACK_EVENT:
+            payload_issues = response_outcomes.feedback_payload_issues(payload)
+            issues.extend(
+                f"event {row['id']} {event_type} {issue}" for issue in payload_issues
+            )
+            if not payload_issues:
+                response_id = int(payload["response_id"])
+                eligible = response_eligibility.get(response_id)
+                if eligible is None:
+                    issues.append(
+                        f"event {row['id']} {event_type} response_id {response_id} "
+                        "does not reference an earlier valid response outcome"
+                    )
+                elif not eligible:
+                    issues.append(
+                        f"event {row['id']} {event_type} response_id {response_id} "
+                        "is not feedback eligible"
+                    )
+            continue
 
         if event_type in {"belief_created", "belief_superseded"} and not payload.get(
             "derivation"
@@ -613,6 +743,8 @@ SNAPSHOT_PROJEKTIONSTABELLEN: dict[str, str] = {
     "rules": "rule_projection",
     "relations": "relation_projection",
     "values": "value_projection",
+    "response_outcomes": "response_outcome_log",
+    "response_feedback": "response_feedback_log",
 }
 
 
@@ -725,6 +857,28 @@ def snapshot_projections(conn) -> dict:
             "FROM value_projection ORDER BY event_id"
         ).fetchall()
     ]
+    response_outcomes_rows = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT response_id, channel, outcome, readings, answer_mode,
+                   feedback_eligible, created_at
+            FROM response_outcome_log
+            ORDER BY response_id
+            """
+        ).fetchall()
+    ]
+    response_feedback_rows = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT feedback_event_id, response_id, signal, corrected_intent,
+                   source, created_at
+            FROM response_feedback_log
+            ORDER BY feedback_event_id
+            """
+        ).fetchall()
+    ]
     return {
         "beliefs": beliefs,
         "proposals": proposals,
@@ -736,4 +890,6 @@ def snapshot_projections(conn) -> dict:
         "rules": rules,
         "relations": relations,
         "values": values,
+        "response_outcomes": response_outcomes_rows,
+        "response_feedback": response_feedback_rows,
     }

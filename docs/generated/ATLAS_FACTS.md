@@ -13,5 +13,5 @@
 - **Verstehens-Raster:** 36 Feinblätter, 11 Zwicky-Zellen
 - **Companion-Dispatch:** 10 Muster-Listen (25 Muster gesamt), 29 handelbare Zellen (als Werkzeuge registriert)
 - **Werkzeugbauer:** 36 registrierte Werkzeuge (29 wortlautfest, davon 29 Gesprächszellen)
-- **Event-Router:** 21 registrierte Projektoren, 16 bewusst-rohe Event-Typen (Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)
+- **Event-Router:** 23 registrierte Projektoren, 16 bewusst-rohe Event-Typen (Vertrag: jeder geschriebene Typ ist entschieden, test_event_vertrag)
 - **Selbst-Codieren Stufe 1:** 1 registrierte Umsetzungs-Art(en) (faehigkeits_ziel) — nur Graph-Wissen, Ausführung erst nach Freigabe

@@ -2,7 +2,7 @@
 
 > **Status:** lebendes Design
 >
-> **Stand:** 12. Juli 2026
+> **Stand:** 13. Juli 2026
 >
 > **Besitzt:** Speicherarten, Abrufregeln, Tagesrhythmus, Datenschutzgrenzen und offene Löschung
 
@@ -39,6 +39,8 @@ Die wichtigste Regel lautet:
 | Tagesstruktur | `~/.genus/chat_tag.jsonl` | Zeit, Konzept-IDs, Lesarten, Warum-Folge | bis atomare Nachtrotation |
 | Korrekturbeispiele | `~/.genus/korrekturen.jsonl` | Rohtext der ausdrücklich korrigierten vorherigen Frage + Lesarten | jüngste 50; kein Alters-TTL |
 | optionale Chat-Lernqueue | `~/.genus/lernwunsch.txt` | unbekannte einzelne Wortformen aus Chattext | höchstens 200, bis Verarbeitung/Löschung |
+| Antwortwirkungen | `response_outcome_log` aus dem Ledger | Kanal, Outcome, Lesarten, Antwortmodus, Feedback-Fähigkeit | dauerhaft / append-only, vollständig replaybar |
+| explizites Antwortfeedback | `response_feedback_log` aus dem Ledger | Response-ID, Signal, optional korrigierter Intent, Quelle | dauerhaft / append-only, vollständig replaybar |
 | Episodisches Gedächtnis | Relationsgraph im Ledger | Inhalt, Quelle, Zeit, erwähnte Konzepte | dauerhaft / append-only |
 | bestätigte Erinnerungsaufträge | Hand-Ereignisse im Ledger | freier Erinnerungstext, Fälligkeit, Status | dauerhaft / append-only |
 
@@ -97,6 +99,47 @@ Es gibt zwei verschiedene Oberflächenverträge:
 Das ist bewusst strenger als der reine Graphabruf. Technische Auffindbarkeit ist keine
 soziale Erlaubnis.
 
+## Antwortwirkung ohne Gesprächsprotokoll
+
+Der erste H1-Pilot trennt das Verstehen einer Nachricht von der Wirkung der tatsächlich
+zugestellten Antwort:
+
+```text
+Antwort vorbereiten → Telegram-Send/Edit → gültiger Zustellbeleg
+                                          ├─ ResponseOutcome + stabile Response-ID
+                                          └─ vorbereiteten Dialogzug in RAM bestätigen
+
+reine 👍-/👎-Nachricht oder enger Korrektur-Cue
+        → letzte feedbackfähige Response-ID → explizites Feedback-Event
+```
+
+Ohne gültigen Zustellbeleg entsteht kein Outcome und kein bestätigter Dialogzug. Die
+Response-ID ist direkt die Event-ID von `response_outcome_recorded`; eine zweite zufällige
+Kennung ist nicht nötig. Gespeichert werden ausschließlich typisierte Strukturfelder:
+
+- Outcomes: `answered`, `invalid_slots`, `understood_unknown` oder `fallback`,
+- Lesarten als begrenzte Intent-Tokens,
+- Antwortmodus und boolesche Feedback-Fähigkeit,
+- beim Feedback: `positive`, `negative` oder `intent_correction` mit Response-ID.
+
+Frage, Antwort, Slots, Chat-/Nutzer-ID und Telegram-`message_id` gelangen weder in Outcome-
+noch Feedback-Payload. Positiv oder negativ bedeutet: Die Nachricht besteht, abgesehen von
+Leerraum und Emoji-Varianten, vollständig aus 👍 beziehungsweise 👎. Allgemeines, nur vom
+Modell gedeutetes Lob oder Kritik gilt nicht als explizites Feedback. Beim engen Korrektur-Cue
+wird nur eine bekannte Raster-Absicht als `corrected_intent` übernommen; ein freier Token
+bleibt aus dem Ledger. Ebenso wichtig: Ein gespeichertes Signal bewertet noch keine Strategie
+und verändert keine Gewichte. Nur der bereits eng begrenzte Korrekturpfad kann über die
+gedeckelte Edge-Datei eine spätere Intentwahl beeinflussen.
+
+Feedback-Antworten sind selbst nicht feedbackfähig und werden bei einem unmittelbar
+folgenden Daumen übersprungen. Eine zugestellte Ritual- oder Fehlerantwort bildet dagegen
+eine Barriere: Feedback danach greift nicht durch sie hindurch auf eine ältere Sachantwort.
+
+Die Zuordnung zur letzten zugestellten Antwort lebt derzeit nur in der sechs Züge großen
+RAM-Session. Nach einem Bot-Neustart kann neues Feedback deshalb keine Antwort von davor
+referenzieren. Ein späterer Randindex muss löschbar und transportnah bleiben; Telegram-
+Kennungen gehören weiterhin nicht in den Kernvertrag.
+
 ## Tagesrhythmus
 
 ```text
@@ -127,6 +170,8 @@ verarbeitet werden. Der neue Tagespuffer bleibt dabei unangetastet.
 - Die Nachtrotation und der Bot-Schreiber verwenden denselben Advisory-Lock.
 - Antworten werden nicht mehr im Tagespuffer dupliziert.
 - Korrekturbeispiele speichern nur ausdrücklich korrigierte Fälle, gedeckelt auf 50.
+- Antwort-Outcomes und explizites Feedback speichern nur Struktur und Response-ID, keinen
+  Gesprächs- oder Transporttext.
 - Token und Allowlist bleiben getrennte, zugriffsgeschützte Betriebskonfiguration.
 
 Zwei begrenzte Rohtext-Ausnahmen bleiben in der Membran:
@@ -175,6 +220,12 @@ Die Tests pinnen insbesondere:
 - bestätigte menschliche Episoden dürfen weiter beiläufig helfen,
 - neue Tagesdateien enthalten keine Frage und keine Antwort,
 - Journalmeldungen enthalten weder Rohtext noch Absender-ID,
+- nur belegte Zustellungen erzeugen ein Outcome und bestätigen einen vorbereiteten
+  RAM-Dialogzug,
+- Outcome- und Feedback-Payloads akzeptieren exakt ihre datensparsamen Felder,
+- Feedback verweist nur auf eine vorhandene, feedbackfähige Response-ID,
+- Feedback-Acks werden übersprungen; Ritual- und Fehlerantworten stoppen den Rückbezug,
+- Replay rekonstruiert Outcome- und Feedback-Projektionen ohne Drift,
 - Nachtrotation nutzt Lock + atomaren Rename und kein nachträgliches Truncate,
 - wiederholte Konsolidierung erzeugt keine Dauererinnerung.
 
@@ -182,9 +233,12 @@ Die Tests pinnen insbesondere:
 
 1. Löschbaren persönlichen Memory-Vault entwerfen und migrieren.
 2. `vergiss`, Export und Retention mit überprüfbarer Bestätigung bauen.
-3. Antwort-Outcomes (`answered`, `invalid_slots`, `understood_unknown`, `fallback`) getrennt
-   messen, damit eine gelesene Absicht nicht fälschlich als gelöste Fähigkeit gilt.
-4. Relevanz aus Zeit, Beziehung, Quelle und Gesprächsziel gewichten — nicht aus bloßer
+3. Die vorhandenen Antwort-Outcomes und expliziten Feedbacklinks über ein kuratiertes
+   Alltagstestset auswerten; noch keine automatische Strategiegewichtung.
+4. Eine löschbare Edge-Outbox samt Randindex entwerfen: Sie soll nach bereits belegter
+   Zustellung eine fehlgeschlagene Outcome-Persistenz wiederholen und Feedbackbezug über
+   Bot-Neustarts erhalten, ohne Telegram-Kennungen oder Gesprächsinhalt in den Kern zu ziehen.
+5. Relevanz aus Zeit, Beziehung, Quelle und Gesprächsziel gewichten — nicht aus bloßer
    Wortwiederholung.
 
 Verwandte Verträge: [ARCHITECTURE.md](../ARCHITECTURE.md),
