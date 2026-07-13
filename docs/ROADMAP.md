@@ -43,23 +43,27 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## H0 · Betrieb beweisen
 
-**Ziel:** Der gehärtete Kern zeigt unter realer Last, dass Wachstum, Wahrheit und
+**Ziel:** Der gehärtete Kern zeigt unter realer Last, dass Ereignisfluss, Wahrheit und
 Betriebsgrenzen beobachtbar bleiben.
 
-### H0.1 · 24/48/72-Stunden-Wachstumsprofil
+### H0.1 · 24/48/72-Stunden-Betriebs- und Ereignisprofil
 
 **Abhängigkeit:** keine.
 
-**Arbeit:** Ledger-, DB- und WAL-Wachstum pro Ereignistyp und Produzent messen;
-alte Flutfenster von neuem Normalbetrieb trennen; Budget und Alarmgrenzen ableiten.
+**Arbeit:** Ledger-, DB- und WAL-Veränderung pro Ereignistyp und Produzent messen; neue Evidenz,
+notwendige Betriebsspur und vermeidbare Wiederholung unterscheiden; alte Flutfenster vom neuen
+Normalbetrieb trennen; Budget und Alarmgrenzen ableiten. Das Ledger soll nicht um seiner selbst
+willen wachsen.
 
 **Definition of Done**
 
 - drei vergleichbare Messpunkte mit gleicher Methodik
 - Top-Verursacher nach Ereignistyp und Quelle ausgewiesen
 - Eventrate, Dateiwachstum und wiederverwendbare WAL-Kapazität getrennt
+- jeder wesentliche Zuwachs als Erkenntnis, notwendige Betriebsspur oder vermeidbare Last bewertet
 - begründetes Tagesbudget plus Warn- und Eingriffsschwelle dokumentiert
 - Messung verändert weder Ledger noch Projektionen
+- Leitmaß ist mehr belegbares Können pro gespeichertem Ereignis, nicht eine höhere Ereigniszahl
 
 ### H0.2 · Externen Anker etablieren
 
@@ -178,7 +182,7 @@ Wirksamkeit er selbst prüfen kann.
 
 ## H4 · Markt- und Außenwelt-Membran
 
-**Abhängigkeit:** H0-Wachstumsbudget und H2-Governance sind belastbar.
+**Abhängigkeit:** H0-Ereignisbudget und H2-Governance sind belastbar.
 
 **Ziel:** externe Signale beobachten und Entscheidungen simulieren, ohne Wahrheit,
 Interesse und Handlung zu vermischen.

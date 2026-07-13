@@ -16,7 +16,7 @@ kontrolliert **verdient**.
 
 ## Das Bild in einem Satz
 
-> Der Boden trägt. Als Nächstes beweisen wir sein Wachstum im Dauerbetrieb,
+> Der Boden trägt. Als Nächstes vermessen wir seinen Ereignisfluss im Dauerbetrieb,
 > sichern seinen Wahrheitszeugen außerhalb des Pi und geben dem Begleiter mehr
 > Zusammenhang, Stimme und generalisierendes Können.
 
@@ -47,14 +47,16 @@ liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### 1. Wachstum sichtbar machen
+### 1. Betrieb und Ereignisfluss sichtbar machen
 
-Ein 24/48/72-Stunden-Profil soll zeigen, welche Ereignistypen das Ledger wachsen
-lassen, ob die behobene Relationsflut wirklich aus dem Messfenster fällt und
-welches tägliche Budget im Normalbetrieb realistisch ist.
+Ein read-only 24/48/72-Stunden-Profil soll zeigen, welche Prozesse Ereignisse anhängen, ob diese
+Ereignisse neue Evidenz, notwendige Betriebsspur oder vermeidbare Wiederholung sind, ob die
+behobene Relationsflut wirklich aus dem Messfenster fällt und welches tägliche Budget im
+Normalbetrieb realistisch ist. Ein größeres Ledger ist dabei **kein** Erfolgskriterium.
 
 **Fertig, wenn:** drei vergleichbare Messpunkte, Verursacher je Ereignistyp,
-WAL-Kontext und ein begründetes Betriebsbudget dokumentiert sind.
+WAL-Kontext und ein begründetes Betriebsbudget dokumentiert sind – mit dem Leitmaß
+**mehr belegbares Können pro gespeichertem Ereignis**.
 
 ### 2. Den Wahrheitszeugen nach außen bringen
 
@@ -122,5 +124,5 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** zuerst das 24-Stunden-Wachstumsprofil. Es liefert die erste
+**Nächster Blick:** zuerst das 24-Stunden-Betriebs- und Ereignisprofil. Es liefert die erste
 neue Evidenz, ohne den Kern zu verändern.
