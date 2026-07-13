@@ -1,0 +1,35 @@
+{
+  "schema_version": "genus-pre-fix-comparison-v1",
+  "ledger_head": 938171,
+  "ledger_snapshot_at": "2026-07-13T07:11:46.185Z",
+  "event_sources": [
+    "hourly_flow_sql",
+    "similarity_repetition_sql"
+  ],
+  "commit_source": "core_fix_commit_file",
+  "commit": {
+    "short_commit": "772aad0",
+    "committed_at_utc": "2026-07-12T15:54:25Z",
+    "subject": "fix(core): bound graph growth and privileged runtime"
+  },
+  "burst": {
+    "window_utc": "2026-07-12T09:00:00Z/2026-07-12T13:00:00Z",
+    "events": 155017,
+    "before_commit": true
+  },
+  "similarity_candidates": {
+    "denominator": 83174,
+    "candidates": 29037,
+    "share_percent": 34.9,
+    "first_at": "2026-07-12T08:22:39.260Z",
+    "last_at": "2026-07-12T12:55:29.700Z",
+    "before_commit": 29037,
+    "at_or_after_commit": 0
+  },
+  "method": "read-only SQLite aggregation and canonical-edge ranking at the fixed ledger head, compared with verified Git commit metadata",
+  "privacy": {
+    "payload_content_persisted": false,
+    "entity_values_persisted": false,
+    "filesystem_paths_persisted": false
+  }
+}

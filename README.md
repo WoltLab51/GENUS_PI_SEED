@@ -120,6 +120,7 @@ genus beliefs show                   # Beliefs mit read-time Confidence
 genus inquiries list                 # benannte Unsicherheit
 genus knowledge                      # Wissensgraph und Strukturkonflikte
 genus skills                         # Fähigkeits-Thermometer
+genus betriebsprofil status          # private 24/48/72-Messreihe prüfen
 genus replay                         # Projektionen deterministisch rekonstruieren
 genus integrity check                # Verträge und Projektionen prüfen
 genus ledger verify                  # Seal-Kette prüfen

@@ -99,6 +99,23 @@ def _luecken(conn) -> dict:
             "offene_proposals": offene}
 
 
+def betriebsstand(conn) -> dict:
+    """Bounded operating subset without the ledger-heavy understanding scan.
+
+    The 24/48/72-hour operating profile needs only generalisation and gap
+    indicators.  Keeping this public helper separate prevents read-only
+    background diagnostics from accidentally invoking ``_verstehen``'s repeated
+    whole-ledger scans.
+    """
+    from genus import zaehlwerk
+
+    planer = _planer(zaehlwerk.stand())
+    return {
+        "generalisierung": _generalisierung(conn, planer),
+        "luecken": _luecken(conn),
+    }
+
+
 def stand(conn) -> dict:
     """Der ganze Thermometer-Stand als EIN Dict -- rein lesend, deterministisch, kein Modell.
     Struktur: planer (Quoten je Absicht) / verstehen (Belegung, Fehlgriffe, unklar) /

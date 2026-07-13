@@ -1,7 +1,7 @@
 # Die GENUS-Dokumentation
 
 > **Status:** kanonischer Index
-> **Zuletzt verifiziert:** 2026-07-12
+> **Zuletzt verifiziert:** 2026-07-13
 > **Regel:** Jede Aussage hat genau einen autoritativen Wohnort.
 
 Willkommen in der Werkstatt. Diese Bibliothek trennt bewusst zwischen dem, was GENUS
@@ -88,6 +88,7 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [Wachstums-Audit vom 2026-07-03](reports/2026-07-03-growth-audit.md)
 - [Kern-/Pi-Härtungs-Audit vom 2026-07-12](reports/2026-07-12-hardening-audit.md)
 - [Systemaudit, Morphologie und SWOT vom 2026-07-12](reports/2026-07-12-system-audit.md)
+- [H0.1-Vorabprofil und Messdesign vom 2026-07-13](reports/2026-07-13-h0-1-baseline/report.html)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 

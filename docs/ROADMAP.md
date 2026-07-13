@@ -50,7 +50,8 @@ Betriebsgrenzen beobachtbar bleiben.
 
 **Abhängigkeit:** keine.
 
-**Arbeit:** Ledger-, DB- und WAL-Veränderung pro Ereignistyp und Produzent messen; neue Evidenz,
+**Arbeit:** Ledger-, DB- und WAL-Veränderung pro Ereignistyp, kontrollierter Herkunftsfamilie und
+aus dem Ereignistyp abgeleitetem Produzenten-Proxy messen; neue Evidenz,
 notwendige Betriebsspur und vermeidbare Wiederholung unterscheiden; alte Flutfenster vom neuen
 Normalbetrieb trennen; Budget und Alarmgrenzen ableiten. Das Ledger soll nicht um seiner selbst
 willen wachsen.
@@ -59,7 +60,7 @@ willen wachsen.
 
 - drei vergleichbare Messpunkte mit gleicher Methodik
 - Top-Verursacher nach Ereignistyp und Quelle ausgewiesen
-- Eventrate, Dateiwachstum und wiederverwendbare WAL-Kapazität getrennt
+- Eventrate, Dateiwachstum und flüchtige WAL-Dateiallokation getrennt
 - jeder wesentliche Zuwachs als Erkenntnis, notwendige Betriebsspur oder vermeidbare Last bewertet
 - begründetes Tagesbudget plus Warn- und Eingriffsschwelle dokumentiert
 - Messung verändert weder Ledger noch Projektionen

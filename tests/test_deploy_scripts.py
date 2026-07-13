@@ -48,6 +48,15 @@ def test_cron_installation_writes_timestamped_ticks():
     assert "[TICK] doctor" in script
     assert "[TICK] repo-observe" in script
     assert "[TICK] status-publish" in script
+    # H0.1: hourly due check, but the baseline remains a deliberate one-time action.
+    assert "23 * * * *" in script
+    assert "pi_betriebsprofil_capture.sh" in script
+    assert "GENUS_PROFILE_DIR" in script
+    profile_line = next(line for line in script.splitlines()
+                        if "pi_betriebsprofil_capture.sh" in line)
+    assert "--start" not in profile_line
+    assert ">>" not in profile_line and "2>&1" not in profile_line
+    assert "runner.log" not in script
     # status-publish is STICKY: a persisted marker survives cron reinstalls that don't
     # carry the env flag (the regression that silently dropped the daily status tick)
     assert "status_publish.enabled" in script
@@ -56,6 +65,24 @@ def test_cron_installation_writes_timestamped_ticks():
     # don't carry the env var -- the regression that made status-publish + anchor fail nightly
     assert "CORE_ID_FILE" in script and "core_id" in script
     assert r"date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ" in script
+
+
+def test_betriebsprofil_cron_wrapper_is_private_bounded_and_quiet_on_noop():
+    script = (ROOT / "deploy" / "pi_betriebsprofil_capture.sh").read_text(encoding="utf-8")
+
+    assert "umask 077" in script
+    assert "/usr/bin/timeout --signal=TERM --kill-after=5s 180s" in script
+    assert "/usr/bin/nice -n 10" in script
+    assert "betriebsprofil capture --quiet" in script
+    assert "MAX_LOG_BYTES=4096" in script
+    assert "/usr/bin/logger --tag genus-betriebsprofil" in script
+    assert 'PROFILE_DIR="${GENUS_PROFILE_DIR:-}"' in script
+    assert '[ ! -d "$PROFILE_DIR" ] || [ -L "$PROFILE_DIR" ]' in script
+    assert "exit 66" in script
+    assert "PIPESTATUS" in script
+    assert 'if [ "$status" -eq 0 ] && [ ! -s "$OUTPUT_FILE" ]' in script
+    assert 'exit "$status"' in script
+    assert "runner.log" not in script
 
 
 def test_weather_membrane_fetches_number_only_and_keeps_location_at_edge():

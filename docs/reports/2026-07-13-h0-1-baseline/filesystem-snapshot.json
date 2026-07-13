@@ -1,0 +1,32 @@
+{
+  "schema_version": "genus-filesystem-snapshot-v1",
+  "executed_at": "2026-07-13T08:08:30.354Z",
+  "ledger_head_context": 938171,
+  "relationship_to_ledger_snapshot": "separate_point_in_time_probe_after_fixed_ledger_snapshot",
+  "method": {
+    "operation": "os.stat",
+    "implementation": "genus/betriebsprofil.py::_physical_storage",
+    "paths_persisted": false,
+    "mode_format": "four_digit_octal_permissions"
+  },
+  "files": [
+    {
+      "role": "main",
+      "bytes": 515706880,
+      "mode": "0644",
+      "present": true
+    },
+    {
+      "role": "wal",
+      "bytes": 4157112,
+      "mode": "0644",
+      "present": true
+    },
+    {
+      "role": "shm",
+      "bytes": 32768,
+      "mode": "0644",
+      "present": true
+    }
+  ]
+}

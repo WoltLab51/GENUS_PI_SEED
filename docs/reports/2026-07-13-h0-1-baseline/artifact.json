@@ -1,0 +1,865 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "GENUS H0.1 – Vorab-Baseline des Ereignisflusses",
+    "description": "Technische Vorab-Baseline für das 24/48/72-Stunden-Betriebs- und Ereignisprofil von GENUS.",
+    "generatedAt": "2026-07-13T07:11:46.185Z",
+    "charts": [
+      {
+        "id": "hourly_event_flow",
+        "title": "Ereignisse pro abgeschlossener UTC-Stunde",
+        "subtitle": "48 abgeschlossene Stunden vom 11. Juli, 07:00 UTC, bis 13. Juli, 07:00 UTC; Stunden ohne Ereignis sind als null enthalten.",
+        "type": "line",
+        "dataset": "hourly_48h",
+        "sourceId": "hourly_flow_sql",
+        "encodings": {
+          "x": {
+            "field": "hour_utc",
+            "type": "temporal",
+            "label": "UTC-Stunde"
+          },
+          "y": {
+            "field": "events",
+            "type": "quantitative",
+            "label": "Ereignisse",
+            "format": "number"
+          }
+        },
+        "yAxisTitle": "Ereignisse",
+        "valueFormat": "number",
+        "palette": {
+          "kind": "sequential",
+          "name": "blue"
+        },
+        "layout": "full"
+      }
+    ],
+    "tables": [
+      {
+        "id": "ledger_exact_table",
+        "title": "Ledger und rollierendes 24-Stunden-Fenster",
+        "subtitle": "Exakte Werte am fixierten Kopf Event-ID 938.171; die laufende Stunde ist separat gekennzeichnet.",
+        "dataset": "ledger_exact",
+        "sourceId": "ledger_summary_sql",
+        "defaultSort": {
+          "field": "metric",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "metric",
+            "label": "Messgröße",
+            "type": "text"
+          },
+          {
+            "field": "value",
+            "label": "Exakter Wert",
+            "type": "number",
+            "format": "number"
+          },
+          {
+            "field": "unit",
+            "label": "Einheit",
+            "type": "text"
+          },
+          {
+            "field": "scope",
+            "label": "Bezug",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "burst_hours_table",
+        "title": "Vier Stunden des Ereignis-Bursts",
+        "subtitle": "Exakte UTC-Stundenwerte für den auffälligen Abschnitt am 12. Juli.",
+        "dataset": "burst_hours",
+        "sourceId": "hourly_flow_sql",
+        "defaultSort": {
+          "field": "hour_utc",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "hour_utc",
+            "label": "UTC-Stunde",
+            "type": "date"
+          },
+          {
+            "field": "events",
+            "label": "Ereignisse",
+            "type": "number",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "repetition_table",
+        "title": "Semantisch kanonische Similarity-Wiederholungen",
+        "subtitle": "Rollierende 24 Stunden bis zum Vorab-Snapshot; frühere gleiche Kanten werden ledgerweit über kleinere Event-IDs erkannt.",
+        "dataset": "repetition_exact",
+        "sourceId": "similarity_repetition_sql",
+        "defaultSort": {
+          "field": "cohort",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "cohort",
+            "label": "Kohorte",
+            "type": "text"
+          },
+          {
+            "field": "denominator",
+            "label": "Qualifizierte Ereignisse",
+            "type": "number",
+            "format": "number"
+          },
+          {
+            "field": "repetition_candidates",
+            "label": "Wiederholungskandidaten",
+            "type": "number",
+            "format": "number"
+          },
+          {
+            "field": "repetition_share_percent",
+            "label": "Kandidatenquote",
+            "type": "number",
+            "format": "number",
+            "unit": "%"
+          },
+          {
+            "field": "definition",
+            "label": "Definition",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "quality_table",
+        "title": "Datenqualitätsprüfungen des Ledgers",
+        "subtitle": "Vollständiger Ledger bis Event-ID 938.171; ID-Lücken folgen der Präfixformel max_id minus event_count.",
+        "dataset": "data_quality_exact",
+        "sourceId": "ledger_quality_sql",
+        "defaultSort": {
+          "field": "check",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "check",
+            "label": "Prüfung",
+            "type": "text"
+          },
+          {
+            "field": "failures",
+            "label": "Fehler",
+            "type": "number",
+            "format": "number"
+          },
+          {
+            "field": "result",
+            "label": "Ergebnis",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "storage_table",
+        "title": "SQLite-Seiten am Vorab-Snapshot",
+        "subtitle": "Punkt-in-Zeit-Werte aus den read-only PRAGMA-Abfragen; freie Seiten können wiederverwendet werden.",
+        "dataset": "storage_exact",
+        "sourceId": "storage_pages_sql",
+        "defaultSort": {
+          "field": "metric",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "metric",
+            "label": "Messgröße",
+            "type": "text"
+          },
+          {
+            "field": "value",
+            "label": "Exakter Wert",
+            "type": "number",
+            "format": "number"
+          },
+          {
+            "field": "unit",
+            "label": "Einheit",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "capability_table",
+        "title": "Fähigkeits- und Klärungsindikatoren",
+        "subtitle": "Aktueller Projektionsstand am Vorab-Snapshot; die Werte sind Indikatoren, kein Qualitätsranking.",
+        "dataset": "capability_exact",
+        "sourceId": "capability_projection_sql",
+        "defaultSort": {
+          "field": "indicator",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "indicator",
+            "label": "Indikator",
+            "type": "text"
+          },
+          {
+            "field": "count",
+            "label": "Anzahl",
+            "type": "number",
+            "format": "number"
+          },
+          {
+            "field": "interpretation",
+            "label": "Einordnung",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "ledger_summary_sql",
+        "label": "GENUS Pi Ledger – fixierter Vorab-Snapshot",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Aggregiert Ledger-Kopf, rollierendes 24-Stunden-Fenster und die laufende Teilstunde an einem fixierten Event-Kopf.",
+          "executed_at": "2026-07-13T07:11:46.185Z",
+          "tables_used": [
+            "event_log"
+          ],
+          "filters": [
+            "Kohorte: event_log.id <= 938171",
+            "Rollierendes Fenster: created_at >= 2026-07-12T07:11:46.185Z und created_at <= 2026-07-13T07:11:46.185Z",
+            "Teilstunde: 2026-07-13T07:00:00.000Z bis 2026-07-13T07:11:46.185Z; keine Hochrechnung"
+          ],
+          "metric_definitions": [
+            "event_count = COUNT(*) der fixierten Event-ID-Kohorte",
+            "events_24h = Anzahl der Kohortenereignisse im rollierenden 24-Stunden-Fenster",
+            "payload_bytes_24h = SUM(length(CAST(payload AS BLOB))) im rollierenden Fenster",
+            "max_payload_bytes_24h = MAX(length(CAST(payload AS BLOB))) im rollierenden Fenster",
+            "partial_current_hour_events = Ereigniszahl der unvollständigen Stunde ohne Hochrechnung"
+          ],
+          "sql": "WITH bounded AS (SELECT id, created_at, payload FROM event_log WHERE id <= 938171) SELECT COUNT(*) AS event_count, MAX(id) AS head_event_id, MIN(created_at) AS first_created_at, MAX(created_at) AS last_created_at, SUM(CASE WHEN created_at >= '2026-07-12T07:11:46.185Z' THEN 1 ELSE 0 END) AS events_24h, SUM(CASE WHEN created_at >= '2026-07-12T07:11:46.185Z' THEN length(CAST(payload AS BLOB)) ELSE 0 END) AS payload_bytes_24h, MAX(CASE WHEN created_at >= '2026-07-12T07:11:46.185Z' THEN length(CAST(payload AS BLOB)) END) AS max_payload_bytes_24h, SUM(CASE WHEN created_at >= '2026-07-13T07:00:00.000Z' AND created_at <= '2026-07-13T07:11:46.185Z' THEN 1 ELSE 0 END) AS partial_current_hour_events FROM bounded;"
+        }
+      },
+      {
+        "id": "hourly_flow_sql",
+        "label": "GENUS Pi Ledger – 48 abgeschlossene UTC-Stunden",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Erzeugt ein lückenloses Raster aus 48 abgeschlossenen UTC-Stunden und zählt Ledger-Ereignisse je Stunde bis zum fixierten Kopf.",
+          "executed_at": "2026-07-13T07:11:46.185Z",
+          "tables_used": [
+            "event_log"
+          ],
+          "filters": [
+            "Kohorte: event_log.id <= 938171",
+            "Zeitfenster: 2026-07-11T07:00:00.000Z inklusive bis 2026-07-13T07:00:00.000Z exklusive",
+            "Zeitgrain: 48 abgeschlossene UTC-Stunden",
+            "Leere Stunden: durch rekursives Stundenraster explizit mit 0 gefüllt"
+          ],
+          "metric_definitions": [
+            "events = COUNT(event_log.id) je vollständiger UTC-Stunde",
+            "hour_utc = Stundenbeginn in UTC",
+            "Die aktuelle Teilstunde ab 07:00 UTC ist ausgeschlossen"
+          ],
+          "sql": "WITH RECURSIVE hours(idx, hour_utc) AS (SELECT 0, '2026-07-11T07:00Z' UNION ALL SELECT idx + 1, strftime('%Y-%m-%dT%H:00Z', datetime(hour_utc, '+1 hour')) FROM hours WHERE idx < 47) SELECT h.hour_utc, COUNT(e.id) AS events FROM hours AS h LEFT JOIN event_log AS e ON substr(e.created_at, 1, 13) || ':00Z' = h.hour_utc AND e.id <= 938171 AND e.created_at >= '2026-07-11T07:00:00.000Z' AND e.created_at < '2026-07-13T07:00:00.000Z' GROUP BY h.idx, h.hour_utc ORDER BY h.idx;"
+        }
+      },
+      {
+        "id": "similarity_repetition_sql",
+        "label": "GENUS Pi Ledger – kanonische Similarity-Wiederholungen",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Zählt ein model:embedder-verwandt-Ereignis im rollierenden 24-Stunden-Fenster als Wiederholung, wenn dieselbe kanonische Kante mit gleicher Derivation bereits bei einer kleineren Event-ID existiert – auch vor der Fenstergrenze.",
+          "executed_at": "2026-07-13T07:11:46.185Z",
+          "tables_used": [
+            "event_log"
+          ],
+          "filters": [
+            "Fixierter Kopf: event_log.id <= 938171",
+            "Messfenster: 2026-07-12T07:11:46.185Z bis 2026-07-13T07:11:46.185Z inklusive",
+            "Kohorte: event_type = relation_asserted, source = model:embedder, predicate = verwandt",
+            "Nur gültige Objekt-Payloads mit subject, predicate, object, source und derivation",
+            "Nur gültige Zeitstempel bis höchstens fünf Minuten nach dem Snapshotzeitpunkt",
+            "Vorgeschichte: alle qualifizierten kleineren Event-IDs, auch vor der Fenstergrenze"
+          ],
+          "metric_definitions": [
+            "qualifying_similarity_events_24h = 83174 qualifizierte Intervallereignisse; Nenner der Quote",
+            "semantic_similarity_repetitions_24h = 29037 Intervallereignisse mit occurrence > 1 nach kanonischer Kante und gleicher Derivation über die ledgerweite ID-Vorgeschichte",
+            "repetition_share_percent = ROUND(100 * 29037 / 83174, 1) = 34.9 Prozent"
+          ],
+          "sql": "WITH valid_similarity AS (SELECT id, created_at, json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.subject') AS subject, json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.object') AS object, json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.derivation') AS derivation FROM event_log WHERE id <= 938171 AND event_type = 'relation_asserted' AND json_valid(payload) AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END) = 'object' AND typeof(created_at) = 'text' AND trim(created_at) <> '' AND julianday(created_at) IS NOT NULL AND julianday(created_at) <= julianday('2026-07-13T07:11:46.185Z', '+5 minutes') AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.subject') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.predicate') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.object') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.source') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.derivation') IS NOT NULL AND json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.source') = 'model:embedder' AND json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.predicate') = 'verwandt'), canonicalized AS (SELECT id, created_at, CASE WHEN subject <= object THEN subject ELSE object END AS a, CASE WHEN subject <= object THEN object ELSE subject END AS b, derivation FROM valid_similarity), ranked AS (SELECT id, created_at, ROW_NUMBER() OVER (PARTITION BY a, b, derivation ORDER BY id) AS occurrence FROM canonicalized) SELECT COUNT(*) AS qualifying_similarity_events_24h, COALESCE(SUM(CASE WHEN occurrence > 1 THEN 1 ELSE 0 END), 0) AS semantic_similarity_repetitions_24h, ROUND(100.0 * SUM(CASE WHEN occurrence > 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1) AS repetition_share_percent FROM ranked WHERE julianday(created_at) >= julianday('2026-07-12T07:11:46.185Z') AND julianday(created_at) <= julianday('2026-07-13T07:11:46.185Z') AND id <= 938171;"
+        }
+      },
+      {
+        "id": "ledger_quality_sql",
+        "label": "GENUS Pi Ledger – Datenqualitätsprüfungen",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Prüft JSON-Form, Zeitstempel, Zukunftszeiten, Zeitinversionen und Event-ID-Präfixlücken bis zum fixierten Kopf.",
+          "executed_at": "2026-07-13T07:11:46.185Z",
+          "tables_used": [
+            "event_log"
+          ],
+          "filters": [
+            "Kohorte: event_log.id <= 938171",
+            "Zukunftsschwelle: Snapshotzeit 2026-07-13T07:11:46.185Z plus fünf Minuten",
+            "ID-Annahme: gültiger Ledger ist das Präfix 1 bis max_id"
+          ],
+          "metric_definitions": [
+            "missing_event_ids = max_id - event_count; 0 bedeutet lückenloses Präfix ab ID 1",
+            "invalid_json_events = Anzahl Payloads mit json_valid(payload) = 0",
+            "non_object_payload_events = gültige JSON-Payloads, deren json_type nicht object ist",
+            "timestamp_inversions_by_event_id = Anzahl created_at-Werte vor dem Zeitstempel der direkt vorherigen Event-ID",
+            "future_timestamp_events = Anzahl Zeitstempel mehr als fünf Minuten nach dem Snapshotzeitpunkt"
+          ],
+          "sql": "WITH bounded AS (SELECT id, created_at, payload FROM event_log WHERE id <= 938171), ordered AS (SELECT id, created_at, LAG(created_at) OVER (ORDER BY id) AS previous_at FROM bounded), head AS (SELECT COUNT(*) AS n, MAX(id) AS max_id FROM bounded) SELECT (SELECT COUNT(*) FROM bounded WHERE json_valid(payload) = 0) AS invalid_json_events, (SELECT COUNT(*) FROM bounded WHERE json_valid(payload) = 1 AND json_type(payload) <> 'object') AS non_object_payload_events, (SELECT COUNT(*) FROM bounded WHERE julianday(created_at) IS NULL) AS invalid_timestamp_events, (SELECT COUNT(*) FROM bounded WHERE julianday(created_at) > julianday('2026-07-13T07:11:46.185Z', '+5 minutes')) AS future_timestamp_events, (SELECT COUNT(*) FROM ordered WHERE julianday(created_at) < julianday(previous_at)) AS timestamp_inversions_by_event_id, (SELECT max_id - n FROM head) AS missing_event_ids;"
+        }
+      },
+      {
+        "id": "core_fix_commit_file",
+        "label": "GENUS Core – Commit 772aad0",
+        "path": "docs/reports/2026-07-13-h0-1-baseline/core-fix-commit.json"
+      },
+      {
+        "id": "pre_fix_comparison_file",
+        "label": "GENUS – kombinierter Vor-Fix-Ereignis-/Commit-Vergleich",
+        "path": "docs/reports/2026-07-13-h0-1-baseline/pre-fix-comparison.json"
+      },
+      {
+        "id": "filesystem_snapshot_file",
+        "label": "GENUS Pi – datierte Main/WAL/SHM-Dateisystemprobe",
+        "path": "docs/reports/2026-07-13-h0-1-baseline/filesystem-snapshot.json"
+      },
+      {
+        "id": "storage_pages_sql",
+        "label": "GENUS Pi – SQLite-Seitenprobe",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Liest page_size, page_count und freelist_count der geöffneten read-only SQLite-Datenbank und berechnet allokierte sowie verwendete Seitenbytes.",
+          "executed_at": "2026-07-13T07:11:46.185Z",
+          "filters": [
+            "Punkt-in-Zeit-Probe der read-only geöffneten GENUS-SQLite-Datenbank",
+            "Keine zeitliche Hochrechnung und keine Gleichsetzung mit Dateiwachstum"
+          ],
+          "metric_definitions": [
+            "allocated_page_bytes = page_size * page_count",
+            "used_page_bytes = page_size * (page_count - freelist_count)",
+            "freelist_count sind intern wiederverwendbare SQLite-Seiten; dies beschreibt nicht die WAL-Datei"
+          ],
+          "sql": "SELECT p.page_size, c.page_count, f.freelist_count AS free_pages, p.page_size * c.page_count AS allocated_page_bytes, p.page_size * (c.page_count - f.freelist_count) AS used_page_bytes FROM pragma_page_size AS p CROSS JOIN pragma_page_count AS c CROSS JOIN pragma_freelist_count AS f;"
+        }
+      },
+      {
+        "id": "capability_projection_sql",
+        "label": "GENUS Pi – Fähigkeits- und Inquiry-Projektionen",
+        "query": {
+          "engine": "sqlite",
+          "language": "sql",
+          "description": "Liest begrenzte, aggregierte Zustandsindikatoren aus den GENUS-Projektionen; keine Entitäts- oder Payload-Inhalte werden ausgegeben.",
+          "executed_at": "2026-07-13T07:11:46.185Z",
+          "tables_used": [
+            "belief_projection",
+            "relation_projection",
+            "value_projection",
+            "experience_log",
+            "rule_projection",
+            "inquiry_log",
+            "proposal_log"
+          ],
+          "filters": [
+            "Punkt-in-Zeit-Projektionsstand am 2026-07-13T07:11:46.185Z",
+            "Aktive Beliefs: state = active",
+            "Aktive Regeln: status = active",
+            "Inquiries getrennt nach state = open und state = resolved",
+            "Ausstehende Proposals: state = pending",
+            "Nur aggregierte Zähler; keine Entitäts-, Payload- oder Freitextwerte"
+          ],
+          "metric_definitions": [
+            "Jeder Indikator ist COUNT(*) der benannten Projektion und Zustandskohorte",
+            "Projektionsgrößen sind Bestandsindikatoren, keine Qualitäts- oder Neuheitsmetrik"
+          ],
+          "sql": "SELECT 'active_beliefs' AS indicator, COUNT(*) AS count FROM belief_projection WHERE state = 'active' UNION ALL SELECT 'relation_projection_rows', COUNT(*) FROM relation_projection UNION ALL SELECT 'value_projection_rows', COUNT(*) FROM value_projection UNION ALL SELECT 'experiences', COUNT(*) FROM experience_log UNION ALL SELECT 'active_rules', COUNT(*) FROM rule_projection WHERE status = 'active' UNION ALL SELECT 'open_inquiries', COUNT(*) FROM inquiry_log WHERE state = 'open' UNION ALL SELECT 'resolved_inquiries', COUNT(*) FROM inquiry_log WHERE state = 'resolved' UNION ALL SELECT 'pending_proposals', COUNT(*) FROM proposal_log WHERE state = 'pending';"
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# GENUS H0.1 – Vorab-Baseline des Ereignisflusses"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "body": "## Technischer Kurzbefund\n\nDie Vorab-Baseline zeigt eine historische Vor-Fix-Belastung: einen kurzen, sehr großen Ereignis-Burst, eine Similarity-Kandidatenquote von 34,9 % und danach wieder niedrigen stündlichen Hintergrundfluss. Die geprüfte Ledger-Struktur ist sauber. Commit `772aad0` dokumentiert mit seinem Betreff die Härtung zum Begrenzen des Graphwachstums und des privilegierten Runtime-Pfads.\n\n**Entscheidung für H0.1:** Das Ledger selbst ist kein Wachstumsziel. Der 24/48/72-Stunden-Lauf soll jetzt Post-Fix-Nichtwiederkehr und Wirkung belegen: weniger vermeidbare Wiederholung bei mindestens gleich guter Evidenz und mehr belegbarem Können pro gespeichertem Ereignis. Mit dieser Vorab-Baseline ist das noch nicht abgeschlossen."
+      },
+      {
+        "id": "baseline_scale",
+        "type": "markdown",
+        "sourceId": "ledger_summary_sql",
+        "body": "## Der Fixpunkt ist groß, aber nicht der Erfolgsmaßstab\n\nAm 13. Juli um 07:11:46 UTC lag der fixierte Kopf bei **938.171 Ereignissen**. Im davorliegenden rollierenden 24-Stunden-Fenster wurden **161.086 Ereignisse** gezählt; die bis zum Snapshot erst elf Minuten alte laufende Stunde enthielt **72 Ereignisse** und wird deshalb nicht in der 48-Stunden-Linie verwendet.\n\nDiese Werte beschreiben Last und Speicherbedarf. Sie belegen für sich allein weder Lernen noch Reife."
+      },
+      {
+        "id": "ledger_exact",
+        "type": "table",
+        "tableId": "ledger_exact_table",
+        "layout": "full"
+      },
+      {
+        "id": "flow_finding",
+        "type": "markdown",
+        "sourceId": "hourly_flow_sql",
+        "body": "## Vier Stunden erklären den auffälligen Ereignisfluss\n\nAm 12. Juli zwischen 09:00 und 13:00 UTC entstanden **155.017 Ereignisse**. Der höchste Einzelwert lag zwischen 09:00 und 10:00 UTC bei **64.403**. Seit dem 13. Juli um 00:00 UTC lagen die sieben vollständig beobachteten Stunden dagegen zwischen **261 und 363 Ereignissen**.\n\nDie Linie ist daher als Betriebsprofil zu lesen, nicht als gleichmäßiger Wachstumstrend: Der Burst muss einem konkreten Produzenten und Nutzen zugeordnet werden, bevor das 24-Stunden-Volumen als Normalbetrieb bewertet werden kann."
+      },
+      {
+        "id": "hourly_chart",
+        "type": "chart",
+        "chartId": "hourly_event_flow",
+        "layout": "full"
+      },
+      {
+        "id": "burst_exact",
+        "type": "table",
+        "tableId": "burst_hours_table",
+        "layout": "full"
+      },
+      {
+        "id": "repetition_finding",
+        "type": "markdown",
+        "sourceId": "similarity_repetition_sql",
+        "body": "## 29.037 von 83.174 Similarity-Ereignissen sind Wiederholungskandidaten\n\nIm fixierten rollierenden 24-Stunden-Fenster qualifizierten sich **83.174** `model:embedder`-`verwandt`-Ereignisse. Davon wurden **29.037** als semantisch kanonische Wiederholungskandidaten erkannt; das sind **34,9 %**. Ein Intervallereignis zählt, wenn dieselbe ungeordnete Kante mit gleicher Derivation bereits bei einer kleineren Event-ID existiert – auch dann, wenn der frühere Eintrag vor der Fenstergrenze liegt.\n\nDie Quote ist eine historische Belastungsbaseline und kein Beweis, dass jedes gezählte Ereignis nutzlos war. Ihre nächste Aufgabe ist die Post-Fix-Wirkungskontrolle."
+      },
+      {
+        "id": "repetition_exact",
+        "type": "table",
+        "tableId": "repetition_table",
+        "layout": "full"
+      },
+      {
+        "id": "core_fix_anchor",
+        "type": "markdown",
+        "sourceId": "core_fix_commit_file",
+        "body": "## H0.1 misst jetzt die Post-Fix-Nichtwiederkehr\n\nCommit `772aad0` – **fix(core): bound graph growth and privileged runtime** – wurde am 12. Juli um **15:54:25 UTC** erstellt. Der verifizierte Commit-Betreff und Zeitstempel bilden den technischen Vergleichspunkt; ob und wie stark die Härtung wirkt, ist Gegenstand der Post-Fix-Messung."
+      },
+      {
+        "id": "pre_fix_interpretation",
+        "type": "markdown",
+        "sourceId": "pre_fix_comparison_file",
+        "body": "Der beobachtete Burst vom 12. Juli, 09:00–13:00 UTC, und alle **29.037** Similarity-Wiederholungskandidaten am fixierten Kopf liegen zeitlich vor diesem Commit; nach dem Vergleichszeitpunkt enthält das Fenster **0** Kandidaten. Sie bilden deshalb eine **historische Vorher-Belastungsbaseline**, keine Aussage über die spätere Wirkung. H0.1 bewertet Wirkung und Nichtwiederkehr in den Post-Fix-Intervallen."
+      },
+      {
+        "id": "quality_finding",
+        "type": "markdown",
+        "sourceId": "ledger_quality_sql",
+        "body": "## Die geprüfte Ledger-Struktur ist sauber\n\nBis zum fixierten Kopf wurden **keine** ungültigen JSON-Payloads, Nicht-Objekt-Payloads, ungültigen oder mehr als fünf Minuten zukünftigen Zeitstempel, Zeitinversionen entlang der Event-ID oder Event-ID-Präfixlücken gefunden. Die Präfixprüfung verwendet `max_id - event_count`; null bedeutet hier, dass die IDs lückenlos bei 1 beginnen.\n\nDamit ist die Vorab-Baseline für deskriptive Volumen- und Flussanalysen belastbar. Die Prüfung sagt nichts darüber aus, ob jede fachliche Aussage wahr, relevant oder neu ist."
+      },
+      {
+        "id": "quality_exact",
+        "type": "table",
+        "tableId": "quality_table",
+        "layout": "full"
+      },
+      {
+        "id": "scope_definitions",
+        "type": "markdown",
+        "body": "## Was diese Vorab-Baseline misst\n\n- **Kohorte:** alle Ledger-Ereignisse bis einschließlich Event-ID 938.171.\n- **Stundenlinie:** 48 vollständige UTC-Stunden von 11. Juli 07:00 bis 13. Juli 07:00; fehlende Stunden werden explizit mit null gefüllt.\n- **24-Stunden-Fenster:** rollierend rückwärts ab dem Snapshotzeitpunkt, nicht nach Kalendertagen.\n- **Ereignis:** eine Zeile in `event_log`; dies ist kein Synonym für Erkenntnis oder Fähigkeit.\n- **Payload-Bytes:** `length(CAST(payload AS BLOB))`, also gespeicherte SQLite-Bytes statt Textzeichenzahl.\n- **Similarity-Wiederholung:** Intervallereignis, dessen kanonische Kante mit gleicher Derivation bereits bei einer kleineren Event-ID im Ledger vorkam.\n- **Vergleichsbasis:** noch keine Längsschnitt-Baseline. Der spätere H0.1-Lauf vergleicht disjunkte Event-ID-Intervalle bei 24, 48 und 72 Stunden."
+      },
+      {
+        "id": "storage_finding",
+        "type": "markdown",
+        "sourceId": "filesystem_snapshot_file",
+        "body": "## Main, WAL und SHM sind flüchtige Punkt-in-Zeit-Allokationen\n\nDie separate `os.stat`-Probe vom **13. Juli, 08:08:30 UTC** ergab:\n\n| Dateirolle | Bytes | Modus |\n|---|---:|---:|\n| Main | 515.706.880 | 0644 |\n| WAL | 4.157.112 | 0644 |\n| SHM | 32.768 | 0644 |\n\nInsbesondere die WAL-Größe ist eine flüchtige Point-in-time-Allokation, die von Schreib- und Checkpoint-Aktivität abhängt. Sie ist weder Tageswachstum noch pauschal wiederverwendbare Kapazität. Erst identisch erhobene Folgeproben erlauben eine belastbare Speicherentwicklung."
+      },
+      {
+        "id": "storage_pages_finding",
+        "type": "markdown",
+        "sourceId": "storage_pages_sql",
+        "body": "**SQLite-Seitenprobe.** Am selben Messpunkt waren **125.905 Seiten** allokiert und **1.066 Seiten** frei; bei 4.096 Bytes pro Seite ergeben sich **511.340.544 verwendete Seitenbytes**. Diese Werte ergänzen die Dateigrößen, ersetzen aber keine Längsschnittmessung."
+      },
+      {
+        "id": "storage_exact",
+        "type": "table",
+        "tableId": "storage_table",
+        "layout": "full"
+      },
+      {
+        "id": "capability_finding",
+        "type": "markdown",
+        "sourceId": "capability_projection_sql",
+        "body": "## Klärung ist weitgehend geschlossen, Fähigkeit bleibt separat zu bewerten\n\nDie Projektionen enthielten **6 offene** und **36.168 gelöste Inquiries**. Gleichzeitig standen **9 aktive Beliefs**, **14 Experiences** und **0 aktive Regeln** im aktuellen Zustand.\n\nDiese Zähler sind nur Anker für die spätere Frage nach belegbarem Können. Besonders `active_rules = 0` braucht eine fachliche Einordnung: erwarteter Zustand oder fehlende Reifung – nicht vorschnell eine Fehlerdiagnose."
+      },
+      {
+        "id": "capability_exact",
+        "type": "table",
+        "tableId": "capability_table",
+        "layout": "full"
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "body": "## Messdesign für den echten 24/48/72-Stunden-Lauf\n\nDie Vorab-Abfrage war vollständig read-only und speicherte ausschließlich Aggregate. Der produktive Profiler soll eine private Baseline plus drei disjunkte Intervalle `(vorheriger Kopf, aktueller Kopf]` erfassen. Zeitstempel dienen der Einordnung; die Event-ID ist der Intervallschlüssel. Payload-Inhalte, Entitätswerte, freie Quellenwerte und Dateipfade gehören nicht in die Messartefakte.\n\nPro Intervall werden Ereignistypen, sichere Quellenfamilien, statisch aus Ereignistypen abgeleitete Produzentenfamilien, die Klassifikation **Erkenntnis / notwendige Betriebsspur / vermeidbare Wiederholung / unklar**, Speicherwerte, Datenqualität und wenige Fähigkeitsindikatoren gespeichert."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "body": "## Was diese Vorab-Baseline noch nicht beweist\n\n- Der vierstündige Vor-Fix-Burst ist beschrieben, aber in diesem Report noch keinem Prozess eindeutig kausal zugeordnet.\n- Die historische Vorher-Baseline beweist noch nicht, dass Commit `772aad0` wirkt; dafür braucht es die disjunkten Post-Fix-Intervalle.\n- Produzentenfamilien im H0.1-Profiler sind statische Ereignistyp-Proxys, keine beobachteten Prozessidentitäten.\n- Die Similarity-Regel erkennt eine enge Form semantischer Wiederholung; andere Wiederholungen bleiben ungezählt, legitime erneute Evidenz kann enthalten sein.\n- Ein einzelner Snapshot erlaubt keine Aussage über 24-, 48- oder 72-Stunden-Stabilität.\n- Projektionsgrößen messen Bestand. Ob daraus bessere Antworten oder belastbares neues Können entstehen, braucht separate Qualitätsproben."
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## Nächste Messpunkte\n\n1. Den privaten Profiler starten und die echte `baseline` mit diesem Vorab-Snapshot eng abgleichen.\n2. Bei 24, 48 und 72 Stunden ausschließlich den jeweils fälligen, disjunkten Post-Fix-Event-ID-Abschnitt erfassen.\n3. Prüfen, ob der Vier-Stunden-Burst und die historische Similarity-Kandidatenquote von 34,9 % nach Commit `772aad0` nicht wiederkehren beziehungsweise deutlich sinken.\n4. Nur bei einer Wiederkehr Produzent und Ursache gezielt diagnostizieren; weitere Kernänderungen benötigen neue Post-Fix-Evidenz.\n5. Nach 72 Stunden ein Ereignisbudget aus Wirkung ableiten: Zielgröße ist mehr belegbares Können pro gespeichertem Ereignis, nicht ein kleiner oder großer Ledger um seiner selbst willen."
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## Offene technische Fragen\n\n- Bleibt der Burst nach Commit `772aad0` aus; falls nicht, welcher konkrete Prozess erzeugt die Wiederkehr?\n- Wie groß sind Similarity-Nenner, Kandidatenzahl und Kandidatenquote in jedem disjunkten Post-Fix-Intervall?\n- Warum stehen derzeit keine Regeln auf `active`, und entspricht das der beabsichtigten Reifungslogik?\n- Welche Fähigkeitsprobe kann nach 72 Stunden zeigen, dass GENUS nicht nur mehr gespeichert, sondern besser geurteilt oder gehandelt hat?"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-13T07:11:46.185Z",
+    "status": "ready",
+    "datasets": {
+      "ledger_exact": [
+        {
+          "metric": "Ereignisse im Ledger",
+          "value": 938171,
+          "unit": "Ereignisse",
+          "scope": "bis Event-ID 938.171"
+        },
+        {
+          "metric": "Event-ID am Kopf",
+          "value": 938171,
+          "unit": "ID",
+          "scope": "fixierter Kopf"
+        },
+        {
+          "metric": "Ereignisse im rollierenden Fenster",
+          "value": 161086,
+          "unit": "Ereignisse",
+          "scope": "24 Stunden bis 07:11:46 UTC"
+        },
+        {
+          "metric": "Payload-Bytes im rollierenden Fenster",
+          "value": 26339495,
+          "unit": "Bytes",
+          "scope": "24 Stunden bis 07:11:46 UTC"
+        },
+        {
+          "metric": "Größte einzelne Payload",
+          "value": 205498,
+          "unit": "Bytes",
+          "scope": "24 Stunden bis 07:11:46 UTC"
+        },
+        {
+          "metric": "Laufende Teilstunde",
+          "value": 72,
+          "unit": "Ereignisse",
+          "scope": "07:00:00–07:11:46 UTC; nicht hochgerechnet"
+        }
+      ],
+      "hourly_48h": [
+        { "hour_utc": "2026-07-11T07:00Z", "events": 0 },
+        { "hour_utc": "2026-07-11T08:00Z", "events": 0 },
+        { "hour_utc": "2026-07-11T09:00Z", "events": 200 },
+        { "hour_utc": "2026-07-11T10:00Z", "events": 146 },
+        { "hour_utc": "2026-07-11T11:00Z", "events": 302 },
+        { "hour_utc": "2026-07-11T12:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T13:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T14:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T15:00Z", "events": 421 },
+        { "hour_utc": "2026-07-11T16:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T17:00Z", "events": 259 },
+        { "hour_utc": "2026-07-11T18:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T19:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T20:00Z", "events": 181 },
+        { "hour_utc": "2026-07-11T21:00Z", "events": 421 },
+        { "hour_utc": "2026-07-11T22:00Z", "events": 261 },
+        { "hour_utc": "2026-07-11T23:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T00:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T01:00Z", "events": 364 },
+        { "hour_utc": "2026-07-12T02:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T03:00Z", "events": 421 },
+        { "hour_utc": "2026-07-12T04:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T05:00Z", "events": 259 },
+        { "hour_utc": "2026-07-12T06:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T07:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T08:00Z", "events": 360 },
+        { "hour_utc": "2026-07-12T09:00Z", "events": 64403 },
+        { "hour_utc": "2026-07-12T10:00Z", "events": 45277 },
+        { "hour_utc": "2026-07-12T11:00Z", "events": 31224 },
+        { "hour_utc": "2026-07-12T12:00Z", "events": 14113 },
+        { "hour_utc": "2026-07-12T13:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T14:00Z", "events": 343 },
+        { "hour_utc": "2026-07-12T15:00Z", "events": 338 },
+        { "hour_utc": "2026-07-12T16:00Z", "events": 364 },
+        { "hour_utc": "2026-07-12T17:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T18:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T19:00Z", "events": 261 },
+        { "hour_utc": "2026-07-12T20:00Z", "events": 384 },
+        { "hour_utc": "2026-07-12T21:00Z", "events": 322 },
+        { "hour_utc": "2026-07-12T22:00Z", "events": 361 },
+        { "hour_utc": "2026-07-12T23:00Z", "events": 261 },
+        { "hour_utc": "2026-07-13T00:00Z", "events": 261 },
+        { "hour_utc": "2026-07-13T01:00Z", "events": 271 },
+        { "hour_utc": "2026-07-13T02:00Z", "events": 274 },
+        { "hour_utc": "2026-07-13T03:00Z", "events": 342 },
+        { "hour_utc": "2026-07-13T04:00Z", "events": 363 },
+        { "hour_utc": "2026-07-13T05:00Z", "events": 261 },
+        { "hour_utc": "2026-07-13T06:00Z", "events": 261 }
+      ],
+      "burst_hours": [
+        { "hour_utc": "2026-07-12T09:00Z", "events": 64403 },
+        { "hour_utc": "2026-07-12T10:00Z", "events": 45277 },
+        { "hour_utc": "2026-07-12T11:00Z", "events": 31224 },
+        { "hour_utc": "2026-07-12T12:00Z", "events": 14113 }
+      ],
+      "repetition_exact": [
+        {
+          "cohort": "model:embedder · verwandt · gültige kanonische Kante und Derivation",
+          "denominator": 83174,
+          "repetition_candidates": 29037,
+          "repetition_share_percent": 34.9,
+          "definition": "Intervallereignis mit gleicher früherer kanonischer Kante und Derivation bei kleinerer Event-ID, auch vor der Fenstergrenze"
+        }
+      ],
+      "data_quality_exact": [
+        { "check": "Event-ID-Präfixlücken", "failures": 0, "result": "bestanden; max_id minus event_count = 0" },
+        { "check": "JSON ungültig", "failures": 0, "result": "bestanden" },
+        { "check": "Payload ist kein Objekt", "failures": 0, "result": "bestanden" },
+        { "check": "Zeitstempel ungültig", "failures": 0, "result": "bestanden" },
+        { "check": "Zeitstempel mehr als fünf Minuten zukünftig", "failures": 0, "result": "bestanden" },
+        { "check": "Zeitinversion entlang Event-ID", "failures": 0, "result": "bestanden" }
+      ],
+      "storage_exact": [
+        { "metric": "SQLite page_size", "value": 4096, "unit": "Bytes" },
+        { "metric": "SQLite page_count", "value": 125905, "unit": "Seiten" },
+        { "metric": "SQLite freie Seiten", "value": 1066, "unit": "Seiten" },
+        { "metric": "Allokierte Seitenbytes", "value": 515706880, "unit": "Bytes" },
+        { "metric": "Verwendete Seitenbytes", "value": 511340544, "unit": "Bytes" }
+      ],
+      "filesystem_snapshot": [
+        {
+          "role": "main",
+          "bytes": 515706880,
+          "mode": "0644",
+          "present": true,
+          "executed_at": "2026-07-13T08:08:30.354Z",
+          "source_id": "filesystem_snapshot_file"
+        },
+        {
+          "role": "wal",
+          "bytes": 4157112,
+          "mode": "0644",
+          "present": true,
+          "executed_at": "2026-07-13T08:08:30.354Z",
+          "source_id": "filesystem_snapshot_file"
+        },
+        {
+          "role": "shm",
+          "bytes": 32768,
+          "mode": "0644",
+          "present": true,
+          "executed_at": "2026-07-13T08:08:30.354Z",
+          "source_id": "filesystem_snapshot_file"
+        }
+      ],
+      "capability_exact": [
+        { "indicator": "Aktive Beliefs", "count": 9, "interpretation": "aktueller Wissenszustand" },
+        { "indicator": "Relationsprojektion", "count": 466117, "interpretation": "Bestand, keine Neuheitsmetrik" },
+        { "indicator": "Werteprojektion", "count": 41772, "interpretation": "Bestand, keine Neuheitsmetrik" },
+        { "indicator": "Experiences", "count": 14, "interpretation": "Reifungsanker" },
+        { "indicator": "Aktive Regeln", "count": 0, "interpretation": "fachlich zu klären" },
+        { "indicator": "Offene Inquiries", "count": 6, "interpretation": "noch ungeklärt" },
+        { "indicator": "Gelöste Inquiries", "count": 36168, "interpretation": "gelöster Bestand" },
+        { "indicator": "Ausstehende Proposals", "count": 0, "interpretation": "aktueller Governance-Zustand" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "ledger_summary_sql",
+      "label": "GENUS Pi Ledger – fixierter Vorab-Snapshot",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Aggregiert Ledger-Kopf, rollierendes 24-Stunden-Fenster und die laufende Teilstunde an einem fixierten Event-Kopf.",
+        "executed_at": "2026-07-13T07:11:46.185Z",
+        "tables_used": ["event_log"],
+        "filters": [
+          "Kohorte: event_log.id <= 938171",
+          "Rollierendes Fenster: created_at >= 2026-07-12T07:11:46.185Z und created_at <= 2026-07-13T07:11:46.185Z",
+          "Teilstunde: 2026-07-13T07:00:00.000Z bis 2026-07-13T07:11:46.185Z; keine Hochrechnung"
+        ],
+        "metric_definitions": [
+          "event_count = COUNT(*) der fixierten Event-ID-Kohorte",
+          "events_24h = Anzahl der Kohortenereignisse im rollierenden 24-Stunden-Fenster",
+          "payload_bytes_24h = SUM(length(CAST(payload AS BLOB))) im rollierenden Fenster",
+          "max_payload_bytes_24h = MAX(length(CAST(payload AS BLOB))) im rollierenden Fenster",
+          "partial_current_hour_events = Ereigniszahl der unvollständigen Stunde ohne Hochrechnung"
+        ],
+        "sql": "WITH bounded AS (SELECT id, created_at, payload FROM event_log WHERE id <= 938171) SELECT COUNT(*) AS event_count, MAX(id) AS head_event_id, MIN(created_at) AS first_created_at, MAX(created_at) AS last_created_at, SUM(CASE WHEN created_at >= '2026-07-12T07:11:46.185Z' THEN 1 ELSE 0 END) AS events_24h, SUM(CASE WHEN created_at >= '2026-07-12T07:11:46.185Z' THEN length(CAST(payload AS BLOB)) ELSE 0 END) AS payload_bytes_24h, MAX(CASE WHEN created_at >= '2026-07-12T07:11:46.185Z' THEN length(CAST(payload AS BLOB)) END) AS max_payload_bytes_24h, SUM(CASE WHEN created_at >= '2026-07-13T07:00:00.000Z' AND created_at <= '2026-07-13T07:11:46.185Z' THEN 1 ELSE 0 END) AS partial_current_hour_events FROM bounded;"
+      }
+    },
+    {
+      "id": "hourly_flow_sql",
+      "label": "GENUS Pi Ledger – 48 abgeschlossene UTC-Stunden",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Erzeugt ein lückenloses Raster aus 48 abgeschlossenen UTC-Stunden und zählt Ledger-Ereignisse je Stunde bis zum fixierten Kopf.",
+        "executed_at": "2026-07-13T07:11:46.185Z",
+        "tables_used": ["event_log"],
+        "filters": [
+          "Kohorte: event_log.id <= 938171",
+          "Zeitfenster: 2026-07-11T07:00:00.000Z inklusive bis 2026-07-13T07:00:00.000Z exklusive",
+          "Zeitgrain: 48 abgeschlossene UTC-Stunden",
+          "Leere Stunden: durch rekursives Stundenraster explizit mit 0 gefüllt"
+        ],
+        "metric_definitions": [
+          "events = COUNT(event_log.id) je vollständiger UTC-Stunde",
+          "hour_utc = Stundenbeginn in UTC",
+          "Die aktuelle Teilstunde ab 07:00 UTC ist ausgeschlossen"
+        ],
+        "sql": "WITH RECURSIVE hours(idx, hour_utc) AS (SELECT 0, '2026-07-11T07:00Z' UNION ALL SELECT idx + 1, strftime('%Y-%m-%dT%H:00Z', datetime(hour_utc, '+1 hour')) FROM hours WHERE idx < 47) SELECT h.hour_utc, COUNT(e.id) AS events FROM hours AS h LEFT JOIN event_log AS e ON substr(e.created_at, 1, 13) || ':00Z' = h.hour_utc AND e.id <= 938171 AND e.created_at >= '2026-07-11T07:00:00.000Z' AND e.created_at < '2026-07-13T07:00:00.000Z' GROUP BY h.idx, h.hour_utc ORDER BY h.idx;"
+      }
+    },
+    {
+      "id": "similarity_repetition_sql",
+      "label": "GENUS Pi Ledger – kanonische Similarity-Wiederholungen",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Zählt ein model:embedder-verwandt-Ereignis im rollierenden 24-Stunden-Fenster als Wiederholung, wenn dieselbe kanonische Kante mit gleicher Derivation bereits bei einer kleineren Event-ID existiert – auch vor der Fenstergrenze.",
+        "executed_at": "2026-07-13T07:11:46.185Z",
+        "tables_used": ["event_log"],
+        "filters": [
+          "Fixierter Kopf: event_log.id <= 938171",
+          "Messfenster: 2026-07-12T07:11:46.185Z bis 2026-07-13T07:11:46.185Z inklusive",
+          "Kohorte: event_type = relation_asserted, source = model:embedder, predicate = verwandt",
+          "Nur gültige Objekt-Payloads mit subject, predicate, object, source und derivation",
+          "Nur gültige Zeitstempel bis höchstens fünf Minuten nach dem Snapshotzeitpunkt",
+          "Vorgeschichte: alle qualifizierten kleineren Event-IDs, auch vor der Fenstergrenze"
+        ],
+        "metric_definitions": [
+          "qualifying_similarity_events_24h = 83174 qualifizierte Intervallereignisse; Nenner der Quote",
+          "semantic_similarity_repetitions_24h = 29037 Intervallereignisse mit occurrence > 1 nach kanonischer Kante und gleicher Derivation über die ledgerweite ID-Vorgeschichte",
+          "repetition_share_percent = ROUND(100 * 29037 / 83174, 1) = 34.9 Prozent"
+        ],
+        "sql": "WITH valid_similarity AS (SELECT id, created_at, json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.subject') AS subject, json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.object') AS object, json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.derivation') AS derivation FROM event_log WHERE id <= 938171 AND event_type = 'relation_asserted' AND json_valid(payload) AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END) = 'object' AND typeof(created_at) = 'text' AND trim(created_at) <> '' AND julianday(created_at) IS NOT NULL AND julianday(created_at) <= julianday('2026-07-13T07:11:46.185Z', '+5 minutes') AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.subject') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.predicate') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.object') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.source') IS NOT NULL AND json_type(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.derivation') IS NOT NULL AND json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.source') = 'model:embedder' AND json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.predicate') = 'verwandt'), canonicalized AS (SELECT id, created_at, CASE WHEN subject <= object THEN subject ELSE object END AS a, CASE WHEN subject <= object THEN object ELSE subject END AS b, derivation FROM valid_similarity), ranked AS (SELECT id, created_at, ROW_NUMBER() OVER (PARTITION BY a, b, derivation ORDER BY id) AS occurrence FROM canonicalized) SELECT COUNT(*) AS qualifying_similarity_events_24h, COALESCE(SUM(CASE WHEN occurrence > 1 THEN 1 ELSE 0 END), 0) AS semantic_similarity_repetitions_24h, ROUND(100.0 * SUM(CASE WHEN occurrence > 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1) AS repetition_share_percent FROM ranked WHERE julianday(created_at) >= julianday('2026-07-12T07:11:46.185Z') AND julianday(created_at) <= julianday('2026-07-13T07:11:46.185Z') AND id <= 938171;"
+      }
+    },
+    {
+      "id": "ledger_quality_sql",
+      "label": "GENUS Pi Ledger – Datenqualitätsprüfungen",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Prüft JSON-Form, Zeitstempel, Zukunftszeiten, Zeitinversionen und Event-ID-Präfixlücken bis zum fixierten Kopf.",
+        "executed_at": "2026-07-13T07:11:46.185Z",
+        "tables_used": ["event_log"],
+        "filters": [
+          "Kohorte: event_log.id <= 938171",
+          "Zukunftsschwelle: Snapshotzeit 2026-07-13T07:11:46.185Z plus fünf Minuten",
+          "ID-Annahme: gültiger Ledger ist das Präfix 1 bis max_id"
+        ],
+        "metric_definitions": [
+          "missing_event_ids = max_id - event_count; 0 bedeutet lückenloses Präfix ab ID 1",
+          "invalid_json_events = Anzahl Payloads mit json_valid(payload) = 0",
+          "non_object_payload_events = gültige JSON-Payloads, deren json_type nicht object ist",
+          "timestamp_inversions_by_event_id = Anzahl created_at-Werte vor dem Zeitstempel der direkt vorherigen Event-ID",
+          "future_timestamp_events = Anzahl Zeitstempel mehr als fünf Minuten nach dem Snapshotzeitpunkt"
+        ],
+        "sql": "WITH bounded AS (SELECT id, created_at, payload FROM event_log WHERE id <= 938171), ordered AS (SELECT id, created_at, LAG(created_at) OVER (ORDER BY id) AS previous_at FROM bounded), head AS (SELECT COUNT(*) AS n, MAX(id) AS max_id FROM bounded) SELECT (SELECT COUNT(*) FROM bounded WHERE json_valid(payload) = 0) AS invalid_json_events, (SELECT COUNT(*) FROM bounded WHERE json_valid(payload) = 1 AND json_type(payload) <> 'object') AS non_object_payload_events, (SELECT COUNT(*) FROM bounded WHERE julianday(created_at) IS NULL) AS invalid_timestamp_events, (SELECT COUNT(*) FROM bounded WHERE julianday(created_at) > julianday('2026-07-13T07:11:46.185Z', '+5 minutes')) AS future_timestamp_events, (SELECT COUNT(*) FROM ordered WHERE julianday(created_at) < julianday(previous_at)) AS timestamp_inversions_by_event_id, (SELECT max_id - n FROM head) AS missing_event_ids;"
+      }
+    },
+    {
+      "id": "core_fix_commit_file",
+      "label": "GENUS Core – Commit 772aad0",
+      "path": "docs/reports/2026-07-13-h0-1-baseline/core-fix-commit.json"
+    },
+    {
+      "id": "pre_fix_comparison_file",
+      "label": "GENUS – kombinierter Vor-Fix-Ereignis-/Commit-Vergleich",
+      "path": "docs/reports/2026-07-13-h0-1-baseline/pre-fix-comparison.json"
+    },
+    {
+      "id": "filesystem_snapshot_file",
+      "label": "GENUS Pi – datierte Main/WAL/SHM-Dateisystemprobe",
+      "path": "docs/reports/2026-07-13-h0-1-baseline/filesystem-snapshot.json"
+    },
+    {
+      "id": "storage_pages_sql",
+      "label": "GENUS Pi – SQLite-Seitenprobe",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Liest page_size, page_count und freelist_count der geöffneten read-only SQLite-Datenbank und berechnet allokierte sowie verwendete Seitenbytes.",
+        "executed_at": "2026-07-13T07:11:46.185Z",
+        "filters": [
+          "Punkt-in-Zeit-Probe der read-only geöffneten GENUS-SQLite-Datenbank",
+          "Keine zeitliche Hochrechnung und keine Gleichsetzung mit Dateiwachstum"
+        ],
+        "metric_definitions": [
+          "allocated_page_bytes = page_size * page_count",
+          "used_page_bytes = page_size * (page_count - freelist_count)",
+          "freelist_count sind intern wiederverwendbare SQLite-Seiten; dies beschreibt nicht die WAL-Datei"
+        ],
+        "sql": "SELECT p.page_size, c.page_count, f.freelist_count AS free_pages, p.page_size * c.page_count AS allocated_page_bytes, p.page_size * (c.page_count - f.freelist_count) AS used_page_bytes FROM pragma_page_size AS p CROSS JOIN pragma_page_count AS c CROSS JOIN pragma_freelist_count AS f;"
+      }
+    },
+    {
+      "id": "capability_projection_sql",
+      "label": "GENUS Pi – Fähigkeits- und Inquiry-Projektionen",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "description": "Liest begrenzte, aggregierte Zustandsindikatoren aus den GENUS-Projektionen; keine Entitäts- oder Payload-Inhalte werden ausgegeben.",
+        "executed_at": "2026-07-13T07:11:46.185Z",
+        "tables_used": ["belief_projection", "relation_projection", "value_projection", "experience_log", "rule_projection", "inquiry_log", "proposal_log"],
+        "filters": [
+          "Punkt-in-Zeit-Projektionsstand am 2026-07-13T07:11:46.185Z",
+          "Aktive Beliefs: state = active",
+          "Aktive Regeln: status = active",
+          "Inquiries getrennt nach state = open und state = resolved",
+          "Ausstehende Proposals: state = pending",
+          "Nur aggregierte Zähler; keine Entitäts-, Payload- oder Freitextwerte"
+        ],
+        "metric_definitions": [
+          "Jeder Indikator ist COUNT(*) der benannten Projektion und Zustandskohorte",
+          "Projektionsgrößen sind Bestandsindikatoren, keine Qualitäts- oder Neuheitsmetrik"
+        ],
+        "sql": "SELECT 'active_beliefs' AS indicator, COUNT(*) AS count FROM belief_projection WHERE state = 'active' UNION ALL SELECT 'relation_projection_rows', COUNT(*) FROM relation_projection UNION ALL SELECT 'value_projection_rows', COUNT(*) FROM value_projection UNION ALL SELECT 'experiences', COUNT(*) FROM experience_log UNION ALL SELECT 'active_rules', COUNT(*) FROM rule_projection WHERE status = 'active' UNION ALL SELECT 'open_inquiries', COUNT(*) FROM inquiry_log WHERE state = 'open' UNION ALL SELECT 'resolved_inquiries', COUNT(*) FROM inquiry_log WHERE state = 'resolved' UNION ALL SELECT 'pending_proposals', COUNT(*) FROM proposal_log WHERE state = 'pending';"
+      }
+    }
+  ]
+}

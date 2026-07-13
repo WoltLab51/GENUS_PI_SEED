@@ -5,12 +5,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 DB_PATH="${GENUS_DB_PATH:-$HOME/.genus/genus.sqlite3}"
 LOG_DIR="${GENUS_LOG_DIR:-$HOME/.genus/logs}"
+PROFILE_DIR="${GENUS_PROFILE_DIR:-$(dirname "$DB_PATH")/betriebsprofil}"
 STATUS_REPO_DIR="${GENUS_STATUS_REPO_DIR:-$HOME/GENUS_PI_STATUS}"
 STATUS_REPO_URL="${GENUS_STATUS_REPO_URL:-git@github-genus-pi-status:WoltLab51/GENUS_PI_STATUS.git}"
 CRON_BEGIN="# BEGIN GENUS_PI_SEED"
 CRON_END="# END GENUS_PI_SEED"
 
-mkdir -p "$(dirname "$DB_PATH")" "$LOG_DIR"
+mkdir -p "$(dirname "$DB_PATH")" "$LOG_DIR" "$PROFILE_DIR"
+chmod 700 "$PROFILE_DIR"
 
 # Status-publish is STICKY: enabling it once (GENUS_ENABLE_STATUS_PUBLISH=1) persists a
 # marker on the Pi, so later reinstalls -- which may not carry the env flag -- keep the
@@ -55,6 +57,7 @@ fi
     echo "GENUS_REPO_DIR=$REPO_DIR"
     echo "GENUS_DB_PATH=$DB_PATH"
     echo "GENUS_LOG_DIR=$LOG_DIR"
+    echo "GENUS_PROFILE_DIR=$PROFILE_DIR"
     echo "GENUS_STATUS_REPO_DIR=$STATUS_REPO_DIR"
     echo "GENUS_STATUS_REPO_URL=$STATUS_REPO_URL"
     echo "GENUS_WEATHER_LAT=${GENUS_WEATHER_LAT:-51.31}"
@@ -75,6 +78,9 @@ fi
     echo '57 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] nacht-konsolidierung $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && bash ./deploy/nacht_konsolidierung.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '*/10 5-9 * * * cd "$GENUS_REPO_DIR" && bash ./deploy/morgen_push.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     echo '6,21,36,51 * * * * cd "$GENUS_REPO_DIR" && bash ./deploy/besinnung.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
+    # H0.1 is deliberately started once by a human.  Before that, and after h72,
+    # this hourly due check is completely silent and never opens the ledger.
+    echo '23 * * * * cd "$GENUS_REPO_DIR" && /usr/bin/bash ./deploy/pi_betriebsprofil_capture.sh'
     echo '27 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] doctor $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/doctor.log" 2>&1 && .venv/bin/genus doctor >> "$GENUS_LOG_DIR/doctor.log" 2>&1'
     echo '47 3 * * * cd "$GENUS_REPO_DIR" && echo "[TICK] repo-observe $(date -u +\%Y-\%m-\%dT\%H:\%M:\%SZ)" >> "$GENUS_LOG_DIR/cron.log" 2>&1 && ./deploy/observe_repo_on_pi.sh >> "$GENUS_LOG_DIR/cron.log" 2>&1'
     if [ "$STATUS_PUBLISH" = "1" ]; then
@@ -89,6 +95,7 @@ echo "[CRON] installed GENUS cron block"
 echo "[CRON] repo=$REPO_DIR"
 echo "[CRON] db=$DB_PATH"
 echo "[CRON] logs=$LOG_DIR"
+echo "[CRON] profile=$PROFILE_DIR"
 echo "[CRON] status_repo=$STATUS_REPO_DIR"
 if [ -n "${GENUS_CORE_ID:-}" ]; then
     echo "[CRON] core_id=$GENUS_CORE_ID"

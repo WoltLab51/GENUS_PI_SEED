@@ -277,6 +277,11 @@ Die aktuelle Abwehr besteht aus mehreren Schichten:
   Root-Home.
 - Read-only-Diagnostik öffnet ausschließlich eine vorhandene Datei mit SQLite
   `mode=ro` und erzeugt bei einem Tippfehler keine neue DB.
+- Das private Betriebsprofil verwendet dieselbe Verbindung, bildet Intervalle nur über
+  Head-IDs und persistiert weder Payloads noch freie Quellen-, Entitäts- oder Pfadwerte.
+  Folgepunkte verlangen dieselbe DB-Datei, einen monotonen Head und denselben vollständigen
+  Hash aller Zeilenfelder im Ledger-Präfix; lokale Snapshot-Hashes sind dabei
+  Korruptionsdetektoren, keine externen Anker.
 - Ein normaler neuer Schreibpfad meldet die Anlage einer DB unübersehbar auf
   `stderr`.
 - Der Root-Watchdog erkennt die historische Root-Streuadresse und lässt sie
@@ -312,6 +317,7 @@ quarantänisiert; Details stehen im [Härtungsaudit](reports/2026-07-12-hardenin
 | Manipulierter Nutzer-Checkout | Root startet keinen privilegierten Code daraus; Kernaufrufe erfolgen als Nutzer. | Nutzer-Dienste führen den Checkout erwartungsgemäß als derselbe Nutzer aus. |
 | Manipulierter Nutzer-State fordert Reboot | Root verlangt eigenen Netzfehler, Schwelle und Cooldown; GENUS kann nur vetoieren. | Root-/Kernel-Kompromittierung umgeht diese Logik. |
 | Adaptive lokale Ledger-Umschreibung | Extern verwahrter Anchor erkennt Änderungen bis zum Head. | Unverankerter Tail und zukünftige Events bleiben lokal kontrollierbar. |
+| Beschädigtes oder vertauschtes Betriebsprofil/Ledger | Private reguläre Dateien, Snapshot-SHA-256, feste Manifeststruktur, exklusiver Lock sowie DB-Datei- und Head-Kontinuitätsprüfung schließen die Messreihe. | Lokale Profil-Hashes erkennen Korruption, sind ohne externen Anchor aber kein Beweis gegen einen vollständig kontrollierenden Nutzer. |
 | Falscher DB-Pfad | explizite Unit-Identität, Drift-Reparatur, read-only Diagnose und Warnung bei Neuanlage | Manuell gestartete Schreibbefehle können nach bestätigter Warnung weiterhin eine neue DB anlegen. |
 
 ## Betriebschecks

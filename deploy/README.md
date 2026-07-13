@@ -4,7 +4,7 @@
 >
 > **Owner:** GENUS Operations
 >
-> **Verified:** 2026-07-12 gegen die Skripte in `deploy/`
+> **Verified:** 2026-07-13 gegen die Skripte in `deploy/`
 
 Dieses Runbook führt vom leeren Raspberry Pi bis zum überprüfbaren Dauerbetrieb. Der kurze
 Weg ist absichtlich langweilig: `main` holen, Tests ausführen, Projektion prüfen, Ledger
@@ -61,6 +61,7 @@ Die produktiven Defaults der Skripte:
 | `GENUS_DB_PATH` | `$HOME/.genus/genus.sqlite3` | produktives Ledger |
 | `GENUS_ANCHOR_DIR` | `$HOME/.genus/anchors` | lokale Offline-Anker |
 | `GENUS_LOG_DIR` | `$HOME/.genus/logs` | Cron-Logs |
+| `GENUS_PROFILE_DIR` | `$HOME/.genus/betriebsprofil` | private H0.1-Snapshots |
 | `GENUS_CORE_ID` | leer bzw. gespeicherte Core-ID | stabile Identität des Kerns |
 | `GENUS_DEPLOY_BRANCH` | `main` | freigegebener Deploy-Branch |
 | `GENUS_STATUS_REPO_DIR` | `$HOME/GENUS_PI_STATUS` | lokaler Status-Checkout |
@@ -188,7 +189,7 @@ Der aktuelle Takt:
 | --- | --- |
 | alle 2–5 Minuten | Hand-Ausführung, Gedanken-Push, Sensoren und State-Refresh |
 | alle 15/20 Minuten | Clock-Check und News |
-| stündlich | zwei Wetterquellen; Besinnung viertelstündlich versetzt |
+| stündlich | zwei Wetterquellen; Besinnung viertelstündlich versetzt; stiller Profil-Fälligkeitscheck um `:23` |
 | morgens | Morgen-Push zwischen 05:00 und 09:59 |
 | nachts | Backup 03:07, Experience 03:17, Doctor 03:27, optional Status 03:37, Repo 03:47, Konsolidierung 03:57 |
 
@@ -201,6 +202,49 @@ tail -f "$HOME/.genus/logs/cron.log"
 tail -f "$HOME/.genus/logs/doctor.log"
 tail -f "$HOME/.genus/logs/status.log"
 ```
+
+### 24/48/72-Stunden-Betriebsprofil
+
+Der Cron-Eintrag startet **keine** Messreihe. Er prüft nur stündlich, ob eine bewusst gestartete
+Reihe fällig ist. Die Baseline wird einmal von Hand ausgelöst:
+
+```bash
+cd "$HOME/GENUS_PI_SEED"
+export GENUS_DB_PATH="$HOME/.genus/genus.sqlite3"
+.venv/bin/genus betriebsprofil capture --start
+.venv/bin/genus betriebsprofil status
+```
+
+Danach schreibt GENUS genau `baseline.json`, `h24.json`, `h48.json`, `h72.json` und
+`manifest.json` nach `$HOME/.genus/betriebsprofil`. Das Manifest enthält für jeden Snapshot
+einen SHA-256-Prüfwert und gleicht dessen feste Metadaten ab. Das erkennt lokalen Dateischaden,
+ist aber kein externer Manipulationsanker. Die drei Tagesintervalle sind exakt
+`(voriger Head, neuer Head]`; gleiche Zeitstempel verlieren deshalb kein Ereignis. Jede
+Folgemessung prüft außerdem die DB-Datei und einen vollständigen Hash aller Zeilenfelder im
+bisherigen Ledger-Präfix – auch bei aktivem Seal. Ein Restore, Ledger-Tausch oder eine Änderung
+an Payload, Zeitstempel oder Seal beendet die Reihe deshalb geschlossen.
+
+Eine planmäßige Aufnahme darf höchstens zwei Stunden verspätet sein. Das deckt den stündlichen
+Cron-Takt ab. Wird ein Punkt später erreicht, markiert GENUS die Reihe als `aborted`, erzeugt
+keinen irreführenden Tages-Snapshot und meldet den einmaligen Abbruch mit Fehlerstatus; danach
+bleibt der fällige Check still. Für einen Neustart den abgebrochenen
+Ordner archivieren und bewusst einen neuen `GENUS_PROFILE_DIR` wählen. Nach `h72` bleibt der
+Cron-Aufruf ebenfalls dauerhaft still.
+
+Das Profil öffnet nur ein bestehendes Ledger mit SQLite `mode=ro`. Es speichert keine Payloads,
+Entitäten, freien Quellenwerte oder Dateipfade, sondern ausschließlich kontrollierte Aggregate.
+Hauptdatei, belegte Seiten und die flüchtige WAL-Dateiallokation bleiben getrennt; keine dieser
+Punktmessungen ist für sich eine tägliche Wachstumsrate. Verzeichnis und Dateien werden auf dem
+POSIX-Ziel Pi trotz Umask auf `0700` beziehungsweise `0600` gesetzt, als reguläre Dateien ohne
+Symlink-Folge geprüft und durch einen exklusiven Lock geschützt. Unter Windows arbeitet der Lock
+ebenfalls exklusiv; die belastbare Unix-Rechtegarantie gilt jedoch für den Pi. Der Cron-Wrapper
+läuft mit niedriger Priorität und einer harten Laufzeitgrenze von 180 Sekunden. Normale No-ops
+bleiben vollständig still; Capture-Meldungen und Fehler gehen mit höchstens 4096 Byte pro Lauf
+unter dem Tag `genus-betriebsprofil` an Syslog beziehungsweise das Journal.
+Ein gelöschter oder durch einen Symlink ersetzter Profilordner wird ebenfalls als Fehler gemeldet.
+
+Eine bestehende Reihe wird nie überschrieben. Für eine spätere neue Messung den abgeschlossenen
+Ordner zuerst bewusst und geschützt archivieren und einen neuen `GENUS_PROFILE_DIR` wählen.
 
 Status-Publishing ist nach einmaligem `GENUS_ENABLE_STATUS_PUBLISH=1` sticky. Abschalten:
 
@@ -391,6 +435,7 @@ export GENUS_DB_PATH="$HOME/.genus/genus.sqlite3"
 .venv/bin/genus ledger verify
 .venv/bin/genus ledger head
 .venv/bin/genus paused
+.venv/bin/genus betriebsprofil status
 git status --short
 git branch --show-current
 ```
@@ -401,6 +446,9 @@ Takt und Dienste:
 crontab -l | sed -n '/BEGIN GENUS_PI_SEED/,/END GENUS_PI_SEED/p'
 tail -n 100 "$HOME/.genus/logs/cron.log"
 tail -n 100 "$HOME/.genus/logs/doctor.log"
+journalctl -t genus-betriebsprofil -n 20 --no-pager
+# falls das System Syslog-Dateien statt Journal-Tags nutzt:
+grep 'genus-betriebsprofil' /var/log/syslog | tail -n 20
 systemctl --no-pager --full status genus-learner.service genus-telegram-bot.service
 systemctl list-timers --all genus-network-watchdog.timer
 journalctl -u genus-network-watchdog.service -n 100 --no-pager
