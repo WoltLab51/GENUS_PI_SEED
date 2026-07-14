@@ -95,6 +95,47 @@ def _get_model():
     return _model
 
 
+def system_prompt(anweisung: str | None = None, kern: str | None = None) -> str:
+    """Der providerneutrale Stimmen-Auftrag als reine Daten.
+
+    Lokale llama.cpp-Stimme und synthetischer Remote-Bake-off bekommen damit exakt dieselbe
+    Aufgabe. Die unabhaengige Ergebnispruefung bleibt :func:`pruefe`.
+    """
+    system = _SYSTEM if not anweisung else (
+        _SYSTEM + " Halte dich zusaetzlich an diese Stil-Vorgabe, ohne je Fakten zu "
+        "aendern oder zu ergaenzen: " + anweisung
+    )
+    if kern:
+        system += (
+            " Gib IMMER den GANZEN Satz zurueck (nie nur einen Teil) und behalte alle Zahlen. "
+            "Der folgende Kern MUSS wortwoertlich und voellig unveraendert enthalten bleiben "
+            "(nur davor und dahinter darfst du umformulieren, nie mittendrin). "
+            "Beispiel: Kern »Katze« zaehlt zu »Tier« | Eingabe: Ja, klar - »Katze« zaehlt zu "
+            "»Tier«. Ziemlich sicher (0.90). | Ausgabe: Ja klar, »Katze« zaehlt zu »Tier« - da "
+            "bin ich mir ziemlich sicher (0.90)! | Der Kern hier: " + kern
+        )
+    return system
+
+
+def pruefe(satz: str, text: str, kern: str | None = None) -> str | None:
+    """Akzeptiert nur eine wirklich neue, anker-, inhalts- und richtungstreue Formulierung."""
+    text = text.strip()
+    if not text:
+        return None
+    anchors = _anchors(satz)
+    if any(anchor not in text for anchor in anchors):
+        return None
+    if any(wort not in text for wort in _inhaltsworte(satz)):
+        return None
+    if not _reihenfolge_haelt(text, _QUOTED.findall(satz)):
+        return None
+    if kern and kern not in text:
+        return None
+    if text == satz:
+        return None
+    return text
+
+
 def formuliere(satz: str, model=None, anweisung: str | None = None,
                kern: str | None = None) -> str | None:
     """A faithfulness-checked rephrasing of an ALREADY-VERIFIED sentence -- ``None`` on any
@@ -120,23 +161,7 @@ def formuliere(satz: str, model=None, anweisung: str | None = None,
         if not os.path.exists(MODEL_PATH):
             return None
         model = _get_model()
-    anchors = _anchors(satz)
-    system = _SYSTEM if not anweisung else (
-        _SYSTEM + " Halte dich zusaetzlich an diese Stil-Vorgabe, ohne je Fakten zu "
-        "aendern oder zu ergaenzen: " + anweisung
-    )
-    if kern:
-        # Ohne diese Fuehrung kollabiert das kleine Modell auf den blossen Kern (und verliert die
-        # Zahl -> Anker verwirft alles); mit „gib den GANZEN Satz zurueck" + einem Beispiel behaelt
-        # es Kern UND Rahmen (live gemessen auf dem Pi: aus 0/4 wurden ~2-3/4 echte Glaettungen).
-        system += (
-            " Gib IMMER den GANZEN Satz zurueck (nie nur einen Teil) und behalte alle Zahlen. "
-            "Der folgende Kern MUSS wortwoertlich und voellig unveraendert enthalten bleiben "
-            "(nur davor und dahinter darfst du umformulieren, nie mittendrin). "
-            "Beispiel: Kern »Katze« zaehlt zu »Tier« | Eingabe: Ja, klar - »Katze« zaehlt zu "
-            "»Tier«. Ziemlich sicher (0.90). | Ausgabe: Ja klar, »Katze« zaehlt zu »Tier« - da "
-            "bin ich mir ziemlich sicher (0.90)! | Der Kern hier: " + kern
-        )
+    system = system_prompt(anweisung, kern)
     try:
         result = model.create_chat_completion(
             messages=[
@@ -149,19 +174,7 @@ def formuliere(satz: str, model=None, anweisung: str | None = None,
         text = result["choices"][0]["message"]["content"].strip()
     except Exception:
         return None
-    if not text:
-        return None
-    if any(anchor not in text for anchor in anchors):
-        return None   # a fact/number went missing or was changed -- fail safe to the original
-    if any(wort not in text for wort in _inhaltsworte(satz)):
-        return None   # ein tragendes Substantiv wurde wegformuliert/korrumpiert (Hausvögel-Fund)
-    if not _reihenfolge_haelt(text, _QUOTED.findall(satz)):
-        return None   # die zitierten Begriffe stehen in anderer Reihenfolge -> Richtung evtl. gekippt
-    if kern and kern not in text:
-        return None   # die Verbatim-Insel (gerichteter Kern-Satz) wurde angetastet -> verworfen
-    if text == satz:
-        return None   # wortidentisch ist keine Glättung -- ehrlich kein Gewinn, kein Tag
-    return text
+    return pruefe(satz, text, kern)
 
 
 if __name__ == "__main__":

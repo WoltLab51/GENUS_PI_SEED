@@ -326,6 +326,16 @@ SEMANTIC_NODES: tuple[dict[str, Any], ...] = (
         "stage": 12,
         "source": ("docs/QUALITY.md", "Abnahme"),
     },
+    {
+        "id": "h1:model_bakeoff",
+        "type": "evaluation_membrane",
+        "label": "Providerneutraler Stimmen-Bake-off",
+        "status": "synthetic_only_dormant",
+        "stage": 12,
+        "privacy": "synthetic",
+        "live_chat": False,
+        "source": ("deploy/model_bakeoff.py", "_synthetic_answers"),
+    },
 )
 
 
@@ -365,6 +375,8 @@ SEMANTIC_EDGES: tuple[dict[str, Any], ...] = (
     {"from": "flow:composer", "to": "h1:alltagsprobe", "type": "exercises_contract_suite"},
     {"from": "h1:alltagsprobe", "to": "h1:evaluation", "type": "supplies_hard_gate"},
     {"from": "h1:alltagsprobe", "to": "h1:evaluation", "type": "awaits_hash_bound_human_review"},
+    {"from": "h1:alltagsprobe", "to": "h1:model_bakeoff", "type": "supplies_synthetic_answers"},
+    {"from": "h1:model_bakeoff", "to": "flow:voice", "type": "evaluates_remote_voice"},
 )
 
 

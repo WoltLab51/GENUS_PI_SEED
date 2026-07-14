@@ -346,6 +346,52 @@ systemctl status genus-telegram-bot.service
 journalctl -u genus-telegram-bot.service -f
 ```
 
+### Modell-Gateway und synthetischer Bake-off
+
+`model_gateway.py` ist die providerneutrale Netz-Membran für entfernte Modelle. Der Kern unter
+`genus/` importiert sie nie. Der erste Adapter spricht die versionierte GitHub-Models-API mit
+Python-Standardbibliothek an; ein schweres Provider-SDK wird nicht Teil des Kern-Venv-Vertrags.
+Jeder Aufruf trägt eine Rolle, ein explizites Modell, eine Datenschutzklasse, Tokenobergrenze
+und optional ein JSON-Schema. Zurück kommt neben dem Entwurf ein Beleg über Provider, Modell,
+Request-ID, Latenz, Token und Abschlussgrund. Providertext ist nie selbst Wahrheit.
+
+Der erste Verbraucher ist bewusst **kein Live-Chat**, sondern `model_bakeoff.py`: Er erzeugt die
+Antworten aus der lebenden 17-Fälle-Alltagsprobe lokal und sendet ausschließlich die
+Datenschutzklasse `synthetic`. Freie Eingaben, Telegram-Verläufe, Ledger und Memory-Vault werden
+von diesem CLI-Pfad nicht angenommen. GitHub Models ist im Provider zusätzlich fail-closed auf
+`synthetic` beschränkt. Die bestehende Anker-, Inhalts- und Richtungsprüfung aus `stimme.py`
+entscheidet anschließend, ob ein Kandidat überhaupt treu genug für eine menschliche Bewertung
+ist.
+
+Ein Fine-grained PAT braucht nur `models: read`. Nicht in Shell-Historie, Repo oder Unit legen:
+
+```bash
+install -d -m 700 "$HOME/.genus"
+umask 077
+read -rsp "GitHub Models PAT: " GITHUB_MODELS_PAT; printf '\n'
+printf '%s' "$GITHUB_MODELS_PAT" > "$HOME/.genus/github_models_token"
+unset GITHUB_MODELS_PAT
+chmod 600 "$HOME/.genus/github_models_token"
+```
+
+Ein kleiner Vergleich bleibt unter den kostenlosen Prototyping-Limits überschaubar:
+
+```bash
+cd "$HOME/GENUS_PI_SEED"
+.venv/bin/python deploy/model_bakeoff.py \
+  --model openai/gpt-4.1-mini \
+  --model meta/llama-4-scout-17b-16e-instruct \
+  --max-cases 5 \
+  --max-requests 20
+```
+
+Modell-IDs sind Beispiele und müssen vor dem Lauf im GitHub-Models-Katalog geprüft werden. Das
+CLI dedupliziert IDs und bricht **vor** dem ersten Netzaufruf ab, wenn Fälle × Modelle das harte
+Request-Limit überschreiten. Bezahlte GitHub-Models-Nutzung bleibt in GitHub standardmäßig aus;
+ein dort gesetztes Budget ist die zweite, externe Kostengrenze. `remote_minimal` existiert als
+Vertragsklasse, ist für den GitHub-Adapter aber erst nach einer ausdrücklichen Code-/Policy-
+Freigabe erreichbar. Eine Live-Telegram-Verdrahtung gibt es in dieser Stufe absichtlich nicht.
+
 ## Clock
 
 Falsche Zeit beschädigt die Bedeutung zeitlicher Beobachtungen. Der Cron-Installer prüft daher
