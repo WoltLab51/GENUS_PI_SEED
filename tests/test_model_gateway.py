@@ -125,6 +125,7 @@ def test_read_secret_rejects_missing_and_empty_files(tmp_path):
         model_gateway.read_secret(tmp_path / "missing")
     empty = tmp_path / "empty"
     empty.write_text("  ", encoding="utf-8")
+    empty.chmod(0o600)
     with pytest.raises(model_gateway.GatewayError, match="leer"):
         model_gateway.read_secret(empty)
 
@@ -204,4 +205,3 @@ def test_bakeoff_refuses_to_cross_its_request_budget(monkeypatch):
 def test_gateway_rejects_unknown_message_roles(role):
     with pytest.raises(ValueError, match="Nachrichtenrolle"):
         model_gateway.Message(role, "Text")
-
