@@ -11,6 +11,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="hoechstens so viele der 17 Alltagsfaelle (Default: 5)")
     parser.add_argument("--max-requests", type=int, default=20,
                         help="harte Obergrenze fuer Provideraufrufe (Default: 20)")
+    parser.add_argument("--min-request-interval", type=float, default=4.1,
+                        help="Mindestabstand zwischen Aufrufen in Sekunden (Default: 4.1)")
     parser.add_argument("--timeout", type=float, default=30.0)
     return parser
 
@@ -50,7 +53,7 @@ def _synthetic_answers(max_cases: int) -> list[tuple[str, int, str]]:
     return answers
 
 
-def run(args: argparse.Namespace, provider=None) -> int:
+def run(args: argparse.Namespace, provider=None, *, clock=time.monotonic, sleeper=time.sleep) -> int:
     models = tuple(dict.fromkeys(model.strip() for model in args.model if model.strip()))
     if not models:
         raise ValueError("mindestens ein nichtleeres Modell ist erforderlich")
@@ -62,7 +65,11 @@ def run(args: argparse.Namespace, provider=None) -> int:
         raise ValueError(
             f"Bake-off braeuchte {request_count} Aufrufe, Limit ist {args.max_requests}"
         )
+    min_request_interval = args.min_request_interval
+    if not 0 <= min_request_interval <= 60:
+        raise ValueError("min-request-interval muss zwischen 0 und 60 Sekunden liegen")
     provider = provider or model_gateway.github_from_token_file(args.token_file)
+    last_request_started: float | None = None
     for model in models:
         for case_id, turn_index, original in answers:
             request = model_gateway.ModelRequest(
@@ -77,6 +84,11 @@ def run(args: argparse.Namespace, provider=None) -> int:
                 temperature=0.3,
             )
             try:
+                if last_request_started is not None:
+                    remaining = min_request_interval - (clock() - last_request_started)
+                    if remaining > 0:
+                        sleeper(remaining)
+                last_request_started = clock()
                 result = provider.complete(request, timeout=args.timeout)
                 accepted, validation = stimme.pruefbericht(original, result.content)
                 row = {

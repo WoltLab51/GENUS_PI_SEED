@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "fad6574524d322e945da286e1b88f5414836f1594a24d282c1b46edd73828388",
+  "content_sha256": "ca524810e9fb52cec4bb4c808dd1fedb187e8776be5558f8b47b51b09511d823",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1159,7 +1159,7 @@
         {
           "file": "deploy/model_bakeoff.py",
           "kind": "curated",
-          "line": 41,
+          "line": 44,
           "symbol": "_synthetic_answers"
         }
       ],
@@ -1582,7 +1582,7 @@
         {
           "file": "deploy/model_bakeoff.py",
           "kind": "ast",
-          "line": 21
+          "line": 22
         }
       ],
       "to": "module:deploy.model_gateway",
@@ -1594,7 +1594,7 @@
         {
           "file": "deploy/model_bakeoff.py",
           "kind": "ast",
-          "line": 22
+          "line": 23
         }
       ],
       "to": "module:deploy.stimme",
@@ -1606,7 +1606,7 @@
         {
           "file": "deploy/model_bakeoff.py",
           "kind": "ast",
-          "line": 20
+          "line": 21
         }
       ],
       "to": "module:genus.alltagsprobe",
@@ -12276,7 +12276,7 @@
         {
           "file": "deploy/model_bakeoff.py",
           "kind": "curated",
-          "line": 41,
+          "line": 44,
           "symbol": "_synthetic_answers"
         }
       ],

@@ -385,6 +385,11 @@ cd "$HOME/GENUS_PI_SEED"
   --max-requests 20
 ```
 
+Der Bake-off wartet standardmaessig mindestens 4,1 Sekunden zwischen zwei Provideraufrufen.
+Damit bleibt auch ein laengerer Lauf unter dem freien Low-Tier-Limit von 15 Anfragen pro Minute.
+`--min-request-interval` kann fuer ein strengeres Providerlimit erhoeht werden; die harte
+`--max-requests`-Kostenbremse gilt davon unabhaengig weiterhin vor dem ersten Netzaufruf.
+
 Modell-IDs sind Beispiele und müssen vor dem Lauf im GitHub-Models-Katalog geprüft werden. Das
 CLI dedupliziert IDs und bricht **vor** dem ersten Netzaufruf ab, wenn Fälle × Modelle das harte
 Request-Limit überschreiten. Bezahlte GitHub-Models-Nutzung bleibt in GitHub standardmäßig aus;

@@ -189,6 +189,7 @@ def _args(**changes):
         "token_file": "never-read",
         "max_cases": 1,
         "max_requests": 2,
+        "min_request_interval": 4.1,
         "timeout": 9.0,
     }
     values.update(changes)
@@ -222,6 +223,30 @@ def test_bakeoff_refuses_to_cross_its_request_budget(monkeypatch):
     with pytest.raises(ValueError, match="braeuchte 4 Aufrufe"):
         model_bakeoff.run(_args(model=["vendor/a", "vendor/b"], max_requests=3),
                           provider=_FakeProvider())
+
+
+def test_bakeoff_spaces_requests_to_stay_below_the_free_minute_limit(monkeypatch):
+    monkeypatch.setattr(
+        model_bakeoff,
+        "_synthetic_answers",
+        lambda _n: [("01", 0, "A"), ("02", 0, "B")],
+    )
+    now = [10.0]
+    sleeps = []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    provider = _FakeProvider()
+    assert model_bakeoff.run(
+        _args(max_requests=2),
+        provider=provider,
+        clock=lambda: now[0],
+        sleeper=sleep,
+    ) == 0
+    assert len(provider.requests) == 2
+    assert sleeps == [pytest.approx(4.1)]
 
 
 @pytest.mark.parametrize("role", ["tool", "owner", ""])
