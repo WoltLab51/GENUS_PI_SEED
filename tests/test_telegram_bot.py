@@ -590,6 +590,14 @@ def test_stimme_formuliere_fails_safe_when_a_number_is_altered():
     assert stimme.formuliere(satz, model=model) is None   # the model must not invent confidence
 
 
+def test_stimme_formuliere_fails_safe_when_provider_appends_new_claims():
+    satz = "Ja — »Hund« zählt zu »Haustier«."
+    model = _FakeModel(
+        "Ja, »Hund« zählt zu »Haustier«. Hunde werden oft als Wachhunde oder Begleiter gehalten."
+    )
+    assert stimme.formuliere(satz, model=model) is None
+
+
 def test_stimme_formuliere_returns_none_without_a_model_and_none_installed():
     # the autouse fixture forces stimme.MODEL_PATH to a nonexistent path
     assert stimme.formuliere("Unter »Hund« versteht GENUS: Haustier.") is None

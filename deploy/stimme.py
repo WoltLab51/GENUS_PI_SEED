@@ -118,14 +118,31 @@ def system_prompt(anweisung: str | None = None, kern: str | None = None) -> str:
 
 
 def pruefe(satz: str, text: str, kern: str | None = None) -> str | None:
-    """Akzeptiert nur eine wirklich neue, anker-, inhalts- und richtungstreue Formulierung."""
+    """Akzeptiert nur eine neue, enge, anker-, inhalts- und richtungstreue Formulierung.
+
+    Die alte Leine pruefte nur, ob alle alten Inhalte *noch da* waren. Ein ungehorsames
+    Remote-Modell konnte deshalb danach neue Behauptungen anhaengen. Eine Stimme ist aber kein
+    Erklaerer: neue Inhaltswoerter und mehr als zwoelf zusaetzliche Zeichen werden verworfen.
+    Gute Umformulierungen duerfen dadurch verloren gehen; durchgelassene Korruption darf es
+    nicht. Die Grenze bleibt rein lokal und providerunabhaengig.
+    """
     text = text.strip()
     if not text:
         return None
     anchors = _anchors(satz)
     if any(anchor not in text for anchor in anchors):
         return None
-    if any(wort not in text for wort in _inhaltsworte(satz)):
+    # Zitierte Begriffe besitzen bereits die staerkere exakte Anker-Leine. Sie hier nochmals als
+    # Satzpositions-abhaengige Substantive zu vergleichen waere falsch: »Hund« ist am Satzanfang
+    # kein _inhaltswort, nach "Ein" aber schon, obwohl der Begriff identisch blieb.
+    zitierte_anker = set(_QUOTED.findall(satz))
+    alte_inhaltswoerter = set(_inhaltsworte(satz)) - zitierte_anker
+    neue_inhaltswoerter = set(_inhaltsworte(text)) - zitierte_anker
+    if any(wort not in text for wort in alte_inhaltswoerter):
+        return None
+    if neue_inhaltswoerter - alte_inhaltswoerter:
+        return None
+    if len(text) > len(satz) + 12:
         return None
     if not _reihenfolge_haelt(text, _QUOTED.findall(satz)):
         return None

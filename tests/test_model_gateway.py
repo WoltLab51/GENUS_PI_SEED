@@ -138,6 +138,17 @@ def test_stimme_public_check_is_the_same_fail_safe_line_for_remote_candidates():
     assert stimme.pruefe(original, original) is None
 
 
+def test_stimme_rejects_provider_additions_even_when_every_old_anchor_survives():
+    relation = "Ja — »Hund« zählt zu »Haustier«."
+    extra_claims = (
+        "Ja, das ist korrekt. Ein »Hund« ist ein »Haustier«. Hunde werden als Begleiter, "
+        "Wachhunde oder als Teil der Familie gehalten."
+    )
+    short_new_content = "Ja — »Hund« zählt zur Kategorie »Haustier«."
+    assert stimme.pruefe(relation, extra_claims) is None
+    assert stimme.pruefe(relation, short_new_content) is None
+
+
 class _FakeProvider:
     name = "fake-provider"
 
@@ -147,7 +158,7 @@ class _FakeProvider:
     def complete(self, request, *, timeout):
         self.requests.append((request, timeout))
         original = request.messages[-1].content
-        candidate = original + " Gern."
+        candidate = original + "!"
         return model_gateway.ModelResult(
             candidate,
             model_gateway.ModelReceipt(
@@ -186,7 +197,7 @@ def test_bakeoff_deduplicates_models_and_sends_only_synthetic_answers(monkeypatc
     assert timeout == 9.0
     row = json.loads(capsys.readouterr().out)
     assert row["accepted"] is True
-    assert row["candidate"] == "Hallo Gern."
+    assert row["candidate"] == "Hallo!"
     assert row["receipt"]["provider"] == "fake-provider"
 
 
