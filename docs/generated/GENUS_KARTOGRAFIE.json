@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "3cb482982e8cd60d8bd0a1b6adb04fc95c35fc3c20660cd6a607e0ed683e54cd",
+  "content_sha256": "fad6574524d322e945da286e1b88f5414836f1594a24d282c1b46edd73828388",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1018,7 +1018,7 @@
         {
           "file": "deploy/stimme.py",
           "kind": "curated",
-          "line": 156,
+          "line": 166,
           "symbol": "formuliere"
         }
       ],
@@ -12153,7 +12153,7 @@
         {
           "file": "deploy/stimme.py",
           "kind": "curated",
-          "line": 156,
+          "line": 166,
           "symbol": "formuliere"
         }
       ],

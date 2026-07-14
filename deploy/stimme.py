@@ -117,8 +117,13 @@ def system_prompt(anweisung: str | None = None, kern: str | None = None) -> str:
     return system
 
 
-def pruefe(satz: str, text: str, kern: str | None = None) -> str | None:
-    """Akzeptiert nur eine neue, enge, anker-, inhalts- und richtungstreue Formulierung.
+def pruefbericht(satz: str, text: str, kern: str | None = None) -> tuple[str | None, str]:
+    """Prueft eine Umformulierung und nennt einen stabilen, maschinenlesbaren Grund.
+
+    Der Grund macht synthetische Modellvergleiche auditierbar. Er enthaelt bewusst weder
+    Prompt noch Textausschnitte und ist deshalb auch fuer knappe Betriebsmetriken geeignet.
+    ``pruefe`` bleibt die einfache produktive Schnittstelle und gibt weiterhin nur den
+    akzeptierten Text oder ``None`` zurueck.
 
     Die alte Leine pruefte nur, ob alle alten Inhalte *noch da* waren. Ein ungehorsames
     Remote-Modell konnte deshalb danach neue Behauptungen anhaengen. Eine Stimme ist aber kein
@@ -128,10 +133,10 @@ def pruefe(satz: str, text: str, kern: str | None = None) -> str | None:
     """
     text = text.strip()
     if not text:
-        return None
+        return None, "leer"
     anchors = _anchors(satz)
     if any(anchor not in text for anchor in anchors):
-        return None
+        return None, "anker_fehlt"
     # Zitierte Begriffe besitzen bereits die staerkere exakte Anker-Leine. Sie hier nochmals als
     # Satzpositions-abhaengige Substantive zu vergleichen waere falsch: »Hund« ist am Satzanfang
     # kein _inhaltswort, nach "Ein" aber schon, obwohl der Begriff identisch blieb.
@@ -139,18 +144,23 @@ def pruefe(satz: str, text: str, kern: str | None = None) -> str | None:
     alte_inhaltswoerter = set(_inhaltsworte(satz)) - zitierte_anker
     neue_inhaltswoerter = set(_inhaltsworte(text)) - zitierte_anker
     if any(wort not in text for wort in alte_inhaltswoerter):
-        return None
+        return None, "inhaltswort_fehlt"
     if neue_inhaltswoerter - alte_inhaltswoerter:
-        return None
+        return None, "neues_inhaltswort"
     if len(text) > len(satz) + 12:
-        return None
+        return None, "zu_lang"
     if not _reihenfolge_haelt(text, _QUOTED.findall(satz)):
-        return None
+        return None, "anker_reihenfolge"
     if kern and kern not in text:
-        return None
+        return None, "kern_fehlt"
     if text == satz:
-        return None
-    return text
+        return None, "unveraendert"
+    return text, "akzeptiert"
+
+
+def pruefe(satz: str, text: str, kern: str | None = None) -> str | None:
+    """Akzeptiert nur eine neue, enge, anker-, inhalts- und richtungstreue Formulierung."""
+    return pruefbericht(satz, text, kern)[0]
 
 
 def formuliere(satz: str, model=None, anweisung: str | None = None,

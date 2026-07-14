@@ -78,13 +78,15 @@ def run(args: argparse.Namespace, provider=None) -> int:
             )
             try:
                 result = provider.complete(request, timeout=args.timeout)
-                accepted = stimme.pruefe(original, result.content)
+                accepted, validation = stimme.pruefbericht(original, result.content)
                 row = {
                     "case": case_id,
                     "turn": turn_index,
                     "accepted": accepted is not None,
                     "original": original,
                     "candidate": accepted,
+                    "raw_candidate": result.content,
+                    "validation": validation,
                     "receipt": result.receipt.as_dict(),
                 }
             except model_gateway.GatewayError as exc:
@@ -94,6 +96,8 @@ def run(args: argparse.Namespace, provider=None) -> int:
                     "accepted": False,
                     "original": original,
                     "candidate": None,
+                    "raw_candidate": None,
+                    "validation": "provider_fehler",
                     "error": str(exc),
                     "provider": provider.name,
                     "model": model,

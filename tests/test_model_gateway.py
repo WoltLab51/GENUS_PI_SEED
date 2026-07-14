@@ -149,6 +149,16 @@ def test_stimme_rejects_provider_additions_even_when_every_old_anchor_survives()
     assert stimme.pruefe(relation, short_new_content) is None
 
 
+def test_stimme_check_report_explains_rejections_without_echoing_content():
+    original = "Ja — »Hund« zählt zu »Haustier«."
+    candidate = "Ja — »Hund« zählt zur Kategorie »Haustier«."
+    accepted, reason = stimme.pruefbericht(original, candidate)
+    assert accepted is None
+    assert reason == "neues_inhaltswort"
+    assert "Kategorie" not in reason
+    assert stimme.pruefbericht(original, original) == (None, "unveraendert")
+
+
 class _FakeProvider:
     name = "fake-provider"
 
@@ -198,6 +208,8 @@ def test_bakeoff_deduplicates_models_and_sends_only_synthetic_answers(monkeypatc
     row = json.loads(capsys.readouterr().out)
     assert row["accepted"] is True
     assert row["candidate"] == "Hallo!"
+    assert row["raw_candidate"] == "Hallo!"
+    assert row["validation"] == "akzeptiert"
     assert row["receipt"]["provider"] == "fake-provider"
 
 
