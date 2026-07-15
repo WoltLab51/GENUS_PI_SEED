@@ -247,7 +247,10 @@ widerruft die Freigabe ohne Root-Eingriff. Queue, Status und Graph prüfen diese
 Wortform. Eine kleine, löschbare und auf 200 Einträge sowie sieben Tage begrenzte Randdatei
 führt ausschließlich `queued → learning → learned|failed`; sie enthält weder Chattext noch
 Nutzerkennung. Erst `learned` bedeutet, dass nach dem Quellenlauf tatsächlich eine
-Bedeutungskante im Ledger auffindbar ist.
+Bedeutung oder ein verständlich benannter Oberbegriff im normalen Definitionspfad aussprechbar
+ist. Eine bloße Lexem- oder `expresses`-Kante reicht nicht. Die Telegram-Membran entscheidet
+`queued`/`learning` vor dem Deuter- und Antwortlauf; so kann ein paralleler Worker keinen alten
+Entwurf mit einem gerade wechselnden Wissenszustand vermischen.
 Der genaue Speicher- und Abrufvertrag steht in
 [design/MEMORY.md](design/MEMORY.md).
 

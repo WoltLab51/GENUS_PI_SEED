@@ -2,13 +2,13 @@
 
 > **Status:** generierte, hermetische Abnahmefläche · menschliche Wertung bleibt bindend
 >
-> **Suite:** `2026-07-13.1` · **Inhalt:** `8418187a53ac8fdb`
+> **Suite:** `2026-07-13.1` · **Inhalt:** `065ecf815be0ac7c`
 >
 > **Datengrenze:** ausschließlich synthetische In-Memory-Fälle; kein Pi-Ledger, kein Chat-Export, kein Modell als Richter
 
 ## Ergebnis zuerst
 
-Die harten Verträge stehen bei **85/85**. Menschlich akzeptiert sind **0/17** Fälle; **17** warten auf die erste Bewertung und **0** sind nach einer Änderung veraltet.
+Die harten Verträge stehen bei **85/85**. Menschlich akzeptiert sind **2/17** Fälle; **15** warten auf die erste Bewertung und **0** sind nach einer Änderung veraltet.
 
 Das ist bewusst **keine Gesamtnote**. Grün beweist Treue, Ehrlichkeit, Richtung, Anschluss und Datensparsamkeit. Ob eine Antwort nativ, tief und nützlich wirkt, entscheidet Ronny an genau dem hier gezeigten Wortlaut.
 
@@ -29,8 +29,8 @@ Das ist bewusst **keine Gesamtnote**. Grün beweist Treue, Ehrlichkeit, Richtung
 
 | Fall | harte Verträge | menschlich | Antwort-Hash |
 |---|---:|---|---|
-| `01-gruss-ohne-technikrest` · Ein natürlicher Gruß | 5/5 | `review_pending` | `cd6161b6d420` |
-| `02-definition-hund` · Belegte Alltagsdefinition | 7/7 | `review_pending` | `74bd178ac90f` |
+| `01-gruss-ohne-technikrest` · Ein natürlicher Gruß | 5/5 | `accepted` | `cd6161b6d420` |
+| `02-definition-hund` · Belegte Alltagsdefinition | 7/7 | `accepted` | `74bd178ac90f` |
 | `03-definition-schwach` · Schwach belegte Bedeutung | 4/4 | `review_pending` | `d9d788bdfab4` |
 | `04-definition-korroboriert` · Unabhängig bestätigte Bedeutung | 4/4 | `review_pending` | `eb8d42e5a8d3` |
 | `05-beziehung-direkt` · Direkte gerichtete Beziehung | 6/6 | `review_pending` | `ab09b8f189b1` |
@@ -79,7 +79,7 @@ Struktur: `outcome=answered` · `readings=['gruss']` · `anchor=Moin, schön dic
 
 **Menschliche Prüffrage:** Klingt dieser Einstieg wie ein warmer, unaufdringlicher GENUS-Gruß?
 
-Status: `review_pending` · Fall `02aae5803c26` · Antwort `cd6161b6d420`
+Status: `accepted` · Fall `02aae5803c26` · Antwort `cd6161b6d420`
 
 <details>
 <summary>Bewertungsvorlage mit vollständigen Hashes</summary>
@@ -98,6 +98,8 @@ Status: `review_pending` · Fall `02aae5803c26` · Antwort `cd6161b6d420`
 ```
 
 </details>
+
+Wertung von `ronny`: Ton `traegt`, Nutzen `traegt`. ok
 
 ### 02-definition-hund · Belegte Alltagsdefinition
 
@@ -127,7 +129,7 @@ Struktur: `outcome=answered` · `readings=['definition']` · `anchor=Was ist ein
 
 **Menschliche Prüffrage:** Erklärt GENUS den Begriff direkt, klar und ohne Lexikon- oder CLI-Gefühl?
 
-Status: `review_pending` · Fall `94316ce8d810` · Antwort `74bd178ac90f`
+Status: `accepted` · Fall `94316ce8d810` · Antwort `74bd178ac90f`
 
 <details>
 <summary>Bewertungsvorlage mit vollständigen Hashes</summary>
@@ -146,6 +148,8 @@ Status: `review_pending` · Fall `94316ce8d810` · Antwort `74bd178ac90f`
 ```
 
 </details>
+
+Wertung von `ronny`: Ton `traegt`, Nutzen `traegt`. ok
 
 ### 03-definition-schwach · Schwach belegte Bedeutung
 

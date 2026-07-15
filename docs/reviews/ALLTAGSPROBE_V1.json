@@ -1,4 +1,25 @@
 {
   "schema": "genus-alltagsprobe-v1",
-  "reviews": []
+  "reviews": [
+    {
+      "case_id": "01-gruss-ohne-technikrest",
+      "case_fingerprint": "02aae5803c26ca717dbacc6ea948d94c0bc56c2a89e856831c50096cf5e3b2d7",
+      "response_sha256": "cd6161b6d420ebedb7eb84fe145a55bc4839503c27f2592c8cddcb33a40c1029",
+      "ton": "traegt",
+      "nutzen": "traegt",
+      "reviewer": "ronny",
+      "reviewed_at": "2026-07-15T16:45:00+02:00",
+      "note": "ok"
+    },
+    {
+      "case_id": "02-definition-hund",
+      "case_fingerprint": "94316ce8d8102e5a0dd5a1648c1887f131abb53310fea76392f8476e3503778d",
+      "response_sha256": "74bd178ac90f07fc23d02e2ab656f538db29585a0c21765400c0f91ef5b2b252",
+      "ton": "traegt",
+      "nutzen": "traegt",
+      "reviewer": "ronny",
+      "reviewed_at": "2026-07-15T16:45:00+02:00",
+      "note": "ok"
+    }
+  ]
 }

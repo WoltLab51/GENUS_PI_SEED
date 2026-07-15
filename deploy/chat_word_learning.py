@@ -125,13 +125,21 @@ def mark(term: str, status: str, *, path: str | None = None,
     return True
 
 
+def explainable(conn, term: str) -> bool:
+    """Use the real deterministic definition contract, not mere lexical presence."""
+    from genus import auskunft
+
+    normalized = normalize_term(term)
+    return bool(normalized and auskunft.erklaerbar(auskunft.answer(conn, normalized)))
+
+
 def _finish(term: str, db_path: str) -> bool:
-    from genus import db, sources
+    from genus import db
 
     normalized = normalize_term(term)
     conn = db.connect(db_path)
     try:
-        learned = sources.bekanntes_wort(conn, normalized)
+        learned = explainable(conn, normalized)
     finally:
         conn.close()
     mark(normalized, "learned" if learned else "failed")

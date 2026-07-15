@@ -199,7 +199,9 @@ Zwei begrenzte Rohtext-Ausnahmen bleiben in der Membran:
   zwischen „wird nachgeschlagen“ und „nicht sicher erschlossen“ unterscheiden, ohne Chattext,
   Antwort oder Telegram-ID zu speichern. Begriffsschreibweise wird vor Graph-, Queue- und
   Statusprüfung identisch normalisiert; ein bereits bekanntes `Misophonie@de` wird daher auch
-  bei der Frage „Was ist misophonie?“ nicht erneut eingereiht.
+  bei der Frage „Was ist misophonie?“ nicht erneut eingereiht. `learned` setzt zusätzlich
+  voraus, dass der normale Definitionspfad eine Bedeutung oder verständlich benannte
+  Einordnung aussprechen kann; ein bloß auffindbares Lexem bleibt `failed`.
 
 Daneben gibt es zwei **ausdrücklich beauftragte** dauerhafte Rohtextpfade im Kern: „Merke dir …“
 legt eine persönliche Episode an; „Erinnere mich …“ legt den freien Erinnerungstext samt

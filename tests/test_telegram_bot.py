@@ -1525,6 +1525,36 @@ def test_fehlgeschlagener_lernstatus_antwortet_ehrlich_ohne_neue_queue(monkeypat
     assert not os.path.exists(telegram_bot.LERNWUNSCH)
 
 
+def test_bloss_auffindbares_wort_ist_nicht_falsch_gelernt(monkeypatch):
+    monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
+    conn = _fresh()
+    reactors.observe_relation(conn, "Blub@de", "expresses", "Q999999", "wikidata")
+    chat_word_learning.mark("Blub", "learned", path=telegram_bot.CHAT_WORD_STATUS_FILE)
+
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist blub?"), allowed={42}, sessions={},
+        deuter_reader=lambda *_args, **_kwargs: pytest.fail("Deuter darf nicht anlaufen"),
+    )
+
+    assert "nicht sicher erschließen" in answer
+    assert chat_word_learning.get_status(
+        "Blub", path=telegram_bot.CHAT_WORD_STATUS_FILE,
+    ) == "failed"
+    assert not os.path.exists(telegram_bot.LERNWUNSCH)
+
+
+def test_laufendes_wortlernen_antwortet_vor_dem_deuter(monkeypatch):
+    monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
+    chat_word_learning.mark("Fernweh", "learning", path=telegram_bot.CHAT_WORD_STATUS_FILE)
+
+    _, answer = telegram_bot.handle_update(
+        _fresh(), _msg(1, 42, "Was bedeutet Fernweh?"), allowed={42}, sessions={},
+        deuter_reader=lambda *_args, **_kwargs: pytest.fail("Deuter darf nicht anlaufen"),
+    )
+
+    assert answer == "Ich lerne »Fernweh« gerade noch. Frag mich gleich noch einmal."
+
+
 def test_lerner_markiert_nur_tatsaechlich_gefundenes_wort_als_gelernt(monkeypatch, tmp_path):
     db_path = str(tmp_path / "genus.sqlite3")
     status_path = str(tmp_path / "status.json")
@@ -1536,6 +1566,11 @@ def test_lerner_markiert_nur_tatsaechlich_gefundenes_wort_als_gelernt(monkeypatc
 
     assert chat_word_learning._finish("misophonie", db_path) is True
     assert chat_word_learning.get_status("Misophonie", path=status_path) == "learned"
+    conn = db.connect(db_path)
+    reactors.observe_relation(conn, "Blub@de", "expresses", "Q999999", "wikidata")
+    conn.close()
+    assert chat_word_learning._finish("Blub", db_path) is False
+    assert chat_word_learning.get_status("Blub", path=status_path) == "failed"
     assert chat_word_learning._finish("Flubbeldiwupp", db_path) is False
     assert chat_word_learning.get_status("Flubbeldiwupp", path=status_path) == "failed"
 
@@ -1566,6 +1601,14 @@ def test_privater_zustimmungsmarker_aktiviert_beide_lernpfade(monkeypatch):
 def test_schreibe_lernwunsch_bleibt_gedeckelt():
     telegram_bot._schreibe_lernwunsch([f"Wort{i}" for i in range(telegram_bot._LERNWUNSCH_MAX + 30)])
     assert len(_lernwunsch(telegram_bot)) == telegram_bot._LERNWUNSCH_MAX
+
+
+def test_schreibe_lernwunsch_behauptet_bei_schreibfehler_keinen_erfolg(tmp_path, monkeypatch):
+    blocker = tmp_path / "blocker"
+    blocker.write_text("kein Verzeichnis", encoding="utf-8")
+    monkeypatch.setattr(telegram_bot, "LERNWUNSCH", str(blocker / "lernwunsch.txt"))
+
+    assert telegram_bot._schreibe_lernwunsch(["Blub"]) is None
 
 
 def test_der_lerner_holt_die_begegnung_vor_den_listen():

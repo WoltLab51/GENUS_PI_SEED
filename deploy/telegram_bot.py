@@ -143,7 +143,7 @@ def _schreibe_lernwunsch(woerter: list[str]) -> str | None:
                 os.remove(tmp)
             except OSError:
                 pass
-    return False
+    return None
 
 
 def _lernkandidaten(conn, question: str) -> list[str]:
@@ -153,14 +153,45 @@ def _lernkandidaten(conn, question: str) -> list[str]:
     Damit bedeutet das Opt-in nicht mehr "jedes grossgeschriebene Wort senden", sondern genau
     "diesen unbekannten Begriff habe ich GENUS als Definitionsfrage vorgelegt".
     """
-    from genus import dialogplanung, sources
+    from genus import dialogplanung
 
-    from chat_word_learning import normalize_term
+    from chat_word_learning import explainable, normalize_term
 
     term = normalize_term(dialogplanung.definitionsbegriff(question) or "")
-    if not term or len(term) > 64 or sources.bekanntes_wort(conn, term):
+    if not term or len(term) > 64 or explainable(conn, term):
         return []
     return [term]
+
+
+def _wortlernantwort(conn, question: str) -> str | None:
+    """Resolve the async learning state before answer generation can race the learner."""
+    if not _chat_wortlernen_aktiv():
+        return None
+    begegnet = _lernkandidaten(conn, question)
+    if not begegnet:
+        return None
+
+    from chat_word_learning import get_status, mark
+
+    begriff = begegnet[0]
+    status = get_status(begriff, path=CHAT_WORD_STATUS_FILE)
+    if status in {"queued", "learning"}:
+        return f"Ich lerne »{begriff}« gerade noch. Frag mich gleich noch einmal."
+    if status in {"failed", "learned"}:
+        # ``learned`` plus nicht erklärbar ist ein alter oder inkonsistenter Erfolgseintrag.
+        # Fail closed statt erneut Erfolg zu behaupten oder im selben Zug still nachzuladen.
+        mark(begriff, "failed", path=CHAT_WORD_STATUS_FILE)
+        return (f"Ich konnte »{begriff}« in meinen freigegebenen Quellen noch nicht sicher "
+                "erschließen. Nenn mir gern den Kontext oder versuch es später noch einmal.")
+
+    queue_status = _schreibe_lernwunsch(begegnet)
+    if queue_status is None:
+        return None
+    mark(begriff, "queued", path=CHAT_WORD_STATUS_FILE)
+    if queue_status == "existing":
+        return f"Ich lerne »{begriff}« gerade noch. Frag mich gleich noch einmal."
+    return (f"»{begriff}« kenne ich noch nicht sicher. Ich schlage den Begriff jetzt in "
+            "meinen freigegebenen Quellen nach. Frag mich gleich noch einmal.")
 
 
 def _schreibe_tagespuffer(conn, frage: str, gelesen: list[str]) -> None:
@@ -789,6 +820,19 @@ def handle_update(
                 answer_mode="edge_ritual", feedback_eligible=False,
             )
             return chat_id, erinnerung
+        try:
+            lernantwort = _wortlernantwort(conn, question)
+        except Exception:
+            # Die optionale Lern-Membran darf nie die normale Kernantwort kosten.
+            lernantwort = None
+        if lernantwort is not None:
+            _bereite_outcome(
+                pending, chat_id,
+                {"feedback_eligible": False, "answer_mode": "edge_learning"},
+                outcome="fallback", readings=[],
+                answer_mode="edge_learning", feedback_eligible=False,
+            )
+            return chat_id, lernantwort
         artikel_organ = waage.artikel_organ() if _waage_aktiv() else None
         if sessions is None:
             answer = companion.respond(conn, question, waage=artikel_organ)
@@ -935,39 +979,6 @@ def handle_update(
             outcome="fallback", readings=[],
             answer_mode="error", feedback_eligible=False,
         )
-    # Kontrolliertes Begriffslernen: nur der unbekannte Einzelbegriff einer ausdruecklichen
-    # Definitionsfrage geht in die externe Queue. Nach der Antwort, nie sie kostend.
-    if _chat_wortlernen_aktiv():
-        try:
-            begegnet = _lernkandidaten(conn, question)
-            if begegnet:
-                from chat_word_learning import get_status, mark
-
-                begriff = begegnet[0]
-                status = get_status(begriff, path=CHAT_WORD_STATUS_FILE)
-                if status in {"queued", "learning"}:
-                    answer = f"Ich lerne »{begriff}« gerade noch. Frag mich gleich noch einmal."
-                elif status == "failed":
-                    answer = (f"Ich konnte »{begriff}« in meinen freigegebenen Quellen noch "
-                              "nicht sicher erschließen. Nenn mir gern den Kontext oder versuch "
-                              "es später noch einmal.")
-                else:
-                    queue_status = _schreibe_lernwunsch(begegnet)
-                    if queue_status:
-                        mark(begriff, "queued", path=CHAT_WORD_STATUS_FILE)
-                        if queue_status == "queued":
-                            answer = (f"»{begriff}« kenne ich noch nicht sicher. Ich schlage den "
-                                      "Begriff jetzt in meinen freigegebenen Quellen nach. Frag "
-                                      "mich gleich noch einmal.")
-                        else:
-                            answer = (f"Ich lerne »{begriff}« gerade noch. Frag mich gleich "
-                                      "noch einmal.")
-                if pending is not None and pending.get("zug") is not None:
-                    pending["zug"]["answer"] = answer
-                elif sessions is not None and sessions.get(chat_id):
-                    sessions[chat_id][-1]["answer"] = answer
-        except Exception:
-            pass
     return chat_id, answer
 
 

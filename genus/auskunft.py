@@ -142,6 +142,23 @@ _GLOSS_META = re.compile(
 )
 
 
+def erklaerbar(a: dict) -> bool:
+    """Kann der normale Definitionspfad aus diesem Ergebnis bereits etwas Sprechbares bilden?
+
+    Eine bloße ``expresses``-Kante macht ein Wort auffindbar, aber noch nicht erklärbar.  Für
+    den Chat-Lernvertrag zählt deshalb erst eine Bedeutung oder wenigstens ein benannter
+    Oberbegriff.  Die Regel entspricht exakt den Zutaten, die :func:`narrate` ausgeben kann.
+    """
+    if not a.get("found"):
+        return False
+    if a.get("meaning"):
+        return True
+    return any(
+        not _BARE_QID.match(str(parent))
+        for parent in a.get("is_a") or ()
+    )
+
+
 def _sprechgloss(gloss: str) -> str:
     """Lexikografische Gebrauchsmarke vom gesprochenen Bedeutungs-Kern trennen.
 
@@ -391,11 +408,12 @@ def _erklaerbar_und_eindeutig(conn, frage: str, ziel_qid: str) -> bool:
     in einer: (1) EINDEUTIG: die Frage muss sich beim Auflösen GENAU auf das gemeinte Konzept
     ``ziel_qid`` zurückführen; sonst zerfiele ein Mehrwort-Label auf sein letztes Wort oder ein
     Homonym wechselte die Bedeutung -- und das spätere „ja" beantwortete ein ANDERES Konzept als
-    angeboten. (2) SUBSTANTIELL: es muss eine echte Definition herauskommen -- eine Bedeutung
-    ODER ein BENANNTER is_a-Platz; ein bloßer Q-Eltern-Knoten zählt NICHT, denn ``narrate``
-    spricht ihn gar nicht aus (sonst liefe das Angebot in „eine Bedeutung ist noch nicht
-    erschlossen"). Geprüft wird genau der String, den das spätere ``respond(frage)`` bekommt --
-    dieselbe Auflösung, also hier schon die Wahrheit von dort. Treue vor Freundlichkeit."""
+    angeboten. (2) SUBSTANTIELL: für ein PROAKTIVES Angebot muss eine echte Bedeutung
+    herauskommen. Ein benannter ``is_a``-Platz genügt zwar für eine ehrliche Antwort auf eine
+    ausdrücklich gestellte Definitionsfrage, aber nicht für ein ungebetenes Anschlussangebot --
+    sonst kehrte der live beobachtete Madschlis-Zufallsanschluss zurück. Geprüft wird genau der
+    String, den das spätere ``respond(frage)`` bekommt -- dieselbe Auflösung, also hier schon die
+    Wahrheit von dort. Treue vor Freundlichkeit."""
     a = answer(conn, frage)
     if a.get("concept") != ziel_qid:
         return False

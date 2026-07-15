@@ -207,8 +207,9 @@ def test_cli_markdown_is_the_human_review_surface(report, monkeypatch):
     assert "LLM" not in result.output
 
 
-def test_generated_answer_quality_report_is_byte_exact(report):
+def test_generated_answer_quality_report_is_byte_exact():
     assert REPORT_ARTIFACT.exists(), (
         "Kanonisches Alltagsproben-Artefakt fehlt: " + str(REPORT_ARTIFACT)
     )
-    assert REPORT_ARTIFACT.read_bytes() == alltagsprobe.render_markdown(report).encode("utf-8")
+    current = alltagsprobe.run_suite()
+    assert REPORT_ARTIFACT.read_bytes() == alltagsprobe.render_markdown(current).encode("utf-8")

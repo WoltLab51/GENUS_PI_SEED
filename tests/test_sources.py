@@ -694,6 +694,28 @@ def test_companion_narrate_is_fluent_and_glassbox():
     assert "chien" not in s   # Fremdsprachen sind Vertiefung, kein Standard-Beiwerk
 
 
+def test_definition_ist_erst_mit_sprechbarem_inhalt_erklaerbar():
+    from genus import auskunft
+
+    conn = _fresh()
+    reactors.observe_relation(conn, "Blub@de", "expresses", "Q999999", "wikidata")
+    bloss_auffindbar = auskunft.answer(conn, "Was ist Blub?")
+    assert bloss_auffindbar["found"] is True
+    assert auskunft.erklaerbar(bloss_auffindbar) is False
+
+    reactors.observe_relation(conn, "Q999999", "is_a", "Q888888", "wikidata")
+    bloss_rohe_einordnung = auskunft.answer(conn, "Was ist Blub?")
+    assert auskunft.erklaerbar(bloss_rohe_einordnung) is False
+
+    reactors.observe_relation(conn, "Oberbegriff@de", "label", "Q888888", "wikidata")
+    benannte_einordnung = auskunft.answer(conn, "Was ist Blub?")
+    assert auskunft.erklaerbar(benannte_einordnung) is True
+
+    reactors.observe_relation(conn, "Blub@de", "primary_gloss", "ein Prüfbegriff", "dbnary")
+    bedeutung = auskunft.answer(conn, "Was ist Blub?")
+    assert auskunft.erklaerbar(bedeutung) is True
+
+
 def _hund_therapie_graph():
     conn = _fresh()
     for wort, qid, gloss in (

@@ -13,7 +13,7 @@ GENUS besitzt jetzt eine wiederholbare Abnahmefläche für alltägliche Antworte
 
 - **17 synthetische Dialogfälle**,
 - **85/85 bestandene harte Verträge**,
-- **0/17 menschlich akzeptierte Antworten**.
+- **2/17 menschlich akzeptierte Antworten**.
 
 Diese Zahlen gehören zusammen. Die automatische Seite beweist bereits viel über Treue und
 Ehrlichkeit. Sie kann aber nicht beweisen, dass eine Antwort natürlich klingt, genügend
@@ -25,7 +25,7 @@ synthetischer Fall
       ↓
 echter GENUS-Antwortpfad ──→ harte Verträge: 85/85
       ↓ exakter Wortlaut
-menschliche Prüfung von Ton + Nutzen: 0/17
+menschliche Prüfung von Ton + Nutzen: 2/17
       ↓ nur mit passenden Fall- und Antwort-Hashes
 akzeptiert · nacharbeiten · bei Änderung automatisch veraltet
 ```
@@ -101,6 +101,14 @@ Gesprächsform schönrechnen.
 Die Fallquelle ist `genus.alltagsprobe.ALLTAGSFAELLE`. Eine Änderung an Frage, Fixture,
 Gate, Zweck oder menschlicher Prüffrage ändert den Fall-Fingerprint.
 
+Die Fälle 03 und 04 prüfen ausschließlich, wie eine **bereits vorhandene** schwache oder
+unabhängig bestätigte Bedeutung ausgesprochen wird. Sie prüfen nicht den asynchronen
+Telegram-Lernlauf. Dessen eigener Vertrag lautet: auffindbar ist noch nicht erklärbar;
+`learned` gilt erst, wenn der normale Definitionspfad eine Bedeutung oder eine verständlich
+benannte Einordnung ausgeben kann. `queued` und `learning` werden vor dem Deuter-Lauf
+beantwortet, damit ein gleichzeitig arbeitender Learner keinen veralteten Antwortentwurf
+erzeugen kann.
+
 ## Benutzen
 
 ```bash
@@ -125,7 +133,7 @@ Hashes.
 Der aktuelle Lauf zeigt:
 
 ```text
-[ALLTAG] 17 Fälle · harte Verträge 85/85 · menschlich akzeptiert 0/17
+[ALLTAG] 17 Fälle · harte Verträge 85/85 · menschlich akzeptiert 2/17
 ```
 
 | Exitcode | Vertrag |
