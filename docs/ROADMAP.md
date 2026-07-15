@@ -145,7 +145,7 @@ Response-ID replaybar verknüpft.
 Die hermetische [`alltagsprobe`](design/ANSWER_QUALITY.md) macht die nächste Reifestufe
 wiederholbar: 17 synthetische Alltagssituationen prüfen derzeit 85 harte Verträge für
 Treue, Ehrlichkeit, Provenienz, Transparenz, Dialog, Komposition, Alltagsform und
-Datensparsamkeit. Alle 85 stehen grün. Die menschliche Abnahme steht mit 2/17 bewusst
+Datensparsamkeit. Alle 85 stehen grün. Die menschliche Abnahme steht mit 4/17 bewusst
 offen; Fall- und Antwort-Hashes verhindern, dass eine alte Zustimmung nach einer Änderung
 unbemerkt weitergilt.
 

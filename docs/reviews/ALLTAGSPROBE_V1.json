@@ -20,6 +20,26 @@
       "reviewer": "ronny",
       "reviewed_at": "2026-07-15T16:45:00+02:00",
       "note": "ok"
+    },
+    {
+      "case_id": "03-definition-schwach",
+      "case_fingerprint": "7a5e0e0d0a4e20a5185ec5a2d03d407d3c2497ea928fe7915748bab05060a6e4",
+      "response_sha256": "d9d788bdfab43e824794f7e3def0def859d58ff251b5f79da31ec7d5c3cfd6f5",
+      "ton": "traegt",
+      "nutzen": "traegt",
+      "reviewer": "ronny",
+      "reviewed_at": "2026-07-15T17:25:00+02:00",
+      "note": "ok"
+    },
+    {
+      "case_id": "04-definition-korroboriert",
+      "case_fingerprint": "6de03f424a0b148e4dd4c73874cc0a494e65899f41122cae8438c90324257945",
+      "response_sha256": "eb8d42e5a8d3254d8c0cf29436d2dd1244f1fa9860b0fb86da71b87345d0a341",
+      "ton": "traegt",
+      "nutzen": "traegt",
+      "reviewer": "ronny",
+      "reviewed_at": "2026-07-15T17:25:00+02:00",
+      "note": "ok"
     }
   ]
 }

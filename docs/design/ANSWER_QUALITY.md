@@ -13,7 +13,7 @@ GENUS besitzt jetzt eine wiederholbare Abnahmefläche für alltägliche Antworte
 
 - **17 synthetische Dialogfälle**,
 - **85/85 bestandene harte Verträge**,
-- **2/17 menschlich akzeptierte Antworten**.
+- **4/17 menschlich akzeptierte Antworten**.
 
 Diese Zahlen gehören zusammen. Die automatische Seite beweist bereits viel über Treue und
 Ehrlichkeit. Sie kann aber nicht beweisen, dass eine Antwort natürlich klingt, genügend
@@ -25,7 +25,7 @@ synthetischer Fall
       ↓
 echter GENUS-Antwortpfad ──→ harte Verträge: 85/85
       ↓ exakter Wortlaut
-menschliche Prüfung von Ton + Nutzen: 2/17
+menschliche Prüfung von Ton + Nutzen: 4/17
       ↓ nur mit passenden Fall- und Antwort-Hashes
 akzeptiert · nacharbeiten · bei Änderung automatisch veraltet
 ```
@@ -133,7 +133,7 @@ Hashes.
 Der aktuelle Lauf zeigt:
 
 ```text
-[ALLTAG] 17 Fälle · harte Verträge 85/85 · menschlich akzeptiert 2/17
+[ALLTAG] 17 Fälle · harte Verträge 85/85 · menschlich akzeptiert 4/17
 ```
 
 | Exitcode | Vertrag |

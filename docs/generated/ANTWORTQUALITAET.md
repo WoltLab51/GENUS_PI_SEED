@@ -2,13 +2,13 @@
 
 > **Status:** generierte, hermetische Abnahmefläche · menschliche Wertung bleibt bindend
 >
-> **Suite:** `2026-07-13.1` · **Inhalt:** `065ecf815be0ac7c`
+> **Suite:** `2026-07-13.1` · **Inhalt:** `3f98e4c265d447a4`
 >
 > **Datengrenze:** ausschließlich synthetische In-Memory-Fälle; kein Pi-Ledger, kein Chat-Export, kein Modell als Richter
 
 ## Ergebnis zuerst
 
-Die harten Verträge stehen bei **85/85**. Menschlich akzeptiert sind **2/17** Fälle; **15** warten auf die erste Bewertung und **0** sind nach einer Änderung veraltet.
+Die harten Verträge stehen bei **85/85**. Menschlich akzeptiert sind **4/17** Fälle; **13** warten auf die erste Bewertung und **0** sind nach einer Änderung veraltet.
 
 Das ist bewusst **keine Gesamtnote**. Grün beweist Treue, Ehrlichkeit, Richtung, Anschluss und Datensparsamkeit. Ob eine Antwort nativ, tief und nützlich wirkt, entscheidet Ronny an genau dem hier gezeigten Wortlaut.
 
@@ -31,8 +31,8 @@ Das ist bewusst **keine Gesamtnote**. Grün beweist Treue, Ehrlichkeit, Richtung
 |---|---:|---|---|
 | `01-gruss-ohne-technikrest` · Ein natürlicher Gruß | 5/5 | `accepted` | `cd6161b6d420` |
 | `02-definition-hund` · Belegte Alltagsdefinition | 7/7 | `accepted` | `74bd178ac90f` |
-| `03-definition-schwach` · Schwach belegte Bedeutung | 4/4 | `review_pending` | `d9d788bdfab4` |
-| `04-definition-korroboriert` · Unabhängig bestätigte Bedeutung | 4/4 | `review_pending` | `eb8d42e5a8d3` |
+| `03-definition-schwach` · Schwach belegte Bedeutung | 4/4 | `accepted` | `d9d788bdfab4` |
+| `04-definition-korroboriert` · Unabhängig bestätigte Bedeutung | 4/4 | `accepted` | `eb8d42e5a8d3` |
 | `05-beziehung-direkt` · Direkte gerichtete Beziehung | 6/6 | `review_pending` | `ab09b8f189b1` |
 | `06-beziehung-transitiv` · Mehrstufige Herleitung | 6/6 | `review_pending` | `92e735fcbb4e` |
 | `07-beziehung-offen` · Offene Welt statt falsches Nein | 6/6 | `review_pending` | `3611007a75b0` |
@@ -176,7 +176,7 @@ Struktur: `outcome=answered` · `readings=['definition']` · `anchor=Was ist Blu
 
 **Menschliche Prüffrage:** Ist die Unsicherheit klar, ohne dass die Antwort defensiv oder mechanisch klingt?
 
-Status: `review_pending` · Fall `7a5e0e0d0a4e` · Antwort `d9d788bdfab4`
+Status: `accepted` · Fall `7a5e0e0d0a4e` · Antwort `d9d788bdfab4`
 
 <details>
 <summary>Bewertungsvorlage mit vollständigen Hashes</summary>
@@ -195,6 +195,8 @@ Status: `review_pending` · Fall `7a5e0e0d0a4e` · Antwort `d9d788bdfab4`
 ```
 
 </details>
+
+Wertung von `ronny`: Ton `traegt`, Nutzen `traegt`. ok
 
 ### 04-definition-korroboriert · Unabhängig bestätigte Bedeutung
 
@@ -221,7 +223,7 @@ Struktur: `outcome=answered` · `readings=['definition']` · `anchor=Was ist Blu
 
 **Menschliche Prüffrage:** Wirkt der Vertrauenshinweis hilfreich oder unterbricht er den natürlichen Fluss?
 
-Status: `review_pending` · Fall `6de03f424a0b` · Antwort `eb8d42e5a8d3`
+Status: `accepted` · Fall `6de03f424a0b` · Antwort `eb8d42e5a8d3`
 
 <details>
 <summary>Bewertungsvorlage mit vollständigen Hashes</summary>
@@ -240,6 +242,8 @@ Status: `review_pending` · Fall `6de03f424a0b` · Antwort `eb8d42e5a8d3`
 ```
 
 </details>
+
+Wertung von `ronny`: Ton `traegt`, Nutzen `traegt`. ok
 
 ### 05-beziehung-direkt · Direkte gerichtete Beziehung
 
