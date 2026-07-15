@@ -100,7 +100,7 @@ def test_definition_renderer_nutzt_dieselbe_bereinigte_sprechglosse_wie_narrate(
     assert "arbeitsfreie Tage" in text and "ohne Plural" not in text
 
 
-def test_definition_renderer_bewahrt_wortart_eltern_und_zusatzmaterial():
+def test_definition_renderer_begrenzt_standardantwort_auf_zwei_eltern():
     material = {
         "found": True,
         "word": "Hund",
@@ -117,10 +117,11 @@ def test_definition_renderer_bewahrt_wortart_eltern_und_zusatzmaterial():
     text = antwort.rendere(draft, _frame("Was ist ein Hund?"))
 
     for bestandteil in (
-        "Substantiv", "ein Haustier", "Säugetier", "Tier", "Lebewesen", "Organismus",
+        "Substantiv", "ein Haustier", "Säugetier", "Tier",
         "Ein bewahrter, graphgestützter Zusatz.",
     ):
         assert bestandteil in text
+    assert "Lebewesen" not in text and "Organismus" not in text
     assert "dog" not in text and "chien" not in text
 
 
@@ -771,6 +772,20 @@ def test_antizipation_bietet_nichts_mit_nur_blankem_elternknoten(conn):
     reactors.observe_relation(conn, "Q_ausbruch", "is_a", "Q999999", "wikidata")  # blank, kein Label
     result = companion.respond_with_deuter(conn, "Was ist ein Vulkan?", deuter=lambda q: None)
     assert "Wenn du magst" not in result["text"] and result.get("anschluss") is None
+
+
+def test_antizipation_bietet_nichts_mit_nur_benannten_eltern(conn):
+    # Live-Fund Haus -> Madschlis: ein Name plus Oberklassen ist noch keine erklärbare Bedeutung.
+    reactors.observe_relation(conn, "Haus@de", "expresses", "Q_haus", "wikidata")
+    reactors.observe_relation(conn, "Haus@de", "primary_gloss", "ein Gebäude", "dbnary")
+    reactors.observe_relation(conn, "Q_haus", "causes", "Q_madschlis", "wikidata")
+    reactors.observe_relation(conn, "Madschlis@de", "expresses", "Q_madschlis", "wikidata")
+    reactors.observe_relation(conn, "Q_madschlis", "is_a", "Q_gremium", "wikidata")
+    reactors.observe_relation(conn, "Gremium@de", "label", "Q_gremium", "wikidata")
+
+    result = companion.respond_with_deuter(conn, "Was ist ein Haus?", deuter=lambda _q: None)
+
+    assert "Madschlis" not in result["text"] and result.get("anschluss") is None
 
 
 # --- die umgezogenen Verbraucher bleiben verhaltensgleich --------------------------------

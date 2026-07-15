@@ -161,15 +161,18 @@ def narrate(a: dict) -> str:
     if a["meaning"]:
         sentence = f"Unter »{a['word']}«{tag} versteht GENUS: {_sprechgloss(a['meaning'][0]).rstrip('.')}"
     else:
-        sentence = f"»{a['word']}«{tag} kennt GENUS, aber eine Bedeutung ist noch nicht erschlossen"
-    named = [_LABEL.sub(r"\1", x) for x in a["is_a"] if not _BARE_QID.match(x)]
+        sentence = f"»{a['word']}«{tag} kann GENUS noch nicht sauber erklären"
+    named = [_LABEL.sub(r"\1", x) for x in a["is_a"] if not _BARE_QID.match(x)][:2]
     if named:   # only human-nameable parents in the voice; a bare Q-id says nothing to a person
         # in Guillemets -- jeder benannte Begriff ist ein ANKER für die Stimme (Anführungs-
         # zeichen-Wörter müssen wortwörtlich überleben). Live gefunden (2026-07-03): ungeschützt
         # wurde "Kernobst" beim Umformulieren zu "Kernaubere" -- eine echte, unbemerkte
         # Faktenverfälschung, weil nur der Kopf-Begriff geschützt war.
         artikel = a.get("artikel") or {}
-        if all(p in artikel for p in named):
+        if not a["meaning"]:
+            sentence += ". Im Wissensgraphen ist der Begriff als " + _join_de(
+                [f"»{parent}«" for parent in named]) + " eingeordnet"
+        elif all(p in artikel for p in named):
             # die natürliche Kopula, sobald die Formwahl-Kette JEDEN Elternteil-Artikel
             # ENTSCHEIDEN kann (Gegründetes -> eigene Regel -> gewogen; genus/formwahl.py).
             # Sicher für den Nominativ: das bare is_a-Label trägt schon die Adjektiv-Endung, die
@@ -380,7 +383,7 @@ def _beispiel(conn, qid: str) -> str | None:
 # Zweck-Kanten (``used_for``) sind oft fachlich wahr, aber als Anschluss an eine Definition
 # zu weit entfernt: Hund -> Therapie war der Live-Beleg. Sie bleiben für explizite
 # Beziehungsfragen vollständig nutzbar, werden hier jedoch nicht mehr proaktiv angeboten.
-_ANTIZIPATION_KANTEN = ("causes", "has_part", "part_of", "made_of", "caused_by")
+_ANTIZIPATION_KANTEN = ("causes", "caused_by")
 
 
 def _erklaerbar_und_eindeutig(conn, frage: str, ziel_qid: str) -> bool:
@@ -396,7 +399,7 @@ def _erklaerbar_und_eindeutig(conn, frage: str, ziel_qid: str) -> bool:
     a = answer(conn, frage)
     if a.get("concept") != ziel_qid:
         return False
-    return bool(a.get("meaning") or any(not _BARE_QID.match(x) for x in a.get("is_a") or []))
+    return bool(a.get("meaning"))
 
 
 def antizipation(conn, a: dict) -> dict | None:

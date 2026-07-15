@@ -776,6 +776,74 @@ def test_kompakte_warum_spur_zeigt_nur_die_gewaehlte_bedeutung():
     assert "Q_schimpf" not in result["text"] and "Schimpfwort" not in result["text"]
 
 
+def _haus_madschlis_graph():
+    conn = _fresh()
+    reactors.observe_relation(conn, "Haus@de", "expresses", "Q_haus", "wikidata")
+    reactors.observe_relation(conn, "Haus@de", "primary_gloss",
+                              "zu einem bestimmten Zweck erbautes Gebäude", "dbnary")
+    for name, qid in (("Wohngebäude", "Q1"), ("Gebäude", "Q2"),
+                      ("Bauwerk", "Q3"), ("Unterstand", "Q4")):
+        reactors.observe_relation(conn, f"{name}@de", "label", qid, "wikidata")
+        reactors.observe_relation(conn, "Q_haus", "is_a", qid, "wikidata")
+    reactors.observe_relation(conn, "Q_haus", "has_part", "Q_madschlis", "wikidata")
+    reactors.observe_relation(conn, "Madschlis@de", "expresses", "Q_madschlis", "wikidata")
+    for name, qid in (("formelle Versammlung", "Q_formell"), ("Gremium", "Q_gremium")):
+        reactors.observe_relation(conn, f"{name}@de", "label", qid, "wikidata")
+        reactors.observe_relation(conn, "Q_madschlis", "is_a", qid, "wikidata")
+    return conn
+
+
+def test_screenshot_dialog_bleibt_lokal_relevant_und_schreibt_keine_reaktion():
+    from genus import antwort, companion
+
+    conn = _haus_madschlis_graph()
+
+    def deuter_darf_nicht_laufen(_question):
+        raise AssertionError("eindeutiger Dialogzug darf nicht zum Deuter")
+
+    bereit = companion.respond_with_deuter(
+        conn, "ich möchte den chat testen nach dem letzten update",
+        deuter=deuter_darf_nicht_laufen, renderer=antwort.rendere,
+    )
+    assert "leg los" in bereit["text"] and "Nochmal" not in bereit["text"]
+
+    haus = companion.respond_with_deuter(
+        conn, "was ist ein Haus?", deuter=deuter_darf_nicht_laufen,
+        renderer=antwort.rendere,
+    )
+    assert "Wohngebäude" in haus["text"] and "Gebäude" in haus["text"]
+    assert "Bauwerk" not in haus["text"] and "Unterstand" not in haus["text"]
+    assert "Madschlis" not in haus["text"] and haus.get("anschluss") is None
+
+    madschlis = companion.respond_with_deuter(
+        conn, "was ist denn Madschlis?", deuter=deuter_darf_nicht_laufen,
+        renderer=antwort.rendere,
+    )
+    assert "noch nicht sauber erklären" in madschlis["text"]
+    assert companion._DEUTED not in madschlis["text"]
+
+    vorher = conn.execute("SELECT COUNT(*) AS n FROM event_log").fetchone()["n"]
+    reaktion = companion.respond_with_deuter(
+        conn, "kannte ich noch garnicht", last_answer=madschlis["text"],
+        deuter=deuter_darf_nicht_laufen, renderer=antwort.rendere,
+    )
+    nachher = conn.execute("SELECT COUNT(*) AS n FROM event_log").fetchone()["n"]
+    assert "nicht als Anschluss vorschlagen" in reaktion["text"]
+    assert "Notiz" not in reaktion["text"] and nachher == vorher
+
+
+def test_wiederholen_laesst_sich_ohne_sprachsignal_nicht_vom_modell_erzwingen():
+    from genus import companion
+
+    conn = _fresh()
+    result = companion.respond_with_deuter(
+        conn, "ich sehe das letzte Update", last_answer="Hallo!",
+        deuter=lambda _q: {"absicht": "wiederholen"},
+    )
+
+    assert "Nochmal" not in result["text"] and result["outcome"] == "fallback"
+
+
 def test_companion_narrate_drops_unnameable_parents():
     from genus import companion  # a verb's is_a often includes concepts with no label -> no raw Q-id
     a = {"found": True, "word": "laufen", "label": "laufen", "concept": "Q105674",

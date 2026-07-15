@@ -266,6 +266,8 @@ def entwurf_definition(
 
     belegte_eltern: set[str] = set()
     for relation in result.get("is_a_evidence") or ():
+        if len(belegte_eltern) >= 2:
+            break
         if not isinstance(relation, Mapping):
             continue
         label = _sprechbarer_begriff(relation.get("label") or relation.get("object"))
@@ -292,6 +294,8 @@ def entwurf_definition(
         belegte_eltern.add(label)
 
     for parent in result.get("is_a") or ():
+        if len(belegte_eltern) >= 2:
+            break
         label = _sprechbarer_begriff(parent)
         if label is None or label in belegte_eltern:
             continue

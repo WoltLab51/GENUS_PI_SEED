@@ -1364,7 +1364,7 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
 
     kind = (guess.get("absicht") or "").strip().lower()
     segment_text = guess.get("text") if isinstance(guess.get("text"), str) else question
-    if not kind or kind == "warum-herkunft" and not sprachsignal.hat_herkunftssignal(segment_text):
+    if not sprachsignal.absicht_geerdet(kind, segment_text):
         return None
     # the graph is authoritative once sown; before the one clean seed-apply, the code-side
     # seed table keeps the mapping sane (same content, Quelle folgt mit der Saat)
@@ -1554,7 +1554,7 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         if frueher is not None:
             text = respond(conn, frueher, waage=waage) + _BACKREF_TAG.format(frueher)
             return {"text": text, "question": frueher}
-    text = _ritual_antwort(conn, question)
+    text = dialogplanung.kurze_reaktion(question, last_answer) or _ritual_antwort(conn, question)
     if text is not None:
         return {"text": text, "question": question}
     from genus import antwort as _antwort

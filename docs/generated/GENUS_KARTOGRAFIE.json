@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "18ba3be2c8d4ef7899371319388b80bb0ca7779e678a897088d8ae0bfc7076f4",
+  "content_sha256": "83ad202148c203442762be523f5272f8cff66ef94c95c5e43c928994afeb1191",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -757,7 +757,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 483,
+          "line": 487,
           "symbol": "rendere"
         }
       ],
@@ -770,7 +770,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 483,
+          "line": 487,
           "symbol": "rendere"
         }
       ],
@@ -783,7 +783,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 483,
+          "line": 487,
           "symbol": "rendere"
         }
       ],
@@ -887,7 +887,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 554,
+          "line": 558,
           "symbol": "belegung"
         }
       ],
@@ -2210,7 +2210,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "ast",
-          "line": 310
+          "line": 314
         }
       ],
       "to": "module:genus.auskunft",
@@ -2246,7 +2246,7 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 745
+          "line": 748
         }
       ],
       "to": "module:genus.gender_rule",
@@ -2258,7 +2258,7 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 814
+          "line": 817
         }
       ],
       "to": "module:genus.hypothese",
@@ -2294,7 +2294,7 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 618
+          "line": 621
         }
       ],
       "to": "module:genus.verwandt",
@@ -2306,22 +2306,22 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 472
+          "line": 475
         },
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 503
+          "line": 506
         },
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 690
+          "line": 693
         },
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 835
+          "line": 838
         }
       ],
       "to": "module:genus.werkzeuge_auskunft",
@@ -4338,12 +4338,12 @@
         {
           "file": "genus/dialogplanung.py",
           "kind": "ast",
-          "line": 47
+          "line": 69
         },
         {
           "file": "genus/dialogplanung.py",
           "kind": "ast",
-          "line": 159
+          "line": 181
         }
       ],
       "to": "module:genus.antwort",
@@ -4379,7 +4379,7 @@
         {
           "file": "genus/dialogplanung.py",
           "kind": "ast",
-          "line": 47
+          "line": 69
         }
       ],
       "to": "module:genus.werkzeuge_auskunft",
@@ -11445,7 +11445,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 554,
+          "line": 558,
           "symbol": "belegung"
         }
       ],
@@ -12138,7 +12138,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 483,
+          "line": 487,
           "symbol": "rendere"
         }
       ],
@@ -12243,7 +12243,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 554,
+          "line": 558,
           "symbol": "belegung"
         }
       ],

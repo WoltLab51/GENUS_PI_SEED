@@ -17,7 +17,8 @@ from genus.auskunft import (
 )
 
 _DEFINITION = re.compile(
-    r"^\s*(?:was\s+ist|was\s+bedeutet)\s+(?:(?:ein|eine|einen|der|die|das)\s+)?"
+    r"^\s*(?:was\s+ist|was\s+bedeutet)\s+"
+    r"(?:(?:denn|eigentlich|genau)\s+)*(?:(?:ein|eine|einen|der|die|das)\s+)?"
     r"([A-Za-zäöüÄÖÜß-]+)\s*[?!.]*\s*$", re.IGNORECASE,
 )
 _ZUSAMMENHANG = re.compile(
@@ -28,6 +29,13 @@ _ZUSAMMENHANG = re.compile(
 _WARUM_THEMA = re.compile(
     r"^\s*(?:warum|wieso|weshalb)\s+(?:denn\s+)?(.+?)\s*[?!.]*\s*$", re.IGNORECASE,
 )
+_CHAT_TEST = re.compile(
+    r"\b(?:chat|bot|dich|genus)\b.{0,24}\btest(?:en|e)?\b", re.IGNORECASE,
+)
+_NEU_REAKTION = re.compile(
+    r"\b(?:kannte|kenne)\s+ich\s+(?:noch\s+)?(?:gar\s*nicht|nicht)\b", re.IGNORECASE,
+)
+_ANKER = re.compile(r"»([^»]+)«")
 
 
 def definitionsbegriff(question: str) -> str | None:
@@ -40,6 +48,20 @@ def zusammenhangsbegriffe(question: str) -> tuple[str, str] | None:
     """Die zwei Begriffe der engen lokalen Form „Wie hängen X und Y zusammen?“."""
     treffer = _ZUSAMMENHANG.match(question)
     return (treffer.group(1), treffer.group(2)) if treffer else None
+
+
+def kurze_reaktion(question: str, last_answer: str | None = None) -> str | None:
+    """Eindeutige Gesprächsreaktionen lokal beantworten, ohne sie als Fakten zu speichern."""
+    if _CHAT_TEST.search(question):
+        return "Klar — leg los. Ich bin bereit."
+    if not _NEU_REAKTION.search(question):
+        return None
+    anker = _ANKER.search(last_answer or "")
+    if last_answer and "noch nicht sauber erklären" in last_answer:
+        name = f" »{anker.group(1)}«" if anker else " diesen Begriff"
+        return (f"Ich kenne{name} bisher selbst nur grob. Deshalb hätte ich ihn dir nicht "
+                "als Anschluss vorschlagen sollen.")
+    return "Dann war das gerade wirklich neu für dich."
 
 
 def beziehungs_antwort(conn, subject: str, object_: str, bel=None, *, allgemein=False):
