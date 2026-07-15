@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "c19b3fbf60c9afb94f7ca7d4951a85d532ce200975737d13b43c12f8115fdc78",
+  "content_sha256": "f39769d0485b6f5174a78a4364f6521944deb20cb7c5b7d6898a5153617968e4",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1349,7 +1349,7 @@
         {
           "file": "deploy/backfill_konzepte.py",
           "kind": "sql_literal",
-          "line": 136
+          "line": 137
         },
         {
           "file": "deploy/backfill_konzepte.py",
@@ -1779,12 +1779,12 @@
         {
           "file": "deploy/schmied_benchmark.py",
           "kind": "sql_literal",
-          "line": 51
+          "line": 59
         },
         {
           "file": "deploy/schmied_benchmark.py",
           "kind": "sql_literal",
-          "line": 82
+          "line": 90
         }
       ],
       "to": "table:relation_projection",
@@ -2410,17 +2410,17 @@
         {
           "file": "genus/bauplan.py",
           "kind": "sql_literal",
-          "line": 167
+          "line": 168
         },
         {
           "file": "genus/bauplan.py",
           "kind": "sql_literal",
-          "line": 175
+          "line": 176
         },
         {
           "file": "genus/bauplan.py",
           "kind": "sql_literal",
-          "line": 188
+          "line": 189
         }
       ],
       "to": "table:relation_projection",
@@ -2544,17 +2544,17 @@
         {
           "file": "genus/betriebsprofil.py",
           "kind": "sql_literal",
-          "line": 600
+          "line": 602
         },
         {
           "file": "genus/betriebsprofil.py",
           "kind": "sql_literal",
-          "line": 660
+          "line": 661
         },
         {
           "file": "genus/betriebsprofil.py",
           "kind": "sql_literal",
-          "line": 688
+          "line": 681
         },
         {
           "file": "genus/betriebsprofil.py",
@@ -2564,17 +2564,17 @@
         {
           "file": "genus/betriebsprofil.py",
           "kind": "sql_literal",
-          "line": 834
+          "line": 832
         },
         {
           "file": "genus/betriebsprofil.py",
           "kind": "sql_literal",
-          "line": 867
+          "line": 857
         },
         {
           "file": "genus/betriebsprofil.py",
           "kind": "sql_literal",
-          "line": 880
+          "line": 875
         },
         {
           "file": "genus/betriebsprofil.py",
@@ -5842,12 +5842,17 @@
         {
           "file": "genus/inference.py",
           "kind": "sql_literal",
-          "line": 359
+          "line": 309
         },
         {
           "file": "genus/inference.py",
           "kind": "sql_literal",
-          "line": 363
+          "line": 360
+        },
+        {
+          "file": "genus/inference.py",
+          "kind": "sql_literal",
+          "line": 364
         }
       ],
       "to": "table:relation_projection",
@@ -6391,7 +6396,7 @@
         {
           "file": "genus/integrity.py",
           "kind": "sql_literal",
-          "line": 856
+          "line": 857
         }
       ],
       "to": "table:value_projection",
@@ -6403,7 +6408,7 @@
         {
           "file": "genus/kartografie.py",
           "kind": "ast",
-          "line": 23
+          "line": 25
         }
       ],
       "to": "module:genus.event_router",
@@ -8965,11 +8970,6 @@
           "file": "genus/sources.py",
           "kind": "sql_literal",
           "line": 431
-        },
-        {
-          "file": "genus/sources.py",
-          "kind": "sql_literal",
-          "line": 434
         }
       ],
       "to": "table:relation_projection",
@@ -8986,7 +8986,7 @@
         {
           "file": "genus/sources.py",
           "kind": "sql_literal",
-          "line": 98
+          "line": 99
         },
         {
           "file": "genus/sources.py",
@@ -8996,7 +8996,7 @@
         {
           "file": "genus/sources.py",
           "kind": "sql_literal",
-          "line": 103
+          "line": 104
         },
         {
           "file": "genus/sources.py",
@@ -9011,7 +9011,7 @@
         {
           "file": "genus/sources.py",
           "kind": "sql_literal",
-          "line": 281
+          "line": 282
         }
       ],
       "to": "table:value_projection",
@@ -9417,6 +9417,11 @@
           "file": "genus/verwandt.py",
           "kind": "sql_literal",
           "line": 41
+        },
+        {
+          "file": "genus/verwandt.py",
+          "kind": "sql_literal",
+          "line": 44
         }
       ],
       "to": "table:relation_projection",

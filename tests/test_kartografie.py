@@ -254,6 +254,19 @@ def test_generated_artifacts_are_current_and_self_contained():
     assert kartografie_render.HTML_PATH.stat().st_size < 2_000_000
 
 
+def test_sql_literal_sources_follow_tokens_not_version_dependent_ast_locations():
+    text = '''def rows(conn):
+    """SELECT prose FROM nowhere"""
+    return conn.execute(
+        "SELECT subject FROM belief_projection "
+        f"JOIN relation_projection "
+        "WHERE predicate = ?"
+    )
+'''
+    found = kartografie._sql_literals(ast.parse(text), text)
+    assert [line for _, line in found] == [4, 5]
+
+
 def test_kartografie_check_command_runs():
     result = CliRunner().invoke(cli.main, ["kartografie", "check"])
     assert result.exit_code == 0, result.output

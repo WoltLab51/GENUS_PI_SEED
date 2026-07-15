@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
 import json
 import re
 import sys
+import tokenize
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable
@@ -802,7 +804,7 @@ def _ledger_bindings(tree: ast.AST) -> tuple[set[str], set[str]]:
     return owners, appenders
 
 
-def _sql_literals(tree: ast.AST) -> list[tuple[str, int]]:
+def _sql_literals(tree: ast.AST, text: str) -> list[tuple[str, int]]:
     """Collect SQL-bearing literals even when they flow through a local helper.
 
     Direct ``conn.execute(<literal>)`` calls are only one form used in GENUS. Helpers
@@ -810,20 +812,44 @@ def _sql_literals(tree: ast.AST) -> list[tuple[str, int]]:
     normal argument. Module/function/class docstrings are excluded to avoid turning
     prose examples into dependency evidence.
     """
-    docstrings: set[int] = set()
+    docstring_lines: list[tuple[int, int]] = []
     for owner in ast.walk(tree):
         body = getattr(owner, "body", None)
         if isinstance(body, list) and body and isinstance(body[0], ast.Expr):
             value = body[0].value
             if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                docstrings.add(id(value))
+                docstring_lines.append((value.lineno, value.end_lineno or value.lineno))
     found: list[tuple[str, int]] = []
-    for node in ast.walk(tree):
-        if id(node) in docstrings:
+    # CPython 3.11 and 3.12 assign different ``lineno`` values to the single AST Constant
+    # produced from adjacent string tokens.  Token start positions are source facts and stay
+    # stable across supported interpreters, so generated cartography must use those instead.
+    fstring_start_type = getattr(tokenize, "FSTRING_START", -1)
+    fstring_middle_type = getattr(tokenize, "FSTRING_MIDDLE", -1)
+    fstring_end_type = getattr(tokenize, "FSTRING_END", -1)
+    fstring_start_line: int | None = None
+    fstring_parts: list[str] = []
+    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+        if token.type == fstring_start_type:
+            fstring_start_line = token.start[0]
+            fstring_parts = []
             continue
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if _READ_SQL.search(node.value) or _WRITE_SQL.search(node.value):
-                found.append((node.value, node.lineno))
+        if fstring_start_line is not None:
+            if token.type == fstring_middle_type:
+                fstring_parts.append(token.string)
+            elif token.type == fstring_end_type:
+                sql = "".join(fstring_parts)
+                if _READ_SQL.search(sql) or _WRITE_SQL.search(sql):
+                    found.append((sql, fstring_start_line))
+                fstring_start_line = None
+                fstring_parts = []
+            continue
+        if token.type != tokenize.STRING:
+            continue
+        line = token.start[0]
+        if any(start <= line <= end for start, end in docstring_lines):
+            continue
+        if _READ_SQL.search(token.string) or _WRITE_SQL.search(token.string):
+            found.append((token.string, line))
     return found
 
 
@@ -998,7 +1024,9 @@ def _modules(graph: _Graph, tables: set[str]) -> tuple[set[str], set[str]]:
             )
 
         sql_evidence = [(sql, line, "sql_call") for _, sql, line in calls.sql]
-        sql_evidence.extend((sql, line, "sql_literal") for sql, line in _sql_literals(tree))
+        sql_evidence.extend(
+            (sql, line, "sql_literal") for sql, line in _sql_literals(tree, text)
+        )
         for sql, line, evidence_kind in sql_evidence:
             src = ({"file": relative, "line": line, "kind": evidence_kind},)
             for table in sorted(set(_READ_SQL.findall(sql)) & tables):
