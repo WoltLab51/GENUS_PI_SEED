@@ -339,14 +339,20 @@ beim Installieren und Deployen nicht automatisch gelöscht; ihre Retention ist e
 Betriebsentscheidung. Details und die noch offene physische Episodenlöschung stehen in
 [`docs/design/MEMORY.md`](../docs/design/MEMORY.md).
 
-Chat-Wortlernen ist aus Datenschutzgründen standardmäßig aus. Ein bewusstes
-Das Opt-in kann als `GENUS_CHAT_WORD_LEARNING=1` für Bot **und** Learner gesetzt werden. Für
+Chat-Wortlernen ist aus Datenschutzgründen standardmäßig aus. Das bewusste Opt-in kann als
+`GENUS_CHAT_WORD_LEARNING=1` für Bot **und** Learner gesetzt werden. Für
 einen laufenden Headless-Pi ist der gemeinsame, widerrufbare Zustimmungsmarker einfacher:
 `install -m 600 deploy/chat_word_learning.enabled ~/.genus/chat_word_learning.enabled`.
 Erst dann wird der unbekannte Einzelbegriff einer ausdrücklichen Definitionsfrage an externe Lexikonquellen
 übermittelt. Freier Chat, persönliche Aussagen und beiläufige Großschreibung werden nicht
 eingereiht. Die Queue ist `0600`,
-gemeinsam verriegelt und der Learner schreibt die Wortform nicht ins Journal.
+gemeinsam verriegelt und der Learner schreibt die Wortform nicht ins Journal. Zusätzlich hält
+`~/.genus/chat_word_learning_status.json` höchstens 200 Zustände für sieben Tage. Darin stehen
+nur normalisierter Begriff, `queued`/`learning`/`learned`/`failed` und Zeitstempel — kein
+Chattext und keine Telegram-ID. Darum sagt der Bot beim ersten Mal „ich schlage nach“, während
+der Verarbeitung „ich lerne noch“ und nach einem erfolglosen Quellenlauf ehrlich, dass er den
+Begriff noch nicht sicher erschließen konnte. Die Datei kann jederzeit gelöscht werden; das
+bereits erworbene, quellenbelegte Wortwissen bleibt davon unberührt im Ledger.
 
 ```bash
 systemctl status genus-telegram-bot.service

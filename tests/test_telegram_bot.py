@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import sys
@@ -5,12 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from genus import reactors, verstehen
+from genus import db, reactors, verstehen
 from genus.db import init_schema
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "deploy"))
 import telegram_bot  # noqa: E402  (deploy/ script, imported directly for its pure logic)
+import chat_word_learning  # noqa: E402
 import deuter  # noqa: E402
 import stimme  # noqa: E402
 
@@ -1430,6 +1432,9 @@ def test_der_besinnungs_herzschlag_ist_rein_reflektierend():
 def _lernwunsch_im_tmp(monkeypatch, tmp_path):
     monkeypatch.setattr(telegram_bot, "LERNWUNSCH", str(tmp_path / "lernwunsch.jsonl"))
     monkeypatch.setattr(
+        telegram_bot, "CHAT_WORD_STATUS_FILE", str(tmp_path / "chat_word_learning_status.json"),
+    )
+    monkeypatch.setattr(
         telegram_bot, "CHAT_WORD_CONSENT_FILE", str(tmp_path / "chat_word_learning.enabled"),
     )
 
@@ -1459,7 +1464,27 @@ def test_lernwarteschlange_dedupliziert_ueber_nachrichten(monkeypatch):
         )
         antworten.append(answer)
     assert _lernwunsch(telegram_bot) == ["Fernweh"]   # dreimal begegnet, einmal in der Schlange
-    assert all("zum Nachschlagen vorgemerkt" in answer for answer in antworten)
+    assert "freigegebenen Quellen" in antworten[0]
+    assert "kenne ich noch nicht sicher" in antworten[0]
+    assert antworten[1:] == [
+        "Ich lerne »Fernweh« gerade noch. Frag mich gleich noch einmal.",
+        "Ich lerne »Fernweh« gerade noch. Frag mich gleich noch einmal.",
+    ]
+
+
+def test_kleingeschriebener_bekannter_begriff_wird_nicht_erneut_vorgemerkt(monkeypatch):
+    monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
+    conn = _fresh()
+    reactors.observe_relation(conn, "Misophonie@de", "primary_gloss",
+                               "verminderte Geräuschtoleranz", "dbnary")
+
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, "Was ist misophonie?"), allowed={42}, sessions={},
+    )
+
+    assert not os.path.exists(telegram_bot.LERNWUNSCH)
+    assert "verminderte Geräuschtoleranz" in answer
+    assert "lerne" not in answer.casefold()
 
 
 def test_nur_einzelne_definitionsbegriffe_werden_lernkandidaten():
@@ -1467,6 +1492,52 @@ def test_nur_einzelne_definitionsbegriffe_werden_lernkandidaten():
     assert telegram_bot._lernkandidaten(conn, "Was ist Madschlis?") == ["Madschlis"]
     assert telegram_bot._lernkandidaten(conn, "Ronny mag das geheime Projekt") == []
     assert telegram_bot._lernkandidaten(conn, "Was ist https://example.invalid?") == []
+
+
+def test_lernstatus_ist_gedeckelt_loeschbar_und_ohne_chattext(tmp_path):
+    path = str(tmp_path / "status.json")
+    assert chat_word_learning.mark("misophonie", "queued", path=path, now=100)
+    assert chat_word_learning.get_status("Misophonie", path=path, now=101) == "queued"
+    assert chat_word_learning.mark("Misophonie", "learning", path=path, now=102)
+    assert chat_word_learning.mark("Misophonie", "queued", path=path, now=103)
+    assert chat_word_learning.get_status("misophonie", path=path, now=103) == "learning"
+    assert "misophonie" in Path(path).read_text(encoding="utf-8").casefold()
+    assert "was ist" not in Path(path).read_text(encoding="utf-8").casefold()
+    assert chat_word_learning.get_status(
+        "Misophonie", path=path, now=102 + chat_word_learning.MAX_AGE_SECONDS + 1,
+    ) is None
+
+    for number in range(chat_word_learning.MAX_ENTRIES + 10):
+        assert chat_word_learning.mark(f"Wort{number}", "failed", path=path, now=1000 + number)
+    entries = json.loads(Path(path).read_text(encoding="utf-8"))["entries"]
+    assert len(entries) == chat_word_learning.MAX_ENTRIES
+
+
+def test_fehlgeschlagener_lernstatus_antwortet_ehrlich_ohne_neue_queue(monkeypatch):
+    monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
+    chat_word_learning.mark("Flubbeldiwupp", "failed", path=telegram_bot.CHAT_WORD_STATUS_FILE)
+
+    _, answer = telegram_bot.handle_update(
+        _fresh(), _msg(1, 42, "Was ist Flubbeldiwupp?"), allowed={42}, sessions={},
+    )
+
+    assert "nicht sicher erschließen" in answer
+    assert not os.path.exists(telegram_bot.LERNWUNSCH)
+
+
+def test_lerner_markiert_nur_tatsaechlich_gefundenes_wort_als_gelernt(monkeypatch, tmp_path):
+    db_path = str(tmp_path / "genus.sqlite3")
+    status_path = str(tmp_path / "status.json")
+    monkeypatch.setenv("GENUS_CHAT_WORD_STATUS_FILE", status_path)
+    conn = db.connect(db_path)
+    reactors.observe_relation(conn, "Misophonie@de", "primary_gloss",
+                               "verminderte Geräuschtoleranz", "dbnary")
+    conn.close()
+
+    assert chat_word_learning._finish("misophonie", db_path) is True
+    assert chat_word_learning.get_status("Misophonie", path=status_path) == "learned"
+    assert chat_word_learning._finish("Flubbeldiwupp", db_path) is False
+    assert chat_word_learning.get_status("Flubbeldiwupp", path=status_path) == "failed"
 
 
 def test_chat_wortlernen_ist_standardmaessig_aus():

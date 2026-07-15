@@ -243,7 +243,11 @@ entsteht keine persönliche Episode. Bis Nutzer-Namespaces existieren, spricht d
 Kern nur mit genau einem Owner im Direktchat. Chat-abgeleitetes externes Wortlernen ist Opt-in:
 Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff gelangt in die Queue.
 Bot und Learner lesen dafür denselben exakten, eigentümergebundenen `0600`-Marker; Entfernen
-widerruft die Freigabe ohne Root-Eingriff.
+widerruft die Freigabe ohne Root-Eingriff. Queue, Status und Graph prüfen dieselbe normalisierte
+Wortform. Eine kleine, löschbare und auf 200 Einträge sowie sieben Tage begrenzte Randdatei
+führt ausschließlich `queued → learning → learned|failed`; sie enthält weder Chattext noch
+Nutzerkennung. Erst `learned` bedeutet, dass nach dem Quellenlauf tatsächlich eine
+Bedeutungskante im Ledger auffindbar ist.
 Der genaue Speicher- und Abrufvertrag steht in
 [design/MEMORY.md](design/MEMORY.md).
 

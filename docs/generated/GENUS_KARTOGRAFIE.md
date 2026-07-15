@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `214658e4c121c74e` · Regeneration: `genus kartografie build`
+> **Inhalt:** `c19b3fbf60c9afb9` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,7 +14,7 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 265 | 708 | 99 | 39 | 23 / 16 | 12 | 3 | 16 |
+| 266 | 711 | 100 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
@@ -85,7 +85,7 @@ zeichnet `raw_fold`, `audit_trigger`, `audit_trace` und `audit_only` getrennt.
 | Forecasts und Fehler | rohe Ledger-Events | learning CLI und Kurven | keine | Kalibrierung sichtbar, aber kein normaler Dialogverbraucher. | [genus/learning.py:97](../../genus/learning.py) |
 | Explizites Antwortfeedback (👍/👎) | response_feedback_log | replaybare Qualitätsmessung | keine | Reine Daumen und enge eindeutige Textkritik werden sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) |
 | Modellgedeutetes Lob oder Kritik | nur Lesarten-Zählung | fester Handler | keine | Wird ohne eindeutige Gebärde oder Korrektur nicht als Qualitätsfeedback gespeichert. | [genus/companion.py:1023](../../genus/companion.py) |
-| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:106](../../deploy/telegram_bot.py) |
+| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:110](../../deploy/telegram_bot.py) |
 | Modellgewichte | statische GGUF-Dateien | Deuter, Stimme, Waage | keine | GENUS aktualisiert oder trainiert diese Gewichte nicht. | [deploy/deuter.py:258](../../deploy/deuter.py) |
 
 ## H1-Pilot und nächste Kanten
@@ -122,7 +122,7 @@ Runtime-Verträge und keine behauptete vollständige Shell-Sprachanalyse.
 | `domaene` | 34 |
 | `fundament` | 5 |
 | `lernen` | 8 |
-| `membranen` | 18 |
+| `membranen` | 19 |
 | `projektionen` | 8 |
 | `querschnitt` | 2 |
 | `schnittstellen` | 12 |

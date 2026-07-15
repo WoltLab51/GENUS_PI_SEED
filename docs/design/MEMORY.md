@@ -39,6 +39,7 @@ Die wichtigste Regel lautet:
 | Tagesstruktur | `~/.genus/chat_tag.jsonl` | Zeit, Konzept-IDs, Lesarten, Warum-Folge | bis atomare Nachtrotation |
 | Korrekturbeispiele | `~/.genus/korrekturen.jsonl` | Rohtext der ausdrücklich korrigierten vorherigen Frage + Lesarten | jüngste 50; kein Alters-TTL |
 | optionale Chat-Lernqueue | `~/.genus/lernwunsch.txt` | unbekannter Einzelbegriff einer ausdrücklichen Definitionsfrage | höchstens 200, bis Verarbeitung/Löschung |
+| Status des Chat-Wortlernens | `~/.genus/chat_word_learning_status.json` | Begriff, `queued`/`learning`/`learned`/`failed`, Zeitstempel | höchstens 200, sieben Tage oder Löschung |
 | Antwortwirkungen | `response_outcome_log` aus dem Ledger | Kanal, Outcome, Lesarten, Antwortmodus, Feedback-Fähigkeit | dauerhaft / append-only, vollständig replaybar |
 | explizites Antwortfeedback | `response_feedback_log` aus dem Ledger | Response-ID, Signal, optional korrigierter Intent, Quelle | dauerhaft / append-only, vollständig replaybar |
 | Episodisches Gedächtnis | Relationsgraph im Ledger | Inhalt, Quelle, Zeit, erwähnte Konzepte | dauerhaft / append-only |
@@ -193,7 +194,12 @@ Zwei begrenzte Rohtext-Ausnahmen bleiben in der Membran:
   ausdrücklichen Definitionsfrage in einer `0600`-Queue gehalten und anschließend an externe
   Lexikonquellen übermittelt; erworbenes Wortwissen landet im Ledger. Freier Chat, Namen in
   Aussagen und beiläufige Großschreibung werden nicht eingereiht. Der Learner loggt
-  dabei nur den Vorgang, nie die Wortform.
+  dabei nur den Vorgang, nie die Wortform. Eine zweite `0600`-Randdatei hält gedeckelt und
+  höchstens sieben Tage lang nur Begriff, Lernzustand und Zeitstempel. So kann der Bot ehrlich
+  zwischen „wird nachgeschlagen“ und „nicht sicher erschlossen“ unterscheiden, ohne Chattext,
+  Antwort oder Telegram-ID zu speichern. Begriffsschreibweise wird vor Graph-, Queue- und
+  Statusprüfung identisch normalisiert; ein bereits bekanntes `Misophonie@de` wird daher auch
+  bei der Frage „Was ist misophonie?“ nicht erneut eingereiht.
 
 Daneben gibt es zwei **ausdrücklich beauftragte** dauerhafte Rohtextpfade im Kern: „Merke dir …“
 legt eine persönliche Episode an; „Erinnere mich …“ legt den freien Erinnerungstext samt

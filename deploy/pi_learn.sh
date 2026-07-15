@@ -94,6 +94,7 @@ learn_from() {
 # auflösbares Wort (Tippfehler/fremd) wird trotzdem entfernt (kein Retry-Hämmern). 1, wenn die
 # Schlange leer ist.
 LERNWUNSCH="${GENUS_LERNWUNSCH:-$(dirname "$DB_PATH")/lernwunsch.txt}"
+CHAT_WORD_STATUS_FILE="${GENUS_CHAT_WORD_STATUS_FILE:-$(dirname "$DB_PATH")/chat_word_learning_status.json}"
 CHAT_WORD_LEARNING="${GENUS_CHAT_WORD_LEARNING:-0}"
 CHAT_WORD_CONSENT_FILE="${GENUS_CHAT_WORD_CONSENT_FILE:-$(dirname "$DB_PATH")/chat_word_learning.enabled}"
 CHAT_WORD_CONSENT_VALUE="external-lexicon:definition-term"
@@ -129,6 +130,9 @@ learn_begegnung() {
     flock -u "$lock_fd"
     exec {lock_fd}>&-
     [ "$dequeued" = "1" ] && [ -n "$word" ] || return 1
+    GENUS_CHAT_WORD_STATUS_FILE="$CHAT_WORD_STATUS_FILE" \
+        "$REPO_DIR/.venv/bin/python" "$SCRIPT_DIR/chat_word_learning.py" \
+        mark "$word" learning >/dev/null 2>&1 || true
     GENUS_KONZEPT_SEARCH_LANG=de "$SCRIPT_DIR/observe_konzept.sh" "$word" >/dev/null 2>&1 || true
     GENUS_LEXEM_LANG=de "$SCRIPT_DIR/observe_lexem.sh" "$word" >/dev/null 2>&1 || true
     GENUS_DBNARY_LANG=de "$SCRIPT_DIR/observe_dbnary.sh" "$word" >/dev/null 2>&1 || true
@@ -136,7 +140,13 @@ learn_begegnung() {
         GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/bridge_senses.py" "$word" >/dev/null 2>&1 || true
         GENUS_DB_PATH="$DB_PATH" "$EMBED_PY" "$SCRIPT_DIR/verwandtschaft.py" "$word" >/dev/null 2>&1 || true
     fi
-    log "learned one encountered chat word (content redacted; explicit opt-in)"
+    if GENUS_CHAT_WORD_STATUS_FILE="$CHAT_WORD_STATUS_FILE" \
+       "$REPO_DIR/.venv/bin/python" "$SCRIPT_DIR/chat_word_learning.py" \
+       finish "$word" "$DB_PATH" >/dev/null 2>&1; then
+        log "learned one encountered chat word (content redacted; explicit opt-in)"
+    else
+        log "could not resolve one encountered chat word (content redacted; explicit opt-in)"
+    fi
     return 0
 }
 

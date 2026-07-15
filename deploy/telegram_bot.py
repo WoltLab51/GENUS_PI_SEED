@@ -100,10 +100,14 @@ CHAT_WORD_CONSENT_FILE = os.environ.get(
     os.path.join(GENUS_USER_HOME, ".genus", "chat_word_learning.enabled"),
 )
 CHAT_WORD_CONSENT_VALUE = "external-lexicon:definition-term"
+CHAT_WORD_STATUS_FILE = os.environ.get(
+    "GENUS_CHAT_WORD_STATUS_FILE",
+    os.path.join(GENUS_USER_HOME, ".genus", "chat_word_learning_status.json"),
+)
 _LERNWUNSCH_MAX = 200   # die Schlange bleibt gedeckelt (jüngste Begegnungen zuletzt)
 
 
-def _schreibe_lernwunsch(woerter: list[str]) -> bool:
+def _schreibe_lernwunsch(woerter: list[str]) -> str | None:
     """Unbekannt begegnete Wörter in die Lern-Warteschlange -- dedupliziert gegen die
     bestehende Schlange, gedeckelt; darf nie eine Antwort kosten (still bei jedem Fehler)."""
     tmp = None
@@ -124,7 +128,7 @@ def _schreibe_lernwunsch(woerter: list[str]) -> bool:
                 vorhanden = []
             neu = [w for w in woerter if w not in vorhanden]
             if not neu:
-                return bool(woerter)
+                return "existing" if woerter else None
             alle = (vorhanden + neu)[-_LERNWUNSCH_MAX:]
             tmp = LERNWUNSCH + f".tmp-{os.getpid()}"
             with open(tmp, "w", encoding="utf-8") as f:
@@ -132,7 +136,7 @@ def _schreibe_lernwunsch(woerter: list[str]) -> bool:
                 f.write("\n".join(alle) + "\n")
             os.replace(tmp, LERNWUNSCH)
             tmp = None
-            return True
+            return "queued"
     except Exception:
         if tmp is not None:
             try:
@@ -151,10 +155,12 @@ def _lernkandidaten(conn, question: str) -> list[str]:
     """
     from genus import dialogplanung, sources
 
-    term = dialogplanung.definitionsbegriff(question)
+    from chat_word_learning import normalize_term
+
+    term = normalize_term(dialogplanung.definitionsbegriff(question) or "")
     if not term or len(term) > 64 or sources.bekanntes_wort(conn, term):
         return []
-    return [term[:1].upper() + term[1:]]
+    return [term]
 
 
 def _schreibe_tagespuffer(conn, frage: str, gelesen: list[str]) -> None:
@@ -935,14 +941,31 @@ def handle_update(
         try:
             begegnet = _lernkandidaten(conn, question)
             if begegnet:
-                if _schreibe_lernwunsch(begegnet):
-                    begriff = begegnet[0]
-                    answer = (answer.rstrip() +
-                              f" Ich habe »{begriff}« zum Nachschlagen vorgemerkt.")
-                    if pending is not None and pending.get("zug") is not None:
-                        pending["zug"]["answer"] = answer
-                    elif sessions is not None and sessions.get(chat_id):
-                        sessions[chat_id][-1]["answer"] = answer
+                from chat_word_learning import get_status, mark
+
+                begriff = begegnet[0]
+                status = get_status(begriff, path=CHAT_WORD_STATUS_FILE)
+                if status in {"queued", "learning"}:
+                    answer = f"Ich lerne »{begriff}« gerade noch. Frag mich gleich noch einmal."
+                elif status == "failed":
+                    answer = (f"Ich konnte »{begriff}« in meinen freigegebenen Quellen noch "
+                              "nicht sicher erschließen. Nenn mir gern den Kontext oder versuch "
+                              "es später noch einmal.")
+                else:
+                    queue_status = _schreibe_lernwunsch(begegnet)
+                    if queue_status:
+                        mark(begriff, "queued", path=CHAT_WORD_STATUS_FILE)
+                        if queue_status == "queued":
+                            answer = (f"»{begriff}« kenne ich noch nicht sicher. Ich schlage den "
+                                      "Begriff jetzt in meinen freigegebenen Quellen nach. Frag "
+                                      "mich gleich noch einmal.")
+                        else:
+                            answer = (f"Ich lerne »{begriff}« gerade noch. Frag mich gleich "
+                                      "noch einmal.")
+                if pending is not None and pending.get("zug") is not None:
+                    pending["zug"]["answer"] = answer
+                elif sessions is not None and sessions.get(chat_id):
+                    sessions[chat_id][-1]["answer"] = answer
         except Exception:
             pass
     return chat_id, answer
