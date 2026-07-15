@@ -240,7 +240,10 @@ Die Telegram-Membran minimiert Gesprächsdaten vor dem Speichern: Journald erhä
 Betriebsmetadaten; der Tagespuffer nur Zeit, erkannte Konzept-IDs, Lesarten und das boolesche
 Warum-Folgesignal. Nachtrotation und Bot-Schreiber teilen einen Lock. Aus Themenhäufigkeit
 entsteht keine persönliche Episode. Bis Nutzer-Namespaces existieren, spricht der persönliche
-Kern nur mit genau einem Owner im Direktchat. Chat-abgeleitetes externes Wortlernen ist Opt-in.
+Kern nur mit genau einem Owner im Direktchat. Chat-abgeleitetes externes Wortlernen ist Opt-in:
+Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff gelangt in die Queue.
+Bot und Learner lesen dafür denselben exakten, eigentümergebundenen `0600`-Marker; Entfernen
+widerruft die Freigabe ohne Root-Eingriff.
 Der genaue Speicher- und Abrufvertrag steht in
 [design/MEMORY.md](design/MEMORY.md).
 

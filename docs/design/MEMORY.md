@@ -38,7 +38,7 @@ Die wichtigste Regel lautet:
 | Arbeitsgedächtnis | Telegram-Prozess | bis zu sechs letzte Züge je Chat | bis Prozessneustart |
 | Tagesstruktur | `~/.genus/chat_tag.jsonl` | Zeit, Konzept-IDs, Lesarten, Warum-Folge | bis atomare Nachtrotation |
 | Korrekturbeispiele | `~/.genus/korrekturen.jsonl` | Rohtext der ausdrücklich korrigierten vorherigen Frage + Lesarten | jüngste 50; kein Alters-TTL |
-| optionale Chat-Lernqueue | `~/.genus/lernwunsch.txt` | unbekannte einzelne Wortformen aus Chattext | höchstens 200, bis Verarbeitung/Löschung |
+| optionale Chat-Lernqueue | `~/.genus/lernwunsch.txt` | unbekannter Einzelbegriff einer ausdrücklichen Definitionsfrage | höchstens 200, bis Verarbeitung/Löschung |
 | Antwortwirkungen | `response_outcome_log` aus dem Ledger | Kanal, Outcome, Lesarten, Antwortmodus, Feedback-Fähigkeit | dauerhaft / append-only, vollständig replaybar |
 | explizites Antwortfeedback | `response_feedback_log` aus dem Ledger | Response-ID, Signal, optional korrigierter Intent, Quelle | dauerhaft / append-only, vollständig replaybar |
 | Episodisches Gedächtnis | Relationsgraph im Ledger | Inhalt, Quelle, Zeit, erwähnte Konzepte | dauerhaft / append-only |
@@ -188,10 +188,11 @@ Zwei begrenzte Rohtext-Ausnahmen bleiben in der Membran:
   Falls. Die Datei ist `0600`, auf 50 Einträge gedeckelt und löschbar, besitzt aber noch kein
   Alters-TTL oder eigenes Löschkommando.
 - Chat-Wortlernen ist standardmäßig **aus**. Bei bewusstem
-  `GENUS_CHAT_WORD_LEARNING=1` werden unbekannte einzelne Wortformen in einer `0600`-Queue
-  gehalten und anschließend an externe Lexikonquellen übermittelt; erworbenes Wortwissen
-  landet im Ledger. Namen, Diagnosen oder andere sensible Wörter dürfen deshalb nicht ohne
-  diese ausdrückliche Datenschutzentscheidung automatisch gelernt werden. Der Learner loggt
+  `GENUS_CHAT_WORD_LEARNING=1` oder dem exakten, eigentümergebundenen `0600`-Marker
+  `~/.genus/chat_word_learning.enabled` wird ausschließlich der unbekannte Einzelbegriff einer
+  ausdrücklichen Definitionsfrage in einer `0600`-Queue gehalten und anschließend an externe
+  Lexikonquellen übermittelt; erworbenes Wortwissen landet im Ledger. Freier Chat, Namen in
+  Aussagen und beiläufige Großschreibung werden nicht eingereiht. Der Learner loggt
   dabei nur den Vorgang, nie die Wortform.
 
 Daneben gibt es zwei **ausdrücklich beauftragte** dauerhafte Rohtextpfade im Kern: „Merke dir …“

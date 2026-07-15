@@ -1429,6 +1429,9 @@ def test_der_besinnungs_herzschlag_ist_rein_reflektierend():
 @pytest.fixture(autouse=True)
 def _lernwunsch_im_tmp(monkeypatch, tmp_path):
     monkeypatch.setattr(telegram_bot, "LERNWUNSCH", str(tmp_path / "lernwunsch.jsonl"))
+    monkeypatch.setattr(
+        telegram_bot, "CHAT_WORD_CONSENT_FILE", str(tmp_path / "chat_word_learning.enabled"),
+    )
 
 
 def _lernwunsch(bot):
@@ -1473,6 +1476,20 @@ def test_chat_wortlernen_ist_standardmaessig_aus():
                                allowed={42}, sessions={})
 
     assert not os.path.exists(telegram_bot.LERNWUNSCH)
+
+
+def test_privater_zustimmungsmarker_aktiviert_beide_lernpfade(monkeypatch):
+    monkeypatch.delenv("GENUS_CHAT_WORD_LEARNING", raising=False)
+    with open(telegram_bot.CHAT_WORD_CONSENT_FILE, "w", encoding="ascii") as handle:
+        handle.write(telegram_bot.CHAT_WORD_CONSENT_VALUE + "\n")
+    os.chmod(telegram_bot.CHAT_WORD_CONSENT_FILE, 0o600)
+
+    assert telegram_bot._chat_wortlernen_aktiv() is True
+
+    learner = (ROOT / "deploy" / "pi_learn.sh").read_text(encoding="utf-8")
+    assert "chat_word_learning.enabled" in learner
+    assert telegram_bot.CHAT_WORD_CONSENT_VALUE in learner
+    assert "stat -c '%U:%a'" in learner
 
 
 def test_schreibe_lernwunsch_bleibt_gedeckelt():

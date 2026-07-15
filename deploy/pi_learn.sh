@@ -95,6 +95,15 @@ learn_from() {
 # Schlange leer ist.
 LERNWUNSCH="${GENUS_LERNWUNSCH:-$(dirname "$DB_PATH")/lernwunsch.txt}"
 CHAT_WORD_LEARNING="${GENUS_CHAT_WORD_LEARNING:-0}"
+CHAT_WORD_CONSENT_FILE="${GENUS_CHAT_WORD_CONSENT_FILE:-$(dirname "$DB_PATH")/chat_word_learning.enabled}"
+CHAT_WORD_CONSENT_VALUE="external-lexicon:definition-term"
+if [ "$CHAT_WORD_LEARNING" != "1" ] \
+   && [ -f "$CHAT_WORD_CONSENT_FILE" ] \
+   && [ ! -L "$CHAT_WORD_CONSENT_FILE" ] \
+   && [ "$(stat -c '%U:%a' "$CHAT_WORD_CONSENT_FILE" 2>/dev/null || true)" = "$GENUS_USER:600" ] \
+   && [ "$(tr -d '\r\n' < "$CHAT_WORD_CONSENT_FILE" 2>/dev/null || true)" = "$CHAT_WORD_CONSENT_VALUE" ]; then
+    CHAT_WORD_LEARNING=1
+fi
 learn_begegnung() {
     local word tmp lock_fd dequeued=0
     [ "$CHAT_WORD_LEARNING" = "1" ] || return 1

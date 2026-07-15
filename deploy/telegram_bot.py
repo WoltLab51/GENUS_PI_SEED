@@ -40,6 +40,7 @@ import json
 import os
 import re
 import ssl
+import stat
 import sys
 import time
 import urllib.error
@@ -94,6 +95,11 @@ TAGESPUFFER = os.environ.get(
 LERNWUNSCH = os.environ.get(
     "GENUS_LERNWUNSCH", os.path.join(GENUS_USER_HOME, ".genus", "lernwunsch.txt")
 )
+CHAT_WORD_CONSENT_FILE = os.environ.get(
+    "GENUS_CHAT_WORD_CONSENT_FILE",
+    os.path.join(GENUS_USER_HOME, ".genus", "chat_word_learning.enabled"),
+)
+CHAT_WORD_CONSENT_VALUE = "external-lexicon:definition-term"
 _LERNWUNSCH_MAX = 200   # die Schlange bleibt gedeckelt (jüngste Begegnungen zuletzt)
 
 
@@ -399,9 +405,21 @@ def _chat_wortlernen_aktiv() -> bool:
     Der Learner fragt externe Lexikonquellen ab und schreibt erworbenes Wissen ins Ledger.
     Deshalb ist die frühere automatische Queue für private Chats standardmäßig geschlossen.
     """
-    return os.environ.get("GENUS_CHAT_WORD_LEARNING", "0").strip().casefold() in {
+    if os.environ.get("GENUS_CHAT_WORD_LEARNING", "0").strip().casefold() in {
         "1", "true", "yes", "on", "ja",
-    }
+    }:
+        return True
+    try:
+        info = os.stat(CHAT_WORD_CONSENT_FILE, follow_symlinks=False)
+        posix = hasattr(os, "getuid")
+        owner = os.getuid() if posix else info.st_uid
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != owner
+                or (posix and stat.S_IMODE(info.st_mode) & 0o077)):
+            return False
+        with open(CHAT_WORD_CONSENT_FILE, encoding="ascii") as handle:
+            return handle.read().strip() == CHAT_WORD_CONSENT_VALUE
+    except (OSError, UnicodeError):
+        return False
 
 
 def _acquire_instance_lock():
