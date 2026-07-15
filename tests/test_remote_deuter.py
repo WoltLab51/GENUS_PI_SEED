@@ -68,6 +68,25 @@ def test_remote_request_contains_only_static_prompt_and_current_bounded_message(
     assert reports and text not in reports[0] and "segments=1" in reports[0]
 
 
+def test_remote_receives_only_structural_correction_pairs_without_old_example_text(tmp_path):
+    text = "Erklaer mir bitte den Hund"
+    old_private_text = "mein alter privater Korrektursatz"
+    provider = _Provider(json.dumps({"segments": []}))
+
+    _reader(tmp_path, provider).interpret(
+        text,
+        absichten=("definition", "tatsache"),
+        korrekturen=(
+            {"gelesen": "tatsache", "gemeint": "definition", "beispiel": old_private_text},
+            {"gelesen": "nicht-im-raster", "gemeint": "definition"},
+        ),
+    )
+
+    prompt = provider.requests[0][0].messages[0].content
+    assert "tatsache" in prompt and "definition" in prompt
+    assert old_private_text not in prompt
+
+
 def test_remote_refuses_oversized_text_before_budget_or_network(tmp_path):
     provider = _Provider()
     reader = _reader(tmp_path, provider)

@@ -36,12 +36,42 @@ _NEU_REAKTION = re.compile(
     r"\b(?:kannte|kenne)\s+ich\s+(?:noch\s+)?(?:gar\s*nicht|nicht)\b", re.IGNORECASE,
 )
 _ANKER = re.compile(r"»([^»]+)«")
+_KORREKTUR_CUE = re.compile(
+    r"^\s*(?:(?:das|du\s+hast\s+(?:mich|das))\s+)?falsch\s+"
+    r"(?:verstanden|gedeutet)\s*(?::\s*([\wäöüß-]+))?\s*[.!?]*\s*$",
+    re.IGNORECASE | re.UNICODE,
+)
+_KORREKTUR_GEMEINT = re.compile(
+    r"^\s*(?:nein\s*[,;:]?\s*)?(?:ich\s+meinte|gemeint\s+war|das\s+war)\s+"
+    r"(?:(?:ein|eine|einen|der|die|das)\s+)?([\wäöüß-]+)\s*[.!?]*\s*$",
+    re.IGNORECASE | re.UNICODE,
+)
+_KORREKTUR_ALIAS = {
+    "definition": "definition", "erklaerung": "definition", "erklärung": "definition",
+    "beziehung": "beziehung", "zusammenhang": "beziehung", "ursache": "ursache",
+    "vergleich": "vergleich", "ort": "ort", "grammatik": "grammatik", "dank": "dank",
+    "gruss": "gruss", "gruß": "gruss", "abschied": "abschied",
+    "erinnerung": "erinnerungs-abruf",
+}
 
 
 def definitionsbegriff(question: str) -> str | None:
     """Der sicher verankerte Einzelbegriff einer einfachen Definitionsfrage."""
     treffer = _DEFINITION.match(question)
     return treffer.group(1) if treffer else None
+
+
+def korrektur_cue(question: str) -> tuple[bool, str | None]:
+    """Eindeutige Kurzkorrektur oder enges alltagssprachliches Intent-Alias lesen."""
+    treffer = _KORREKTUR_CUE.match(question)
+    if treffer:
+        richtig = treffer.group(1)
+        return (True, richtig.lower() if richtig else None)
+    treffer = _KORREKTUR_GEMEINT.match(question)
+    if not treffer:
+        return (False, None)
+    ziel = _KORREKTUR_ALIAS.get(treffer.group(1).casefold())
+    return ((True, ziel) if ziel else (False, None))
 
 
 def zusammenhangsbegriffe(question: str) -> tuple[str, str] | None:

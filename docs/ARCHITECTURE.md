@@ -134,14 +134,18 @@ Read-Model → AnswerDraft → DialogueFrame + treuer Renderer → Telegram
   des `response_outcome_recorded`-Events. Erst danach wird der RAM-Session-Zug bestätigt.
 - Outcome und Feedback sind datensparsame, replaybare Strukturprojektionen. Frage,
   Antwort, Slots, Telegram-`message_id`, Chat- und Nutzerkennung sind dort verboten.
-- Als Feedback gelten nur reine 👍-/👎-Nachrichten und der enge Korrektur-Cue. Die
+- Als Feedback gelten reine 👍-/👎-Nachrichten, eine kleine exakte Menge eindeutiger
+  Textkritik und der enge Korrektur-Cue. Eine benannte Warum-Frage zählt nur dann als
+  Kritik, wenn sie exakt auf das strukturierte Anschlussangebot der vorigen Antwort zeigt. Die
   Membran lässt als korrigierten Intent nur eine bekannte Raster-Absicht durch. Ein Modell
   darf allgemeines Lob oder Kritik nicht zur Qualitätsevidenz hochstufen. Feedback-Acks
   werden beim Rückbezug übersprungen; Ritual- und Fehlerantworten stoppen ihn.
 
 Dieser Schnitt ist ein Pilot, kein abgeschlossenes H1: Die übrigen Handler liefern noch
 fertige Strings, ein vollständiger Diskursplan und eine kuratierte Wirkungsbewertung fehlen.
-Feedback verändert weder Modellgewichte noch Antwortstrategie automatisch. Die Response-ID
+Feedback verändert weder Modellgewichte noch die allgemeine Antwortstrategie automatisch.
+Eine enge Intent-Korrektur fließt jedoch als begrenztes typisiertes Verwechslungspaar in den
+nächsten Deuter-Prompt zurück. Die Response-ID
 lebt an der Telegram-Kante nur in der RAM-Session; ein löschbarer Randindex für Neustarts
 ist noch nicht gebaut. Auch für den schmalen Fehlerkorridor „Telegram zugestellt,
 Outcome-Persistenz fehlgeschlagen“ gibt es noch keine Edge-Outbox; der Update-Offset wird
@@ -242,8 +246,9 @@ Der genaue Speicher- und Abrufvertrag steht in
 
 Eine ausdrücklich freigegebene zweite Datenschutzgrenze liegt vor GitHub Models: Erst wenn
 lokale Rituale und Muster keinen sicheren Pfad finden, darf der Remote-Deuter den statischen
-Segmentvertrag und ausschließlich den aktuellen, auf 1.000 Zeichen begrenzten Telegram-Text
-sehen. Verlauf, Nutzerkennung, Ledger, Antwort und Korrekturdatei bleiben lokal. Sein Vorschlag
+Segmentvertrag, ausschließlich den aktuellen, auf 1.000 Zeichen begrenzten Telegram-Text und
+höchstens vier typisierte Intent-Verwechslungen sehen. Verlauf, Nutzerkennung, Ledger, Antwort,
+alte Beispieltexte und Korrekturdatei bleiben lokal. Sein Vorschlag
 ist weder Antwort noch Evidenz: Herkunftsfilter, Rastergrenze und Kernzelle prüfen ihn erneut.
 Die Freigabe ist eine widerrufbare `0600`-Datei; Minuten-/Tagesbudget und Circuit Breaker
 begrenzen Kosten und Ausfälle.

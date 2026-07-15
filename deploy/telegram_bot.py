@@ -97,7 +97,7 @@ LERNWUNSCH = os.environ.get(
 _LERNWUNSCH_MAX = 200   # die Schlange bleibt gedeckelt (jüngste Begegnungen zuletzt)
 
 
-def _schreibe_lernwunsch(woerter: list[str]) -> None:
+def _schreibe_lernwunsch(woerter: list[str]) -> bool:
     """Unbekannt begegnete Wörter in die Lern-Warteschlange -- dedupliziert gegen die
     bestehende Schlange, gedeckelt; darf nie eine Antwort kosten (still bei jedem Fehler)."""
     tmp = None
@@ -118,7 +118,7 @@ def _schreibe_lernwunsch(woerter: list[str]) -> None:
                 vorhanden = []
             neu = [w for w in woerter if w not in vorhanden]
             if not neu:
-                return
+                return bool(woerter)
             alle = (vorhanden + neu)[-_LERNWUNSCH_MAX:]
             tmp = LERNWUNSCH + f".tmp-{os.getpid()}"
             with open(tmp, "w", encoding="utf-8") as f:
@@ -126,12 +126,29 @@ def _schreibe_lernwunsch(woerter: list[str]) -> None:
                 f.write("\n".join(alle) + "\n")
             os.replace(tmp, LERNWUNSCH)
             tmp = None
+            return True
     except Exception:
         if tmp is not None:
             try:
                 os.remove(tmp)
             except OSError:
                 pass
+    return False
+
+
+def _lernkandidaten(conn, question: str) -> list[str]:
+    """Nur bewusst erfragte unbekannte Einzelbegriffe duerfen die externe Lernqueue sehen.
+
+    Freier Chat, persoenliche Aussagen, URLs, Zahlen und mehrteilige Phrasen bleiben lokal.
+    Damit bedeutet das Opt-in nicht mehr "jedes grossgeschriebene Wort senden", sondern genau
+    "diesen unbekannten Begriff habe ich GENUS als Definitionsfrage vorgelegt".
+    """
+    from genus import dialogplanung, sources
+
+    term = dialogplanung.definitionsbegriff(question)
+    if not term or len(term) > 64 or sources.bekanntes_wort(conn, term):
+        return []
+    return [term[:1].upper() + term[1:]]
 
 
 def _schreibe_tagespuffer(conn, frage: str, gelesen: list[str]) -> None:
@@ -563,8 +580,20 @@ def _finalisiere_pending_zug(
     return True
 
 
-def _explizites_feedback(question: str) -> tuple[str, str | None] | None:
-    """Nur deutungsfreie Qualitätssignale: enger Korrektur-Cue oder reine 👍/👎-Gebärde."""
+_NEGATIVES_FEEDBACK = frozenset({
+    "falsch", "das ist falsch", "das war falsch", "stimmt nicht", "das stimmt nicht",
+    "das passt nicht", "passt nicht", "das ergibt keinen sinn", "ergibt keinen sinn",
+    "das wirkt zufällig", "das wirkt random", "wirkt zufällig", "wirkt random",
+})
+_WARUM_BEGRIFF = re.compile(
+    r"^\s*(?:warum|wieso|weshalb)\s+(?:denn\s+)?(.+?)\s*[?!.]*\s*$", re.IGNORECASE,
+)
+
+
+def _explizites_feedback(
+    question: str, ziel: dict | None = None,
+) -> tuple[str, str | None] | None:
+    """Deutungsfreie Qualitätssignale mit eindeutigem Bezug zur vorigen Antwort."""
     from genus import companion
 
     ist_korrektur, richtig = companion.korrektur_cue(question)
@@ -575,6 +604,16 @@ def _explizites_feedback(question: str) -> tuple[str, str | None] | None:
     if kern and set(kern) == {"👍"}:
         return "positive", None
     if kern and set(kern) == {"👎"}:
+        return "negative", None
+    normal = question.strip().casefold().rstrip(".!?").strip()
+    if normal in _NEGATIVES_FEEDBACK:
+        return "negative", None
+    # "Warum Therapie?" ist nur dann Feedback, wenn GENUS exakt diesen Begriff im letzten
+    # Zug als Anschluss angeboten hat. Ohne den strukturellen Beleg bleibt es eine Sachfrage.
+    treffer = _WARUM_BEGRIFF.match(question)
+    beleg = (ziel or {}).get("anschluss_beleg") or {}
+    if (treffer and beleg.get("object")
+            and treffer.group(1).strip().casefold() == str(beleg["object"]).casefold()):
         return "negative", None
     return None
 
@@ -745,10 +784,9 @@ def handle_update(
             # verdrängen den Cache und machten den nächsten Deuter-Aufruf gemessen 26s langsam.
             zuege = sessions.get(chat_id) or []
             vorher = zuege[-1] if zuege else {}
-            explizites_feedback = _explizites_feedback(question)
-            feedback_ziel = (
-                _letztes_feedbackziel(zuege) if explizites_feedback is not None else None
-            )
+            moegliches_feedbackziel = _letztes_feedbackziel(zuege)
+            explizites_feedback = _explizites_feedback(question, moegliches_feedbackziel)
+            feedback_ziel = moegliches_feedbackziel if explizites_feedback is not None else None
             # Eine Bestätigungs-Antwort ist selbst absichtlich nicht feedbackfähig. Folgt
             # darauf noch eine Korrektur oder reine 👍/👎-Gebärde, bleibt deshalb die
             # letzte echte Antwort der Bezug — nicht der Ack. Das ist nur flüchtiger Dialogkontext;
@@ -760,11 +798,19 @@ def handle_update(
                     q, absichten=angebot, grammatik=grenze, korrekturen=hinweise,
                 )
             else:
-                # Remote-minimal bekommt nur den aktuellen Zug und das Raster-Angebot. Verlauf,
-                # Korrekturbeispiele und GBNF-Implementierungsdetails bleiben auf dem Pi.
+                # Remote-minimal bekommt nur den aktuellen Zug, das Raster-Angebot und maximal
+                # vier rein strukturelle Intent-Verwechslungen. Verlauf, Beispieltexte,
+                # Korrekturdatei und GBNF-Implementierungsdetails bleiben auf dem Pi.
                 def deute(q):
                     try:
-                        return deuter_reader(q, absichten=angebot)
+                        strukturell = [
+                            {"gelesen": h.get("gelesen"), "gemeint": h.get("gemeint")}
+                            for h in hinweise
+                            if h.get("gelesen") and h.get("gemeint")
+                        ][:_HINWEIS_BEISPIELE]
+                        return deuter_reader(
+                            q, absichten=angebot, korrekturen=strukturell,
+                        )
                     except (RuntimeError, ValueError) as exc:
                         _log(f"remote Deuter fell back to local core ({type(exc).__name__})")
                         return None
@@ -806,6 +852,7 @@ def handle_update(
                 )
                 if corrected_intent not in bekannte_absichten:
                     corrected_intent = None
+                feedback_gespeichert = False
                 try:
                     response_outcomes.record_feedback(
                         conn,
@@ -813,11 +860,16 @@ def handle_update(
                         signal=signal,
                         corrected_intent=corrected_intent,
                     )
+                    feedback_gespeichert = True
                 except Exception as exc:
                     # Feedback ist ein nachgelagerter Messpunkt, niemals der Preis der Antwort.
                     # Der Fehler bleibt ohne Rohtext im Journal sichtbar; der Ack darf trotzdem
                     # zugestellt werden und wird selbst nicht feedbackfähig.
                     _log(f"explicit feedback could not be recorded ({type(exc).__name__})")
+                if feedback_gespeichert and signal == "negative":
+                    answer = ("Verstanden — ich habe die vorige Antwort als unpassend markiert. "
+                              "Wenn du mir die gemeinte Lesart nennst, kann ich auch den "
+                              "konkreten Fehlgriff lernen.")
             # Lernkreis v1: eine angenommene Korrektur wird als Beispiel-Paar in der
             # Edge-Datei festgehalten (Text wohnt NUR an der Membran, nie im Ledger)
             ist_korrektur, richtig = companion.korrektur_cue(question)
@@ -859,14 +911,20 @@ def handle_update(
             outcome="fallback", readings=[],
             answer_mode="error", feedback_eligible=False,
         )
-    # Vokabel-bei-Begegnung: GENUS spürt (Kern, rein lesend), welche Wörter der Nachricht es
-    # nicht kennt, und legt sie in die Lern-Warteschlange (Membran) -- der Lerner holt sie vor
-    # den Frequenzlisten. Nach der Antwort, nie sie kostend (still bei jedem Fehler).
+    # Kontrolliertes Begriffslernen: nur der unbekannte Einzelbegriff einer ausdruecklichen
+    # Definitionsfrage geht in die externe Queue. Nach der Antwort, nie sie kostend.
     if _chat_wortlernen_aktiv():
         try:
-            begegnet = companion.unbekannte_woerter(conn, question)
+            begegnet = _lernkandidaten(conn, question)
             if begegnet:
-                _schreibe_lernwunsch(begegnet)
+                if _schreibe_lernwunsch(begegnet):
+                    begriff = begegnet[0]
+                    answer = (answer.rstrip() +
+                              f" Ich habe »{begriff}« zum Nachschlagen vorgemerkt.")
+                    if pending is not None and pending.get("zug") is not None:
+                        pending["zug"]["answer"] = answer
+                    elif sessions is not None and sessions.get(chat_id):
+                        sessions[chat_id][-1]["answer"] = answer
         except Exception:
             pass
     return chat_id, answer

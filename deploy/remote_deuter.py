@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Selektiver Remote-Deuter fuer offene Telegram-Formulierungen.
 
-Nur die aktuelle, bereits auf 1.000 Zeichen begrenzte Nachricht verlaesst den Pi. Verlauf,
-Ledger, Antwort, Korrekturbeispiele und Nutzer-ID sind nicht Teil des Requests. Das Modell
+Nur die aktuelle, bereits auf 1.000 Zeichen begrenzte Nachricht verlaesst den Pi. Hinzu kommen
+hoechstens vier bekannte Intent-Verwechslungen ohne Beispieltext. Verlauf, Ledger, Antwort,
+Korrekturbeispiele und Nutzer-ID sind nicht Teil des Requests. Das Modell
 liefert ausschliesslich strukturierte Lesarten; ``deuter.clean_segments`` und danach der
 deterministische Kern pruefen Herkunft und Wirkung. Eine 0600-Zustimmungsdatei schaltet diesen
 Pfad bewusst frei. Fehler, Rate-Limit und Tagesbudget fallen ohne lokales Grossmodell auf die
@@ -17,7 +18,7 @@ from pathlib import Path
 import re
 import stat
 import time
-from typing import Callable, Sequence
+from typing import Callable, Mapping, Sequence
 
 import deuter
 import model_gateway
@@ -160,12 +161,30 @@ class RemoteDeuter:
         _write_budget(self.budget_file, day, count + 1)
         self._recent.append(now)
 
-    def interpret(self, message: str, *, absichten: Sequence[str] | None = None) -> list[dict]:
+    def interpret(
+        self,
+        message: str,
+        *,
+        absichten: Sequence[str] | None = None,
+        korrekturen: Sequence[Mapping[str, object]] | None = None,
+    ) -> list[dict]:
         if not isinstance(message, str) or not message.strip():
             raise ValueError("Remote-Deuter braucht Nachrichtentext")
         if len(message) > MAX_TEXT_CHARS:
             raise model_gateway.GatewayError("Nachricht ist fuer Remote-Deutung zu lang")
         leaves = tuple(absichten or deuter.DEFAULT_ABSICHTEN)
+        # Remote-minimal darf keine frueheren Nachrichten sehen. Der Lernkreis gibt deshalb
+        # ausschliesslich typisierte Intent-Verwechslungen weiter; Beispieltext und alle
+        # anderen Felder bleiben lokal. Beide Tokens muessen Teil des aktuellen Rasters sein.
+        allowed = set(leaves)
+        structural_corrections = []
+        for correction in korrekturen or ():
+            read = correction.get("gelesen")
+            meant = correction.get("gemeint")
+            if read in allowed and meant in allowed and read != meant:
+                structural_corrections.append({"gelesen": read, "gemeint": meant})
+            if len(structural_corrections) >= 4:
+                break
         now = self.clock()
         self._consume_budget(now)
         try:
@@ -175,7 +194,9 @@ class RemoteDeuter:
                     model=self.model,
                     privacy="remote_minimal",
                     messages=(
-                        model_gateway.Message("system", deuter._system_prompt(leaves)),
+                        model_gateway.Message(
+                            "system", deuter._system_prompt(leaves, structural_corrections)
+                        ),
                         model_gateway.Message("user", message),
                     ),
                     max_output_tokens=MAX_OUTPUT_TOKENS,

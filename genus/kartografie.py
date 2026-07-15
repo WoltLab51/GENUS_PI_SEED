@@ -408,9 +408,9 @@ LEARNING_IMPACT: tuple[dict[str, Any], ...] = (
     {
         "signal": "Enge Intent-Korrektur",
         "store": "response_feedback_log + korrekturen.jsonl",
-        "consumer": "Deuter-Prompt + Qualitätsmessung",
+        "consumer": "lokaler/entfernter Deuter-Prompt + Qualitätsmessung",
         "impact": "indirect",
-        "effect": "Ist mit der Response-ID replaybar belegt; nur das begrenzte Edge-Beispiel kann die spätere Intentwahl verbessern.",
+        "effect": "Ist mit der Response-ID replaybar belegt; Beispieltext bleibt lokal, begrenzte Intent-Verwechslungen schärfen die spätere Intentwahl.",
         "sources": (
             ("genus/response_outcomes.py", "record_feedback"),
             ("deploy/deuter.py", "_korrektur_abschnitt"),
@@ -445,7 +445,7 @@ LEARNING_IMPACT: tuple[dict[str, Any], ...] = (
         "store": "response_feedback_log",
         "consumer": "replaybare Qualitätsmessung",
         "impact": "none",
-        "effect": "Ist sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus.",
+        "effect": "Reine Daumen und enge eindeutige Textkritik werden sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus.",
         "sources": (("genus/response_outcomes.py", "record_feedback"),),
     },
     {
@@ -461,7 +461,7 @@ LEARNING_IMPACT: tuple[dict[str, Any], ...] = (
         "store": "Opt-in Lernqueue",
         "consumer": "externer Lerner",
         "impact": "potential",
-        "effect": "Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus.",
+        "effect": "Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff kann später Graphwissen erzeugen; die Queue ist standardmäßig aus.",
         "sources": (("deploy/telegram_bot.py", "_schreibe_lernwunsch"),),
     },
     {

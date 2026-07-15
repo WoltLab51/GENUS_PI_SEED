@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "83ad202148c203442762be523f5272f8cff66ef94c95c5e43c928994afeb1191",
+  "content_sha256": "07dcd79a5e19996919c277b6c85d9c53714707446a36aa24e9056e9713ed943b",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -874,7 +874,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 428,
+          "line": 445,
           "symbol": "_allowed_ids"
         }
       ],
@@ -926,7 +926,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1507,
+          "line": 1490,
           "symbol": "respond_with_deuter"
         }
       ],
@@ -939,7 +939,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 656,
+          "line": 695,
           "symbol": "handle_update"
         }
       ],
@@ -952,7 +952,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 656,
+          "line": 695,
           "symbol": "handle_update"
         }
       ],
@@ -965,7 +965,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 656,
+          "line": 695,
           "symbol": "handle_update"
         }
       ],
@@ -978,7 +978,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 454,
+          "line": 471,
           "symbol": "_send_message"
         }
       ],
@@ -991,7 +991,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 454,
+          "line": 471,
           "symbol": "_send_message"
         }
       ],
@@ -1005,7 +1005,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "runtime_contract",
-          "line": 454,
+          "line": 471,
           "symbol": "_send_message"
         }
       ],
@@ -1134,7 +1134,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 566,
+          "line": 593,
           "symbol": "_explizites_feedback"
         }
       ],
@@ -1172,7 +1172,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 622,
+          "line": 661,
           "symbol": "_bestaetige_zustellung"
         }
       ],
@@ -1185,7 +1185,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 622,
+          "line": 661,
           "symbol": "_bestaetige_zustellung"
         }
       ],
@@ -1642,7 +1642,7 @@
         {
           "file": "deploy/remote_deuter.py",
           "kind": "ast",
-          "line": 22
+          "line": 23
         }
       ],
       "to": "module:deploy.deuter",
@@ -1654,7 +1654,7 @@
         {
           "file": "deploy/remote_deuter.py",
           "kind": "ast",
-          "line": 23
+          "line": 24
         }
       ],
       "to": "module:deploy.model_gateway",
@@ -1784,12 +1784,12 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 683
+          "line": 722
         },
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 916
+          "line": 974
         }
       ],
       "to": "module:deploy.deuter",
@@ -1801,7 +1801,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 898
+          "line": 956
         }
       ],
       "to": "module:deploy.remote_deuter",
@@ -1813,7 +1813,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 775
+          "line": 821
         }
       ],
       "to": "module:deploy.stimme",
@@ -1825,7 +1825,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 684
+          "line": 723
         }
       ],
       "to": "module:deploy.waage",
@@ -1837,7 +1837,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 781
+          "line": 827
         }
       ],
       "to": "module:genus.antwort",
@@ -1849,12 +1849,12 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 568
+          "line": 597
         },
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 682
+          "line": 721
         }
       ],
       "to": "module:genus.companion",
@@ -1866,7 +1866,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 914
+          "line": 972
         }
       ],
       "to": "module:genus.db",
@@ -1878,7 +1878,19 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 280
+          "line": 146
+        }
+      ],
+      "to": "module:genus.dialogplanung",
+      "type": "imports_lazy"
+    },
+    {
+      "from": "module:deploy.telegram_bot",
+      "sources": [
+        {
+          "file": "deploy/telegram_bot.py",
+          "kind": "ast",
+          "line": 297
         }
       ],
       "to": "module:genus.hand",
@@ -1890,7 +1902,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 144
+          "line": 161
         }
       ],
       "to": "module:genus.konsolidierung",
@@ -1902,12 +1914,12 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 641
+          "line": 680
         },
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 801
+          "line": 847
         }
       ],
       "to": "module:genus.response_outcomes",
@@ -1919,12 +1931,24 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 321
+          "line": 146
+        }
+      ],
+      "to": "module:genus.sources",
+      "type": "imports_lazy"
+    },
+    {
+      "from": "module:deploy.telegram_bot",
+      "sources": [
+        {
+          "file": "deploy/telegram_bot.py",
+          "kind": "ast",
+          "line": 338
         },
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 682
+          "line": 721
         }
       ],
       "to": "module:genus.verstehen",
@@ -3760,7 +3784,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1560
+          "line": 1543
         }
       ],
       "to": "module:genus.antwort",
@@ -3847,7 +3871,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1602
+          "line": 1585
         }
       ],
       "to": "module:genus.gebaerde",
@@ -3992,12 +4016,12 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1491
+          "line": 1474
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1525
+          "line": 1508
         }
       ],
       "to": "module:genus.verstehen",
@@ -4031,7 +4055,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1571
+          "line": 1554
         }
       ],
       "to": "module:genus.werkzeug",
@@ -4338,12 +4362,12 @@
         {
           "file": "genus/dialogplanung.py",
           "kind": "ast",
-          "line": 69
+          "line": 99
         },
         {
           "file": "genus/dialogplanung.py",
           "kind": "ast",
-          "line": 181
+          "line": 211
         }
       ],
       "to": "module:genus.antwort",
@@ -4379,7 +4403,7 @@
         {
           "file": "genus/dialogplanung.py",
           "kind": "ast",
-          "line": 69
+          "line": 99
         }
       ],
       "to": "module:genus.werkzeuge_auskunft",
@@ -10862,7 +10886,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "runtime_contract",
-          "line": 449,
+          "line": 466,
           "symbol": "_get_updates"
         }
       ],
@@ -11093,7 +11117,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 582,
+          "line": 621,
           "symbol": "_letztes_feedbackziel"
         },
         {
@@ -11111,7 +11135,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 985
+          "line": 1043
         },
         {
           "file": "docs/reports/2026-07-13-h1-response-loop.md",
@@ -11401,8 +11425,8 @@
       "store": "relation_projection"
     },
     {
-      "consumer": "Deuter-Prompt + Qualitätsmessung",
-      "effect": "Ist mit der Response-ID replaybar belegt; nur das begrenzte Edge-Beispiel kann die spätere Intentwahl verbessern.",
+      "consumer": "lokaler/entfernter Deuter-Prompt + Qualitätsmessung",
+      "effect": "Ist mit der Response-ID replaybar belegt; Beispieltext bleibt lokal, begrenzte Intent-Verwechslungen schärfen die spätere Intentwahl.",
       "impact": "indirect",
       "signal": "Enge Intent-Korrektur",
       "sources": [
@@ -11468,7 +11492,7 @@
     },
     {
       "consumer": "replaybare Qualitätsmessung",
-      "effect": "Ist sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus.",
+      "effect": "Reine Daumen und enge eindeutige Textkritik werden sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus.",
       "impact": "none",
       "signal": "Explizites Antwortfeedback (👍/👎)",
       "sources": [
@@ -11498,7 +11522,7 @@
     },
     {
       "consumer": "externer Lerner",
-      "effect": "Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus.",
+      "effect": "Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff kann später Graphwissen erzeugen; die Queue ist standardmäßig aus.",
       "impact": "potential",
       "signal": "Unbekanntes Chatwort",
       "sources": [
@@ -12228,7 +12252,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 428,
+          "line": 445,
           "symbol": "_allowed_ids"
         }
       ],
@@ -12273,7 +12297,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1507,
+          "line": 1490,
           "symbol": "respond_with_deuter"
         }
       ],
@@ -12288,7 +12312,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 656,
+          "line": 695,
           "symbol": "handle_update"
         }
       ],
@@ -12303,7 +12327,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 656,
+          "line": 695,
           "symbol": "handle_update"
         }
       ],
@@ -12318,7 +12342,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 454,
+          "line": 471,
           "symbol": "_send_message"
         }
       ],
@@ -12425,7 +12449,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 566,
+          "line": 593,
           "symbol": "_explizites_feedback"
         }
       ],
@@ -12471,7 +12495,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 622,
+          "line": 661,
           "symbol": "_bestaetige_zustellung"
         }
       ],
@@ -12486,7 +12510,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 137,
+          "line": 154,
           "symbol": "_schreibe_tagespuffer"
         }
       ],
@@ -15368,7 +15392,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "runtime_contract",
-          "line": 441,
+          "line": 458,
           "symbol": "_api"
         }
       ],
@@ -15598,7 +15622,7 @@
   ],
   "summary": {
     "dynamic_sql_calls": 25,
-    "edges": 706,
+    "edges": 708,
     "event_types": 39,
     "external_dependencies": 6,
     "import_cycles": 3,

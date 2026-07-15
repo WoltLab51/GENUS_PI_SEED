@@ -123,8 +123,10 @@ Feedback-Fähigkeit gespeichert. Frage, Antwort, Slots, Chat-/Nutzer-ID und Tele
 `message_id` sind in diesen Payloads ausdrücklich verboten.
 
 Explizites Feedback bedeutet im Pilot eine Nachricht, die — abgesehen von Leerraum und
-Emoji-Varianten — vollständig aus 👍 oder vollständig aus 👎 besteht, oder den engen
-Korrektur-Cue. Beim Korrektur-Cue übernimmt die Telegram-Membran nur bekannte
+Emoji-Varianten — vollständig aus 👍 oder vollständig aus 👎 besteht, einer kleinen exakten
+Menge deutungsfreier Textkritik entspricht oder den engen Korrektur-Cue nutzt. Eine benannte
+Warum-Frage gilt nur bei exakter Übereinstimmung mit dem strukturierten Anschlussangebot.
+Beim Korrektur-Cue übernimmt die Telegram-Membran nur bekannte
 Raster-Absichten; ein freier Nutzer-Token wird nicht ins Ledger geschrieben.
 Modellgedeutetes allgemeines Lob oder Kritik wird nicht still zu Qualitätsevidenz
 erhoben. Die Projektion macht Feedback messbar und replaybar; sie ändert keine

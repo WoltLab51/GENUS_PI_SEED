@@ -1464,24 +1464,7 @@ def _komponiere(teile: list[str]) -> str:
     return antwort.komponiere(teile, (_DEUTED, _STIMME_TAG))
 
 
-_KORREKTUR_CUE = re.compile(
-    r"^\s*falsch\s+(?:verstanden|gedeutet)\s*(?::\s*([\wäöüß-]+))?\s*[.!?]*\s*$",
-    re.IGNORECASE | re.UNICODE,
-)
-
-
-def korrektur_cue(question: str) -> tuple[bool, str | None]:
-    """Der ENGE Korrektur-Kanal (Phase 3 Scheibe 3, Naht 1): exakt „falsch verstanden"
-    oder „falsch gedeutet", optional mit „: <blatt>" (dem exakten Blattnamen dessen, was
-    gemeint war). Bewusst fast deutungsfrei -- eine Freitext-Korrektur müsste durch
-    genau den Klassifikator, der eben danebengegriffen hat (zirkulär); die exakte
-    Kurzform braucht kein Modell. Ein längerer Satz („das hast du falsch verstanden,
-    glaube ich") ist KEIN Cue -- er läuft den normalen Weg."""
-    m = _KORREKTUR_CUE.match(question)
-    if not m:
-        return (False, None)
-    richtig = m.group(1)
-    return (True, richtig.lower() if richtig else None)
+korrektur_cue = dialogplanung.korrektur_cue
 
 
 def _korrektur_antwort(conn, letzte_lesarten: list[str], richtig: str | None) -> str:

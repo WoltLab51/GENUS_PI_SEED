@@ -109,7 +109,7 @@ Antwort vorbereiten → Telegram-Send/Edit → gültiger Zustellbeleg
                                           ├─ ResponseOutcome + stabile Response-ID
                                           └─ vorbereiteten Dialogzug in RAM bestätigen
 
-reine 👍-/👎-Nachricht oder enger Korrektur-Cue
+reine 👍-/👎-Nachricht, enge eindeutige Textkritik oder enger Korrektur-Cue
         → letzte feedbackfähige Response-ID → explizites Feedback-Event
 ```
 
@@ -123,13 +123,16 @@ Kennung ist nicht nötig. Gespeichert werden ausschließlich typisierte Struktur
 - beim Feedback: `positive`, `negative` oder `intent_correction` mit Response-ID.
 
 Frage, Antwort, Slots, Chat-/Nutzer-ID und Telegram-`message_id` gelangen weder in Outcome-
-noch Feedback-Payload. Positiv oder negativ bedeutet: Die Nachricht besteht, abgesehen von
-Leerraum und Emoji-Varianten, vollständig aus 👍 beziehungsweise 👎. Allgemeines, nur vom
-Modell gedeutetes Lob oder Kritik gilt nicht als explizites Feedback. Beim engen Korrektur-Cue
+noch Feedback-Payload. Positiv bedeutet: Die Nachricht besteht, abgesehen von Leerraum und
+Emoji-Varianten, vollständig aus 👍. Negativ entsteht durch reines 👎 oder eine kleine exakte
+Menge deutungsfreier Textkritik wie „das passt nicht“. Eine benannte Warum-Frage gilt nur bei
+exakter Übereinstimmung mit dem strukturierten Anschlussangebot. Allgemeines, nur vom Modell
+gedeutetes Lob oder Kritik gilt nicht als explizites Feedback. Beim engen Korrektur-Cue
 wird nur eine bekannte Raster-Absicht als `corrected_intent` übernommen; ein freier Token
-bleibt aus dem Ledger. Ebenso wichtig: Ein gespeichertes Signal bewertet noch keine Strategie
-und verändert keine Gewichte. Nur der bereits eng begrenzte Korrekturpfad kann über die
-gedeckelte Edge-Datei eine spätere Intentwahl beeinflussen.
+bleibt aus dem Ledger. Ebenso wichtig: Ein gespeichertes Signal bewertet noch keine allgemeine
+Strategie und verändert keine Gewichte. Nur der eng begrenzte Korrekturpfad beeinflusst eine
+spätere Intentwahl: lokal mit gedeckelten Beispielen, remote ausschließlich mit maximal vier
+bekannten Intent-Paaren ohne Beispieltext.
 
 Feedback-Antworten sind selbst nicht feedbackfähig und werden bei einem unmittelbar
 folgenden Daumen übersprungen. Eine zugestellte Ritual- oder Fehlerantwort bildet dagegen

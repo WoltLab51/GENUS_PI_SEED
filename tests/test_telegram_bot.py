@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from genus import reactors
+from genus import reactors, verstehen
 from genus.db import init_schema
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -392,6 +392,53 @@ def test_unknown_correction_token_never_crosses_the_ledger_privacy_boundary():
     assert "ronnygeheim" not in payload
 
 
+def test_natuerliche_enge_korrektur_lernt_die_gemeinte_definition():
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Ich teste eine freie Aussage"), allowed={42},
+        sessions=sessions, pending=pending,
+        deuter_reader=lambda question, **_kwargs: [{
+            "text": question, "absicht": "tatsache", "subject": "Aussage", "object": None,
+        }],
+    )
+    ziel_id = telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=93)
+
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(2, 42, "Nein, ich meinte eine Definition."), allowed={42},
+        sessions=sessions, pending=pending,
+    )
+
+    feedback = conn.execute(
+        "SELECT response_id, signal, corrected_intent FROM response_feedback_log"
+    ).fetchone()
+    assert tuple(feedback) == (ziel_id, "intent_correction", "definition")
+    assert "Gemeint war „definition“" in answer
+
+
+def test_eindeutige_textkritik_wird_der_zugestellten_antwort_zugeordnet():
+    conn = _fresh()
+    sessions: dict = {}
+    pending: dict = {}
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Hallo!"), allowed={42}, sessions=sessions, pending=pending,
+    )
+    ziel_id = telegram_bot._bestaetige_zustellung(conn, sessions, pending, message_id=94)
+
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(2, 42, "das wirkt random"), allowed={42},
+        sessions=sessions, pending=pending,
+    )
+
+    feedback = conn.execute(
+        "SELECT response_id, signal FROM response_feedback_log"
+    ).fetchone()
+    assert tuple(feedback) == (ziel_id, "negative")
+    assert "als unpassend markiert" in answer
+    assert pending["outcome"]["answer_mode"] == "feedback_ack"
+
+
 def test_answer_exception_is_a_delivered_non_feedbackable_error_outcome(monkeypatch):
     conn = _fresh()
     sessions: dict = {}
@@ -566,8 +613,8 @@ def test_bot_uses_injected_remote_deuter_without_loading_the_local_model(monkeyp
     text = "Ich teste dich grad, denn wir haben einen neuen Worker angeschlossen"
     calls = []
 
-    def remote_reader(question, *, absichten):
-        calls.append((question, absichten))
+    def remote_reader(question, *, absichten, korrekturen=None):
+        calls.append((question, absichten, korrekturen))
         return [{"text": question, "absicht": "tatsache", "subject": "Worker",
                  "object": None}]
 
@@ -583,6 +630,25 @@ def test_bot_uses_injected_remote_deuter_without_loading_the_local_model(monkeyp
     assert calls and calls[0][0] == text and "tatsache" in calls[0][1]
     assert "unsichere Notiz" in answer
     assert "Herkunft" not in answer
+
+
+def test_remote_deuter_bekommt_korrekturstruktur_aber_keinen_alten_chattext():
+    calls = []
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    verstehen.record_fehlgriff(conn, "tatsache", "definition")
+    verstehen.record_fehlgriff(conn, "tatsache", "definition")
+
+    def remote_reader(question, *, absichten, korrekturen=None):
+        calls.append((question, korrekturen))
+        return []
+
+    telegram_bot.handle_update(
+        conn, _msg(1, 42, "Erklaer mir den Hund"), allowed={42}, sessions={},
+        deuter_reader=remote_reader,
+    )
+
+    assert calls and calls[0][1] == [{"gelesen": "tatsache", "gemeint": "definition"}]
 
 
 def test_deuter_interpret_distinguishes_explicit_empty_from_hard_failure(monkeypatch):
@@ -1370,23 +1436,34 @@ def _lernwunsch(bot):
         return [z.strip() for z in f if z.strip()]
 
 
-def test_ein_unbekanntes_wort_landet_nur_nach_opt_in_in_der_lernwarteschlange(monkeypatch):
+def test_freier_chat_verlaesst_trotz_opt_in_nicht_die_lernwarteschlange(monkeypatch):
     monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
     conn = _fresh()
     reactors.observe_relation(conn, "Hund@de", "expresses", "Q144", "wikidata")
     reactors.observe_relation(conn, "Hund@de", "primary_gloss", "ein Haustier", "dbnary")
     telegram_bot.handle_update(conn, _msg(1, 42, "Hat ein Hund auch Fernweh?"),
                                allowed={42}, sessions={})
-    assert _lernwunsch(telegram_bot) == ["Fernweh"]   # „Hund" ist bekannt, „Hat" gefiltert
+    assert not os.path.exists(telegram_bot.LERNWUNSCH)
 
 
 def test_lernwarteschlange_dedupliziert_ueber_nachrichten(monkeypatch):
     monkeypatch.setenv("GENUS_CHAT_WORD_LEARNING", "1")
     conn = _fresh()
+    antworten = []
     for _ in range(3):
-        telegram_bot.handle_update(conn, _msg(1, 42, "Was bedeutet Fernweh?"),
-                                   allowed={42}, sessions={})
+        _, answer = telegram_bot.handle_update(
+            conn, _msg(1, 42, "Was bedeutet Fernweh?"), allowed={42}, sessions={},
+        )
+        antworten.append(answer)
     assert _lernwunsch(telegram_bot) == ["Fernweh"]   # dreimal begegnet, einmal in der Schlange
+    assert all("zum Nachschlagen vorgemerkt" in answer for answer in antworten)
+
+
+def test_nur_einzelne_definitionsbegriffe_werden_lernkandidaten():
+    conn = _fresh()
+    assert telegram_bot._lernkandidaten(conn, "Was ist Madschlis?") == ["Madschlis"]
+    assert telegram_bot._lernkandidaten(conn, "Ronny mag das geheime Projekt") == []
+    assert telegram_bot._lernkandidaten(conn, "Was ist https://example.invalid?") == []
 
 
 def test_chat_wortlernen_ist_standardmaessig_aus():

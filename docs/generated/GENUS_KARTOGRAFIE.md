@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `83ad202148c20344` · Regeneration: `genus kartografie build`
+> **Inhalt:** `07dcd79a5e199969` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,7 +14,7 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 265 | 706 | 99 | 39 | 23 / 16 | 12 | 3 | 16 |
+| 265 | 708 | 99 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
@@ -79,13 +79,13 @@ zeichnet `raw_fold`, `audit_trigger`, `audit_trace` und `audit_only` getrennt.
 | Fakten und Relationen | event_log + relation/value_projection | sources, auskunft, Wortgraph | direkt | Mehr erkannte Begriffe, Definitionen, Relationen und Quellenbelege. | [genus/sources.py:395](../../genus/sources.py) |
 | Quellenvertrauen und Übereinstimmung | Read-time Confidence | Narratoren | indirekt | Auswahl, Unsicherheits- und Mehrfachbelegsätze ändern sich. | [genus/sources.py:293](../../genus/sources.py) |
 | Intent-Lesungen | relation_projection | Thermometer und Lückendetektor | keine | Zählt Verständnis, verbessert aber keine Formulierung und keinen Inhalt. | [genus/verstehen.py:232](../../genus/verstehen.py) |
-| Enge Intent-Korrektur | response_feedback_log + korrekturen.jsonl | Deuter-Prompt + Qualitätsmessung | indirekt | Ist mit der Response-ID replaybar belegt; nur das begrenzte Edge-Beispiel kann die spätere Intentwahl verbessern. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) · [deploy/deuter.py:178](../../deploy/deuter.py) |
+| Enge Intent-Korrektur | response_feedback_log + korrekturen.jsonl | lokaler/entfernter Deuter-Prompt + Qualitätsmessung | indirekt | Ist mit der Response-ID replaybar belegt; Beispieltext bleibt lokal, begrenzte Intent-Verwechslungen schärfen die spätere Intentwahl. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) · [deploy/deuter.py:178](../../deploy/deuter.py) |
 | Persönliche Episode | append-only Ledger | Erinnerungsabruf | direkt, begrenzt | Wird auf Abruf und über einen engen Konzeptbezug eingebunden. | [genus/erinnerung.py:113](../../genus/erinnerung.py) |
 | Persönlichkeitseinstellung | art:* Relationen | Antwort-Belegung | direkt, begrenzt | Ändert wenige Floskeln, Länge, Beiwerk und optionale Stimme. | [genus/antwort.py:558](../../genus/antwort.py) |
 | Forecasts und Fehler | rohe Ledger-Events | learning CLI und Kurven | keine | Kalibrierung sichtbar, aber kein normaler Dialogverbraucher. | [genus/learning.py:97](../../genus/learning.py) |
-| Explizites Antwortfeedback (👍/👎) | response_feedback_log | replaybare Qualitätsmessung | keine | Ist sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) |
+| Explizites Antwortfeedback (👍/👎) | response_feedback_log | replaybare Qualitätsmessung | keine | Reine Daumen und enge eindeutige Textkritik werden sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) |
 | Modellgedeutetes Lob oder Kritik | nur Lesarten-Zählung | fester Handler | keine | Wird ohne eindeutige Gebärde oder Korrektur nicht als Qualitätsfeedback gespeichert. | [genus/companion.py:1023](../../genus/companion.py) |
-| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:100](../../deploy/telegram_bot.py) |
+| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Nur ein ausdrücklich als Definition erfragter unbekannter Einzelbegriff kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:100](../../deploy/telegram_bot.py) |
 | Modellgewichte | statische GGUF-Dateien | Deuter, Stimme, Waage | keine | GENUS aktualisiert oder trainiert diese Gewichte nicht. | [deploy/deuter.py:258](../../deploy/deuter.py) |
 
 ## H1-Pilot und nächste Kanten

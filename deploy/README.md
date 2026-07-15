@@ -340,8 +340,10 @@ Betriebsentscheidung. Details und die noch offene physische Episodenlöschung st
 [`docs/design/MEMORY.md`](../docs/design/MEMORY.md).
 
 Chat-Wortlernen ist aus Datenschutzgründen standardmäßig aus. Ein bewusstes
-`GENUS_CHAT_WORD_LEARNING=1` muss für Bot **und** Learner gesetzt werden; erst dann werden
-unbekannte einzelne Wortformen an externe Lexikonquellen übermittelt. Die Queue ist `0600`,
+`GENUS_CHAT_WORD_LEARNING=1` muss für Bot **und** Learner gesetzt werden; erst dann wird der
+unbekannte Einzelbegriff einer ausdrücklichen Definitionsfrage an externe Lexikonquellen
+übermittelt. Freier Chat, persönliche Aussagen und beiläufige Großschreibung werden nicht
+eingereiht. Die Queue ist `0600`,
 gemeinsam verriegelt und der Learner schreibt die Wortform nicht ins Journal.
 
 ```bash
