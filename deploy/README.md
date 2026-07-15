@@ -326,7 +326,10 @@ Die letzte Zahl ist durch die eigene numerische Telegram-User-ID zu ersetzen. Bi
 Erinnerungen echte Nutzer-Namespaces besitzen, ist genau **ein** Besitzer erlaubt und der Bot
 antwortet ausschließlich in dessen Direktchat. Der Installer validiert die ID, bettet nur sie
 in die root-owned Unit ein und hält das Token in der Datei mit Modus `0600`. Die Unit läuft unprivilegiert, mit
-Prozess-Lock, Systemd-Sandbox und Speichergrenzen; eine zweite Stimme bleibt standardmäßig aus.
+Prozess-Lock, Systemd-Sandbox und Speichergrenzen. Im Kompaktmodus bleibt die Modell-Waage aus,
+der lokale Deuter wird nur bei einer ungelösten Formulierung geladen und nach 90 Sekunden Ruhe
+wieder freigegeben; eine zweite Stimme bleibt standardmäßig aus. Dadurch bezahlt der Pi die
+Modellkosten nur für den seltenen offenen Lesefall, nicht während des gesamten Leerlaufs.
 
 Das Journal enthält nur Betriebsmetadaten (zum Beispiel Nachrichtenlänge und Fehlerklasse),
 keinen Nachrichtentext und keine Absender-ID. `~/.genus/chat_tag.jsonl` speichert ebenfalls nur
@@ -355,13 +358,14 @@ Jeder Aufruf trägt eine Rolle, ein explizites Modell, eine Datenschutzklasse, T
 und optional ein JSON-Schema. Zurück kommt neben dem Entwurf ein Beleg über Provider, Modell,
 Request-ID, Latenz, Token und Abschlussgrund. Providertext ist nie selbst Wahrheit.
 
-Der erste Verbraucher ist bewusst **kein Live-Chat**, sondern `model_bakeoff.py`: Er erzeugt die
-Antworten aus der lebenden 17-Fälle-Alltagsprobe lokal und sendet ausschließlich die
-Datenschutzklasse `synthetic`. Freie Eingaben, Telegram-Verläufe, Ledger und Memory-Vault werden
-von diesem CLI-Pfad nicht angenommen. GitHub Models ist im Provider zusätzlich fail-closed auf
-`synthetic` beschränkt. Die bestehende Anker-, Inhalts- und Richtungsprüfung aus `stimme.py`
-entscheidet anschließend, ob ein Kandidat überhaupt treu genug für eine menschliche Bewertung
-ist.
+Die ersten Verbraucher sind bewusst **kein Live-Chat**. `model_bakeoff.py` erzeugt Antworten aus
+der lebenden 17-Fälle-Alltagsprobe lokal und sendet ausschließlich die Datenschutzklasse
+`synthetic`. Freie Eingaben, Telegram-Verläufe, Ledger und Memory-Vault werden von diesem CLI-Pfad
+nicht angenommen. GitHub Models ist im Provider zusätzlich fail-closed auf `synthetic` beschränkt.
+Die bestehende Anker-, Inhalts- und Richtungsprüfung aus `stimme.py` entscheidet anschließend, ob
+ein Kandidat überhaupt treu genug für eine menschliche Bewertung ist. Daneben prüft
+`remote_deuter_benchmark.py` die strukturierte Absichtserkennung mit ausschließlich synthetischen
+deutschen Sätzen. Beide Werkzeuge schalten keinen entfernten Anbieter in Telegram frei.
 
 Ein Fine-grained PAT braucht nur `models: read`. Nicht in Shell-Historie, Repo oder Unit legen:
 

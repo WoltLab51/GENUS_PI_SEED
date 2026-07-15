@@ -491,7 +491,7 @@ def test_learner_acquisition_chain_preserves_the_pinned_ledger_path():
 
 def test_deuter_installer_puts_llama_cpp_in_the_shared_venv_not_a_new_one():
     script = (ROOT / "deploy" / "pi_install_deuter.sh").read_text(encoding="utf-8")
-    # unlike the embedder, this model must stay warm inside the bot's own process -- no new venv
+    # unlike the embedder, this model shares the bot venv; idle release avoids permanent RAM use
     assert "llama-cpp-python" in script
     assert ".venv" in script
     assert "embed-venv" not in script
@@ -558,7 +558,7 @@ def test_stimme_module_only_rephrases_never_invents():
 def test_telegram_keeps_the_second_model_behind_an_explicit_opt_in():
     # Live-Befund 2026-07-12: zwei warme 1.5B-Modelle belegten rund 4 GiB. Teilen ist wegen
     # Prompt-Cache-Verdrängung (26s statt 3s) ebenfalls keine robuste Lösung. Daher bleibt
-    # nur der notwendige Deuter warm; Stimme ist eine explizite Stil-/RAM-Entscheidung.
+    # der Deuter nur kurz warm; Stimme ist eine explizite Stil-/RAM-Entscheidung.
     bot = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
     assert "deuter.get_model" not in bot
     assert 'os.environ.get("GENUS_TELEGRAM_STIMME", "0")' in bot

@@ -132,6 +132,10 @@ Environment=GENUS_CHAT_WORD_LEARNING=$CHAT_WORD_LEARNING
 # Die verifizierte Template-Antwort bleibt ohne sie vollständig; ein Opt-in braucht bewusst
 # zusätzlich einen höheren MemoryMax-Override, statt den Pi versehentlich wieder zu verdrängen.
 Environment=GENUS_TELEGRAM_STIMME=0
+# Kompaktmodus: die Modell-Waage ist optionaler Satzfeinschliff; der Deuter wird nach Ruhe
+# freigegeben und beim nächsten wirklich offenen Sprachfall transparent wieder geladen.
+Environment=GENUS_TELEGRAM_WAAGE=0
+Environment=GENUS_DEUTER_IDLE_SECONDS=90
 ExecStart=$REPO_DIR/.venv/bin/python $REPO_DIR/deploy/telegram_bot.py
 StandardOutput=journal
 StandardError=journal

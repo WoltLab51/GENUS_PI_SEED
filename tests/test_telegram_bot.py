@@ -521,6 +521,45 @@ def test_deuter_never_calls_a_real_question_a_statement():
     assert not deuter._looks_like_question("mein Geburtstag ist im Mai")
 
 
+def test_deuter_never_calls_a_plain_worker_statement_a_provenance_question():
+    text = "Ich teste dich grad, denn wir haben einen neuen Worker angeschlossen"
+    wrong = {
+        "text": text,
+        "absicht": "warum-herkunft",
+        "subject": "GENUS",
+        "object": None,
+    }
+    assert deuter._segment(wrong, text) == {
+        "text": text,
+        "absicht": "tatsache",
+        "subject": "GENUS",
+        "object": None,
+    }
+
+
+def test_core_rejects_provenance_without_a_provenance_signal_even_after_a_genus_greeting():
+    from genus import antwort, companion
+
+    conn = _fresh()
+    result = companion.respond_with_deuter(
+        conn,
+        "Ich teste dich grad, denn wir haben einen neuen Worker angeschlossen",
+        last_question="Hallo GENUS",
+        last_answer="Hallo! Schön, dass du da bist.",
+        deuter=lambda question: {
+            "text": question,
+            "absicht": "warum-herkunft",
+            "subject": "GENUS",
+            "object": None,
+        },
+        renderer=antwort.rendere,
+    )
+    assert result["outcome"] == "fallback"
+    assert result["gelesen"] == []
+    assert "Herkunft" not in result["text"]
+    assert "Q162378" not in result["text"]
+
+
 def test_deuter_interpret_distinguishes_explicit_empty_from_hard_failure(monkeypatch):
     # live gefunden: "OK prima" bekam wortwörtlich "[]" vom echten Modell zurück -- eine
     # erfolgreich geparste, aber LEERE Liste ist ein anderes Signal als "Modell/JSON kaputt"
@@ -530,6 +569,57 @@ def test_deuter_interpret_distinguishes_explicit_empty_from_hard_failure(monkeyp
 
     monkeypatch.setattr(deuter, "_get_model", lambda: _FakeModel("das ist kein JSON"))
     assert deuter.interpret("kaputte antwort") is None
+
+
+def test_deuter_reserves_only_a_compact_structured_output_window(monkeypatch):
+    class CapturingModel(_FakeModel):
+        def create_chat_completion(self, messages, max_tokens=None, temperature=None):
+            self.max_tokens = max_tokens
+            return super().create_chat_completion(messages, max_tokens, temperature)
+
+    fake = CapturingModel("[]")
+    monkeypatch.setattr(deuter, "MODEL_PATH", __file__)
+    monkeypatch.setattr(deuter, "_get_model", lambda: fake)
+    assert deuter.interpret("Hallo") == []
+    assert fake.max_tokens == deuter.MAX_OUTPUT_TOKENS == 160
+
+
+def test_deuter_deduplicates_identical_model_segments():
+    item = {"text": "Tschüss", "absicht": "abschied", "subject": None, "object": None}
+    assert deuter.clean_segments([item, dict(item)], "Tschüss") == [item]
+
+
+def test_deuter_compact_mode_releases_only_after_idle_timeout(monkeypatch):
+    class Closable:
+        def __init__(self):
+            self.closed = 0
+
+        def close(self):
+            self.closed += 1
+
+    model = Closable()
+    monkeypatch.setenv("GENUS_DEUTER_IDLE_SECONDS", "90")
+    monkeypatch.setattr(deuter, "_model", model)
+    monkeypatch.setattr(deuter, "_model_last_used_at", 100.0)
+
+    assert deuter.release_if_idle(now=189.9) is False
+    assert deuter.release_if_idle(now=190.0) is True
+    assert model.closed == 1
+    assert deuter._model is None
+
+
+def test_deuter_compact_mode_zero_keeps_model_warm(monkeypatch):
+    monkeypatch.setenv("GENUS_DEUTER_IDLE_SECONDS", "0")
+    monkeypatch.setattr(deuter, "_model", object())
+    monkeypatch.setattr(deuter, "_model_last_used_at", 1.0)
+    assert deuter.release_if_idle(now=9999.0) is False
+
+
+def test_telegram_waage_is_an_explicit_compact_mode_opt_in(monkeypatch):
+    monkeypatch.delenv("GENUS_TELEGRAM_WAAGE", raising=False)
+    assert telegram_bot._waage_aktiv() is False
+    monkeypatch.setenv("GENUS_TELEGRAM_WAAGE", "1")
+    assert telegram_bot._waage_aktiv() is True
 
 
 def test_stimme_anchors_extracts_every_quoted_word_and_number():
@@ -802,6 +892,10 @@ def test_gbnf_grammatik_kompiliert_die_blaetter_als_grenze():
     # der Segment-Vertrag (die vier Schluessel in fester Reihenfolge) steht drin
     for schluessel in ("text", "absicht", "subject", "object"):
         assert f'\\"{schluessel}\\"' in grammatik
+    # genau drei Klauseln reichen fuer "Hallo + Frage + Danke"; keine Endlos-Wiederholung
+    assert grammatik.splitlines()[0].count("segment") == 3
+    assert "segment)*" not in grammatik
+    assert "ws ::= [ \\t\\n\\r]*" not in grammatik
     # ohne Angebot: das RASTER_SEED ist die Grenze
     voll = verstehen.gbnf_grammatik(None)
     assert '"\\"berechnen\\""' in voll
@@ -888,7 +982,7 @@ def test_fabrizierter_segment_text_wird_nicht_geglaubt(monkeypatch):
     # Live-Fund (Pi, 2026-07-04): das Modell meldete ein Segment mit dem Text
     # "f'(x) = 2x + 3" -- selbst ausgerechnet, steht nirgends in der Nachricht. Die
     # Grammatik erzwingt Struktur, nicht Herkunft; die prueft der deterministische
-    # Segment-Filter: fabrizierter Text -> die ganze Nachricht ist die ehrliche Klausel.
+    # Segment-Filter: fabrizierter Text -> das ganze Segment samt erfundener Absicht faellt weg.
     fake = _FakeModelMitKwargs(
         '[{"text": "f\'(x) = 2x + 3", "absicht": "berechnen", "subject": null, '
         '"object": null}]'
@@ -898,8 +992,7 @@ def test_fabrizierter_segment_text_wird_nicht_geglaubt(monkeypatch):
 
     nachricht = "Bestimme die Ableitung von f(x) = x^2 + 3x"
     ergebnis = deuter.interpret(nachricht)
-    assert ergebnis and ergebnis[0]["absicht"] == "berechnen"
-    assert ergebnis[0]["text"] == nachricht   # nicht der fabrizierte Text
+    assert ergebnis == []
 
     # ein ECHTER Teil-Text der Nachricht bleibt dagegen unangetastet
     fake2 = _FakeModelMitKwargs(

@@ -15,6 +15,8 @@ model can read an ALREADY-verified answer back OUT more naturally (a faithfulnes
 rephrase -- every quoted word/number must survive, or the original template stands). It is
 disabled by default: keeping both 1.5B models warm made the bridge occupy roughly 4 GiB on the
 Pi, while Stimme changes style only and the verified template is already a complete answer.
+The required Deuter is lazy-loaded and released after an idle interval (90 seconds by default),
+so an idle bot does not permanently reserve the local model's roughly two GiB working set.
 Set GENUS_TELEGRAM_STIMME=1 explicitly to accept that extra memory cost (the hardened systemd
 service also requires an intentional MemoryMax override). Sharing one model is not the fallback
 because the two system prompts evict each other's llama.cpp prompt cache and made measured
@@ -355,6 +357,18 @@ def _stimme_aktiv() -> bool:
     versehentlich einen weiteren dauerhaften 1.5B-Singleton zu laden.
     """
     return os.environ.get("GENUS_TELEGRAM_STIMME", "0").strip().casefold() in {
+        "1", "true", "yes", "on", "ja",
+    }
+
+
+def _waage_aktiv() -> bool:
+    """Die kalibrierte Modell-Waage ist im Kompaktmodus ein bewusstes RAM-Opt-in.
+
+    Sie entscheidet nur zwischen bereits gebauten Formulierungsvarianten. Der deterministische
+    Rückfall ist vollständig, während ein eigener llama.cpp-Kontext dasselbe große GGUF erneut
+    mappt. Darum bleibt sie im dauerhaft laufenden Telegram-Dienst standardmäßig aus.
+    """
+    return os.environ.get("GENUS_TELEGRAM_WAAGE", "0").strip().casefold() in {
         "1", "true", "yes", "on", "ja",
     }
 
@@ -709,8 +723,9 @@ def handle_update(
                 answer_mode="edge_ritual", feedback_eligible=False,
             )
             return chat_id, erinnerung
+        artikel_organ = waage.artikel_organ() if _waage_aktiv() else None
         if sessions is None:
-            answer = companion.respond(conn, question, waage=waage.artikel_organ())
+            answer = companion.respond(conn, question, waage=artikel_organ)
         else:
             # the OFFER of known Absichten comes from GENUS's own sown raster (the graph is
             # authoritative); before the one clean seed-apply, the module default steps in.
@@ -720,7 +735,7 @@ def handle_update(
             # ist strukturell unmöglich. Wächst das Raster, wächst die Grenze mit.
             angebot = verstehen.leaf_kinds(conn) or None
             grenze = verstehen.gbnf_grammatik(angebot)
-            # Nur der Deuter bleibt standardmäßig warm. Die Stimme ist ein ausdrückliches
+            # Der Deuter bleibt nur bis zum Idle-Release warm. Die Stimme ist ein ausdrückliches
             # Opt-in: ihr zweiter 1.5B-Singleton machte aus dem Bot live einen ~4-GiB-Prozess,
             # obwohl ohne sie dieselbe verifizierte Template-Antwort vollständig erhalten bleibt.
             # Ein Modell zu teilen wäre keine robuste Sparvariante: die verschiedenen Prompts
@@ -761,7 +776,7 @@ def handle_update(
                 # das Wiege-Organ der Formwahl-Kette: liest nur, handelt nur über seiner
                 # Blind-Proben-Schwelle; ohne Kalibrierung (~/.genus/waage_kalibrierung.json)
                 # ist es None und die Kette bleibt rein deterministisch
-                waage=waage.artikel_organ(),
+                waage=artikel_organ,
                 renderer=antwort_wuerfel.rendere,
                 previous_response_id=bezug.get("response_id"),
             )
@@ -863,6 +878,7 @@ def main() -> int:
         return 0
     _log(
         f"telegram bridge started — one private owner, Stimme={'on' if _stimme_aktiv() else 'off'}, "
+        f"Waage={'on' if _waage_aktiv() else 'off'}, "
         f"Chat-Wortlernen={'on' if _chat_wortlernen_aktiv() else 'off'}"
     )
 
@@ -872,6 +888,7 @@ def main() -> int:
     # frischen oder unmigrierten DB anders verhalten als jeder andere Zugang.
     from genus import db
     conn = db.connect(DB_PATH)
+    import deuter
 
     offset = _load_offset()
     start_zeit = time.time()
@@ -903,6 +920,8 @@ def main() -> int:
             _log(f"getUpdates failed ({type(exc).__name__}) — retrying shortly")
             time.sleep(5)
             continue
+        if deuter.release_if_idle():
+            _log("compact mode released the idle local Deuter model")
         for update in updates:
             offset = max(offset, update["update_id"] + 1)
             # Letzter Wächter: KEINE einzelne Nachricht darf die Brücke töten ODER den Offset

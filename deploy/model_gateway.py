@@ -218,6 +218,13 @@ class GitHubModels:
                 response_body = json.loads(response.read().decode("utf-8"))
                 request_id = response.headers.get("x-github-request-id")
         except urllib.error.HTTPError as exc:
+            if (request.privacy == "synthetic"
+                    and os.environ.get("GENUS_MODEL_GATEWAY_DIAGNOSTICS") == "synthetic-only"):
+                try:
+                    detail = exc.read(500).decode("utf-8", errors="replace").replace("\n", " ")
+                except OSError:
+                    detail = ""
+                raise GatewayError(f"GitHub Models HTTP {exc.code}: {detail}") from exc
             raise GatewayError(f"GitHub Models HTTP {exc.code}") from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise GatewayError("GitHub Models nicht erreichbar") from exc
@@ -249,4 +256,3 @@ def github_from_token_file(
 ) -> GitHubModels:
     privacy = frozenset({"synthetic", "remote_minimal"}) if allow_remote_minimal else frozenset({"synthetic"})
     return GitHubModels(read_secret(path), allowed_privacy=privacy)
-

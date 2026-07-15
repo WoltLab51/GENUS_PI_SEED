@@ -3,11 +3,11 @@ set -Eeuo pipefail
 
 # Permanent home for the Deuter -- the local model genus.companion.respond_with_deuter falls
 # back to as a LAST resort, when the deterministic pipeline finds nothing at all. Unlike the
-# embedder (its own venv, reloaded per word in the batch learner), this model must stay WARM
-# inside the same long-lived process as the Telegram bot -- a reload per message would cost
-# ~2-3s extra on every question. So: no new venv, llama-cpp-python goes straight into the
-# existing .venv (a deploy/-only dependency; genus/ never imports it -- membrane purity is
-# about WHAT genus/ imports, not where a deploy/ dependency happens to live). Idempotent.
+# embedder (its own venv, reloaded per word in the batch learner), this model shares the bot's
+# existing .venv but is loaded only when the deterministic pipeline really needs it. The bot's
+# compact default releases it again after 90 idle seconds: a rare cold read costs a few seconds,
+# while an idle Pi recovers roughly two GiB of RAM. No second venv is needed; genus/ never imports
+# this deploy-only dependency. Idempotent.
 #
 # Model choice is MEASURED, not guessed: 7 models/families benchmarked on the Pi (0.5B-3.8B,
 # Qwen/Llama/Gemma/Phi) -- Qwen2.5-1.5B-Instruct matched the accuracy of models 2-4x its size

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from genus import inference, sources
+from genus import inference, sources, sprachsignal
 # Der WELT-SINN (Wetter/News/Uhr) lebt seit der Modularisierung (2026-07-09, Schritt ②)
 # eigenständig in :mod:`genus.weltsinn`. Hier re-exportiert, damit ``companion.X`` unveraendert
 # weiterlaeuft -- konsolidierung liest ``companion.wetter_kurz``/``news_top``, die Tests
@@ -602,7 +602,6 @@ def is_why_followup(question: str) -> bool:
     subject of its own, but makes sense read against the PREVIOUS turn's question."""
     return question.strip().strip("?!.").strip().lower() in _WHY_FOLLOWUP
 
-
 # --- Mehr-Zug-Arbeitsgedächtnis (Punkt 4 von docs/design/MEMORY.md, Scheibe "das Tier von
 # vorhin wird auflösbar") -- dieselbe Disziplin wie beim "warum?"-Nachfrage-Fix: ein kleiner,
 # geschlossener Signalsatz statt allgemeiner Koreferenz-Auflösung (ein echt schwereres Problem).
@@ -831,8 +830,8 @@ def _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme=No
 
     text = guess.get("text") or question
     erinnerung.merke(conn, text, quelle=erinnerung.STATEMENT_SOURCE)
-    return (f"Das klingt nach einer Erinnerung — ich hab's mir notiert, aber noch unsicher "
-            f"(sag „merke dir: {text}“, wenn's wichtig ist, dann bin ich mir sicher).")
+    return ("Verstanden — danke für den Kontext. Ich habe das erst einmal als unsichere Notiz "
+            f"notiert. Wenn es wichtig ist, sag „merke dir: {text}“.")
 
 
 def _zelle_merken(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1366,7 +1365,8 @@ def _deuter_antwort(conn, guess: dict, question: str, last_question: str | None,
     from genus import verstehen
 
     kind = (guess.get("absicht") or "").strip().lower()
-    if not kind:
+    segment_text = guess.get("text") if isinstance(guess.get("text"), str) else question
+    if not kind or kind == "warum-herkunft" and not sprachsignal.hat_herkunftssignal(segment_text):
         return None
     # the graph is authoritative once sown; before the one clean seed-apply, the code-side
     # seed table keeps the mapping sane (same content, Quelle folgt mit der Saat)

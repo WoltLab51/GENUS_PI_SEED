@@ -22,8 +22,9 @@ Modell-Wahl gemessen, nicht geraten: 7 Modelle/4 Familien auf dem Pi verglichen 
 Qwen/Llama/Gemma/Phi). Qwen2.5-1.5B-Instruct traf 7/8 bei den geringsten Kosten der
 zuverlässigen Gruppe.
 
-Anders als der Embedder lebt dieses Modell WARM im selben Prozess wie der Telegram-Bot (lazy
-Modul-Singleton, llama-cpp-python in der bestehenden .venv; der Kern importiert diese Datei nie).
+Anders als der Embedder wird dieses Modell bei Bedarf im Telegram-Prozess geladen
+(llama-cpp-python in der bestehenden .venv; der Kern importiert diese Datei nie). Im
+Kompaktmodus gibt der Bot den Singleton nach einer kurzen Ruhezeit wieder frei.
 
 Zwei deterministische Leitplanken, unabhängig vom Modell:
 - `_looks_like_question`: eine "tatsache"-Lesart wird NIE geglaubt, wenn das SEGMENT strukturell
@@ -39,12 +40,20 @@ import json
 import os
 import re
 import sys
+import time
 
 MODEL_PATH = os.environ.get(
     "GENUS_DEUTER_MODEL",
     os.path.expanduser("~/.genus/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"),
 )
 N_THREADS = int(os.environ.get("GENUS_DEUTER_THREADS", "4"))
+MAX_OUTPUT_TOKENS = 160
+
+# Der Deuter ist ein Werkzeug, kein Grundrauschen: auf dem Pi darf das mmap des lokalen Modells
+# nach einer ruhigen Gesprächsphase wieder verschwinden. 0 deaktiviert die Freigabe ausdrücklich;
+# der Telegram-Dienst ruft ``release_if_idle`` nach jedem Long-Poll auf.
+_DEFAULT_IDLE_SECONDS = 90.0
+_model_last_used_at: float | None = None
 
 # Spiegel der gesäten Blätter (genus.verstehen.RASTER_SEED) -- das ANGEBOT, kein Käfig. Der
 # Bot übergibt die lebende Liste aus dem Graphen; dieser Default hält das Modul eigenständig
@@ -139,10 +148,15 @@ _QUESTION_STARTERS = {
     "ist", "sind", "hat", "haben", "kannst", "kennst", "weißt", "weisst",
 }
 _FIRST_WORD = re.compile(r"^\s*([^\s?!.,]+)", re.UNICODE)
+_PROVENANCE_CUE = re.compile(
+    r"\b(?:warum|wieso|weshalb|woher|herkunft|ursprung|quelle|beleg\w*|herleit\w*)\b"
+    r"|\bworan\s+liegt\b|\bwie\s+kommt\b",
+    re.IGNORECASE | re.UNICODE,
+)
 _JSON_ARRAY = re.compile(r"\[.*\]", re.DOTALL)
 _JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
-_model = None   # lazy singleton -- loaded once per process (~2-3s), then warm
+_model = None   # lazy singleton -- stays warm only until the configured idle release
 
 
 def _looks_like_question(text: str) -> bool:
@@ -154,6 +168,11 @@ def _looks_like_question(text: str) -> bool:
         return True
     m = _FIRST_WORD.match(t)
     return bool(m and m.group(1).lower() in _QUESTION_STARTERS)
+
+
+def _has_provenance_cue(text: str) -> bool:
+    """Herkunft ist nie eine plausible Modellvermutung, sondern braucht ein Textsignal."""
+    return bool(_PROVENANCE_CUE.search(text))
 
 
 def _korrektur_abschnitt(korrekturen) -> str:
@@ -211,54 +230,24 @@ def _system_prompt(absichten, korrekturen=None) -> str:
         "Umlaute) oder null.\n"
         "4. object -- das zweite Bezugswort, falls vorhanden, sonst null.\n"
         "Kein Fliesstext, kein Kommentar -- nur das JSON-Array.\n"
-        "Beispiele:\n"
-        "was ist eigentlich ein Hund? -> "
-        "[{\"text\": \"was ist eigentlich ein Hund?\", \"absicht\": \"definition\", "
-        "\"subject\": \"Hund\", \"object\": null}]\n"
+        "Ein Formbeispiel:\n"
         "Hallo! Was ist ein Hund? Danke dir schonmal! -> "
         "[{\"text\": \"Hallo!\", \"absicht\": \"gruss\", \"subject\": null, \"object\": null}, "
         "{\"text\": \"Was ist ein Hund?\", \"absicht\": \"definition\", \"subject\": \"Hund\", "
         "\"object\": null}, "
         "{\"text\": \"Danke dir schonmal!\", \"absicht\": \"dank\", \"subject\": null, "
         "\"object\": null}]\n"
-        "zaehlt ein Apfel zu den Pflanzen -> "
-        "[{\"text\": \"zaehlt ein Apfel zu den Pflanzen\", \"absicht\": \"beziehung\", "
-        "\"subject\": \"Apfel\", \"object\": \"Pflanze\"}]\n"
-        "Was verursacht Kopfschmerzen? -> "
-        "[{\"text\": \"Was verursacht Kopfschmerzen?\", \"absicht\": \"ursache\", "
-        "\"subject\": \"Kopfschmerz\", \"object\": null}]\n"
-        "und woran liegt das? -> "
-        "[{\"text\": \"und woran liegt das?\", \"absicht\": \"warum-herkunft\", "
-        "\"subject\": null, \"object\": null}]\n"
-        "wie kommt das eigentlich? -> "
-        "[{\"text\": \"wie kommt das eigentlich?\", \"absicht\": \"warum-herkunft\", "
-        "\"subject\": null, \"object\": null}]\n"
-        "Fuehrt Rauchen zu Krebs? -> "
-        "[{\"text\": \"Fuehrt Rauchen zu Krebs?\", \"absicht\": \"beziehung\", "
-        "\"subject\": \"Rauchen\", \"object\": \"Krebs\"}]\n"
-        "Ist Kassel in Hessen? -> "
-        "[{\"text\": \"Ist Kassel in Hessen?\", \"absicht\": \"ort\", "
-        "\"subject\": \"Kassel\", \"object\": \"Hessen\"}]\n"
-        "Was weisst du ueber dich selbst? -> "
-        "[{\"text\": \"Was weisst du ueber dich selbst?\", \"absicht\": \"selbstbild\", "
-        "\"subject\": \"Selbstbild\", \"object\": null}]\n"
-        "Kennt GENUS sein Habitat? -> "
-        "[{\"text\": \"Kennt GENUS sein Habitat?\", \"absicht\": \"selbstbild\", "
-        "\"subject\": \"Habitat\", \"object\": null}]\n"
-        "Wie wird das Wetter morgen? -> "
-        "[{\"text\": \"Wie wird das Wetter morgen?\", \"absicht\": \"weltfrage\", "
-        "\"subject\": null, \"object\": null}]\n"
-        "Ich moechte einen Familienausflug planen. Kannst du mir helfen? -> "
-        "[{\"text\": \"Ich moechte einen Familienausflug planen. Kannst du mir helfen?\", "
-        "\"absicht\": \"tun\", \"subject\": \"Familienausflug\", \"object\": null}]\n"
-        "kannst du das nochmal sagen -> "
-        "[{\"text\": \"kannst du das nochmal sagen\", \"absicht\": \"wiederholen\", "
-        "\"subject\": null, \"object\": null}]\n"
-        "koenntest du dich generell etwas kuerzer fassen? -> "
-        "[{\"text\": \"koenntest du dich generell etwas kuerzer fassen?\", "
-        "\"absicht\": \"einstellung\", \"subject\": null, \"object\": null}]\n"
-        "danke dir -> [{\"text\": \"danke dir\", \"absicht\": \"dank\", \"subject\": null, "
-        "\"object\": null}]\n"
+        "Knappe Zuordnungshilfen (Ausgabe bleibt immer das JSON-Format oben):\n"
+        "- \"Was verursacht Kopfschmerzen?\" => ursache; subject=Kopfschmerz\n"
+        "- \"und woran liegt das?\" => warum-herkunft; subject=null\n"
+        "- \"Fuehrt Rauchen zu Krebs?\" => beziehung; subject=Rauchen; object=Krebs\n"
+        "- \"Ist Kassel in Hessen?\" => ort; subject=Kassel; object=Hessen\n"
+        "- \"Kennt GENUS sein Habitat?\" => selbstbild; subject=Habitat\n"
+        "- \"Wie wird das Wetter morgen?\" => weltfrage\n"
+        "- \"Kannst du mir beim Planen eines Ausflugs helfen?\" => tun; subject=Ausflug\n"
+        "- \"koenntest du dich generell kuerzer fassen?\" => einstellung\n"
+        "- \"Ich teste dich grad, denn wir haben einen neuen Worker angeschlossen\" "
+        "=> tatsache; subject=Worker\n"
         "Fuer eindeutige, ALLTAEGLICHE Hoeflichkeitsfloskeln (Gruss, Dank, Abschied) waehle "
         "immer die passende Kategorie aus der Liste -- rate NIEMALS eine andere Absicht nur, "
         "weil ein Wort oberflaechlich aehnlich klingt. Wenn WIRKLICH nichts passt: unklar."
@@ -267,11 +256,58 @@ def _system_prompt(absichten, korrekturen=None) -> str:
 
 
 def _get_model():
-    global _model
+    global _model, _model_last_used_at
     if _model is None:
         from llama_cpp import Llama   # local import: this module stays importable without the dep
         _model = Llama(model_path=MODEL_PATH, n_threads=N_THREADS, n_ctx=2048, verbose=False)
+    _model_last_used_at = time.monotonic()
     return _model
+
+
+def _idle_seconds() -> float:
+    """Konfigurierte Ruhezeit; kaputte Werte fallen sicher auf 90 Sekunden zurück."""
+    raw = os.environ.get("GENUS_DEUTER_IDLE_SECONDS", str(_DEFAULT_IDLE_SECONDS))
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return _DEFAULT_IDLE_SECONDS
+
+
+def _diagnostics_enabled() -> bool:
+    return os.environ.get("GENUS_DEUTER_DIAGNOSTICS", "0").strip().casefold() in {
+        "1", "true", "yes", "on", "ja",
+    }
+
+
+def release_model() -> bool:
+    """Gibt das lokale Modell deterministisch frei; ``True`` nur bei echter Freigabe."""
+    global _model, _model_last_used_at
+    model = _model
+    if model is None:
+        return False
+    _model = None
+    _model_last_used_at = None
+    try:
+        close = getattr(model, "close", None)
+        if callable(close):
+            close()
+    finally:
+        # ``close`` löst mmap/KV-Kontext; der Import hier hält modellfreie Prozesse klein.
+        import gc
+        gc.collect()
+    return True
+
+
+def release_if_idle(now: float | None = None) -> bool:
+    """Gibt den Singleton nach der konfigurierten Ruhezeit frei (0 = bewusst dauerhaft warm)."""
+    if _model is None or _model_last_used_at is None:
+        return False
+    idle = _idle_seconds()
+    if idle <= 0:
+        return False
+    if (time.monotonic() if now is None else now) - _model_last_used_at < idle:
+        return False
+    return release_model()
 
 
 _grammatik_cache: dict[str, object] = {}   # GBNF-Text -> LlamaGrammar (einmal kompiliert, warm)
@@ -313,11 +349,18 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
     # FABRIZIEREN, der nirgends in der Nachricht steht (es rechnete selbst "f'(x) = 2x + 3"
     # aus und meldete das als eigenes Segment). Die Grammatik erzwingt Struktur, nicht
     # Herkunft -- die prüfen wir deterministisch: ein Text, der nicht in der Nachricht
-    # vorkommt, wird nicht geglaubt; die ganze Nachricht ist dann die ehrliche Klausel.
+    # vorkommt, wird samt seiner Absicht verworfen. Sonst könnte ein erfundenes Segment durch
+    # Ersetzen mit der ganzen Nachricht als weiterhin erfundene Absicht in den Kern gelangen.
     if segment_text.strip() and segment_text.strip() not in ganze_nachricht:
-        segment_text = ganze_nachricht
+        return None
     if absicht == "tatsache" and _looks_like_question(segment_text):
         absicht = "definition"   # eine Frage ist nie eine Aussage -- pro Segment geprueft
+    # Gegenrichtung derselben Leine (live 2026-07-14): Eine schlichte Mitteilung ueber einen
+    # neuen Worker wurde als "warum-herkunft" gelesen und zog daraufhin die Herkunft des Worts
+    # GENUS aus dem vorigen Gruss. Eine Herkunftslesart braucht ein explizites Signal im EIGENEN
+    # Segment. Ohne Frageform ist es eine Mitteilung; mit Frageform bleibt es ehrlich unklar.
+    if absicht == "warum-herkunft" and not _has_provenance_cue(segment_text):
+        absicht = "unklar" if _looks_like_question(segment_text) else "tatsache"
     subject = eintrag.get("subject")
     obj = eintrag.get("object")
     return {
@@ -326,6 +369,20 @@ def _segment(eintrag: dict, ganze_nachricht: str) -> dict | None:
         "subject": subject if isinstance(subject, str) else None,
         "object": obj if isinstance(obj, str) else None,
     }
+
+
+def clean_segments(entries, message: str) -> list[dict]:
+    """Validiert Herkunft und entfernt identische Modell-Dopplungen reihenfolgestabil."""
+    cleaned = []
+    seen = set()
+    for segment in (_segment(entry, message) for entry in entries):
+        if segment is None:
+            continue
+        key = tuple(segment.get(field) for field in ("text", "absicht", "subject", "object"))
+        if key not in seen:
+            seen.add(key)
+            cleaned.append(segment)
+    return cleaned
 
 
 def interpret(nachricht: str, absichten=None, grammatik: str | None = None,
@@ -366,11 +423,15 @@ def interpret(nachricht: str, absichten=None, grammatik: str | None = None,
                 {"role": "system", "content": _system_prompt(absichten, korrekturen)},
                 {"role": "user", "content": nachricht},
             ],
-            max_tokens=300,
+            max_tokens=MAX_OUTPUT_TOKENS,
             temperature=0.0,
             **zusatz,
         )
         text = result["choices"][0]["message"]["content"].strip()
+        if os.environ.get("GENUS_DEUTER_DIAGNOSTICS_RAW") == "synthetic-only":
+            finish = result["choices"][0].get("finish_reason")
+            print(f"[DEUTER] synthetic raw reply ({finish=}): {text[:500]!r}; "
+                  f"usage={result.get('usage')!r}", file=sys.stderr)
         match = _JSON_ARRAY.search(text)
         if match:
             parsed = json.loads(match.group(0))
@@ -378,13 +439,15 @@ def interpret(nachricht: str, absichten=None, grammatik: str | None = None,
             # das Modell gab evtl. nur EIN Objekt statt eines Arrays -- lenient akzeptieren
             obj_match = _JSON_OBJECT.search(text)
             parsed = [json.loads(obj_match.group(0))] if obj_match else json.loads(text)
-    except Exception:
+    except Exception as exc:
+        if _diagnostics_enabled():
+            print(f"[DEUTER] interpret failed ({type(exc).__name__}: {exc})", file=sys.stderr)
         return None
     if isinstance(parsed, dict):
         parsed = [parsed]
     if not isinstance(parsed, list):
         return None
-    return [s for s in (_segment(e, nachricht) for e in parsed) if s is not None]
+    return clean_segments(parsed, nachricht)
 
 
 def _merkmale_prompt(blaetter) -> str:

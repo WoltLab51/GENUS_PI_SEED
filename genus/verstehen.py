@@ -191,7 +191,7 @@ def gbnf_grammatik(blaetter=None) -> str:
     angebot.add("unklar")
     alternativen = " | ".join(f'"\\"{b}\\""' for b in sorted(angebot))
     return "\n".join([
-        'root ::= "[" ws "]" | "[" ws segment (ws "," ws segment)* ws "]"',
+        'root ::= "[" ws "]" | "[" ws segment (ws "," ws segment)? (ws "," ws segment)? ws "]"',
         'segment ::= "{" ws "\\"text\\"" ws ":" ws string ws "," ws "\\"absicht\\"" ws ":" ws'
         ' absicht ws "," ws "\\"subject\\"" ws ":" ws wort ws "," ws "\\"object\\"" ws ":" ws'
         ' wort ws "}"',
@@ -199,7 +199,7 @@ def gbnf_grammatik(blaetter=None) -> str:
         'wort ::= string | "null"',
         'string ::= "\\"" zeichen* "\\""',
         'zeichen ::= [^"\\\\] | "\\\\" ["\\\\/bfnrt]',
-        'ws ::= [ \\t\\n\\r]*',
+        'ws ::= [ \\t\\n\\r]? [ \\t\\n\\r]? [ \\t\\n\\r]? [ \\t\\n\\r]?',
     ])
 
 
