@@ -2,7 +2,7 @@
 
 > **Status:** canonical
 > **Owner:** Kernvertrag
-> **Zuletzt verifiziert:** 2026-07-13
+> **Zuletzt verifiziert:** 2026-07-15
 > **Besitzt:** Systemgrenzen, Schichten, Abhängigkeiten und technische Invarianten
 
 ## Ein Satz
@@ -17,7 +17,7 @@ Netzwerk sowie privilegierte Betriebshandlungen hinter expliziten Membranen.
 flowchart TB
     subgraph M["Membranen — offen, austauschbar, begrenzt"]
         SRC["Sensoren / Quellen"]
-        MODEL["lokale Modelle / Deuter / Stimme"]
+        MODEL["lokale oder entfernte Modelle / Deuter / Stimme"]
         TG["Telegram / Bedienung"]
         OPS["systemd / Cron / Recovery"]
     end
@@ -239,6 +239,14 @@ entsteht keine persönliche Episode. Bis Nutzer-Namespaces existieren, spricht d
 Kern nur mit genau einem Owner im Direktchat. Chat-abgeleitetes externes Wortlernen ist Opt-in.
 Der genaue Speicher- und Abrufvertrag steht in
 [design/MEMORY.md](design/MEMORY.md).
+
+Eine ausdrücklich freigegebene zweite Datenschutzgrenze liegt vor GitHub Models: Erst wenn
+lokale Rituale und Muster keinen sicheren Pfad finden, darf der Remote-Deuter den statischen
+Segmentvertrag und ausschließlich den aktuellen, auf 1.000 Zeichen begrenzten Telegram-Text
+sehen. Verlauf, Nutzerkennung, Ledger, Antwort und Korrekturdatei bleiben lokal. Sein Vorschlag
+ist weder Antwort noch Evidenz: Herkunftsfilter, Rastergrenze und Kernzelle prüfen ihn erneut.
+Die Freigabe ist eine widerrufbare `0600`-Datei; Minuten-/Tagesbudget und Circuit Breaker
+begrenzen Kosten und Ausfälle.
 
 ## 7. Privileggrenze auf dem Pi
 

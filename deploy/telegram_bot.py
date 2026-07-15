@@ -15,8 +15,11 @@ model can read an ALREADY-verified answer back OUT more naturally (a faithfulnes
 rephrase -- every quoted word/number must survive, or the original template stands). It is
 disabled by default: keeping both 1.5B models warm made the bridge occupy roughly 4 GiB on the
 Pi, while Stimme changes style only and the verified template is already a complete answer.
-The required Deuter is lazy-loaded and released after an idle interval (90 seconds by default),
-so an idle bot does not permanently reserve the local model's roughly two GiB working set.
+Without explicit remote consent, the required local Deuter is lazy-loaded and released after an
+idle interval (90 seconds by default), so an idle bot does not permanently reserve its roughly
+two GiB working set. With the private remote-consent marker, only unresolved current messages
+(at most 1,000 characters; no history or ledger) are classified by GPT-4.1 Nano through GitHub
+Models. Its structured guess crosses the same deterministic verification line.
 Set GENUS_TELEGRAM_STIMME=1 explicitly to accept that extra memory cost (the hardened systemd
 service also requires an intentional MemoryMax override). Sharing one model is not the fallback
 because the two system prompts evict each other's llama.cpp prompt cache and made measured
@@ -652,7 +655,7 @@ def _bestaetige_zustellung(
 
 def handle_update(
     conn, update: dict, allowed: set[int], sessions: dict[int, list[dict]] | None = None,
-    status=None, pending: dict | None = None,
+    status=None, pending: dict | None = None, deuter_reader=None,
 ) -> tuple[int, str] | None:
     """Pure logic, no network: given one Telegram update + the allow-list, decide whether to
     answer and with what -- ``None`` if the sender isn't allowed or there's no text to answer.
@@ -752,6 +755,19 @@ def handle_update(
             # ins Ledger gelangt später ausschließlich dessen transportneutrale response_id.
             bezug = feedback_ziel or vorher
             hinweise = _korrektur_hinweise(conn)   # Lernkreis-Rückfluss, frisch berechnet
+            if deuter_reader is None:
+                deute = lambda q: deuter.interpret(
+                    q, absichten=angebot, grammatik=grenze, korrekturen=hinweise,
+                )
+            else:
+                # Remote-minimal bekommt nur den aktuellen Zug und das Raster-Angebot. Verlauf,
+                # Korrekturbeispiele und GBNF-Implementierungsdetails bleiben auf dem Pi.
+                def deute(q):
+                    try:
+                        return deuter_reader(q, absichten=angebot)
+                    except (RuntimeError, ValueError) as exc:
+                        _log(f"remote Deuter fell back to local core ({type(exc).__name__})")
+                        return None
             sprich = None
             if status is not None:
                 status(chat_id, "🤔 Ich denke nach …")   # gleich ruft der Deuter (Sekunden)
@@ -766,8 +782,7 @@ def handle_update(
 
             result = companion.respond_with_deuter(
                 conn, question, bezug.get("question"),
-                deuter=lambda q: deuter.interpret(q, absichten=angebot, grammatik=grenze,
-                                                  korrekturen=hinweise),
+                deuter=deute,
                 stimme=sprich,
                 last_answer=bezug.get("answer"),
                 verlauf=zuege[:-1],
@@ -876,9 +891,17 @@ def main() -> int:
     if _instance_lock is None:
         _log("another telegram bridge instance already owns the poll lock — stopping")
         return 0
+    remote_reader = None
+    try:
+        import remote_deuter
+        remote_reader = remote_deuter.from_environment(reporter=_log)
+    except (RuntimeError, ValueError, OSError) as exc:
+        _log(f"remote Deuter disabled ({type(exc).__name__})")
+    remote_label = remote_reader.model if remote_reader is not None else "off"
     _log(
         f"telegram bridge started — one private owner, Stimme={'on' if _stimme_aktiv() else 'off'}, "
         f"Waage={'on' if _waage_aktiv() else 'off'}, "
+        f"Remote-Deuter={remote_label}, "
         f"Chat-Wortlernen={'on' if _chat_wortlernen_aktiv() else 'off'}"
     )
 
@@ -931,6 +954,7 @@ def main() -> int:
             try:
                 result = handle_update(
                     conn, update, allowed, sessions, status=melder.melde, pending=pending,
+                    deuter_reader=(remote_reader.interpret if remote_reader is not None else None),
                 )
             except Exception as exc:
                 _log(f"handle_update crashed ({type(exc).__name__})")

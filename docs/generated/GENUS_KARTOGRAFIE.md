@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `78ef1590a83b2810` · Regeneration: `genus kartografie build`
+> **Inhalt:** `7628642e45d34d44` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,7 +14,7 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 263 | 697 | 97 | 39 | 23 / 16 | 12 | 3 | 16 |
+| 264 | 701 | 98 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
@@ -85,7 +85,7 @@ zeichnet `raw_fold`, `audit_trigger`, `audit_trace` und `audit_only` getrennt.
 | Forecasts und Fehler | rohe Ledger-Events | learning CLI und Kurven | keine | Kalibrierung sichtbar, aber kein normaler Dialogverbraucher. | [genus/learning.py:97](../../genus/learning.py) |
 | Explizites Antwortfeedback (👍/👎) | response_feedback_log | replaybare Qualitätsmessung | keine | Ist sicher mit einer zugestellten Response-ID verknüpft; automatische Strategiegewichtung bleibt bewusst aus. | [genus/response_outcomes.py:165](../../genus/response_outcomes.py) |
 | Modellgedeutetes Lob oder Kritik | nur Lesarten-Zählung | fester Handler | keine | Wird ohne eindeutige Gebärde oder Korrektur nicht als Qualitätsfeedback gespeichert. | [genus/companion.py:1025](../../genus/companion.py) |
-| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:97](../../deploy/telegram_bot.py) |
+| Unbekanntes Chatwort | Opt-in Lernqueue | externer Lerner | potenziell | Kann später Graphwissen erzeugen; die Queue ist standardmäßig aus. | [deploy/telegram_bot.py:100](../../deploy/telegram_bot.py) |
 | Modellgewichte | statische GGUF-Dateien | Deuter, Stimme, Waage | keine | GENUS aktualisiert oder trainiert diese Gewichte nicht. | [deploy/deuter.py:258](../../deploy/deuter.py) |
 
 ## H1-Pilot und nächste Kanten
@@ -122,7 +122,7 @@ Runtime-Verträge und keine behauptete vollständige Shell-Sprachanalyse.
 | `domaene` | 33 |
 | `fundament` | 5 |
 | `lernen` | 8 |
-| `membranen` | 17 |
+| `membranen` | 18 |
 | `projektionen` | 8 |
 | `querschnitt` | 2 |
 | `schnittstellen` | 12 |

@@ -173,6 +173,11 @@ verarbeitet werden. Der neue Tagespuffer bleibt dabei unangetastet.
 - Antwort-Outcomes und explizites Feedback speichern nur Struktur und Response-ID, keinen
   Gesprächs- oder Transporttext.
 - Token und Allowlist bleiben getrennte, zugriffsgeschützte Betriebskonfiguration.
+- Der selektive Remote-Deuter darf nach ausdrücklicher `0600`-Freigabe nur den aktuellen,
+  höchstens 1.000 Zeichen langen Zug zusammen mit einem statischen Strukturvertrag an GitHub
+  Models übertragen. Er erhält weder Verlauf noch Telegram-ID, Ledger, Antworten oder
+  Korrekturbeispiele und persistiert selbst keinen Rohtext; das Journal führt nur technische
+  Nutzungszahlen. Widerruf löscht die Freigabedatei, nicht erst ein Modellprofil.
 
 Zwei begrenzte Rohtext-Ausnahmen bleiben in der Membran:
 

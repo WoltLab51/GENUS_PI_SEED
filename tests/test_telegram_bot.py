@@ -560,6 +560,31 @@ def test_core_rejects_provenance_without_a_provenance_signal_even_after_a_genus_
     assert "Q162378" not in result["text"]
 
 
+def test_bot_uses_injected_remote_deuter_without_loading_the_local_model(monkeypatch):
+    from genus import verstehen
+
+    text = "Ich teste dich grad, denn wir haben einen neuen Worker angeschlossen"
+    calls = []
+
+    def remote_reader(question, *, absichten):
+        calls.append((question, absichten))
+        return [{"text": question, "absicht": "tatsache", "subject": "Worker",
+                 "object": None}]
+
+    monkeypatch.setattr(
+        deuter, "interpret",
+        lambda *_a, **_k: pytest.fail("lokales Grossmodell darf im Remote-Modus nicht laden"),
+    )
+    conn = _fresh()
+    verstehen.seed_raster(conn)
+    _, answer = telegram_bot.handle_update(
+        conn, _msg(1, 42, text), allowed={42}, sessions={}, deuter_reader=remote_reader,
+    )
+    assert calls and calls[0][0] == text and "tatsache" in calls[0][1]
+    assert "unsichere Notiz" in answer
+    assert "Herkunft" not in answer
+
+
 def test_deuter_interpret_distinguishes_explicit_empty_from_hard_failure(monkeypatch):
     # live gefunden: "OK prima" bekam wortwörtlich "[]" vom echten Modell zurück -- eine
     # erfolgreich geparste, aber LEERE Liste ist ein anderes Signal als "Modell/JSON kaputt"

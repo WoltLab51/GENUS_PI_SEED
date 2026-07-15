@@ -9,33 +9,10 @@ import time
 import deuter
 from deuter_benchmark import CASES
 import model_gateway
+import remote_deuter
 
 
-SCHEMA = model_gateway.JsonSchema(
-    "genus_deuter_segmente",
-    {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["segments"],
-        "properties": {
-            "segments": {
-                "type": "array",
-                "maxItems": 3,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["text", "absicht", "subject", "object"],
-                    "properties": {
-                        "text": {"type": "string"},
-                        "absicht": {"type": "string", "enum": list(deuter.DEFAULT_ABSICHTEN)},
-                        "subject": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                        "object": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                    },
-                },
-            },
-        },
-    },
-)
+SCHEMA = remote_deuter.schema_for(deuter.DEFAULT_ABSICHTEN)
 
 
 def run(args, provider=None, *, clock=time.monotonic, sleeper=time.sleep) -> int:

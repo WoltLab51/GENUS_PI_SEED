@@ -349,7 +349,7 @@ systemctl status genus-telegram-bot.service
 journalctl -u genus-telegram-bot.service -f
 ```
 
-### Modell-Gateway und synthetischer Bake-off
+### Modell-Gateway, selektiver Remote-Deuter und synthetischer Bake-off
 
 `model_gateway.py` ist die providerneutrale Netz-Membran für entfernte Modelle. Der Kern unter
 `genus/` importiert sie nie. Der erste Adapter spricht die versionierte GitHub-Models-API mit
@@ -358,7 +358,7 @@ Jeder Aufruf trägt eine Rolle, ein explizites Modell, eine Datenschutzklasse, T
 und optional ein JSON-Schema. Zurück kommt neben dem Entwurf ein Beleg über Provider, Modell,
 Request-ID, Latenz, Token und Abschlussgrund. Providertext ist nie selbst Wahrheit.
 
-Die ersten Verbraucher sind bewusst **kein Live-Chat**. `model_bakeoff.py` erzeugt Antworten aus
+Die Vergleichswerkzeuge bleiben bewusst **kein Live-Chat**. `model_bakeoff.py` erzeugt Antworten aus
 der lebenden 17-Fälle-Alltagsprobe lokal und sendet ausschließlich die Datenschutzklasse
 `synthetic`. Freie Eingaben, Telegram-Verläufe, Ledger und Memory-Vault werden von diesem CLI-Pfad
 nicht angenommen. GitHub Models ist im Provider zusätzlich fail-closed auf `synthetic` beschränkt.
@@ -366,6 +366,30 @@ Die bestehende Anker-, Inhalts- und Richtungsprüfung aus `stimme.py` entscheide
 ein Kandidat überhaupt treu genug für eine menschliche Bewertung ist. Daneben prüft
 `remote_deuter_benchmark.py` die strukturierte Absichtserkennung mit ausschließlich synthetischen
 deutschen Sätzen. Beide Werkzeuge schalten keinen entfernten Anbieter in Telegram frei.
+
+Telegram kann nach einer **persönlichen, widerrufbaren Freigabe** den gemessenen Sieger
+`openai/gpt-4.1-nano` als selektiven Deuter verwenden. Der Aufruf geschieht erst nach lokalen
+Ritualen und Muster-Zellen. Übertragen werden ausschließlich der statische Segmentvertrag und
+der aktuelle Nachrichtentext (höchstens 1.000 Zeichen) — niemals Telegram-ID, Verlauf, Ledger,
+Antworten oder frühere Korrekturbeispiele. Das Modell darf höchstens drei strukturierte Lesarten
+vorschlagen; Segment-Herkunft und Wirkung prüft danach derselbe deterministische Kern wie beim
+lokalen Deuter. Ein Providerfehler lädt nicht automatisch das große lokale Modell nach.
+
+Die Freigabe ist eine private `0600`-Datei und damit ohne Root widerrufbar:
+
+```bash
+install -d -m 700 "$HOME/.genus"
+umask 077
+printf '%s\n' 'github-models:remote_minimal' > "$HOME/.genus/remote_deuter.enabled"
+chmod 600 "$HOME/.genus/remote_deuter.enabled"
+touch "$HOME/.genus/telegram_bot.neustart"
+```
+
+Widerruf: `rm "$HOME/.genus/remote_deuter.enabled"` und denselben Neustart-Flag berühren. Der
+Live-Pfad ist zusätzlich auf 10 Aufrufe pro Minute, 120 pro UTC-Tag, 160 Ausgabetoken und acht
+Sekunden Laufzeit begrenzt. Das Tagesbudget liegt ohne Nachrichtentext in
+`~/.genus/remote_deuter_budget.json`; HTTP 429 öffnet eine fünfminütige Ausfall-Sperre. Das
+Journal enthält nur Modell-, Latenz-, Token- und Segmentzahlen, niemals den Chattext.
 
 Ein Fine-grained PAT braucht nur `models: read`. Nicht in Shell-Historie, Repo oder Unit legen:
 
@@ -397,9 +421,9 @@ Damit bleibt auch ein laengerer Lauf unter dem freien Low-Tier-Limit von 15 Anfr
 Modell-IDs sind Beispiele und müssen vor dem Lauf im GitHub-Models-Katalog geprüft werden. Das
 CLI dedupliziert IDs und bricht **vor** dem ersten Netzaufruf ab, wenn Fälle × Modelle das harte
 Request-Limit überschreiten. Bezahlte GitHub-Models-Nutzung bleibt in GitHub standardmäßig aus;
-ein dort gesetztes Budget ist die zweite, externe Kostengrenze. `remote_minimal` existiert als
-Vertragsklasse, ist für den GitHub-Adapter aber erst nach einer ausdrücklichen Code-/Policy-
-Freigabe erreichbar. Eine Live-Telegram-Verdrahtung gibt es in dieser Stufe absichtlich nicht.
+ein dort gesetztes Budget ist die zweite, externe Kostengrenze. `remote_minimal` ist im
+GitHub-Adapter ausschließlich für den explizit freigegebenen Live-Deuter erreichbar; synthetische
+Werkzeuge bleiben auf `synthetic` gepinnt.
 
 ## Clock
 
