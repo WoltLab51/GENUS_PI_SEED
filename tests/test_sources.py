@@ -691,7 +691,89 @@ def test_companion_narrate_is_fluent_and_glassbox():
     # jeder benannte Begriff in Guillemets -- der Stimme-Anker-Schutz (live gefunden: ohne den
     # Schutz wurde "Kernobst" beim Umformulieren unbemerkt zu "Kernaubere")
     assert "»Heimtier« und »domestiziertes Säugetier«" in s and "Q39201" not in s   # labels, no Q-id
-    assert "»chien«" in s
+    assert "chien" not in s   # Fremdsprachen sind Vertiefung, kein Standard-Beiwerk
+
+
+def _hund_therapie_graph():
+    conn = _fresh()
+    for wort, qid, gloss in (
+        ("Hund", "Q144", "Haustier, dessen Vorfahre der Wolf ist"),
+        ("Therapie", "Q179661", "Maßnahmen zur Behandlung einer Krankheit"),
+        ("Heilmittel", "Q1595418", "Mittel zur Behandlung einer Krankheit"),
+    ):
+        reactors.observe_relation(conn, f"{wort}@de", "expresses", qid, "wikidata")
+        reactors.observe_relation(conn, f"{wort}@de", "primary_gloss", gloss, "dbnary")
+    reactors.observe_relation(conn, "dog@en", "expresses", "Q144", "wikidata")
+    reactors.observe_relation(conn, "Q144", "used_for", "Q179661", "wikidata")
+    reactors.observe_relation(conn, "Q179661", "used_for", "Q1595418", "wikidata")
+    return conn
+
+
+def test_einfache_definition_bleibt_lokal_knapp_und_ohne_zufallsanschluss():
+    from genus import companion
+
+    conn = _hund_therapie_graph()
+
+    def deuter_darf_nicht_laufen(_question):
+        raise AssertionError("eine eindeutige Definition darf nicht zum Deuter")
+
+    result = companion.respond_with_deuter(
+        conn, "Was ist ein Hund?", deuter=deuter_darf_nicht_laufen,
+    )
+
+    assert "Haustier" in result["text"]
+    assert "In anderen Sprachen" not in result["text"]
+    assert "Therapie" not in result["text"]
+    assert companion._DEUTED not in result["text"]
+    assert result.get("anschluss") is None
+
+
+def test_allgemeine_beziehungsfrage_nutzt_used_for_statt_is_a_fehlmeldung():
+    from genus import companion
+
+    conn = _hund_therapie_graph()
+
+    def deuter_darf_nicht_laufen(_question):
+        raise AssertionError("die feste Zusammenhangsfrage ist lokal eindeutig")
+
+    result = companion.respond_with_deuter(
+        conn, "Wie hängen Hund und Therapie zusammen?", deuter=deuter_darf_nicht_laufen,
+    )
+
+    assert "Hund" in result["text"] and "Therapie" in result["text"]
+    assert "eingesetzt" in result["text"]
+    assert "is_a" not in result["text"]
+    assert result.get("anschluss") is None
+
+
+def test_benannte_warum_nachfrage_erklaert_den_sprung_statt_altes_thema_zu_dumpen():
+    from genus import companion
+
+    conn = _hund_therapie_graph()
+    deuter = lambda _q: {"absicht": "warum-herkunft", "subject": "Therapie"}
+    result = companion.respond_with_deuter(
+        conn, "weshalb Therapie?", last_question="Was ist ein Hund?", deuter=deuter,
+    )
+
+    assert "Hund" in result["text"] and "Therapie" in result["text"]
+    assert "eingesetzt" in result["text"]
+    assert "zu weit" in result["text"] and "unpassend" in result["text"]
+    assert "Woher GENUS" not in result["text"]
+
+
+def test_kompakte_warum_spur_zeigt_nur_die_gewaehlte_bedeutung():
+    from genus import companion
+
+    conn = _hund_therapie_graph()
+    reactors.observe_relation(conn, "Hund@de", "expresses", "Q_schimpf", "wikidata-lexemes")
+    reactors.observe_relation(conn, "Hund@de", "primary_gloss", "Schimpfwort", "dbnary")
+
+    result = companion.respond_with_deuter(
+        conn, "warum?", last_question="Was ist ein Hund?", deuter=lambda _q: [],
+    )
+
+    assert "Q144" in result["text"]
+    assert "Q_schimpf" not in result["text"] and "Schimpfwort" not in result["text"]
 
 
 def test_companion_narrate_drops_unnameable_parents():

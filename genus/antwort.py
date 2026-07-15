@@ -264,11 +264,6 @@ def entwurf_definition(
         if label:
             claims.append(Claim(subject=word, predicate="part_of_speech", object=label))
 
-    for form in result.get("languages") or ():
-        label = str(form).strip()
-        if label:
-            claims.append(Claim(subject=word, predicate="other_language_form", object=label))
-
     belegte_eltern: set[str] = set()
     for relation in result.get("is_a_evidence") or ():
         if not isinstance(relation, Mapping):
@@ -394,7 +389,6 @@ def _rendere_definition(draft: AnswerDraft, frame: DialogueFrame) -> str:
         return draft.fallback_text
     eltern = [c for c in draft.claims if c.predicate == "is_a"]
     wortarten = [c.object for c in draft.claims if c.predicate == "part_of_speech"]
-    sprachen = [c.object for c in draft.claims if c.predicate == "other_language_form"]
     subject = draft.anchors[0]
     kopf = f"»{subject}«"
     if wortarten:
@@ -418,8 +412,6 @@ def _rendere_definition(draft: AnswerDraft, frame: DialogueFrame) -> str:
     quellen = _quellen(draft.claims)
     if frame.knappheit == "ausfuehrlich" and quellen:
         saetze.append(f"Die Belege stammen aus {_join_de(quellen)}.")
-    if sprachen:
-        saetze.append(f"In anderen Sprachen: {', '.join(f'»{form}«' for form in sprachen[:4])}.")
     saetze.extend(draft.supplements)
     return " ".join(saetze) or draft.fallback_text
 

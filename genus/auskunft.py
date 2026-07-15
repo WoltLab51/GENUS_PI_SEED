@@ -191,8 +191,6 @@ def narrate(a: dict) -> str:
         sentence += " Bei dieser Bedeutung bin ich noch unsicher — sie ist erst schwach belegt."
     elif n >= 2:
         sentence += " Diese Bedeutung ist mehrfach unabhängig belegt."
-    if a["languages"]:
-        sentence += f" In anderen Sprachen: {', '.join(f'»{w}«' for w in a['languages'][:4])}."
     return sentence
 
 # Die verbindenden (dynamischen) Prädikate → nativer Satz. Dieselben Prädikatnamen, die der
@@ -208,6 +206,81 @@ _DYNAMISCHE_KANTEN: tuple[tuple[str, str], ...] = (
     ("caused_by", "»{w}« wird verursacht von {o}."),
 )
 
+# Direkte, gesprächsrelevante Konzeptbeziehungen. Lexikalische und administrative Kanten
+# bleiben absichtlich draußen: Eine allgemeine Frage „Wie hängen X und Y zusammen?“ soll
+# Sachwissen lesen, nicht die interne Ablageform des Graphen erklären.
+_BEZIEHUNGS_KANTEN = (
+    "part_of", "has_part", "made_of", "used_for", "causes", "caused_by",
+    "located_in", "instance_of",
+)
+
+_BEZIEHUNGS_SAETZE = {
+    "part_of": "»{s}« ist Teil von »{o}«.",
+    "has_part": "Zu »{s}« gehört »{o}«.",
+    "made_of": "»{s}« besteht aus »{o}«.",
+    "used_for": "»{s}« wird für »{o}« eingesetzt.",
+    "causes": "»{s}« kann »{o}« verursachen.",
+    "caused_by": "»{s}« kann durch »{o}« verursacht werden.",
+    "located_in": "»{s}« befindet sich in »{o}«.",
+    "instance_of": "»{s}« ist ein konkretes Beispiel für »{o}«.",
+}
+
+
+def direkte_beziehung(conn, subject: str, object_: str, *, beide_richtungen: bool = False) \
+        -> dict | None:
+    """Eine direkte Sachkante zwischen zwei gemeinten Konzepten, in beiden Richtungen.
+
+    Anders als :func:`relate` ist dies keine reine ``is_a``-Prüfung. Die Funktion löst die
+    prominente Bedeutung des Subjekts und alle bekannten Bedeutungen des Objekts auf und
+    liefert nur eine tatsächlich gespeicherte, gesprächsrelevante Kante samt Beleg zurück.
+    """
+    subject_form = _concept_form(conn, subject)
+    object_concepts, object_form = _concepts_of(conn, object_)
+    if subject_form is None or object_form is None:
+        return None
+    subject_qid = _prominent_concept(conn, subject_form)
+    if subject_qid is None:
+        return None
+
+    richtungen = [(subject_qid, object_concepts, subject_form, object_form)]
+    if beide_richtungen:
+        richtungen.append((None, {subject_qid}, object_form, subject_form))
+    for left, right, left_name, right_name in richtungen:
+        left_nodes = {left} if left is not None else object_concepts
+        for left_node in left_nodes:
+            for right_node in right:
+                for predicate in _BEZIEHUNGS_KANTEN:
+                    rows = sources.relations(
+                        conn, subject=left_node, predicate=predicate, object=right_node,
+                    )
+                    if not rows:
+                        continue
+                    confidence = sources.relation_confidence(
+                        conn, left_node, predicate, right_node,
+                    )
+                    return {
+                        "relational": True,
+                        "verdict": "yes",
+                        "subject": left_name,
+                        "object": right_name,
+                        "subject_qid": left_node,
+                        "object_qid": right_node,
+                        "predicate": predicate,
+                        "trust": confidence["confidence"],
+                        "chain": [
+                            {"subject": row["subject"], "predicate": row["predicate"],
+                             "object": row["object"], "source": row["source"]}
+                            for row in rows
+                        ],
+                    }
+    return None
+
+
+def narrate_direkte_beziehung(r: dict) -> str:
+    """Knapper, natürlicher Satz für eine von :func:`direkte_beziehung` belegte Kante."""
+    vorlage = _BEZIEHUNGS_SAETZE.get(r["predicate"], "»{s}« steht mit »{o}« in Verbindung.")
+    return vorlage.format(s=r["subject"], o=r["object"])
+
 
 def vertiefung(conn, a: dict) -> list[str]:
     """Die VERTIEFUNGS-KOMPOSITION (Antwort-Würfel, Umfang „ausführlich" -- Ronnys Frage
@@ -217,6 +290,9 @@ def vertiefung(conn, a: dict) -> list[str]:
     Leiter eine Stufe hinauf, die Quellen namentlich. Rein deterministisch, nichts
     erfunden; jeder benannte Begriff steht in »« (Anker für die Stimme-Leine)."""
     saetze: list[str] = []
+    if a.get("languages"):
+        saetze.append("In anderen Sprachen: "
+                      + ", ".join(f"»{w}«" for w in a["languages"][:4]) + ".")
     if len(a.get("meaning") or []) > 1:
         saetze.append(f"Daneben kenne ich eine weitere Bedeutung von »{a['word']}«: "
                       f"{_sprechgloss(a['meaning'][1]).rstrip('.')}.")
@@ -301,7 +377,10 @@ def _beispiel(conn, qid: str) -> str | None:
 # genau das angebotene Konzept trifft). Genau EIN Angebot, das schwächste-relevanteste zuerst.
 # Sagt der Nutzer im nächsten Zug „ja", löst :func:`respond_with_deuter` es ein -- sonst
 # bricht das Service-Gefühl (ein „ja" ins Leere wäre schlimmer als kein Angebot).
-_ANTIZIPATION_KANTEN = ("causes", "used_for", "has_part", "part_of", "made_of", "caused_by")
+# Zweck-Kanten (``used_for``) sind oft fachlich wahr, aber als Anschluss an eine Definition
+# zu weit entfernt: Hund -> Therapie war der Live-Beleg. Sie bleiben für explizite
+# Beziehungsfragen vollständig nutzbar, werden hier jedoch nicht mehr proaktiv angeboten.
+_ANTIZIPATION_KANTEN = ("causes", "has_part", "part_of", "made_of", "caused_by")
 
 
 def _erklaerbar_und_eindeutig(conn, frage: str, ziel_qid: str) -> bool:
@@ -338,7 +417,10 @@ def antizipation(conn, a: dict) -> dict | None:
             frage = f"Was ist {y_name}?"
             if _erklaerbar_und_eindeutig(conn, frage, r["object"]):
                 return {"text": f"Wenn du magst, erkläre ich dir noch, was »{y_name}« ist.",
-                        "frage": frage}
+                        "frage": frage,
+                        "beleg": {"subject": wort, "subject_qid": qid,
+                                  "predicate": praedikat, "object": y_name,
+                                  "object_qid": r["object"], "source": r["source"]}}
     return None
 
 # --- relational questions ("Ist ein X ein Y?") -----------------------------------------

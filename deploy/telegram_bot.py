@@ -788,6 +788,7 @@ def handle_update(
                 verlauf=zuege[:-1],
                 letzte_lesarten=bezug.get("gelesen"),
                 letzter_anschluss=bezug.get("anschluss"),
+                letzter_anschluss_beleg=bezug.get("anschluss_beleg"),
                 # das Wiege-Organ der Formwahl-Kette: liest nur, handelt nur über seiner
                 # Blind-Proben-Schwelle; ohne Kalibrierung (~/.genus/waage_kalibrierung.json)
                 # ist es None und die Kette bleibt rein deterministisch
@@ -836,6 +837,7 @@ def handle_update(
             neuer_zug = {"question": result["question"], "answer": answer,
                          "gelesen": result.get("gelesen") or [],
                          "anschluss": result.get("anschluss"),
+                         "anschluss_beleg": result.get("anschluss_beleg"),
                          "feedback_eligible": not feedback_ack,
                          "answer_mode": answer_mode}
             if pending is None:

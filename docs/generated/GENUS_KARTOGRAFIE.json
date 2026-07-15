@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "7628642e45d34d4482c68420cf7dfcf8a9eb8121d9e2daf16a2f1c7379c221f3",
+  "content_sha256": "18ba3be2c8d4ef7899371319388b80bb0ca7779e678a897088d8ae0bfc7076f4",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -757,7 +757,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 491,
+          "line": 483,
           "symbol": "rendere"
         }
       ],
@@ -770,7 +770,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 491,
+          "line": 483,
           "symbol": "rendere"
         }
       ],
@@ -783,7 +783,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 491,
+          "line": 483,
           "symbol": "rendere"
         }
       ],
@@ -809,7 +809,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1351,
+          "line": 1349,
           "symbol": "_deuter_antwort"
         }
       ],
@@ -822,7 +822,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 715,
+          "line": 728,
           "symbol": "_zelle_definition"
         }
       ],
@@ -835,7 +835,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 715,
+          "line": 728,
           "symbol": "_zelle_definition"
         }
       ],
@@ -887,7 +887,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 562,
+          "line": 554,
           "symbol": "belegung"
         }
       ],
@@ -926,7 +926,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1531,
+          "line": 1507,
           "symbol": "respond_with_deuter"
         }
       ],
@@ -1789,7 +1789,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 914
+          "line": 916
         }
       ],
       "to": "module:deploy.deuter",
@@ -1801,7 +1801,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 896
+          "line": 898
         }
       ],
       "to": "module:deploy.remote_deuter",
@@ -1866,7 +1866,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 912
+          "line": 914
         }
       ],
       "to": "module:genus.db",
@@ -1907,7 +1907,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 800
+          "line": 801
         }
       ],
       "to": "module:genus.response_outcomes",
@@ -2210,7 +2210,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "ast",
-          "line": 315
+          "line": 310
         }
       ],
       "to": "module:genus.auskunft",
@@ -2246,7 +2246,7 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 663
+          "line": 745
         }
       ],
       "to": "module:genus.gender_rule",
@@ -2258,7 +2258,7 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 732
+          "line": 814
         }
       ],
       "to": "module:genus.hypothese",
@@ -2294,7 +2294,7 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 536
+          "line": 618
         }
       ],
       "to": "module:genus.verwandt",
@@ -2306,22 +2306,22 @@
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 390
+          "line": 472
         },
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 421
+          "line": 503
         },
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 608
+          "line": 690
         },
         {
           "file": "genus/auskunft.py",
           "kind": "ast",
-          "line": 753
+          "line": 835
         }
       ],
       "to": "module:genus.werkzeuge_auskunft",
@@ -3690,22 +3690,22 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 360
+          "line": 373
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 406
+          "line": 419
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 645
+          "line": 658
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 746
+          "line": 759
         },
         {
           "file": "genus/companion.py",
@@ -3725,47 +3725,42 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1007
+          "line": 1005
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1014
+          "line": 1012
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1282
+          "line": 1280
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1347
+          "line": 1345
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1410
+          "line": 1408
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1430
+          "line": 1428
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1465
+          "line": 1463
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1478
-        },
-        {
-          "file": "genus/companion.py",
-          "kind": "ast",
-          "line": 1578
+          "line": 1560
         }
       ],
       "to": "module:genus.antwort",
@@ -3789,7 +3784,19 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 561
+          "line": 15
+        }
+      ],
+      "to": "module:genus.dialogplanung",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.companion",
+      "sources": [
+        {
+          "file": "genus/companion.py",
+          "kind": "ast",
+          "line": 574
         }
       ],
       "to": "module:genus.druck",
@@ -3811,12 +3818,12 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 829
+          "line": 827
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 844
+          "line": 842
         }
       ],
       "to": "module:genus.erinnerung",
@@ -3828,7 +3835,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1452
+          "line": 1450
         }
       ],
       "to": "module:genus.experience",
@@ -3840,7 +3847,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1609
+          "line": 1602
         }
       ],
       "to": "module:genus.gebaerde",
@@ -3864,7 +3871,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 512
+          "line": 525
         }
       ],
       "to": "module:genus.inquiries",
@@ -3881,7 +3888,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1041
+          "line": 1039
         }
       ],
       "to": "module:genus.persoenlichkeit",
@@ -3898,7 +3905,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 850
+          "line": 848
         }
       ],
       "to": "module:genus.query",
@@ -3922,7 +3929,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 855
+          "line": 853
         }
       ],
       "to": "module:genus.selbstbild",
@@ -3970,27 +3977,27 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 895
+          "line": 893
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1205
+          "line": 1203
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1365
+          "line": 1363
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1515
+          "line": 1491
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1548
+          "line": 1525
         }
       ],
       "to": "module:genus.verstehen",
@@ -4014,17 +4021,17 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1159
+          "line": 1157
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1190
+          "line": 1188
         },
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 1589
+          "line": 1571
         }
       ],
       "to": "module:genus.werkzeug",
@@ -4033,11 +4040,6 @@
     {
       "from": "module:genus.companion",
       "sources": [
-        {
-          "file": "genus/companion.py",
-          "kind": "ast",
-          "line": 746
-        },
         {
           "file": "genus/companion.py",
           "kind": "ast",
@@ -4056,7 +4058,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 896
+          "line": 894
         }
       ],
       "to": "module:genus.werkzeuge_auskunft",
@@ -4080,7 +4082,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 744
+          "line": 757
         },
         {
           "file": "genus/companion.py",
@@ -4107,7 +4109,7 @@
         {
           "file": "genus/companion.py",
           "kind": "ast",
-          "line": 486
+          "line": 499
         }
       ],
       "to": "module:genus.ziele",
@@ -4329,6 +4331,59 @@
       ],
       "to": "module:genus.sources",
       "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.dialogplanung",
+      "sources": [
+        {
+          "file": "genus/dialogplanung.py",
+          "kind": "ast",
+          "line": 47
+        },
+        {
+          "file": "genus/dialogplanung.py",
+          "kind": "ast",
+          "line": 159
+        }
+      ],
+      "to": "module:genus.antwort",
+      "type": "imports_lazy"
+    },
+    {
+      "from": "module:genus.dialogplanung",
+      "sources": [
+        {
+          "file": "genus/dialogplanung.py",
+          "kind": "ast",
+          "line": 8
+        }
+      ],
+      "to": "module:genus.auskunft",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.dialogplanung",
+      "sources": [
+        {
+          "file": "genus/dialogplanung.py",
+          "kind": "ast",
+          "line": 7
+        }
+      ],
+      "to": "module:genus.sources",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.dialogplanung",
+      "sources": [
+        {
+          "file": "genus/dialogplanung.py",
+          "kind": "ast",
+          "line": 47
+        }
+      ],
+      "to": "module:genus.werkzeuge_auskunft",
+      "type": "imports_lazy"
     },
     {
       "from": "module:genus.doctor",
@@ -11056,7 +11111,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 983
+          "line": 985
         },
         {
           "file": "docs/reports/2026-07-13-h1-response-loop.md",
@@ -11390,7 +11445,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 562,
+          "line": 554,
           "symbol": "belegung"
         }
       ],
@@ -11435,7 +11490,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1025,
+          "line": 1023,
           "symbol": "_zelle_kritik"
         }
       ],
@@ -12083,7 +12138,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 491,
+          "line": 483,
           "symbol": "rendere"
         }
       ],
@@ -12113,7 +12168,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1351,
+          "line": 1349,
           "symbol": "_deuter_antwort"
         }
       ],
@@ -12128,7 +12183,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 715,
+          "line": 728,
           "symbol": "_zelle_definition"
         }
       ],
@@ -12188,7 +12243,7 @@
         {
           "file": "genus/antwort.py",
           "kind": "curated",
-          "line": 562,
+          "line": 554,
           "symbol": "belegung"
         }
       ],
@@ -12218,7 +12273,7 @@
         {
           "file": "genus/companion.py",
           "kind": "curated",
-          "line": 1531,
+          "line": 1507,
           "symbol": "respond_with_deuter"
         }
       ],
@@ -13181,6 +13236,22 @@
       "sources": [
         {
           "file": "genus/deduktion.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
+      "id": "module:genus.dialogplanung",
+      "label": "genus.dialogplanung",
+      "ring": "domaene",
+      "roles": [
+        "module"
+      ],
+      "sources": [
+        {
+          "file": "genus/dialogplanung.py",
           "kind": "ast",
           "line": 1
         }
@@ -15527,13 +15598,13 @@
   ],
   "summary": {
     "dynamic_sql_calls": 25,
-    "edges": 701,
+    "edges": 706,
     "event_types": 39,
     "external_dependencies": 6,
     "import_cycles": 3,
     "missing_h1_contracts": 3,
-    "modules": 98,
-    "nodes": 264,
+    "modules": 99,
+    "nodes": 265,
     "projected_events": 23,
     "projection_tables": 12,
     "raw_events": 16,
@@ -15863,6 +15934,7 @@
         "module:genus.control",
         "module:genus.db",
         "module:genus.deduktion",
+        "module:genus.dialogplanung",
         "module:genus.doctor",
         "module:genus.druck",
         "module:genus.erinnerung",

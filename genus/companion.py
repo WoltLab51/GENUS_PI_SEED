@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from genus import inference, sources, sprachsignal
+from genus import dialogplanung, inference, sources, sprachsignal
 # Der WELT-SINN (Wetter/News/Uhr) lebt seit der Modularisierung (2026-07-09, Schritt ②)
 # eigenständig in :mod:`genus.weltsinn`. Hier re-exportiert, damit ``companion.X`` unveraendert
 # weiterlaeuft -- konsolidierung liest ``companion.wetter_kurz``/``news_top``, die Tests
@@ -355,6 +355,19 @@ def _muster_antwort(conn, question: str, bel: dict | None = None) -> tuple[str, 
     ``bel`` (Antwort-Würfel-Belegung, optional): reicht die Wärme an die relationalen/kausalen
     Narrationen durch (Voice 1, Scheibe 1). Ohne Belegung -- der CLI-nahe :func:`respond` --
     bleibt der nüchterne Wortlaut; die Gesprächs-Einstiege reichen sie durch."""
+    # Die häufigste Wissensfrage ist lokal eindeutig und braucht keinen Modelldeuter. Enges,
+    # verankertes Muster: genau ein Begriff, damit der schnelle Pfad nicht wieder gierig wird.
+    definition = dialogplanung.definitionsbegriff(question)
+    if definition:
+        text = _wort_antwort(conn, definition)
+        if text is not None:
+            return text, "definition"
+    allgemein = dialogplanung.zusammenhangsbegriffe(question)
+    if allgemein:
+        text = dialogplanung.beziehungs_antwort(conn, *allgemein, bel, allgemein=True)
+        if text is not None:
+            return text, "beziehung"
+
     rel = relate(conn, question)
     if rel.get("relational"):
         from genus import antwort as _antwort
@@ -743,25 +756,12 @@ def _zelle_beziehung(conn, guess, question, last_question, last_answer, stimme=N
     if not _anker_ok(question, guess["subject"], guess["object"]):
         from genus import zaehlwerk
         zaehlwerk.zaehle("beziehung", "anker_frei")   # gedeutet statt zitiert -- messen, nicht blocken
-    from genus import antwort as _antwort, werkzeuge_auskunft
+    from genus import antwort as _antwort
     bel = _antwort.belegung(conn, "plausch")   # Voice 1 (Scheibe 1) -- Wärme aus dem Antwort-Würfel
-    r = werkzeuge_auskunft.relate_geplant(conn, guess["subject"], guess["object"])
-    if r["relational"] and r["verdict"] == "yes":
-        text = narrate_relation(conn, r, bel)
-        return _antwort.AnswerText(text, _antwort.entwurf_beziehung(r, text))
-    # keine POSITIVE is_a-Beziehung? -> dieselbe Zelle trägt auch die GERICHTETE Kausal-Beziehung
-    # („Verursacht X Y?", „Führt X zu Y?" -- Formulierungen, die die festen Muster von
-    # _muster_antwort verfehlen, der Deuter aber als beziehung liest). Wichtig: „beide bekannt,
-    # keine is_a-Kante" ist verdict=="no_path" (relational=True!) -- genau der Kausal-Fall; er darf
-    # NICHT von der is_a-Zurückhaltung geschluckt werden. Reihenfolge: is_a-Ja > Kausal-Ja >
-    # ehrliche is_a-Zurückhaltung. Die Kausal-Antwort ist selbst wortlautfest (Richtung = Wahrheit).
-    k = _kausal_zwischen(conn, guess["subject"], guess["object"])
-    if k["kausal_q"] and k["art"] == "ja":
-        return narrate_kausal(conn, k, bel)
-    if not r["relational"]:
-        return None
-    text = narrate_relation(conn, r, bel)
-    return _antwort.AnswerText(text, _antwort.entwurf_beziehung(r, text))
+    return dialogplanung.beziehungs_antwort(
+        conn, guess["subject"], guess["object"], bel,
+        allgemein=bool(re.search(r"\bzusammen\b", question, re.IGNORECASE)),
+    )
 
 
 def _zelle_ursache(conn, guess, question, last_question, last_answer, stimme=None):
@@ -818,9 +818,7 @@ def _zelle_grammatik(conn, guess, question, last_question, last_answer, stimme=N
 
 
 def _zelle_nachfrage(conn, guess, question, last_question, last_answer, stimme=None):
-    if not last_question:
-        return None
-    return "\n".join(render_trace(conn, trace(conn, last_question)))
+    return dialogplanung.nachfrage_antwort(conn, guess, last_question)
 
 
 def _zelle_tatsache(conn, guess, question, last_question, last_answer, stimme=None):
@@ -1466,28 +1464,6 @@ def _komponiere(teile: list[str]) -> str:
     return antwort.komponiere(teile, (_DEUTED, _STIMME_TAG))
 
 
-def _anschluss_beiwerk(conn, question: str, aktiv: bool) -> tuple[str, str | None]:
-    """Die Antizipation als Beiwerk der Antwort (Antwort-Komposition, Achse Nutzer&Service):
-    nach einer beantwortbaren Konzept-Antwort EIN graph-verifiziertes Anschluss-Angebot.
-    Kreuz-Konsistenz an EINER Stelle (``antwort.belegung``): nur auf dem Gesprächspfad
-    (``aktiv``) und nur, wenn die Belegung Rückfragen zulässt (neugier · nicht knapp,
-    Rollen-gepinnt -- Wache/knapp ⇒ keins). Gibt ``(" " + Angebot, Anschluss-Frage)`` oder
-    ``("", None)``, wenn nichts Anknüpfbares vorliegt (nichts erfunden)."""
-    if not aktiv:
-        return "", None
-    from genus import antwort as _antwort
-
-    if not _antwort.belegung(conn, "plausch")["beiwerk_rueckfrage"]:
-        return "", None
-    a = answer(conn, question)
-    if not a.get("found") or not a.get("concept"):
-        return "", None
-    ang = antizipation(conn, a)
-    if ang is None:
-        return "", None
-    return " " + ang["text"], ang["frage"]
-
-
 _KORREKTUR_CUE = re.compile(
     r"^\s*falsch\s+(?:verstanden|gedeutet)\s*(?::\s*([\wäöüß-]+))?\s*[.!?]*\s*$",
     re.IGNORECASE | re.UNICODE,
@@ -1532,7 +1508,8 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                          deuter=None, stimme=None, last_answer: str | None = None,
                          verlauf: list[dict] | None = None,
                          letzte_lesarten: list[str] | None = None,
-                         letzter_anschluss: str | None = None, waage=None,
+                         letzter_anschluss: str | None = None,
+                         letzter_anschluss_beleg: dict | None = None, waage=None,
                          renderer=None, previous_response_id: int | None = None) -> dict:
     """Der vollständige Gesprächspfad: sichere Rituale und Muster, segmentierte Deutung,
     Wort-Lesart, dann ehrlicher Rest. Deuter-Lesarten werden als reine Struktur gezählt;
@@ -1564,8 +1541,13 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
     if letzter_anschluss and _ist_zustimmung(question):
         text = _stimme_versucht(conn, respond(conn, letzter_anschluss, waage=waage), stimme)
         return {"text": text, "question": letzter_anschluss, "gelesen": []}
+    begruendung = dialogplanung.anschluss_begruendung(
+        question, letzter_anschluss_beleg, last_question,
+    )
+    if begruendung is not None:
+        return begruendung
     if last_question and is_why_followup(question):
-        text = "\n".join(render_trace(conn, trace(conn, last_question)))
+        text = dialogplanung.kompakte_spur(conn, last_question)
         return {"text": text, "question": last_question}
     if verlauf and is_backreference(question):
         frueher = _fruehere_frage_mit_bekanntem_begriff(conn, verlauf)
@@ -1599,8 +1581,19 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
             text = _stimme_versucht(conn, text, stimme, kern=kern)
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
-        return {"text": text, "question": question, "gelesen": [muster[1]],
-                "outcome": draft.resolution if draft else "answered"}
+        outcome = draft.resolution if draft else "answered"
+        bei, anschluss, anschluss_beleg = dialogplanung.anschluss_beiwerk(
+            conn, question, deuter is not None, outcome=outcome,
+        )
+        res = {"text": text + bei, "question": question}
+        # Der reine Python-/CLI-Vertrag bleibt so klein wie vor dem Definitions-Fast-Path;
+        # die Telegram-Membran injiziert einen Renderer und erhält den strukturierten Rahmen.
+        if renderer is not None or muster[1] != "definition":
+            res.update(gelesen=[muster[1]], outcome=outcome)
+        if anschluss:
+            res["anschluss"] = anschluss
+            res["anschluss_beleg"] = anschluss_beleg
+        return res
     if deuter is not None:
         # DIE GEBÄRDEN-SCHNELLSPUR (Proposal #14): eine reine Emoji-Nachricht wird gläsern und
         # modellfrei gelesen, VOR dem Deuter -- ein 👍 ist eindeutiger als jeder Modell-Tipp.
@@ -1625,11 +1618,14 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
                 waage=waage, renderer=renderer,
                 previous_response_id=previous_response_id)
             if teile:
-                bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
+                bei, anschluss, anschluss_beleg = dialogplanung.anschluss_beiwerk(
+                    conn, question, deuter is not None, outcome=outcome,
+                )
                 res = {"text": _komponiere(teile) + bei, "question": anchor,
                        "gelesen": gelesen, "outcome": outcome}
                 if anschluss:   # der Schlüssel erscheint nur, wenn es wirklich ein Angebot gibt
                     res["anschluss"] = anschluss
+                    res["anschluss_beleg"] = anschluss_beleg
                 return res
             # der Deuter lief und fand ehrlich nichts -- kein Rückfall auf den gierigen
             # Wort-Lookup mehr (siehe _NICHT_VERSTANDEN-Kommentar oben). Gezählt wird der
@@ -1649,12 +1645,15 @@ def respond_with_deuter(conn, question: str, last_question: str | None = None,
         text = _stimme_versucht(conn, text, stimme)
         if deuter is not None:
             text += _notiz_bezug(conn, question) or ""
-        bei, anschluss = _anschluss_beiwerk(conn, question, deuter is not None)
+        bei, anschluss, anschluss_beleg = dialogplanung.anschluss_beiwerk(
+            conn, question, deuter is not None, outcome=draft.resolution,
+        )
         res = {"text": text + bei, "question": question}
         if renderer is not None:
             res.update(gelesen=["definition"], outcome=draft.resolution)
         if anschluss:
             res["anschluss"] = anschluss
+            res["anschluss_beleg"] = anschluss_beleg
         return res
     res = {"text": _UNKNOWN_FALLBACK, "question": question}
     if renderer is not None:

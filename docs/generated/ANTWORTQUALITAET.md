@@ -2,7 +2,7 @@
 
 > **Status:** generierte, hermetische Abnahmefläche · menschliche Wertung bleibt bindend
 >
-> **Suite:** `2026-07-13.1` · **Inhalt:** `1ce7a11ff8a15fe5`
+> **Suite:** `2026-07-13.1` · **Inhalt:** `8418187a53ac8fdb`
 >
 > **Datengrenze:** ausschließlich synthetische In-Memory-Fälle; kein Pi-Ledger, kein Chat-Export, kein Modell als Richter
 
@@ -40,7 +40,7 @@ Das ist bewusst **keine Gesamtnote**. Grün beweist Treue, Ehrlichkeit, Richtung
 | `09-pflichtslot-fehlt` · Unvollständige Beziehung | 5/5 | `review_pending` | `a62b0b48ccaf` |
 | `10-freie-definition` · Freie Formulierung, graphgeprüft | 5/5 | `review_pending` | `ed8ea16ffc00` |
 | `11-empfehlung-noch-nicht` · Verstandene, noch nicht beherrschte Bitte | 4/4 | `review_pending` | `4364c8ffbacf` |
-| `12-warum-rueckbezug` · Warum bleibt am Thema | 4/4 | `review_pending` | `2f444c0a13da` |
+| `12-warum-rueckbezug` · Warum bleibt am Thema | 4/4 | `review_pending` | `2baa42cb91a0` |
 | `13-anschluss-ja` · Ein angebotenes Thema wird eingelöst | 6/6 | `review_pending` | `628e9ee54bbd` |
 | `14-von-vorhin` · Rückbezug über eine Floskel hinweg | 4/4 | `review_pending` | `bdf1ffaf60ee` |
 | `15-mehrsegment` · Gruß, Frage und Dank in einer Nachricht | 6/6 | `review_pending` | `354208b8a5e3` |
@@ -583,10 +583,9 @@ Struktur: `outcome=answered` · `readings=['beziehung']` · `anchor=Ist ein Hund
 **Zug 2 · GENUS**
 
 ```text
-Warum »Hund« zu »Haustier« zählt — die Herleitung:
+Die Herleitung von »Hund« zu »Haustier«:
   Hund@de —expresses→ Q144 (Hund)   ← wikidata (Vertrauen 0.50)
   Q144 (Hund) —is_a→ Q1001 (Haustier)   ← wikidata (Vertrauen 0.50)
-  ⇒ Vertrauen 0.50 — die schwächste Prämisse der Kette.
 ```
 
 Struktur: `outcome=answered` · `readings=[]` · `anchor=Ist ein Hund ein Haustier?`
@@ -602,7 +601,7 @@ Hinweis: Dieser Legacy-Zweig lieferte `outcome`, `gelesen` noch nicht explizit; 
 
 **Menschliche Prüffrage:** Ist die Herleitung lesbar genug, um Vertrauen zu schaffen statt nur Technik zu zeigen?
 
-Status: `review_pending` · Fall `83d16a51cd0d` · Antwort `2f444c0a13da`
+Status: `review_pending` · Fall `83d16a51cd0d` · Antwort `2baa42cb91a0`
 
 <details>
 <summary>Bewertungsvorlage mit vollständigen Hashes</summary>
@@ -611,7 +610,7 @@ Status: `review_pending` · Fall `83d16a51cd0d` · Antwort `2f444c0a13da`
 {
   "case_id": "12-warum-rueckbezug",
   "case_fingerprint": "83d16a51cd0d9522172aa95efd71b0e0322820616295196f055b8b8654a8bf07",
-  "response_sha256": "2f444c0a13da9cb79252739b9aff04993fbdcbc9de96fc96a0b88f14c1066cea",
+  "response_sha256": "2baa42cb91a09f8bed7878a5d4edb885bb59d7f898a6290e05b65dd3795fc271",
   "ton": "traegt",
   "nutzen": "traegt",
   "reviewer": "ronny",

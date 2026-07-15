@@ -100,7 +100,7 @@ def test_definition_renderer_nutzt_dieselbe_bereinigte_sprechglosse_wie_narrate(
     assert "arbeitsfreie Tage" in text and "ohne Plural" not in text
 
 
-def test_definition_renderer_bewahrt_wortart_sprachen_eltern_und_zusatzmaterial():
+def test_definition_renderer_bewahrt_wortart_eltern_und_zusatzmaterial():
     material = {
         "found": True,
         "word": "Hund",
@@ -118,9 +118,10 @@ def test_definition_renderer_bewahrt_wortart_sprachen_eltern_und_zusatzmaterial(
 
     for bestandteil in (
         "Substantiv", "ein Haustier", "Säugetier", "Tier", "Lebewesen", "Organismus",
-        "dog", "chien", "Ein bewahrter, graphgestützter Zusatz.",
+        "Ein bewahrter, graphgestützter Zusatz.",
     ):
         assert bestandteil in text
+    assert "dog" not in text and "chien" not in text
 
 
 def test_definition_renderer_faellt_zurueck_wenn_ein_claim_verloren_geht(monkeypatch):
