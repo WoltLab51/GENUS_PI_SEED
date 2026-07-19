@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from genus import cli, hand, ledger, sealing
+from genus import cli, doctor as doctor_checks, hand, ledger, sealing
 from genus.sensor import mock_activity, mock_cpu, mock_disk, mock_memory, mock_temperature
 
 
@@ -23,7 +23,7 @@ def test_doctor_exits_zero_with_warnings_and_writes_no_events(
 
     result = CliRunner().invoke(cli.main, ["doctor"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "[OK] database:" in result.output
     assert "[OK] ledger-storage:" in result.output
     assert "events_24h=" in result.output
@@ -46,7 +46,7 @@ def test_doctor_reports_sealing_and_core_id(monkeypatch, cli_conn, conn):
         env={"GENUS_CORE_ID": "pi-core"},
     )
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "[OK] sealing:" in result.output
     assert "[OK] core-id: GENUS_CORE_ID=pi-core" in result.output
     assert "[OK] forbidden-model-imports: none" in result.output
@@ -77,7 +77,7 @@ def test_doctor_warnt_bei_ueberfaelliger_ungesendeter_hand(monkeypatch, cli_conn
 
     result = CliRunner().invoke(cli.main, ["doctor"])
 
-    assert result.exit_code == 0                       # WARN, kein FAIL -> doctor bleibt gruen
+    assert result.exit_code == 0, result.output         # WARN, kein FAIL -> doctor bleibt gruen
     assert "[WARN] hand-faellig:" in result.output
     assert "[OK] integrity:" in result.output          # hand-Ereignisse sind dem Vertrag jetzt bekannt
 
@@ -88,5 +88,21 @@ def test_doctor_hand_check_ok_ohne_ueberfaellige(monkeypatch, cli_conn, conn):
 
     result = CliRunner().invoke(cli.main, ["doctor"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "[OK] hand-faellig:" in result.output
+
+
+def test_doctor_prueft_echte_importe_statt_woerter_in_strings(tmp_path, monkeypatch):
+    core = tmp_path / "genus"
+    core.mkdir()
+    module = core / "probe.py"
+    monkeypatch.setattr(doctor_checks, "ROOT", tmp_path)
+
+    module.write_text('TEXT = "requests ist hier nur ein Prüfwort"\nimport json\n', encoding="utf-8")
+    checks = {check.name: check for check in doctor_checks._forbidden_import_checks()}
+    assert checks["forbidden-network-imports"].status == "OK"
+
+    module.write_text("import requests\n", encoding="utf-8")
+    checks = {check.name: check for check in doctor_checks._forbidden_import_checks()}
+    assert checks["forbidden-network-imports"].status == "FAIL"
+    assert checks["forbidden-network-imports"].detail == "requests"

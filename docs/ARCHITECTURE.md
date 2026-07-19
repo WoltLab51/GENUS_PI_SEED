@@ -292,6 +292,15 @@ Generatoren dürfen Entwürfe liefern, aber weder ihre eigene Abnahme definieren
 Merge, Deploy oder Rootwirkung freischalten. Siehe
 [ADR-0002](decisions/ADR-0002-CHANGE-TRUST.md).
 
+Der allgemeine Entwicklerloop operationalisiert diese Asymmetrie: `genus/entwickler.py` liest
+Selbstkarte und Repositoryquellen ohne Prozess- oder Netzwirkung, erzeugt evidenzgebundene
+Diagnosen, risikogestufte ChangeSpecs und hashgebundene `draft_only`-Freigaben. Nur die Membran
+`deploy/entwickler_worker.py` darf einen detached Git-Worktree oder ein externes Coding-Modell
+aufrufen. Der Worker kennt keinen Commit-, Merge-, Push- oder Deploypfad. Kritische Dateien
+(Ledger, Schema, Siegel, Governance und kritische Deploypfade) verlassen v1 nie als Modellprompt. Der genaue
+Vertrag steht in [design/SELF_CODING.md](design/SELF_CODING.md) und
+[ADR-0004](decisions/ADR-0004-SUPERVISED-SELF-CODING.md).
+
 ## 9. Abhängigkeitsrichtung
 
 Die grobe Richtung bleibt nach unten gerichtet:
@@ -332,7 +341,8 @@ ist ein Architekturhinweis, nicht automatisch ein Defekt.
 - Föderation benötigt strukturell getrennte Kerne und ein Löschkonzept.
 - Volltext-Episoden im heutigen append-only Ledger sind nicht physisch löschbar; ein echter
   persönlicher Memory-Vault mit Export, Retention und verifizierbarem Vergessen fehlt noch.
-- Selbst-Codieren bleibt menschlich gemergt.
+- Selbst-Codieren darf isolierte, geprüfte Entwürfe erzeugen; Commit, Merge und Deploy bleiben
+  menschlich entschieden.
 - Modelle verbessern Ausdruck und Deutung, nicht den Wahrheitsrang.
 
 Aktuelle Betriebsgrenzen und Prioritäten gehören in [NOW.md](NOW.md), nicht in diesen

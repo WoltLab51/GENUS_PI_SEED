@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 import click
 
@@ -38,6 +39,10 @@ def register(main: click.Group) -> click.Command:
         reviews: Path | None,
     ) -> None:
         """Run synthetic everyday dialogues without model, network, or live database."""
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except (AttributeError, OSError):
+            pass
         if sum(bool(value) for value in (json_output, markdown, write_report)) > 1:
             raise click.UsageError(
                 "--json-output, --markdown und --write-report schließen einander aus."

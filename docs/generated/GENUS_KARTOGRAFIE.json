@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "9604317d930e2728476a325adb15be0d68d9c340f31d9980143b5a0221b769f9",
+  "content_sha256": "68dc4084884825369901774e7e8ec266c1cfdb8221458d3519cdbc598d17b692",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1565,6 +1565,30 @@
       "type": "reads_table"
     },
     {
+      "from": "module:deploy.entwickler_worker",
+      "sources": [
+        {
+          "file": "deploy/entwickler_worker.py",
+          "kind": "ast",
+          "line": 27
+        }
+      ],
+      "to": "module:deploy.model_gateway",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:deploy.entwickler_worker",
+      "sources": [
+        {
+          "file": "deploy/entwickler_worker.py",
+          "kind": "ast",
+          "line": 26
+        }
+      ],
+      "to": "module:genus.entwickler",
+      "type": "imports_eager"
+    },
+    {
       "from": "module:deploy.export_pi_status",
       "sources": [
         {
@@ -2788,6 +2812,18 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
+          "line": 51
+        }
+      ],
+      "to": "module:genus.cli_entwickler",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli",
+      "sources": [
+        {
+          "file": "genus/cli.py",
+          "kind": "ast",
           "line": 52
         }
       ],
@@ -3534,7 +3570,7 @@
         {
           "file": "genus/cli_alltagsprobe.py",
           "kind": "ast",
-          "line": 7
+          "line": 8
         }
       ],
       "to": "external:click",
@@ -3546,7 +3582,7 @@
         {
           "file": "genus/cli_alltagsprobe.py",
           "kind": "ast",
-          "line": 9
+          "line": 10
         }
       ],
       "to": "module:genus.alltagsprobe",
@@ -3586,6 +3622,30 @@
         }
       ],
       "to": "module:genus.db",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_entwickler",
+      "sources": [
+        {
+          "file": "genus/cli_entwickler.py",
+          "kind": "ast",
+          "line": 8
+        }
+      ],
+      "to": "external:click",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_entwickler",
+      "sources": [
+        {
+          "file": "genus/cli_entwickler.py",
+          "kind": "ast",
+          "line": 10
+        }
+      ],
+      "to": "module:genus.entwickler",
       "type": "imports_eager"
     },
     {
@@ -4444,7 +4504,7 @@
         {
           "file": "genus/doctor.py",
           "kind": "ast",
-          "line": 8
+          "line": 9
         }
       ],
       "to": "module:genus.db",
@@ -4456,7 +4516,7 @@
         {
           "file": "genus/doctor.py",
           "kind": "ast",
-          "line": 8
+          "line": 9
         }
       ],
       "to": "module:genus.hand",
@@ -4468,7 +4528,7 @@
         {
           "file": "genus/doctor.py",
           "kind": "ast",
-          "line": 8
+          "line": 9
         }
       ],
       "to": "module:genus.integrity",
@@ -4480,7 +4540,7 @@
         {
           "file": "genus/doctor.py",
           "kind": "ast",
-          "line": 8
+          "line": 9
         }
       ],
       "to": "module:genus.sealing",
@@ -4492,7 +4552,7 @@
         {
           "file": "genus/doctor.py",
           "kind": "ast",
-          "line": 8
+          "line": 9
         }
       ],
       "to": "module:genus.sensor",
@@ -11304,7 +11364,7 @@
         {
           "file": "docs/SECURITY_MODEL.md",
           "kind": "curated",
-          "line": 112
+          "line": 119
         }
       ],
       "statement": "Der private Elternpfad ist 0700, einzelne State-, Log- und Ledgerdateien besitzen aber keinen einheitlichen 0600-Eigenvertrag."
@@ -11343,7 +11403,7 @@
         {
           "file": "docs/SECURITY_MODEL.md",
           "kind": "curated",
-          "line": 96
+          "line": 103
         }
       ],
       "statement": "Der netzaktive Learner teilt den Benutzer und damit einen breiten Ausfallradius mit Ledger und privatem Membranzustand."
@@ -12754,6 +12814,23 @@
       "type": "module"
     },
     {
+      "id": "module:deploy.entwickler_worker",
+      "label": "deploy.entwickler_worker",
+      "ring": "membranen",
+      "roles": [
+        "module",
+        "membrane"
+      ],
+      "sources": [
+        {
+          "file": "deploy/entwickler_worker.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
       "id": "module:deploy.export_pi_status",
       "label": "deploy.export_pi_status",
       "ring": "membranen",
@@ -13156,6 +13233,22 @@
       "type": "module"
     },
     {
+      "id": "module:genus.cli_entwickler",
+      "label": "genus.cli_entwickler",
+      "ring": "schnittstellen",
+      "roles": [
+        "module"
+      ],
+      "sources": [
+        {
+          "file": "genus/cli_entwickler.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
       "id": "module:genus.cli_format",
       "label": "genus.cli_format",
       "ring": "schnittstellen",
@@ -13360,6 +13453,22 @@
       "sources": [
         {
           "file": "genus/druck.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
+      "id": "module:genus.entwickler",
+      "label": "genus.entwickler",
+      "ring": "domaene",
+      "roles": [
+        "module"
+      ],
+      "sources": [
+        {
+          "file": "genus/entwickler.py",
           "kind": "ast",
           "line": 1
         }
@@ -15673,13 +15782,13 @@
   ],
   "summary": {
     "dynamic_sql_calls": 25,
-    "edges": 710,
+    "edges": 715,
     "event_types": 39,
     "external_dependencies": 6,
     "import_cycles": 3,
     "missing_h1_contracts": 3,
-    "modules": 100,
-    "nodes": 266,
+    "modules": 103,
+    "nodes": 269,
     "projected_events": 23,
     "projection_tables": 12,
     "raw_events": 16,
@@ -15976,6 +16085,7 @@
         "module:deploy.deuter",
         "module:deploy.deuter_benchmark",
         "module:deploy.disambiguate",
+        "module:deploy.entwickler_worker",
         "module:deploy.export_pi_status",
         "module:deploy.model_bakeoff",
         "module:deploy.model_gateway",
@@ -16000,6 +16110,7 @@
         "module:genus.cli",
         "module:genus.cli_alltagsprobe",
         "module:genus.cli_betriebsprofil",
+        "module:genus.cli_entwickler",
         "module:genus.cli_format",
         "module:genus.cli_inquiries",
         "module:genus.cli_kartografie",
@@ -16013,6 +16124,7 @@
         "module:genus.dialogplanung",
         "module:genus.doctor",
         "module:genus.druck",
+        "module:genus.entwickler",
         "module:genus.erinnerung",
         "module:genus.event_router",
         "module:genus.experience",

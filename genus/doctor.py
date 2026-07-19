@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import datetime as _dt
 import time
 from dataclasses import dataclass
@@ -190,14 +191,27 @@ def _read_required_sensor(name: str, reader) -> Check:
 
 
 def _forbidden_import_checks() -> list[Check]:
-    text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (ROOT / "genus").rglob("*.py")
-        if path.is_file()
-    )
+    imports = set()
+    for path in (ROOT / "genus").rglob("*.py"):
+        if not path.is_file():
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imports.add(node.module)
+                imports.update(f"{node.module}.{alias.name}" for alias in node.names)
+
+    def forbidden_hits(tokens):
+        return [
+            token for token in tokens
+            if any(name == token or name.startswith(token + ".") for name in imports)
+        ]
+
     checks = []
-    model_hits = [token for token in FORBIDDEN_MODEL_TOKENS if token in text]
-    network_hits = [token for token in FORBIDDEN_NETWORK_TOKENS if token in text]
+    model_hits = forbidden_hits(FORBIDDEN_MODEL_TOKENS)
+    network_hits = forbidden_hits(FORBIDDEN_NETWORK_TOKENS)
     if model_hits:
         checks.append(Check("FAIL", "forbidden-model-imports", ", ".join(model_hits)))
     else:

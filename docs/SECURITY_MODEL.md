@@ -90,6 +90,13 @@ weder direkt Projektionen umschreiben noch Root-Autorität erhalten. Herkunft,
 Widersprüche und epistemischer Status begrenzen den Schaden auf sichtbare,
 replaybare Behauptungen.
 
+Die Coding-Membran `deploy/entwickler_worker.py` ist enger als eine allgemeine Shell: Sie liest
+nur die im hashgebundenen ChangeSpec erlaubten Repositorydateien, verlangt für Remote-Quelltext
+ein separates `0600`-Opt-in und führt nur registrierte argv-Gates aus. Der Modelltext ist ein
+Unified-Diff-Entwurf. Scope-, Secret-, Kernreinheits- und Budgetscan laufen vor `git apply`; die
+Anwendung erfolgt ausschließlich in einem detached Worktree. Der Worker implementiert bewusst
+keinen Commit-, Merge-, Push- oder Deploybefehl.
+
 ### 3. GENUS-Nutzer
 
 Der produktive Login besitzt Checkout, virtuelle Umgebung, Ledger und
@@ -319,6 +326,8 @@ quarantänisiert; Details stehen im [Härtungsaudit](reports/2026-07-12-hardenin
 | Adaptive lokale Ledger-Umschreibung | Extern verwahrter Anchor erkennt Änderungen bis zum Head. | Unverankerter Tail und zukünftige Events bleiben lokal kontrollierbar. |
 | Beschädigtes oder vertauschtes Betriebsprofil/Ledger | Private reguläre Dateien, Snapshot-SHA-256, feste Manifeststruktur, exklusiver Lock sowie DB-Datei- und Head-Kontinuitätsprüfung schließen die Messreihe. | Lokale Profil-Hashes erkennen Korruption, sind ohne externen Anchor aber kein Beweis gegen einen vollständig kontrollierenden Nutzer. |
 | Falscher DB-Pfad | explizite Unit-Identität, Drift-Reparatur, read-only Diagnose und Warnung bei Neuanlage | Manuell gestartete Schreibbefehle können nach bestätigter Warnung weiterhin eine neue DB anlegen. |
+| Manipulierter Coding-Modell-Patch | `draft_only`-Freigabe bindet Basiscommit und Scope; Secret-/Pfad-/Budgetscan, detached Worktree und unabhängige Gates; kein Commit-/Merge-/Deploypfad im Worker. | Ein plausibel falscher Patch kann automatische Tests bestehen; menschliches Diff-Review und Laufzeitabnahme bleiben erforderlich. |
+| Gestohlene Coding-Freigabedatei | Hash bindet sie an genau eine Spec und einen Commit; Rechte enden beim isolierten Draft. | v1 authentifiziert den Namen des Reviewers nicht kryptografisch; der GENUS-Nutzer bleibt eine Vertrauenszone. |
 
 ## Betriebschecks
 

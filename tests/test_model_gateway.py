@@ -110,6 +110,12 @@ def test_remote_minimal_is_fail_closed_until_a_provider_is_explicitly_allowed():
         provider.complete(_request(privacy="remote_minimal"))
 
 
+def test_repository_source_is_fail_closed_until_a_provider_is_explicitly_allowed():
+    provider = model_gateway.GitHubModels("x", opener=lambda *_a, **_k: pytest.fail("network"))
+    with pytest.raises(model_gateway.GatewayError, match="repository_source"):
+        provider.complete(_request(privacy="repository_source"))
+
+
 def test_provider_errors_are_honest_and_never_contain_the_secret():
     def opener(*_args, **_kwargs):
         raise urllib.error.HTTPError("https://models.github.ai", 429, "rate", {}, None)

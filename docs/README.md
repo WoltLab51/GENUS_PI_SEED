@@ -15,6 +15,7 @@ wertvollen **Entstehungsgeschichte**.
 | GENUS zum ersten Mal siehst | [Charter](CHARTER.md) | [NOW](NOW.md) |
 | heute weiterbauen willst | [NOW](NOW.md) | [Roadmap](ROADMAP.md) · [Quality](QUALITY.md) |
 | GENUS' Antworten prüfen willst | [Antwortqualität](design/ANSWER_QUALITY.md) | [generierte Alltagsprobe](generated/ANTWORTQUALITAET.md) · [Reviews](reviews/ALLTAGSPROBE_V1.json) |
+| GENUS beim Selbst-Codieren begleiten willst | [Selbst-Codieren](design/SELF_CODING.md) | [ADR-0004](decisions/ADR-0004-SUPERVISED-SELF-CODING.md) · [Change Trust](decisions/ADR-0002-CHANGE-TRUST.md) |
 | einen Kernvertrag änderst | [Architektur](ARCHITECTURE.md) | [GENUS-Kartografie](visual/GENUS_KARTOGRAFIE.html) · [Event-Vertrag](EVENT_CONTRACT.md) |
 | eine frühere Entscheidung verstehen willst | [Decisions](decisions/README.md) | [Baujournal](history/BUILD_JOURNAL.md) |
 | den Pi betreibst | [Operations](operations/README.md) | [Deploy-Runbook](../deploy/README.md) |
@@ -62,6 +63,7 @@ Sie gehören nicht in zeitlose Verträge.
 - [ADR-0001 — Kern und Membranen](decisions/ADR-0001-CORE-AND-MEMBRANES.md)
 - [ADR-0002 — Change Trust](decisions/ADR-0002-CHANGE-TRUST.md)
 - [ADR-0003 — Wachstum als Kreislauf](decisions/ADR-0003-GROWTH-LOOP.md)
+- [ADR-0004 — Beaufsichtigtes Selbst-Codieren](decisions/ADR-0004-SUPERVISED-SELF-CODING.md)
 
 Neue ADRs werden nur für Entscheidungen angelegt, die mehrere Module oder spätere
 Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.
@@ -72,6 +74,7 @@ Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.
 - [Gedächtnis](design/MEMORY.md)
 - [Persönlichkeit](design/PERSONALITY.md)
 - [Sensor-Prinzip](design/SENSOR_PRINCIPLE.md)
+- [Beaufsichtigtes Selbst-Codieren](design/SELF_CODING.md)
 - [Grundausbildung / Materialwahl (datierter Design-Snapshot)](design/BASIC_TRAINING.md)
 
 Der Banner jedes Dokuments sagt, ob es aktiv oder ein datierter Design-Snapshot ist. Bei

@@ -73,6 +73,16 @@ Für neue Fähigkeiten zusätzlich:
 - Property-/Differenzialtest, wenn eine endliche Zustandsmaschine oder Graphinvariante
   unabhängig prüfbar ist.
 
+### Selbstcoding-Gates
+
+- Diagnose benennt Quellen und Wirkungsraum, aber nie eine unbewiesene Root Cause.
+- ChangeSpec bindet Ziel, Basiscommit, erlaubte Dateien, Risiko, Budget und Prüffälle.
+- Freigabe gilt ausschließlich für einen isolierten Draft und ist an den Spec-Hash gebunden.
+- Modellpatch und finaler Worktree-Diff werden getrennt geprüft; deterministisch generierte
+  Artefakte erweitern den Modellscope nicht.
+- Automatische Gates enden bei `ready_for_human_review`; `merge_ready` bleibt falsch.
+- Bestätigte Fehlschläge dürfen künftige Rechte nur verschärfen. Erfolg erweitert sie nie.
+
 ### Antwortqualität braucht zwei Schlüssel
 
 Eine Antwort darf weder allein von automatischen Tests noch allein vom Bauchgefühl
@@ -151,5 +161,6 @@ Act:  behalten, nachschärfen oder zurücknehmen
 
 GENUS wendet diesen Kreis zunehmend auf sich selbst an. Genau deshalb sind
 [Change Trust](decisions/ADR-0002-CHANGE-TRUST.md) und
-[Wachstum als Kreislauf](decisions/ADR-0003-GROWTH-LOOP.md) keine Projektfolklore,
+[Wachstum als Kreislauf](decisions/ADR-0003-GROWTH-LOOP.md) sowie
+[beaufsichtigtes Selbst-Codieren](decisions/ADR-0004-SUPERVISED-SELF-CODING.md) keine Projektfolklore,
 sondern Teil der Architektur.

@@ -25,7 +25,7 @@ GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_TOKEN_FILE = os.path.expanduser("~/.genus/github_models_token")
 _ROLES = frozenset({"system", "developer", "user", "assistant"})
-_PRIVACY = frozenset({"synthetic", "remote_minimal"})
+_PRIVACY = frozenset({"synthetic", "remote_minimal", "repository_source"})
 
 
 class GatewayError(RuntimeError):
@@ -253,6 +253,11 @@ def github_from_token_file(
     path: str | os.PathLike[str] = DEFAULT_TOKEN_FILE,
     *,
     allow_remote_minimal: bool = False,
+    allow_repository_source: bool = False,
 ) -> GitHubModels:
-    privacy = frozenset({"synthetic", "remote_minimal"}) if allow_remote_minimal else frozenset({"synthetic"})
-    return GitHubModels(read_secret(path), allowed_privacy=privacy)
+    privacy = {"synthetic"}
+    if allow_remote_minimal:
+        privacy.add("remote_minimal")
+    if allow_repository_source:
+        privacy.add("repository_source")
+    return GitHubModels(read_secret(path), allowed_privacy=frozenset(privacy))

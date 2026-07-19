@@ -189,6 +189,14 @@ Lücke → Inquiry → Plan → Vorschlag → Sandbox → Test → Freigabe
 - Fehlschlag und Rollback sind absichtlich getestet und vollständig nachvollziehbar
 - kein selbst erzeugter Code wird automatisch gemergt oder privilegiert ausgeführt
 
+**Fundament umgesetzt (2026-07-15):** GENUS kann seine generierte Selbstkarte und den
+Basiscommit lesen, Symptome als Quell- und Wirkungsraum diagnostizieren, risikogestufte
+ChangeSpecs erzeugen, eine menschliche `draft_only`-Freigabe hashbinden und einen externen
+Coder in einen detached Worktree mit Scope-, Secret-, Budget- und Testgates einsperren. Der
+Loop endet technisch vor Commit, Merge, Push und Deploy. Für H2 fehlen weiterhin drei
+strukturell verschiedene Live-Aufgaben, belastbare Wirkungsrückführung und absichtliche
+Rollback-Nachweise.
+
 ## H3 · Erschaffen mit Beweis
 
 **Abhängigkeit:** H2 ist über mehrere Aufgaben stabil.

@@ -435,6 +435,27 @@ ein dort gesetztes Budget ist die zweite, externe Kostengrenze. `remote_minimal`
 GitHub-Adapter ausschließlich für den explizit freigegebenen Live-Deuter erreichbar; synthetische
 Werkzeuge bleiben auf `synthetic` gepinnt.
 
+### Beaufsichtigter Coding-Worker
+
+Der allgemeine Entwicklerloop ist **kein Dienst** und läuft nicht dauerhaft auf dem Pi. Diagnose
+und ChangeSpec kommen aus `genus entwickler ...`; `deploy/entwickler_worker.py` wird je Entwurf
+explizit gestartet. Er arbeitet ausschließlich in einem detached Worktree unter
+`~/.genus/entwickler/worktrees`, besitzt keinen Commit-/Merge-/Push-/Deploy-Unterbefehl und
+liefert am Ende ein Review-JSON für den Menschen.
+
+Remote-Codegenerierung benötigt zusätzlich zum vorhandenen GitHub-Models-Token:
+
+```bash
+printf '%s\n' 'github-models:repository-source:draft-only' > "$HOME/.genus/coder.enabled"
+chmod 600 "$HOME/.genus/coder.enabled"
+export GENUS_CODER_ENABLE=1
+export GENUS_CODER_MODEL='<explizit gewähltes Coding-Modell>'
+```
+
+Ohne beide Schalter wird kein Repository-Quelltext gesendet. Kritische Spezifikationen werden
+unabhängig davon abgewiesen. Vollständiger Ablauf, Artefakte und Grenzen:
+[`docs/design/SELF_CODING.md`](../docs/design/SELF_CODING.md).
+
 ## Clock
 
 Falsche Zeit beschädigt die Bedeutung zeitlicher Beobachtungen. Der Cron-Installer prüft daher
