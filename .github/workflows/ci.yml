@@ -103,10 +103,5 @@ jobs:
           GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
         run: genus integrity check
 
-      - name: Guard forbidden model imports
-        run: |
-          ! grep -R -n -E --include='*.py' "anthropic|openai|ollama" genus
-
-      - name: Guard forbidden network imports
-        run: |
-          ! grep -R -n -E --include='*.py' "requests|httpx|aiohttp|urllib\.request" genus
+      - name: Guard core membrane imports
+        run: python -m pytest -q tests/test_membrane_purity.py

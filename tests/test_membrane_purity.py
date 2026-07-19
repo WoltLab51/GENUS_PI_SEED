@@ -14,6 +14,7 @@ import ast
 from pathlib import Path
 
 CORE = Path(__file__).resolve().parent.parent / "genus"
+CI_WORKFLOW = CORE.parent / ".github" / "workflows" / "ci.yml"
 
 # Top-level modules the pure core must never import, grouped by the membrane they
 # would cross. Explicit on purpose: if some outside dependency is ever genuinely
@@ -65,3 +66,9 @@ def test_core_never_imports_across_the_membrane():
         + "\n  ".join(violations)
         + "\n(such work belongs in deploy/ shell scripts, never in genus/)"
     )
+
+
+def test_ci_uses_the_ast_gate_instead_of_a_text_grep():
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert "python -m pytest -q tests/test_membrane_purity.py" in workflow
+    assert "grep -R -n -E --include='*.py'" not in workflow
