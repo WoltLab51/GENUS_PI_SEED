@@ -1,6 +1,6 @@
 # A0 Decision Packet
 
-> **Status:** decision required · datierter Report, keine angenommene Entscheidung
+> **Status:** decided by Ronny · acht Empfehlungen am 2026-08-09 angenommen
 > **Decision Owner:** Ronny
 > **Snapshot:** 2026-08-09 (Europe/Berlin)
 > **Geprüfter Commit:** `cd22fc42cab9d5a693336f47ffea7aaf53782d2f`
@@ -9,11 +9,14 @@
 
 ## 1. Ausgangspunkt, Snapshot und Autorität
 
-Dieses Packet bereitet die menschlichen Entscheidungen vor, die A0 erst
-implementierbar machen. Es ist weder ADR noch Roadmap, Freigabe, ChangeSpec oder
-Implementierungsauftrag. Keine Empfehlung ist angenommen; nur Ronny darf die
-Checkboxen in Abschnitt 11 entscheiden. Erst angenommene ADRs dürfen danach
-`docs/ROADMAP.md` und `docs/NOW.md` binden.
+Dieses Packet bereitete die menschlichen Entscheidungen vor, die A0 erst
+implementierbar machen. Ronny hat die acht Empfehlungen in Abschnitt 11 durch
+ausdrückliche Anweisung angenommen; dieses Dokument hält diese Entscheidungen
+fest. Es ist weiterhin weder ADR noch Roadmap, ChangeSpec oder
+Implementierungsauftrag. Die Annahme autorisiert ausschließlich die gesonderte
+Überführung in ADRs und kanonische Dokumente. Erst angenommene ADRs dürfen
+`docs/ROADMAP.md` und `docs/NOW.md` binden; Runtime-Implementierung bleibt danach
+ein eigener human-owned Auftrag.
 
 ### Vergleich mit dem Audit-Snapshot
 
@@ -768,10 +771,11 @@ Unterentscheidungen; sein Titel allein ist keine Freigabe.
 
 ## 11. Decision Sheet für Ronny
 
-Keine Checkbox ist vorausgefüllt. `accept recommendation` nimmt nur die hier
-formulierte Architekturentscheidung an; es autorisiert noch keinen Patch,
-Produktlauf, Commit, Push oder Deploy. Notizen sollten Entscheidung, Abweichung,
-Owner, Datum und offene Bedingung nennen.
+Ronny hat alle acht Empfehlungen ausdrücklich angenommen. Die ausgefüllten
+Checkboxen und Notes sind der menschliche Entscheidungsbeleg. `accept
+recommendation` nimmt nur die formulierte Architekturentscheidung samt
+vermerkter Präzisierung an; es autorisiert noch keinen Runtime-Patch,
+Produktlauf, Push oder Deploy.
 
 ### D-A0.1 — Schema Evolution
 
@@ -786,11 +790,17 @@ Owner, Datum und offene Bedingung nennen.
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+GENUS führt eine explizite, versionierte und fail-closed Schema-Evolution ein.
+Normale Connect- und Startup-Pfade dürfen ein bestehendes Schema nicht
+verändern. Migrationen werden nummeriert, manuell aufgerufen, zunächst nur
+gegen Kopien getestet und durch Backup, Anchor, Integrity und Replay
+abgesichert.
 
 ---
 
@@ -807,11 +817,20 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+GENUS erhält eine datenschutzfreie, handgeprüfte Golden-Ledger-Fixture mit
+unversiegeltem Legacy-Präfix, Epochen-Event und versiegeltem Tail. Erwartete
+Projektionen und Digests werden als unabhängiges, versioniertes Orakel gepflegt.
+Fixture und Orakel dürfen nicht ausschließlich durch den aktuell geprüften
+Runtime-Code erzeugt werden. Als kanonische, menschenlesbare Eventdarstellung
+gilt JSONL zusammen mit einem statischen Oracle-Manifest; daraus entsteht für
+Replaytests eine temporäre SQLite-DB. Eine kleine statische historische
+SQLite-Fixture ergänzt diesen Corpus für echte Alt-Schema-/Migrationstests.
 
 ---
 
@@ -828,11 +847,19 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+GENUS ersetzt vollständiges `fetchall()` durch bounded Cursor-/Batch-
+Verarbeitung. Zunächst wird transaktionaler Batch-Replay gegen das Golden Ledger
+sowie mit 10k/100k/1M synthetischen Events gemessen. Die Entscheidung über die
+endgültige Sichtbarkeitsstrategie fällt auf Basis von Peak-RAM, WAL, Laufzeit,
+Concurrent-Reader- und Crash-Experimenten. Falls eine einzelne Transaktion die
+Pi-Budgets oder Verfügbarkeitsgrenzen verletzt, sind Shadow-Projektionen mit
+atomarem Wechsel der verbindliche Fallback.
 
 ---
 
@@ -849,11 +876,19 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+Der private Anchor-Signaturschlüssel darf niemals auf dem Raspberry Pi liegen.
+Der Pi erzeugt ausschließlich unsigned Anchor Candidates. Reguläre Signaturen
+erfolgen manuell über einen Hardware-Token an einer getrennten
+Vertrauensstation. Ein separates offline verwahrtes Recovery-Medium schützt
+gegen Verlust des primären Tokens. Öffentliche Prüfkeys dürfen im Repository
+und auf dem Pi liegen. Rotation, Widerruf, Verlust und Recovery werden vor
+produktiver Nutzung definiert.
 
 ---
 
@@ -870,11 +905,17 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+GENUS entwickelt einen versionierten Anchor-v2-Vertrag mit
+Signaturalgorithmus, `key_id`, Public-Key-Lineage, kanonischer Serialisierung
+und eindeutiger Verifikationssemantik. Ein unsigned Anchor bleibt ein Candidate
+und gilt nicht als unabhängige kryptografische Bezeugung. Anchor v1 bleibt
+historisch verifizierbar und wird nicht still umgedeutet.
 
 ---
 
@@ -891,11 +932,19 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+Production-Reseal ist standardmäßig verboten und kein regulärer Wartungspfad.
+Ein Reseal ist ausschließlich als menschlich geführte Notfallzeremonie zulässig:
+mit letztem gültigem Anchor, Backup, Schadensgrund, Operator, betroffenem
+Eventbereich, ausdrücklicher Freigabe, externem Wartungsbeleg, neuer Signatur
+und neuem Anchor. Alte Anchors bleiben unverändert erhalten. Ein
+`ledger_resealed`-Event innerhalb der neu versiegelten Kette genügt nicht als
+kryptografischer Nachweis.
 
 ---
 
@@ -912,11 +961,18 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+GENUS verfolgt langfristig ein versioniertes Multi-Epoch-/Repair-Transition-
+Protokoll. Eine beschädigte Epoche bleibt als beschädigt sichtbar. Eine neue
+Epoche referenziert den letzten vertrauenswürdigen Punkt, Schadensgrenze,
+Reparaturgrund, menschliche Freigabe und externen Wartungsbeleg. Diese
+Entscheidung eröffnet noch keine Implementierung; zunächst werden Golden Ledger,
+Anchor v2 und Reseal-Zeremonie fertiggestellt.
 
 ---
 
@@ -933,11 +989,18 @@ Note:
 
 RONNY DECISION:
 
-- [ ] accept recommendation
+- [x] accept recommendation
 - [ ] choose alternative
 - [ ] defer
 
 Note:
+
+A0 ist die human-owned critical lane und bleibt der einzige mergefähige
+Produktänderungspfad in `GENUS_PI_SEED`. Der Entwickler-Loop darf parallel nur
+in einer isolated non-production learning lane üben: auf synthetischen
+Repositories, isolierten Worktrees, `GENUS_EGG`, `GENUS_CORE` oder nicht
+produktiv gemergten unkritischen Aufgaben. Kein kritischer Scope, keine
+Produktdaten, keine Rechteausweitung und keine automatische Aktivierung.
 
 ## 12. Nicht-Ziele und Stopplinie
 
@@ -952,11 +1015,14 @@ Dieses Packet implementiert oder autorisiert ausdrücklich nicht:
 - weitere Branch-Protection-/GitHub-Regeln oder Deploy-Key-Änderungen;
 - `NOW.md`-/`ROADMAP.md`-Änderungen;
 - angenommene ADRs;
-- Commit, Push, Pull Request oder Deploy für dieses Decision Packet.
+- keinen Runtime-/Implementierungscommit, Push, Pull Request oder Deploy; die
+  zwei ausdrücklich angeordneten Docs-Commits erfassen nur neutrales Packet und
+  menschlichen Decision Record.
 
-Insbesondere wurden keine Checkboxes ausgefüllt. Die vier ADR-Kandidaten sind
-Namen und Zuständigkeitsvorschläge, keine angelegten oder angenommenen
-Entscheidungen.
+Die acht Checkboxes sind als menschlicher Entscheidungsbeleg ausgefüllt. Zum
+Zeitpunkt dieses Entscheidungsrecords bleiben die vier ADR-Kandidaten Namen und
+Zuständigkeitsvorschläge; ihre gesonderte Überführung in angenommene ADRs 0005
+bis 0008 und die Lane-Entscheidung folgt erst nach diesem Record.
 
 ## 13. Evidenz und Verifikation
 
@@ -990,38 +1056,30 @@ Der Commitvergleich wurde mit `git rev-parse HEAD`, `git log`, `git show` und
 9 passed
 ```
 
-Strukturprüfungen des Decision Sheets:
+Strukturprüfungen des menschlichen Decision Records:
 
-- achtmal `[ ] accept recommendation`;
-- achtmal `[ ] choose alternative`;
-- achtmal `[ ] defer`;
-- null vorausgefüllte Checkboxen;
+- achtmal `[x] accept recommendation`;
+- null gewählte Alternative;
+- null `defer`;
+- für jede Entscheidung eine ausgefüllte Note;
 - null TODO/TBD/PLACEHOLDER;
-- genau ein Index-Link auf dieses Packet.
+- der Index-Link blieb unverändert.
 
 ### Finaler Diff-Scope
 
-Der erwartete Arbeitsumfang dieses Packets besteht ausschließlich aus:
+Der neutrale Packet-Stand wurde getrennt als `3f50c54 docs: add A0 decision
+packet` committed. Der erwartete Arbeitsumfang des menschlichen
+Entscheidungsrecords besteht anschließend ausschließlich aus:
 
 - `docs/reports/2026-08-09-a0-decision-packet.md`
-- `docs/README.md`
 
-```text
-git diff --check
-→ Exit 0, keine Ausgabe
+Vor dem Entscheidungscommit wurden `git diff --check`, Dokumenttests,
+`git status --short` und `git diff --stat` erneut ausgeführt:
 
-git status --short
-→  M docs/README.md
-→ ?? docs/reports/2026-08-09-a0-decision-packet.md
-
-git diff --stat
-→ docs/README.md | 1 +
-```
-
-`git diff --stat` zeigt nur bereits getrackte Dateien; der neue Report bleibt
-bis zu einer späteren ausdrücklichen menschlichen Entscheidung untracked und
-wird deshalb dort nicht mitgezählt. Maßgeblich für die vollständige Liste ist
-`git status --short`.
+- `git diff --check`: Exit 0;
+- Dokumenttests: 9 bestanden;
+- `git status --short`: ausschließlich das Decision Packet geändert;
+- acht Empfehlungen angenommen, null Alternative, null `defer`, acht Notes.
 
 ### Scope-Bestätigung
 
