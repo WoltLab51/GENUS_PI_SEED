@@ -100,6 +100,7 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [H0.1-Vorabprofil und Messdesign vom 2026-07-13](reports/2026-07-13-h0-1-baseline/report.html)
 - [Runtime-Kartografie und Pi-Audit vom 2026-07-13](reports/2026-07-13-cartography-runtime-audit.md)
 - [H1-Pilot und erster geschlossener Antwortkreis vom 2026-07-13](reports/2026-07-13-h1-response-loop.md)
+- [A0-Wahrheitsfundament-Audit vom 2026-08-09](reports/2026-08-09-a0-foundation-audit.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 
