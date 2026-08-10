@@ -2,13 +2,14 @@
 
 > **Status:** aktuelle Zukunftsplanung
 >
-> **Stand:** 13. Juli 2026
+> **Stand:** 9. August 2026
 >
 > **Enthält:** Reihenfolge, Abhängigkeiten und Definition of Done – keine
 > Bauchronik und keine flüchtigen Live-Zahlen
 
-Die Roadmap führt vom gehärteten Kern zum persönlichen, lernenden Begleiter.
-Der aktuelle Ausgangspunkt steht in [NOW.md](NOW.md), ausgelieferte Etappen im
+Die Roadmap sichert zuerst das A0-Wahrheitsfundament und führt danach vom
+gehärteten Kern zum persönlichen, lernenden Begleiter. Der aktuelle
+Ausgangspunkt steht in [NOW.md](NOW.md), ausgelieferte Etappen im
 [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Nordstern
@@ -31,15 +32,167 @@ Menschen.
 ## Die Abhängigkeiten
 
 ```text
-H0 Betriebsbeweis ──┬──> H1 Begleiter ──> H2 Fähigkeitsloop ──> H3 Erschaffen
-                    │                              │
-                    └──> externer Anker            └──> H4 Markt-Membran
+A0.2 Golden Ledger + Oracle ──> A0.1 read-only Schemaerkennung
+A0.1 + A0.2 ──────────────────> A0.3 B/C-Experiment
+
+A0.1 + A0.2 + A0.3 ──> Migration Runner nur auf Kopien
+A0.2 ──> A0.4 Custody-/Anchor-v2-Vertrag ──> Witness ──> Signatur
+                                                        └──> Reseal-Zeremonie
+                                                             └──> Multi-Epoch
+
+A0-Wahrheitsfundament ──> H1 Begleiter ──> H2 Fähigkeitsloop ──> H3 Erschaffen
+zulässige H0-Read-only-Teile ─┘                    │
+                                                  └──> H4 Markt-Membran
 
 H3 + geklärte Isolation/Löschung/Governance ─────────> H5 Föderation
 ```
 
 Die Horizonte sind keine Versionsnummern. Ein später Horizont darf erforscht,
 aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün sind.
+
+## A0 · Wahrheitsfundament vor Migration
+
+**Status:** einziger mergefähiger aktiver Produktpfad; A0.2 ist der eine aktive
+Implementierungsschritt.
+
+**Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
+besitzt es eine unabhängige semantische Beweisbasis, explizite
+Migrationsgrenzen, bounded Laufzeitmechanik und extern getrenntes
+Anchor-Vertrauen. Die angenommenen Verträge stehen in
+[ADR-0005](decisions/ADR-0005-EXPLICIT-SCHEMA-EVOLUTION.md),
+[ADR-0006](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md),
+[ADR-0007](decisions/ADR-0007-BOUNDED-REPLAY-INTEGRITY.md),
+[ADR-0008](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md) und
+[ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md).
+
+Die technische Reihenfolge folgt Beweisabhängigkeiten, nicht der Nummer der
+Auditkapitel.
+
+### A0.2 · Golden Ledger und unabhängiges Oracle
+
+**Abhängigkeit:** angenommene ADRs und menschliches Fixture-/Oracle-Ownership.
+
+**Arbeit:** Eine kanonische synthetische JSONL-Eventfixture, ein statisches,
+unabhängig geprüftes Oracle-Manifest und eine daraus erzeugte temporäre
+SQLite-Testdatenbank aufbauen. Eine kleine statische historische
+SQLite-Altfixture ergänzt die reale Schema-Migrationsmatrix und wird vor dem
+ersten Migration-Runner als eigenes A0.2-Gate fertiggestellt.
+
+**Definition of Done**
+
+- nichtleerer Legacy-Präfix, korrektes Epochen-/Genesis-Event und versiegelter
+  Tail sind enthalten
+- projizierte und bewusst rohe Eventtypen sowie die in ADR-0006 genannten
+  fachlichen Zustände und Lebenszyklen sind abgedeckt
+- Fixture enthält nur synthetische, nicht persönliche und nicht produktive Daten
+- Eventzahl, IDs, Reihenfolge, Präfix, Genesis, Epoche, Head, Seal, Integrity und
+  historischer Anchor sind festgeschrieben
+- erwartete normalisierte Daten, Digest jeder Projektion und Gesamtdigest sind
+  unabhängig versioniert
+- Manifest bindet JSONL-Digest, Altfixture-Digest, historischen
+  Schema-Fingerprint und die read-only bewiesene Eventstrom-Gleichheit
+- Corpus Owner, Datenschutzprüfer, Oracle-Reviewer und Kanonisierungsvertrag
+  sind vor Artefakterzeugung menschlich festgelegt
+- zwei Replays erzeugen weder Events noch Drift; negative Tamper-Fälle schlagen an
+- Oracle-Erwartungen werden nicht ausschließlich vom Runtime-Code unter Test
+  erzeugt oder aktualisiert
+
+### A0.1 · Explizite Schemaerkennung und Migration Boundary
+
+**Abhängigkeit:** A0.2 definiert zuerst Corpus und Oracle. Eine ausschließlich
+read-only Version-/Fingerprint-Erkennung darf danach als nichtmutierende Scheibe
+entstehen; sie autorisiert keine Migration.
+
+**Arbeit:** Normale Connect-/Startup-Pfade von Schemaänderung trennen,
+Schema-Version und Fingerprint fail-closed erkennen und anschließend einen
+manuell aufgerufenen, nummerierten Runner nur gegen Kopien entwickeln.
+
+**Definition of Done**
+
+- Statusabfrage verändert Datei, Schema und Ledger nicht
+- alte, neue, unbekannte und teilweise migrierte Schemas werden eindeutig
+  erkannt und verständlich verweigert
+- normaler Connect und Dienststart führen an bestehenden Datenbanken keine DDL aus
+- Migrationen sind nummeriert, deterministisch, idempotent und menschlich ausgelöst
+- Backup, Restore-Probe, Integrity und Seal sind Vorbedingungen; ein gültiger
+  externer Anchor ist zusätzliches Gate jedes späteren Produktlaufs nach A0.4,
+  nicht des Kopien-Runners
+- Alt-Schemafixture → Migration → gewählter bounded Replay → zweiter Replay →
+  Golden Oracle/Integrity/Seal/Anchor ist auf einer Kopie grün
+- keine Produktmigration wird durch diesen Schritt automatisch freigegeben
+- ein grünes Kopien-Receipt braucht vor Produkt-Cutover ein zweites gebundenes
+  Human-Go; nach Cutover bleibt der Dienst bis zum grünen read-only
+  Post-Cutover-Receipt gestoppt
+
+### A0.3 · Bounded Replay und Integrity topologiegegated entscheiden
+
+**Abhängigkeit:** A0.2 ist grün; die read-only Schemaerkennung aus A0.1 steht vor
+Replay einer fremden Datenbank. Ein verändernder Migration Runner wartet auf
+Golden Oracle und die A0.3-Abnahme.
+
+**Arbeit:** Vollständiges `fetchall()` durch einen fixed-head, deterministisch
+geordneten und speicherbegrenzten Eventstrom ersetzen. Option B als kleinsten
+Live-Kandidaten in einer atomaren Transaktion prüfen. Nur wenn B alle vorab
+menschlich beschlossenen Pi-, Reader-, Writer-, WAL-, Kill- und
+Recovery-Budgets besteht, wird B gewählt; sonst folgt Option C mit
+Shadow-Projektionen und atomarem Wechsel. Option D validiert Migrationen und
+forensische Kopien, entscheidet aber keinen Live-Cutover.
+
+**Definition of Done**
+
+- kein Replay-/Integrity-Pfad materialisiert den vollständigen Ledger im RAM
+- fixer Head, stabile Reihenfolge, begrenzte Batchgröße und payloadfreier
+  Fortschritt sind explizit
+- Event-Log, Präfix, Genesis, Epoche, Head, Seal und Anchor bleiben exakt gleich
+- Golden Oracle und Digests aller Projektionen stimmen; zweiter Replay erzeugt
+  weder Events noch Drift
+- 0/1/Batchgrenzen sowie 10k, 100k und 1M Events sind gemessen
+- Ziel-Pi-Receipts binden Peak RSS, Laufzeit, Datei-/WAL-Hochwasser,
+  Reader-Kohärenz, Writer-Block/-Timeout und Recoveryzeit
+- Projector-Fehler, konkurrierender Leser/Writer, Kill, Reopen und Retry sind
+  fault-injected; Leser sehen nur einen vollständigen alten oder neuen Stand
+- Projector-, Oracle- und Validierungsfehler prüfen vor Commit/Cutover und rollen
+  vollständig auf alt zurück; nur ein Crash an der atomaren Grenze darf nach
+  Reopen eindeutig alt oder den vollständig geprüften neuen Stand ergeben
+- B ist nur nach vollständig bestandenem Gate grün; andernfalls ist C samt
+  Generation-, Cutover-, Cleanup- und Recovery-Vertrag grün
+- die gemessene Wahl B oder C und die vorab akzeptierten Budgets ergänzen
+  ADR-0007 als versioniertes Receipt
+
+### A0.4 · Externes Anchor-Vertrauen und erklärbare Reparatur
+
+**Abhängigkeit:** Golden Ledger steht. Custody, kanonische Bytes, Algorithmus,
+Trust-Manifest, Rotation und Widerruf werden vor Signaturcode entschieden. Diese
+Vorbereitung darf organisatorisch parallel laufen, öffnet aber keinen zweiten
+Produktmerge.
+
+**Arbeit in dieser Reihenfolge:**
+
+1. Hardware-Token-/Offline-Recovery-Custody und Anchor-v2-Vertrag festlegen;
+   kein privater Signaturschlüssel liegt auf dem Pi.
+2. Status-/Witness-Pfade nach dem v2-Vertrag härten; minimaler Git-Ref-Schutz
+   allein ist keine Signatur- oder Dateiunveränderlichkeitsgarantie.
+3. Getrennten Signierer, Verifier, Legacy-v1-Regel, Rotation, Widerruf und
+   Recovery-Drill abnehmen; erst dann signierte Anchors ausstellen.
+4. Production-Reseal nur als menschliche Notfallzeremonie mit externem Receipt,
+   separatem Approver, Signatur und erhaltenen Altankern implementieren.
+5. Zuletzt ein versioniertes Multi-Epoch-/Repair-Transition-Protokoll entwickeln;
+   nicht reparierbare Geschichte bleibt sichtbar oder beginnt eine neue,
+   lineage-gebundene Ledger-Generation.
+
+**Definition of Done**
+
+- Pi kann allein keine gültige externe Signatur erzeugen
+- Anchor v1 bleibt historisch unsigned; die v2-Envelope trennt kanonisches
+  Statement und Signaturenliste und bindet Epoche, Vorgänger, Algorithmus,
+  `key_id`, Signatur und Lineage
+- GitHub ist Transport, nicht alleinige Signaturautorität; eine signer-owned
+  Witness-Fläche ist geprüft, unabhängige Mirrors dürfen sie nur ergänzen
+- alte Anchors bleiben unverändert; neue Ausstellungen überschreiben keinen Pfad
+- vor erfüllter v2-/Custody-/Approver-/Witness-Kette bleibt Production-Reseal
+  vollständig gestoppt
+- Repair-Transitions bewahren Schadensgrenze, menschliche Freigabe und externen
+  Beleg, statt gebrochene Geschichte unsichtbar neu zu versiegeln
 
 ## H0 · Betrieb beweisen
 
@@ -261,7 +414,8 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** H1.2 die 17 exakten Probeantworten menschlich abnehmen, holprige Fälle
-schärfen und jede neue Fassung erneut hashgebunden prüfen.
-Die read-only H0.1-Messreihe darf nach Regel 1 parallel weiterlaufen; sie öffnet keinen
-zweiten verändernden Produktpfad.
+**Aktive Baulinie:** A0.2 schafft zuerst Golden Ledger und unabhängiges Oracle.
+Danach folgen read-only Schemaerkennung und das A0.3-Experiment zwischen Option
+B und dem verbindlichen Fallback C. H1.2 bleibt Produktziel, ist aber kein
+paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
+nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.

@@ -64,6 +64,11 @@ Sie gehören nicht in zeitlose Verträge.
 - [ADR-0002 — Change Trust](decisions/ADR-0002-CHANGE-TRUST.md)
 - [ADR-0003 — Wachstum als Kreislauf](decisions/ADR-0003-GROWTH-LOOP.md)
 - [ADR-0004 — Beaufsichtigtes Selbst-Codieren](decisions/ADR-0004-SUPERVISED-SELF-CODING.md)
+- [ADR-0005 — Explizite Schema-Evolution](decisions/ADR-0005-EXPLICIT-SCHEMA-EVOLUTION.md)
+- [ADR-0006 — Golden Ledger und unabhängiges Replay-Oracle](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md)
+- [ADR-0007 — Bounded Replay und Integrity](decisions/ADR-0007-BOUNDED-REPLAY-INTEGRITY.md)
+- [ADR-0008 — Externes Anchor-Vertrauen und Ledger-Reparatur](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md)
+- [ADR-0009 — Human-owned Critical Lane](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md)
 
 Neue ADRs werden nur für Entscheidungen angelegt, die mehrere Module oder spätere
 Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.

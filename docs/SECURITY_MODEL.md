@@ -1,8 +1,9 @@
 # GENUS Sicherheitsmodell
 
-**Status:** kanonisch · **Zuletzt verifiziert:** 12. Juli 2026
+**Status:** kanonisch · **Kanon abgeglichen:** 9. August 2026
 **Owner:** Security- und Trust-Boundary-Vertrag
-**Gilt für:** aktueller Stand von `main` und die produktive Raspberry-Pi-Installation
+**Runtime-Basis:** zuletzt am 12. Juli 2026 verifizierter Pi-Stand
+**Gilt für:** aktuelle Runtime sowie ausdrücklich als noch nicht umgesetzt markierte A0-Verträge
 
 Dieses Dokument beschreibt, worauf GENUS vertraut, wo Privilegien wechseln und
 welche Aussagen Ledger, Siegel und Anchor tatsächlich tragen. Praktische
@@ -246,10 +247,15 @@ und Reihenfolge fließen in eine SHA-256-Kette ein.
 Die Kette erkennt versehentliche Korruption und Änderungen, die nicht passend
 neu versiegelt wurden. Ein lokaler Angreifer mit DB-Schreibrecht kann jedoch
 Trigger entfernen, Events ändern und die Kette neu berechnen. Der vorhandene
-`reseal`-Befehl ist deshalb eine bewusste Wartungsoperation: Er setzt die
-Manipulationserkennung über den betroffenen Abschnitt zurück und darf erst nach
-Beweissicherung, dokumentierter Entscheidung und anschließender externer
-Neu-Verankerung eingesetzt werden.
+`reseal`-Befehl setzt die Manipulationserkennung über den betroffenen Abschnitt
+zurück und ist technisch weiterhin aufrufbar.
+
+Nach [ADR-0008](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md) ist
+Production-Reseal kein normaler Wartungspfad, sondern standardmäßig verboten.
+Da Anchor v2, externe Signatur, Recovery-Custody und separater Approver noch
+fehlen, kann derzeit keine produktive Ausnahme den angenommenen Incident-
+Vertrag erfüllen. Praktisch gilt deshalb ein vollständiger
+Production-Reseal-Stopp.
 
 ### Offline-Anchor
 
@@ -268,6 +274,32 @@ Ein Anchor:
 
 Die Anchor-Kadenz ist damit ein echter Sicherheitsparameter: Sie bestimmt die
 maximale Länge des lokal unbezeugten Tails.
+
+### Angenommene externe Vertrauensgrenze — noch nicht umgesetzt
+
+ADR-0008 trennt künftig Candidate, Signatur und Verwahrung:
+
+- Der Pi hält keinen privaten Anchor-Signaturschlüssel und erzeugt nur unsigned
+  Candidates.
+- Reguläre Signaturen entstehen manuell an einer getrennten Vertrauensstation
+  mit Hardware-Token; ein separates verschlüsseltes Offline-Medium dient der
+  Recovery.
+- Anchor v2 trennt in einer versionierten Envelope das kanonische Statement von
+  einer separaten Signaturenliste. Das Statement bindet unter anderem Epoche,
+  Head und Vorgänger; jeder Signatureintrag bindet Algorithmus, `key_id` und
+  Signaturwert. Public-Key- und Anchor-Lineage bleiben prüfbar. Anchor v1 bleibt
+  historisch unsigned und wird nicht rückwirkend umgedeutet.
+- GitHub ist Transport und Archivfläche, nicht alleinige Signaturautorität. Die
+  aktive Sperre gegen Force-Push und Branch-Löschung schützt Ref-Historie, nicht
+  einzelne Anchor-Pfade. Normale Fast-Forward-Pushes und der schreibende
+  Status-Publisher bleiben deshalb keine unabhängige Bezeugung.
+- Ziel ist eine signer-owned Witness-Fläche. Unabhängige Mirrors dürfen sie
+  ergänzen, nicht ersetzen. Rotation, Widerruf, Verlust, Recovery und
+  Aufbewahrung werden vor der ersten produktiven Signatur festgelegt.
+
+Keine dieser Fähigkeiten ist heute implementiert. Ein unsigned Candidate oder
+v1-Anchor darf daher nicht als externe kryptografische Signatur bezeichnet
+werden.
 
 ## Streu-Datenbanken
 
@@ -356,10 +388,15 @@ verwenden dafür ebenfalls Platzhalter.
 1. Writer stoppen; DB, `-wal` und `-shm` kopieren und hashen.
 2. Letzten externen Anchor und dessen ursprünglichen Speicherort sichern.
 3. Integrity, Seal-Verify und Anchor-Verify gegen eine Arbeitskopie ausführen.
-4. Erst danach Ursache und Wiederherstellung entscheiden. Nicht vorschnell
-   `reseal` ausführen.
-5. Jede bewusste Reparatur dokumentieren und einen neuen externen Anchor
-   erzeugen.
+4. Produktives `reseal` nicht ausführen. Der aktuelle Stand erfüllt die
+   angenommene Ausnahmezeremonie aus ADR-0008 nicht.
+5. Ursache, Quarantäne, Restore oder Neuaufbau menschlich entscheiden. Originale
+   Abbilder und alte Anchors unverändert erhalten.
+6. Eine spätere Reseal-Ausnahme verlangt vorab Incident-ID, Schaden und
+   Eventbereich, Operator, separaten Approver, Restore-Probe, Arbeitskopie,
+   Golden-/Integrity-/Seal-Prüfung, externen Wartungsbeleg, externe Signatur und
+   einen neuen eindeutigen Anchor. Ein Event in der neu versiegelten Kette
+   genügt nicht.
 
 ### Telegram-Token könnte offengelegt sein
 
@@ -387,7 +424,9 @@ verwenden dafür ebenfalls Platzhalter.
 - physische Löschung bereits im append-only Ledger gespeicherter persönlicher
   Episoden; dafür braucht GENUS einen getrennten Memory-Vault mit Export- und
   Retention-Vertrag;
-- externe, signierte Zeitstempelung der Anchor-Artefakte.
+- produktive Anchor-v2-Signatur, unabhängiger Witness und vertrauenswürdige
+  externe Zeitbezeugung; die Architektur dafür ist angenommen, aber noch nicht
+  implementiert.
 
 Diese Grenzen sind keine Ausrede, sondern Teil der Sicherheitsgarantie: GENUS
 soll genau sagen können, was es weiß – und ebenso genau, was seine Schutztechnik
