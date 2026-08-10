@@ -1,7 +1,7 @@
 # Die GENUS-Dokumentation
 
 > **Status:** kanonischer Index
-> **Zuletzt verifiziert:** 2026-07-13
+> **Zuletzt verifiziert:** 2026-08-10
 > **Regel:** Jede Aussage hat genau einen autoritativen Wohnort.
 
 Willkommen in der Werkstatt. Diese Bibliothek trennt bewusst zwischen dem, was GENUS
@@ -69,6 +69,7 @@ Sie gehören nicht in zeitlose Verträge.
 - [ADR-0007 — Bounded Replay und Integrity](decisions/ADR-0007-BOUNDED-REPLAY-INTEGRITY.md)
 - [ADR-0008 — Externes Anchor-Vertrauen und Ledger-Reparatur](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md)
 - [ADR-0009 — Human-owned Critical Lane](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md)
+- [ADR-0010 — Menschlich geführte Modellassistenz ausschließlich in A0.2](decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md)
 
 Neue ADRs werden nur für Entscheidungen angelegt, die mehrere Module oder spätere
 Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.
@@ -115,6 +116,10 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
 - [Alltagsprobe v1](reviews/ALLTAGSPROBE_V1.json) — hashgebundene Einzelwertungen für Ton
   und Nutzen; ein leerer Reviewbestand ist ein ehrlicher offener Status, kein Fehler im
   Dokument.
+- [A0.2 Golden Ledger Entry Contract](reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md) —
+  angenommene Rollen, Corpus-, Kanonisierungs-, Digest- und Stop-Grenzen vor dem
+  ersten Golden-Artefakt; die spätere Oracle-Checkliste bleibt bis Ronnys
+  getrenntem Review offen.
 
 Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
 exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.

@@ -14,6 +14,7 @@
 | [0007](ADR-0007-BOUNDED-REPLAY-INTEGRITY.md) | Bounded Replay und Integrity werden durch Golden- und Pi-Evidenz topologiegegated | accepted |
 | [0008](ADR-0008-EXTERNAL-ANCHOR-TRUST.md) | Externe Anchor-Trust-, Key-Custody- und Ledger-Repair-Grenzen | accepted |
 | [0009](ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) | A0 bleibt human-owned critical lane; Lernen bleibt nichtproduktiv isoliert | accepted |
+| [0010](ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md) | Ronny darf Codex für A0.2 eng begrenzt read-only und test-only assistieren lassen | accepted |
 
 Ein ADR erklärt **warum** eine Entscheidung gilt. Der aktuelle technische Vertrag lebt
 weiterhin in [ARCHITECTURE.md](../ARCHITECTURE.md).
