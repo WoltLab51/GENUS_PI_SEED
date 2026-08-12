@@ -121,6 +121,9 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
   angenommene Rollen, Corpus-, Kanonisierungs-, Digest- und Stop-Grenzen vor dem
   ersten Golden-Artefakt; die spätere Oracle-Checkliste bleibt bis Ronnys
   getrenntem Review offen.
+- [A0.2 Golden Ledger Artifact Schema Contract](reviews/A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md) —
+  angenommene mechanische Supporting Specification für exakte Artefaktnamen,
+  JSON-Feldmengen, Dateibytes und Digestbindungen des A0.2-Kandidaten.
 
 Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
 exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.

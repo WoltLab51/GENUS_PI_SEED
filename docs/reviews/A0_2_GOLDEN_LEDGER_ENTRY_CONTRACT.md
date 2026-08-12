@@ -4,10 +4,12 @@
 >
 > **Owner:** Ronny
 >
-> **Contract version:** 1.1
+> **Contract version:** 1.2
 >
 > **Amended by:**
 > [ADR-0011 — Golden Ledger Canonicalization, Belief Coverage and Projector Read Scope](../decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
+> and the
+> [A0.2 Golden Ledger Artifact Schema Contract](A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md)
 >
 > **Gilt vor:** dem ersten Golden-Ledger-, Oracle-, Anchor-Fixture- oder
 > Testartefakt
@@ -17,18 +19,39 @@
 > [ADR-0009](../decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) und
 > [ADR-0010](../decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md),
 > präzisiert durch [ADR-0011](../decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
+> und den
+> [Artifact Schema Contract](A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md)
 
 ## Amendment history
 
 - **Version 1.0:** initial accepted entry contract
 - **Version 1.1:** fixture schema version, semantic event-stream digest,
   belief coverage and projector read scope made explicit
+- **Version 1.2:** artifact filenames, JSON schemas, status placement, source
+  bindings, count fields, oracle file digest, anchor bytes and bundle binding
+  made explicit
 
 ## Zweck und Gate
 
 Dieser Vertrag legt Rollen, Corpusgrenzen, Kanonisierung, Oracle-Digests,
 menschliche Abnahme und Stop Conditions fest, bevor das erste A0.2-Artefakt
 entsteht. Er autorisiert noch keine Fixture, kein Oracle und keinen Testcode.
+
+Der
+[Artifact Schema Contract](A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md) ist
+ausschließlich für die dort ausdrücklich spezifizierten Dateinamen,
+Schema-IDs, exakten Feldmengen, JSON-Dateiserialisierungen, Count-Feldnamen,
+Digestnamen, Digest-Byteformen und Digestbindungen, die
+Anchor-v1-Testartefaktform sowie die Platzierung des Kandidatenstatus
+maßgeblich. In diesen eng delegierten mechanischen Themen ersetzt er
+widersprechende Formulierungen aus Version 1.0 und 1.1.
+
+Dieser Entry Contract bleibt maßgeblich für Rollen, Corpus, Datenschutz,
+Oracle-Unabhängigkeit, Human Review, Read- und Write-Scope, Stop Conditions und
+den Kandidatenlebenszyklus. Seine nicht ersetzten JSONL-, Fixture-,
+Eventstrom- und fachlichen Normalisierungsregeln gelten fort. Die ADRs bleiben
+übergeordnet; außerhalb der ausdrücklich delegierten mechanischen Themen hat
+der Supporting Contract keinen Vorrang.
 
 Ein später von Codex erzeugtes Artefakt bleibt bis zu Ronnys getrenntem Review:
 
@@ -157,28 +180,24 @@ zweite den semantischen Eventstrom. Derselbe Eventstromalgorithmus wird auf die
 Fixture und auf den read-only Export der importierten Temp-DB angewandt; beide
 Eventstromdigests müssen gleich sein.
 
-`manifest.json` bindet mindestens `fixture_schema_version`,
-`fixture_sha256`, `event_stream_digest_schema`, `event_stream_sha256` und die
-Eventzahl. Diese Mindestbindung gilt zusätzlich zu den ausführlicheren
-Oracle- und Import-Receipt-Bindungen.
+Die exakten Dateinamen, Schema-IDs, Feldmengen, Count-Feldnamen und
+artefaktübergreifenden Bindungen von Manifest, Oracle, statischem Import
+Receipt und Anchor stehen im
+[Artifact Schema Contract](A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md).
+Insbesondere bindet `oracle.json` die Fixture-Datei und den semantischen
+Eventstrom direkt und getrennt unter `source_bindings`. Der dort festgelegte
+`projection_digest_set_sha256` ist der verpflichtende Gesamtdigest aller zwölf
+Projektionsdigests.
 
-Das statische `oracle.json` bindet mindestens:
-
-- seine eigene Schema- und Formatversion;
-- `fixture_schema_version`, Fixture-Dateinamen und `fixture_sha256`;
-- `event_stream_digest_schema`, Eventzahl und `event_stream_sha256`;
-- Legacy-Präfix, Genesis, Epoche, Head und erwarteten Seal-/Integrity-Status;
-- die vollständige statische Projektionsinventarliste aus Abschnitt D;
-- Normalisierungs- und Digestversion sowie jeden Projektionsdigest und den
-  Gesamtdigest.
-
-Der deterministische Import in eine temporäre Current-Schema-SQLite-Datenbank
-erzeugt `import_receipt.json` als Test-Receipt mit `fixture_schema_version`,
-`fixture_sha256`, `event_stream_digest_schema`, importierter Zeilenzahl und dem
-aus dem read-only Export erneut berechneten `event_stream_sha256`. Dieser Wert
-muss dem im Manifest gebundenen Source-Eventstrom entsprechen. Die Identität
-des Current-Schema-Temp-Derivats bleibt davon getrennt; die temporäre Datenbank
-ist nie normative Quelle.
+`import_receipt.json` ist das statische erwartete Receipt. Der deterministische
+Import in eine temporäre Current-Schema-SQLite-Datenbank erzeugt kein
+persistentes Receipt-Artefakt, sondern berechnet ein Actual Receipt
+ausschließlich im Arbeitsspeicher. Dieses wird vollständig und unabhängig aus
+Quelldateibytes, importierten Zeilen und read-only Exporten gebildet und gegen
+die statische Datei verglichen. Der nach diesem Abschnitt berechnete
+`event_stream_sha256` des Imports muss dem Source-Eventstrom entsprechen. Die
+Identität des Current-Schema-Temp-Derivats bleibt davon getrennt; die temporäre
+Datenbank ist nie normative Quelle.
 
 Die separate statische historische SQLite-Altfixture aus ADR-0006 gehört nicht
 zum ersten A0.2-Kandidatenauftrag. Sie benötigt vor einem späteren
@@ -219,6 +238,11 @@ Für jede Projektion enthält das Oracle:
 - die zugehörige Normalisierungs- und Digestversion;
 - einen Projektiondigest nach Abschnitt E.
 
+Die exakte Ablageform aus `columns`, `sort_by`, `rows` und `sha256` sowie die
+Schema-ID `genus-golden-ledger-projection-rows-v1` stehen im Artifact Schema
+Contract. Diese Row-Schema-ID bezeichnet die nach der folgenden weiterhin
+geltenden Normalisierungsversion gebildete Darstellung.
+
 Die Normalisierungsversion für den ersten Kandidaten heißt
 `genus-projection-normalization-v1` und legt SQLite-Werte wie folgt fest:
 
@@ -248,7 +272,7 @@ autoritative Gegenprüfung dienen.
 
 ### D.1 Persistierter Belief-Lifecycle und read-time Epistemik
 
-`expected_projections.belief_projection` enthält ausschließlich die statisch
+`expected.projections.belief_projection` enthält ausschließlich die statisch
 erwarteten persistierten Projektionszeilen. Für deren Feld `state` sind im
 Golden Oracle nur die Lifecyclewerte `active` und `superseded` zulässig.
 `supported`, `contested` und `uncertain` sind read-time Epistemik und keine
@@ -275,14 +299,15 @@ Die Fixture enthält drei getrennte Fälle:
   Dieser Fall wird als persistierter Lifecycle und nicht zusätzlich über
   `epistemic_state()` geprüft.
 
-Das Oracle führt getrennt von `expected_projections` exakt diesen Bereich:
+Das Oracle führt getrennt von `expected.projections` exakt diesen Bereich:
 
 ```yaml
-expected_read_models:
-  belief_epistemic_state_v1:
-    as_of: "2026-01-01T00:00:00.000Z"
-    halflife_seconds: 3600.0
-    cases: []
+expected:
+  read_models:
+    belief_epistemic_state_v1:
+      as_of: "2026-01-01T00:00:00.000Z"
+      halflife_seconds: 3600.0
+      cases: []
 ```
 
 Jeder Fall enthält `belief_id`, `supporting_event_ids`,
@@ -298,25 +323,21 @@ oder Digests aus aktuellem Runtimeoutput als Autorität übernommen werden.
 
 ## E. Projection Digest Contract
 
-Für jede Projektion gilt:
+Die Eingabe jedes Projektiondigests ist die nach Abschnitt D normalisierte und
+stabil sortierte `rows`-Liste. Sie enthält nur endliche Zahlen, ist rekursiv
+Unicode-NFC-normalisiert und hat `-0.0` vor der Serialisierung zu `0.0`
+normalisiert. Auch eine leere Projektion besitzt die explizite Liste `[]` und
+deren Digest.
 
-1. Die nach Abschnitt D normalisierten und stabil sortierten Zeilen werden als
-   ein kanonisches JSON-Array serialisiert.
-2. Die Kodierung ist UTF-8.
-3. Die Serialisierung verwendet vollständig den Encodervertrag aus Abschnitt C,
-   einschließlich Unicode-NFC, `ensure_ascii=false`, `allow_nan=false`,
-   `sort_keys=true` und `separators=(",", ":")`, ohne zusätzliche
-   Whitespace-Varianz.
-4. Der Digest ist SHA-256 über genau diese kanonischen Bytes.
-5. Das Oracle nennt Digestalgorithmus und Normalisierungsversion ausdrücklich.
-6. Auch eine leere Projektion besitzt die explizite Zeilenliste `[]` und deren
-   kanonischen Digest.
+Die exakten kompakten Bytes des einzelnen Projektiondigests und des
+Projection-Digest-Sets definiert der Artifact Schema Contract. Beide verwenden
+`ensure_ascii=False`, UTF-8 ohne BOM und keine abschließende Newline. Diese
+semantischen Byteformen sind von der äußeren `ensure_ascii=True`-
+Dateiserialisierung des Oracle getrennt.
 
-Ein Gesamtdigest ist verpflichtend. Dafür wird ein JSON-Objekt aus exakt den
-zwölf Projektionsnamen und ihren kleingeschriebenen hexadezimalen SHA-256-
-Digests gebildet und mit dem Encodervertrag aus Abschnitt C kanonisch
-serialisiert; der Gesamtdigest ist SHA-256 über diese Bytes. Eine Änderung an
-Spalten, Sortierung, JSON-Behandlung,
+`projection_digest_set_sha256` ist der verpflichtende Gesamtdigest aus exakt
+den zwölf Projektionsnamen und ihren kleingeschriebenen hexadezimalen
+SHA-256-Digests. Eine Änderung an Spalten, Sortierung, JSON-Behandlung,
 Normalisierungsversion oder Digestbildung ist eine bewusste Vertragsänderung
 unter Ronnys Patchhoheit und kein beiläufiges Testupdate.
 
@@ -335,7 +356,7 @@ Oracle-Review-Durchlauf mindestens:
 - [ ] getrennte read-time Fälle `supported`/`contested` bei festem `as_of` und fester Half-life
 - [ ] jede ausdrücklich leere Projektion
 - [ ] Feldmengen, Sortierung und JSON-Normalisierung
-- [ ] jeden Projektionsdigest und den Gesamtdigest
+- [ ] jeden Projektionsdigest und `projection_digest_set_sha256`
 - [ ] das Anchor-v1-Testartefakt und seine historische Head-Grenze
 - [ ] Datenschutzfreiheit und ausschließlich synthetischen Inhalt
 - [ ] den exakten Wert und alle Pflichtvorkommen von `fixture_schema_version`
@@ -345,6 +366,10 @@ Oracle-Review-Durchlauf mindestens:
   lowercase `event_stream_sha256`
 - [ ] `event_stream_digest_schema` und Source-/Import-Gleichheit von `event_stream_sha256`
 - [ ] Manifestversion und vollständige Import-Receipt-Bindung
+- [ ] exakte Dateinamen, Schema-IDs und Kandidatenstatus-Platzierung
+- [ ] direkte Oracle-Source-Bindings und artefaktübergreifende Count-Gleichheiten
+- [ ] Oracle-, Manifest-, Anchor- und Bundle-Digest nach ihrer jeweiligen Byteform
+- [ ] statisches Import Receipt gegen das unabhängig berechnete In-Memory-Actual-Receipt
 - [ ] exakte Gleichheit der zwölf Oracle- und Runtime-Projektionsnamen
 - [ ] Legacy-, Tail-, Anchor- und Oracle-Gegenfälle
 
@@ -415,10 +440,12 @@ Pfaderweiterung benötigt vor dem Lesen eine erneute menschliche Freigabe.
 - `docs/decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md`
 - `docs/decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md`
 - `docs/reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md`
+- `docs/reviews/A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md`
 
 ### Test-only write
 
-Die Read-only-Erweiterung aus ADR-0011 erweitert diesen Write-Scope nicht.
+Die Read-only-Erweiterungen aus ADR-0011 und Version 1.2 erweitern diesen
+Write-Scope nicht.
 
 Persistente Repository-Kandidatenwrites sind ausschließlich erlaubt in:
 
@@ -445,6 +472,7 @@ sind nicht autorisiert.
 
 ## Aktueller Stand
 
-Der Eingangskontrakt ist angenommen. Es existiert aus diesem Auftrag noch kein
-Golden Ledger, Oracle, Anchor-Testartefakt, Loader, Digest oder Golden-Testcode.
-A0.2 bleibt aktiv und wartet auf einen gesonderten Implementierungsauftrag.
+Der Eingangskontrakt und sein mechanischer Artifact Schema Contract sind
+angenommen. Es existiert aus diesem Auftrag noch kein Golden Ledger, Oracle,
+Anchor-Testartefakt, Loader, Digest oder Golden-Testcode. A0.2 bleibt aktiv und
+wartet auf einen gesonderten Implementierungsauftrag.
