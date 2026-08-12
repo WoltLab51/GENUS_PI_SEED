@@ -4,12 +4,12 @@
 >
 > **Owner:** Ronny
 >
-> **Contract version:** 1.2
+> **Contract version:** 1.4
 >
 > **Amended by:**
 > [ADR-0011 — Golden Ledger Canonicalization, Belief Coverage and Projector Read Scope](../decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
 > and the
-> [A0.2 Golden Ledger Artifact Schema Contract](A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md)
+> [A0.2 Golden Ledger Artifact Schema Contract 1.2](A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md)
 >
 > **Gilt vor:** dem ersten Golden-Ledger-, Oracle-, Anchor-Fixture- oder
 > Testartefakt
@@ -30,6 +30,11 @@
 - **Version 1.2:** artifact filenames, JSON schemas, status placement, source
   bindings, count fields, oracle file digest, anchor bytes and bundle binding
   made explicit
+- **Version 1.3:** import-receipt event-stream schema binding, separate
+  `expected_projections` and `expected_read_models` sections, and expected
+  Anchor-v1 outcomes aligned with ADR-0006 and ADR-0011
+- **Version 1.4:** explicit bundle-bound oracle provenance added to satisfy
+  ADR-0006 without duplicating provenance across manifest and import receipt
 
 ## Zweck und Gate
 
@@ -44,7 +49,7 @@ Schema-IDs, exakten Feldmengen, JSON-Dateiserialisierungen, Count-Feldnamen,
 Digestnamen, Digest-Byteformen und Digestbindungen, die
 Anchor-v1-Testartefaktform sowie die Platzierung des Kandidatenstatus
 maßgeblich. In diesen eng delegierten mechanischen Themen ersetzt er
-widersprechende Formulierungen aus Version 1.0 und 1.1.
+widersprechende Formulierungen aus den früheren Versionen 1.0 bis 1.2.
 
 Dieser Entry Contract bleibt maßgeblich für Rollen, Corpus, Datenschutz,
 Oracle-Unabhängigkeit, Human Review, Read- und Write-Scope, Stop Conditions und
@@ -52,6 +57,27 @@ den Kandidatenlebenszyklus. Seine nicht ersetzten JSONL-, Fixture-,
 Eventstrom- und fachlichen Normalisierungsregeln gelten fort. Die ADRs bleiben
 übergeordnet; außerhalb der ausdrücklich delegierten mechanischen Themen hat
 der Supporting Contract keinen Vorrang.
+
+ADR-0006 und ADR-0011 bleiben auch für die in Version 1.4 harmonisierte Form
+übergeordnet. Artifact Schema Contract 1.2 macht ihre mechanische Ausprägung
+explizit: `expected.projections` und `expected.read_models` sind nicht mehr
+gültig; ausschließlich die getrennten Oracle-Top-Level-Bereiche
+`expected_projections` und `expected_read_models` sind zulässig.
+`expected_anchor_v1` trägt die statischen Anchor-Verifikationsergebnisse, und
+`event_stream_digest_schema` ist im Import Receipt verpflichtend.
+
+`source_bindings` bezeichnet ausschließlich die technische Bindung des Oracle
+an Fixture-Datei, Fixture-Digest und semantischen Eventstrom und ist keine
+vollständige Provenienz. `oracle.json.provenance` ist der einzige autoritative
+Provenienzwohnort und bindet Repository, Baseline-Commit, geltende
+Vertragsdokumente, Ableitung und Rollen. `baseline_commit` ist der saubere HEAD
+zu Beginn des späteren Kandidatenbaus.
+
+Die Provenienz ist als Teil der Oracle-Dateibytes durch `oracle_sha256`, über
+die Manifest-Dateibytes durch `manifest_sha256` und durch den beide Werte
+enthaltenden `bundle_sha256` in den Kandidatenverbund eingebunden. Manifest und
+Import Receipt duplizieren das Provenienzobjekt nicht; ein separater
+`provenance_sha256` wird nicht eingeführt.
 
 Ein später von Codex erzeugtes Artefakt bleibt bis zu Ronnys getrenntem Review:
 
@@ -187,7 +213,11 @@ Receipt und Anchor stehen im
 Insbesondere bindet `oracle.json` die Fixture-Datei und den semantischen
 Eventstrom direkt und getrennt unter `source_bindings`. Der dort festgelegte
 `projection_digest_set_sha256` ist der verpflichtende Gesamtdigest aller zwölf
-Projektionsdigests.
+Projektionsdigests. `import_receipt.json.event_stream_digest_schema` ist
+verpflichtend, besitzt denselben festen Schemawert wie die entsprechenden
+Manifest- und Oracle-Bindungen und bezeichnet getrennt vom konkreten
+`import_receipt.json.digests.event_stream_sha256` dessen Algorithmus- und
+Byteformvertrag.
 
 `import_receipt.json` ist das statische erwartete Receipt. Der deterministische
 Import in eine temporäre Current-Schema-SQLite-Datenbank erzeugt kein
@@ -272,7 +302,7 @@ autoritative Gegenprüfung dienen.
 
 ### D.1 Persistierter Belief-Lifecycle und read-time Epistemik
 
-`expected.projections.belief_projection` enthält ausschließlich die statisch
+`expected_projections.belief_projection` enthält ausschließlich die statisch
 erwarteten persistierten Projektionszeilen. Für deren Feld `state` sind im
 Golden Oracle nur die Lifecyclewerte `active` und `superseded` zulässig.
 `supported`, `contested` und `uncertain` sind read-time Epistemik und keine
@@ -299,15 +329,15 @@ Die Fixture enthält drei getrennte Fälle:
   Dieser Fall wird als persistierter Lifecycle und nicht zusätzlich über
   `epistemic_state()` geprüft.
 
-Das Oracle führt getrennt von `expected.projections` exakt diesen Bereich:
+Das Oracle führt getrennt von `expected_projections` exakt diesen
+Top-Level-Bereich:
 
 ```yaml
-expected:
-  read_models:
-    belief_epistemic_state_v1:
-      as_of: "2026-01-01T00:00:00.000Z"
-      halflife_seconds: 3600.0
-      cases: []
+expected_read_models:
+  belief_epistemic_state_v1:
+    as_of: "2026-01-01T00:00:00.000Z"
+    halflife_seconds: 3600.0
+    cases: []
 ```
 
 Jeder Fall enthält `belief_id`, `supporting_event_ids`,

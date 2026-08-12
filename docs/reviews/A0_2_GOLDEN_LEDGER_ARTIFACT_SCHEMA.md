@@ -4,10 +4,21 @@
 >
 > **Owner:** Ronny
 >
+> **Contract version:** 1.2
+>
 > **Datum:** 2026-08-10
 >
 > **Zweck:** Exakte Dateinamen, Schema-IDs, Feldmengen, Dateibytes und
 > Digestbindungen für den A0.2-Golden-Ledger-Kandidaten festlegen.
+
+## Amendment history
+
+- **Version 1.0:** initial accepted mechanical artifact specification
+- **Version 1.1:** import-receipt digest-schema field, ADR-aligned oracle
+  sections and expected Anchor-v1 outcomes made explicit
+- **Version 1.2:** explicit oracle provenance for repository, baseline commit,
+  governing documents, derivation and human roles made bundle-bound through
+  `oracle_sha256`
 
 ## 1. Geltung und Autoritätsgrenze
 
@@ -31,6 +42,7 @@ Dieser Vertrag ist ausschließlich maßgeblich für:
 - Digestnamen;
 - Digest-Byteformen;
 - Digestbindungen;
+- die mechanische Oracle-Provenienz und ihre Digestbindung;
 - die Form des Anchor-v1-Testartefakts;
 - die Platzierung des Kandidatenstatus.
 
@@ -278,9 +290,13 @@ schema
 format_version
 status
 fixture_schema_version
+provenance
 source_bindings
 canonicalization
 expected
+expected_projections
+expected_read_models
+expected_anchor_v1
 projection_digest_set_sha256
 ```
 
@@ -295,7 +311,76 @@ fixture_schema_version = "genus-golden-ledger-fixture-v1"
 
 `oracle.json` enthält keinen Digest seiner eigenen Dateibytes.
 
-### 6.2 Direkte Source-Bindings
+### 6.2 Provenienz
+
+`provenance` besitzt exakt:
+
+```text
+repository
+baseline_commit
+derivation
+governing_documents
+roles
+```
+
+Weitere Felder sind nicht zulässig. Die festen Werte sind:
+
+```text
+repository = "WoltLab51/GENUS_PI_SEED"
+derivation = "a0_2:human_supervised_golden_ledger_candidate:v1"
+```
+
+`baseline_commit` ist ein String aus exakt 40 Kleinbuchstaben-Hexzeichen und
+entspricht damit dem regulären Ausdruck `[0-9a-f]{40}`. Sein Wert entspricht
+exakt `git rev-parse HEAD` des sauberen Worktrees zu Beginn des späteren
+Golden-Ledger-Kandidatenbaus. Er wird als statischer Kandidatenwert in
+`oracle.json` gespeichert und während Tests nicht aus dem aktuellen Worktree
+neu geschrieben.
+
+`governing_documents` ist exakt diese geordnete Liste; ihre Reihenfolge ist
+Teil des Vertrags:
+
+```text
+docs/ARCHITECTURE.md
+docs/EVENT_CONTRACT.md
+docs/QUALITY.md
+docs/SECURITY_MODEL.md
+docs/decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md
+docs/decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md
+docs/decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md
+docs/decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md
+docs/reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md
+docs/reviews/A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md
+```
+
+`roles` besitzt exakt:
+
+```text
+canonicalization_digest_contract_owner
+corpus_owner
+human_implementer_committer
+non_authoritative_model_assistant
+oracle_reviewer
+privacy_reviewer
+```
+
+mit den exakten Werten:
+
+```text
+canonicalization_digest_contract_owner = "Ronny"
+corpus_owner = "Ronny"
+human_implementer_committer = "Ronny"
+non_authoritative_model_assistant = "Codex"
+oracle_reviewer = "Ronny"
+privacy_reviewer = "Ronny"
+```
+
+`provenance` bindet den Kandidaten an Repository, Baseline-Commit, geltende
+Vertragsdokumente, Ableitung und menschliche Rollen. Der einzige autoritative
+Wohnort dieser Provenienz ist `oracle.json.provenance`; Manifest und Import
+Receipt duplizieren das Objekt nicht.
+
+### 6.3 Direkte Source-Bindings
 
 `source_bindings` besitzt exakt:
 
@@ -315,9 +400,11 @@ event_stream_digest_schema = "genus-golden-ledger-event-stream-digest-v1"
 
 `fixture_sha256` und `event_stream_sha256` sind jeweils 64
 Kleinbuchstaben-Hexzeichen. Damit bindet das Oracle die kanonische Eventdatei
-und den semantischen Eventstrom direkt und getrennt.
+und den semantischen Eventstrom direkt und getrennt. `source_bindings`
+bezeichnet ausschließlich diese technische Fixture- und Eventstrombindung und
+ist keine vollständige Provenienz.
 
-### 6.3 `canonicalization`
+### 6.4 `canonicalization`
 
 `canonicalization` besitzt exakt:
 
@@ -337,7 +424,7 @@ projection_digest_set_schema = "genus-golden-ledger-projection-digest-set-v1"
 read_model_schema = "genus-golden-ledger-belief-epistemic-read-model-v1"
 ```
 
-### 6.4 `expected`
+### 6.5 `expected`
 
 `expected` besitzt exakt:
 
@@ -347,8 +434,6 @@ legacy_prefix
 epoch
 head
 integrity
-projections
-read_models
 ```
 
 `legacy_prefix` besitzt exakt:
@@ -389,9 +474,9 @@ ok = true
 issues = []
 ```
 
-### 6.5 Zwölf Projektionen
+### 6.6 Zwölf Projektionen
 
-`expected.projections` besitzt exakt alle zwölf Replayziele:
+`expected_projections` besitzt exakt alle zwölf Replayziele:
 
 ```text
 response_feedback_log
@@ -425,9 +510,9 @@ sha256
 Auch eine erwartbar leere Projektion wird vollständig geführt. Ihre
 `rows`-Liste ist `[]`; ihr `sha256` bindet das kanonische leere JSON-Array.
 
-### 6.6 Deterministische Read-Modelle
+### 6.7 Deterministische Read-Modelle
 
-`expected.read_models` besitzt exakt:
+`expected_read_models` besitzt exakt:
 
 ```text
 belief_epistemic_state_v1
@@ -460,6 +545,47 @@ expected_epistemic_state
 
 Die fachliche Semantik der Fälle, einschließlich Rundung und Trennung vom
 persistierten Belief-Lifecycle, bleibt im Entry Contract festgelegt.
+
+### 6.8 Erwartete Anchor-v1-Ergebnisse
+
+`expected_anchor_v1` besitzt exakt:
+
+```text
+artifact_file
+verification_core_id
+cases
+```
+
+mit den festen Werten:
+
+```text
+artifact_file = "anchor_v1.json"
+verification_core_id = "golden-ledger-v1"
+```
+
+`cases` besitzt exakt:
+
+```text
+historical_head_with_later_tail
+wrong_head_event_id
+wrong_head_seal
+wrong_core_id
+```
+
+Jeder Case besitzt exakt das Feld `accepted`. Die festen erwarteten Werte sind:
+
+```text
+historical_head_with_later_tail.accepted = true
+wrong_head_event_id.accepted = false
+wrong_head_seal.accepted = false
+wrong_core_id.accepted = false
+```
+
+Das Oracle schreibt keine Fehlermeldungstexte oder Issue-Strings für diese
+Fälle fest, sondern ausschließlich das fachliche Akzeptanzresultat. Der
+unveränderte Anchor-v1-Dateivertrag aus Abschnitt 10 bleibt maßgeblich: exakt
+zwölf Felder, kein `status`-Feld, `signature = null` und ein historischer Head,
+nach dem ein späterer Tail existieren darf.
 
 ## 7. Projektiondigest
 
@@ -547,6 +673,18 @@ Der identische Wert steht an exakt diesen zwei Stellen:
 
 `oracle.json` enthält keinen eigenen Dateidigest. Damit entsteht keine
 Selbstreferenz.
+
+Weil `provenance` Bestandteil der exakten `oracle.json`-Dateibytes ist, bindet
+`oracle_sha256` die vollständige Provenienz. `manifest.json` bindet diesen
+`oracle_sha256`; `import_receipt.json` bindet sowohl `oracle_sha256` als auch
+den über die Manifest-Dateibytes gebildeten `manifest_sha256`. Das
+Bundle-Eingabeobjekt aus Abschnitt 12 enthält beide Digests, sodass
+`bundle_sha256` sie erneut bindet.
+
+Manifest und Import Receipt enthalten keine zweite Provenienzkopie. Es gibt
+keinen separaten `provenance_sha256`. Da weder `provenance` noch `oracle.json`
+einen eigenen Oracle-, Manifest- oder Bundle-Digest enthalten, entsteht keine
+Digest-Selbstreferenz.
 
 ## 10. `anchor_v1.json`
 
@@ -651,6 +789,7 @@ schema
 format_version
 status
 fixture_schema_version
+event_stream_digest_schema
 source_files
 counts
 digests
@@ -665,8 +804,13 @@ schema = "genus-golden-ledger-import-receipt-v1"
 format_version = 1
 status = "candidate_pending_human_review"
 fixture_schema_version = "genus-golden-ledger-fixture-v1"
+event_stream_digest_schema = "genus-golden-ledger-event-stream-digest-v1"
 bundle_digest_schema = "genus-golden-ledger-bundle-digest-v1"
 ```
+
+`event_stream_digest_schema` bezeichnet den kanonischen Algorithmus- und
+Byteformvertrag. Der daraus resultierende konkrete Digest bleibt getrennt
+unter `digests.event_stream_sha256` gespeichert.
 
 ### 11.2 `source_files`
 
@@ -796,6 +940,10 @@ Gleichheiten:
   `oracle.source_bindings.event_stream_sha256` und
   `import_receipt.digests.event_stream_sha256` entsprechen dem nach Entry
   Contract gebildeten Digest des Source- und des importierten Eventstroms;
+- `manifest.canonicalization.event_stream_digest_schema`,
+  `oracle.source_bindings.event_stream_digest_schema` und
+  `import_receipt.event_stream_digest_schema` sind identisch und lauten
+  `genus-golden-ledger-event-stream-digest-v1`;
 - `manifest.digests.oracle_sha256` und
   `import_receipt.digests.oracle_sha256` entsprechen SHA-256 über die exakten
   `oracle.json`-Dateibytes;
