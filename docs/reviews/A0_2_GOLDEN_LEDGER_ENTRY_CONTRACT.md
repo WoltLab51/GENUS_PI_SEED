@@ -4,13 +4,25 @@
 >
 > **Owner:** Ronny
 >
+> **Contract version:** 1.1
+>
+> **Amended by:**
+> [ADR-0011 — Golden Ledger Canonicalization, Belief Coverage and Projector Read Scope](../decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
+>
 > **Gilt vor:** dem ersten Golden-Ledger-, Oracle-, Anchor-Fixture- oder
 > Testartefakt
 >
 > **Entscheidungsgrundlage:**
 > [ADR-0006](../decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md),
 > [ADR-0009](../decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) und
-> [ADR-0010](../decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md)
+> [ADR-0010](../decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md),
+> präzisiert durch [ADR-0011](../decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
+
+## Amendment history
+
+- **Version 1.0:** initial accepted entry contract
+- **Version 1.1:** fixture schema version, semantic event-stream digest,
+  belief coverage and projector read scope made explicit
 
 ## Zweck und Gate
 
@@ -58,7 +70,8 @@ Der Golden-Ledger-v1-Corpus ist:
 - mit festen IDs und festen Zeitstempeln definiert;
 - mit expliziten terminalen Lebenszyklen ausgestattet;
 - fachlich aus projizierten und bewusst rohen Events zusammengesetzt;
-- mit Belief-Zuständen `supported`, `contested` und `superseded` ausgestattet;
+- mit persistiertem Belief-Lifecycle `active` und `superseded` sowie getrennten,
+  statischen read-time Fällen für `supported` und `contested` ausgestattet;
 - mit Relation, Inquiry, Experience, Proposal und Governance ausgestattet.
 
 Die kanonische Ereignismenge wird nicht beim Testlauf durch `ledger.append()`,
@@ -100,21 +113,72 @@ neues menschliches Review der betroffenen Verträge und Erwartungen.
 
 ## C.1 Manifest- und Derivatbindung
 
+Die Fixture-Schemaversion lautet exakt:
+
+```text
+fixture_schema_version = "genus-golden-ledger-fixture-v1"
+```
+
+Sie erscheint mindestens in `manifest.json`, `oracle.json` und
+`import_receipt.json`. Sie bezeichnet die Form einer Fixture-Zeile mit exakt
+`id`, `event_type`, `payload`, `created_at`, `prev_seal` und `seal`, nicht die
+SQLite-Schema- oder Oracle-Schemaversion. `events.jsonl` wiederholt sie nicht in
+jeder Zeile.
+
+Zwei getrennte SHA-256-Domänen sind verbindlich:
+
+- `fixture_sha256` bindet die exakten, nach Abschnitt C kanonischen
+  `events.jsonl`-Dateibytes einschließlich genau einer finalen LF.
+- `event_stream_sha256` bindet die semantisch zu importierenden
+  `event_log`-Zeilen. Seine Schema-ID lautet exakt
+  `genus-golden-ledger-event-stream-digest-v1` und steht im Feld
+  `event_stream_digest_schema`.
+
+Für `event_stream_sha256` gilt diese exakte Byteform:
+
+1. Events nach ganzzahliger `id` aufsteigend sortieren.
+2. Das `payload` jeder Fixture-Zeile als JSON-Objekt lesen.
+3. `payload_text` mit
+   `json.dumps(payload, ensure_ascii=True, sort_keys=True,
+   separators=(",", ":"))` bilden.
+4. Je Event genau ein Objekt aus `created_at`, `event_type`, `id`,
+   `payload_text`, `prev_seal` und `seal` bilden. `id` ist Integer;
+   `prev_seal` und `seal` sind String oder JSON `null`.
+5. Die ID-geordnete Liste dieser Objekte mit
+   `json.dumps(records, ensure_ascii=True, sort_keys=True,
+   separators=(",", ":"))` als JSON-Array serialisieren.
+6. Als UTF-8 ohne BOM und ohne abschließende Newline codieren.
+7. SHA-256 über exakt diese Bytes bilden und als 64 Kleinbuchstaben-Hexzeichen
+   ausgeben.
+
+`fixture_sha256` und `event_stream_sha256` werden nicht gleichgesetzt. Der
+erste bindet die reviewte Datei einschließlich ihrer äußeren Darstellung, der
+zweite den semantischen Eventstrom. Derselbe Eventstromalgorithmus wird auf die
+Fixture und auf den read-only Export der importierten Temp-DB angewandt; beide
+Eventstromdigests müssen gleich sein.
+
+`manifest.json` bindet mindestens `fixture_schema_version`,
+`fixture_sha256`, `event_stream_digest_schema`, `event_stream_sha256` und die
+Eventzahl. Diese Mindestbindung gilt zusätzlich zu den ausführlicheren
+Oracle- und Import-Receipt-Bindungen.
+
 Das statische `oracle.json` bindet mindestens:
 
 - seine eigene Schema- und Formatversion;
-- den Fixture-Dateinamen und SHA-256 der exakten `events.jsonl`-Bytes;
-- Eventzahl und einen kanonischen Digest des vollständigen Eventstroms;
+- `fixture_schema_version`, Fixture-Dateinamen und `fixture_sha256`;
+- `event_stream_digest_schema`, Eventzahl und `event_stream_sha256`;
 - Legacy-Präfix, Genesis, Epoche, Head und erwarteten Seal-/Integrity-Status;
 - die vollständige statische Projektionsinventarliste aus Abschnitt D;
 - Normalisierungs- und Digestversion sowie jeden Projektionsdigest und den
   Gesamtdigest.
 
 Der deterministische Import in eine temporäre Current-Schema-SQLite-Datenbank
-erzeugt ein Test-Receipt mit JSONL-Digest, Fixture-Schemaversion und dem
-resultierenden read-only Eventdigest. Dieser Eventdigest muss dem im Manifest
-gebundenen Eventstrom entsprechen. Die temporäre Datenbank ist nie normative
-Quelle.
+erzeugt `import_receipt.json` als Test-Receipt mit `fixture_schema_version`,
+`fixture_sha256`, `event_stream_digest_schema`, importierter Zeilenzahl und dem
+aus dem read-only Export erneut berechneten `event_stream_sha256`. Dieser Wert
+muss dem im Manifest gebundenen Source-Eventstrom entsprechen. Die Identität
+des Current-Schema-Temp-Derivats bleibt davon getrennt; die temporäre Datenbank
+ist nie normative Quelle.
 
 Die separate statische historische SQLite-Altfixture aus ADR-0006 gehört nicht
 zum ersten A0.2-Kandidatenauftrag. Sie benötigt vor einem späteren
@@ -182,6 +246,56 @@ Oracle-Ersterzeugung aus dem aktuellen Projektor- oder Replayoutput als
 Autorität übernommen. Ein Runtime-Lauf darf ausschließlich als nicht
 autoritative Gegenprüfung dienen.
 
+### D.1 Persistierter Belief-Lifecycle und read-time Epistemik
+
+`expected_projections.belief_projection` enthält ausschließlich die statisch
+erwarteten persistierten Projektionszeilen. Für deren Feld `state` sind im
+Golden Oracle nur die Lifecyclewerte `active` und `superseded` zulässig.
+`supported`, `contested` und `uncertain` sind read-time Epistemik und keine
+persistierten Werte von `belief_projection.state`.
+
+Die Fixture enthält drei getrennte Fälle:
+
+- **Supported:** `state = active`, genau zwei Supporting-Events, null
+  Contradicting-Events und alle verwendeten Evidence-Zeitpunkte nach Parsing
+  gleich dem festen UTC-`as_of`; ihre Fixture-Strings bleiben im Format
+  `YYYY-MM-DDTHH:MM:SS.ffffff+00:00`. Die erwartete Confidence ist der Quotient
+  `2 / (2 + 0 + 1)`, für das statische Feld und den Vergleich auf drei
+  Dezimalstellen gerundet `0.667`; erwarteter read-time Zustand ist
+  `supported`.
+- **Contested:** `state = active`, genau ein Supporting-Event, zwei
+  Contradicting-Events und alle verwendeten Evidence-Zeitpunkte nach Parsing
+  gleich dem festen UTC-`as_of`; ihre Fixture-Strings bleiben im Format
+  `YYYY-MM-DDTHH:MM:SS.ffffff+00:00`. Die erwartete Confidence ist der Quotient
+  `1 / (1 + 2 + 1)`, für das statische Feld und den Vergleich auf drei
+  Dezimalstellen gerundet `0.250`; erwarteter read-time Zustand ist
+  `contested`.
+- **Superseded:** Der alte Belief besitzt `state = superseded` und verweist mit
+  `superseded_by` auf den Nachfolger; der Nachfolger besitzt `state = active`.
+  Dieser Fall wird als persistierter Lifecycle und nicht zusätzlich über
+  `epistemic_state()` geprüft.
+
+Das Oracle führt getrennt von `expected_projections` exakt diesen Bereich:
+
+```yaml
+expected_read_models:
+  belief_epistemic_state_v1:
+    as_of: "2026-01-01T00:00:00.000Z"
+    halflife_seconds: 3600.0
+    cases: []
+```
+
+Jeder Fall enthält `belief_id`, `supporting_event_ids`,
+`contradicting_event_ids`, `expected_confidence` und
+`expected_epistemic_state`. Der Test darf `confidence.calculate_confidence`
+nur mit explizitem `now=as_of` und `halflife_seconds=3600.0` sowie
+`projection.epistemic_state` aufrufen. `expected_confidence` ist eine JSON-Zahl;
+der berechnete Wert wird vor dem Vergleich ebenfalls auf drei Dezimalstellen
+gerundet. Aktuelle Wall Clock, implizit gelernte Half-life und
+`belief_with_confidence()` als Golden-Zeitquelle sind unzulässig.
+Die statischen read-time Erwartungen dürfen ebenso wenig wie Projektionszeilen
+oder Digests aus aktuellem Runtimeoutput als Autorität übernommen werden.
+
 ## E. Projection Digest Contract
 
 Für jede Projektion gilt:
@@ -217,13 +331,20 @@ Oracle-Review-Durchlauf mindestens:
 - [ ] das vorhandene v1-Epochen-Event
 - [ ] die vollständige Seal-Kette und den erwarteten Head
 - [ ] jede erwartete Projektionswirkung gegen ihre Quell-Events
+- [ ] persistierten Belief-Lifecycle `active`/`superseded` einschließlich Nachfolger
+- [ ] getrennte read-time Fälle `supported`/`contested` bei festem `as_of` und fester Half-life
 - [ ] jede ausdrücklich leere Projektion
 - [ ] Feldmengen, Sortierung und JSON-Normalisierung
 - [ ] jeden Projektionsdigest und den Gesamtdigest
 - [ ] das Anchor-v1-Testartefakt und seine historische Head-Grenze
 - [ ] Datenschutzfreiheit und ausschließlich synthetischen Inhalt
-- [ ] den SHA-256-Digest der exakten `events.jsonl`-Bytes
-- [ ] Manifestversion, Eventdigest und Import-Receipt-Bindung
+- [ ] den exakten Wert und alle Pflichtvorkommen von `fixture_schema_version`
+- [ ] `fixture_sha256` über die exakten `events.jsonl`-Bytes
+- [ ] die vollständige Eventstrom-Byteform einschließlich Record-Feldmenge,
+  `payload_text`, Arrayserialisierung ohne finale Newline und 64-stelligem
+  lowercase `event_stream_sha256`
+- [ ] `event_stream_digest_schema` und Source-/Import-Gleichheit von `event_stream_sha256`
+- [ ] Manifestversion und vollständige Import-Receipt-Bindung
 - [ ] exakte Gleichheit der zwölf Oracle- und Runtime-Projektionsnamen
 - [ ] Legacy-, Tail-, Anchor- und Oracle-Gegenfälle
 
@@ -235,7 +356,7 @@ geändert, werden alle betroffenen Prüfpunkte wieder offen.
 
 Die Arbeit stoppt sofort bei:
 
-- Widerspruch zu ADR-0006, ADR-0009, ADR-0010 oder diesem Vertrag;
+- Widerspruch zu ADR-0006, ADR-0009, ADR-0010, ADR-0011 oder diesem Vertrag;
 - Produktdaten oder identifizierenden Inhalten im Corpus;
 - notwendiger Änderung an Runtime, Schema, Replay, Integrity, Seal, Anchor,
   Deploy oder CI;
@@ -269,6 +390,17 @@ Pfaderweiterung benötigt vor dem Lesen eine erneute menschliche Freigabe.
 - `genus/anchor.py`
 - `genus/event_router.py`
 - `genus/integrity.py`
+- `genus/projection.py`
+- `genus/relation_semantics.py`
+- `genus/confidence.py`
+- `genus/proposals.py`
+- `genus/inquiries.py`
+- `genus/experience.py`
+- `genus/state.py`
+- `genus/governance.py`
+- `genus/operation.py`
+- `genus/maturation.py`
+- `genus/response_outcomes.py`
 - `schema.sql`
 - `tests/test_anchor.py`
 - `tests/test_integrity.py`
@@ -281,9 +413,12 @@ Pfaderweiterung benötigt vor dem Lesen eine erneute menschliche Freigabe.
 - `docs/decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md`
 - `docs/decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md`
 - `docs/decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md`
+- `docs/decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md`
 - `docs/reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md`
 
 ### Test-only write
+
+Die Read-only-Erweiterung aus ADR-0011 erweitert diesen Write-Scope nicht.
 
 Persistente Repository-Kandidatenwrites sind ausschließlich erlaubt in:
 

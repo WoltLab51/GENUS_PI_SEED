@@ -15,6 +15,7 @@
 | [0008](ADR-0008-EXTERNAL-ANCHOR-TRUST.md) | Externe Anchor-Trust-, Key-Custody- und Ledger-Repair-Grenzen | accepted |
 | [0009](ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) | A0 bleibt human-owned critical lane; Lernen bleibt nichtproduktiv isoliert | accepted |
 | [0010](ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md) | Ronny darf Codex für A0.2 eng begrenzt read-only und test-only assistieren lassen | accepted |
+| [0011](ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md) | Fixture- und Eventstromdigests, Belief-Coverage und Projektor-Lesescope sind für A0.2 exakt getrennt | accepted |
 
 Ein ADR erklärt **warum** eine Entscheidung gilt. Der aktuelle technische Vertrag lebt
 weiterhin in [ARCHITECTURE.md](../ARCHITECTURE.md).

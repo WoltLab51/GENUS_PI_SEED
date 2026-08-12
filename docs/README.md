@@ -70,6 +70,7 @@ Sie gehören nicht in zeitlose Verträge.
 - [ADR-0008 — Externes Anchor-Vertrauen und Ledger-Reparatur](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md)
 - [ADR-0009 — Human-owned Critical Lane](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md)
 - [ADR-0010 — Menschlich geführte Modellassistenz ausschließlich in A0.2](decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md)
+- [ADR-0011 — Golden-Ledger-Kanonisierung und Belief-Coverage](decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
 
 Neue ADRs werden nur für Entscheidungen angelegt, die mehrere Module oder spätere
 Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.
