@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `68dc408488482536` · Regeneration: `genus kartografie build`
+> **Inhalt:** `59bcd900e6e8643b` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -151,11 +151,11 @@ verbindet sich aber nicht live mit dem Pi. Der vollständige Befund steht im
 |---|---|---|
 | Das Embedder-Venv ist persistent, der Modellcache liegt live jedoch flüchtig unter /tmp; Offline- und Neustartverhalten sind dadurch nicht reproduzierbar. | `high` | [docs/reports/2026-07-13-cartography-runtime-audit.md:55](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_embedder.sh:25](../../deploy/pi_install_embedder.sh) |
 | Die Installer deklarieren Chat-Wortlernen explizit aus; die live installierten Units verließen sich beim Audit noch auf denselben Code-Default. | `medium` | [docs/reports/2026-07-13-cartography-runtime-audit.md:61](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_learner.sh:33](../../deploy/pi_install_learner.sh) · [deploy/pi_install_telegram_bot.sh:40](../../deploy/pi_install_telegram_bot.sh) · [deploy/pi_network_watchdog.sh:278](../../deploy/pi_network_watchdog.sh) |
-| Backups sind funktional und physisch getrennt, aber Ziel und Dateien benötigen einen eigenen 0700/0600-Vertrag für Defense in Depth. | `high` | [docs/reports/2026-07-13-cartography-runtime-audit.md:67](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/backup_ledger_to_sd.sh:20](../../deploy/backup_ledger_to_sd.sh) · [docs/SECURITY_MODEL.md:46](../../docs/SECURITY_MODEL.md) |
+| Backups sind funktional und physisch getrennt, aber Ziel und Dateien benötigen einen eigenen 0700/0600-Vertrag für Defense in Depth. | `high` | [docs/reports/2026-07-13-cartography-runtime-audit.md:67](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/backup_ledger_to_sd.sh:20](../../deploy/backup_ledger_to_sd.sh) · [docs/SECURITY_MODEL.md:47](../../docs/SECURITY_MODEL.md) |
 | Cron-, Doctor- und Statuslogs werden ohne Größen- oder Generationengrenze fortgeschrieben. | `medium` | [docs/reports/2026-07-13-cartography-runtime-audit.md:73](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_cron.sh:68](../../deploy/pi_install_cron.sh) |
-| Der private Elternpfad ist 0700, einzelne State-, Log- und Ledgerdateien besitzen aber keinen einheitlichen 0600-Eigenvertrag. | `medium` | [docs/reports/2026-07-13-cartography-runtime-audit.md:78](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [docs/SECURITY_MODEL.md:119](../../docs/SECURITY_MODEL.md) |
+| Der private Elternpfad ist 0700, einzelne State-, Log- und Ledgerdateien besitzen aber keinen einheitlichen 0600-Eigenvertrag. | `medium` | [docs/reports/2026-07-13-cartography-runtime-audit.md:78](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [docs/SECURITY_MODEL.md:120](../../docs/SECURITY_MODEL.md) |
 | Mehrere nicht aktive Werkstattmodelle erschweren Rollen-, Update- und Speicherinventar. | `low` | [docs/reports/2026-07-13-cartography-runtime-audit.md:83](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_deuter.sh:1](../../deploy/pi_install_deuter.sh) |
-| Der netzaktive Learner teilt den Benutzer und damit einen breiten Ausfallradius mit Ledger und privatem Membranzustand. | `architectural` | [docs/reports/2026-07-13-cartography-runtime-audit.md:88](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_learner.sh:85](../../deploy/pi_install_learner.sh) · [docs/SECURITY_MODEL.md:103](../../docs/SECURITY_MODEL.md) |
+| Der netzaktive Learner teilt den Benutzer und damit einen breiten Ausfallradius mit Ledger und privatem Membranzustand. | `architectural` | [docs/reports/2026-07-13-cartography-runtime-audit.md:88](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_learner.sh:85](../../deploy/pi_install_learner.sh) · [docs/SECURITY_MODEL.md:104](../../docs/SECURITY_MODEL.md) |
 | Cron wird in lokaler Pi-Zeit interpretiert, Tickzeilen sind UTC; der Sommerzeitvertrag ist nicht explizit. | `low` | [docs/reports/2026-07-13-cartography-runtime-audit.md:93](../../docs/reports/2026-07-13-cartography-runtime-audit.md) · [deploy/pi_install_cron.sh:68](../../deploy/pi_install_cron.sh) |
 
 ## Pflegevertrag
