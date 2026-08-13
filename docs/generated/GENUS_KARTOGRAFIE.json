@@ -256,7 +256,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "68dc4084884825369901774e7e8ec266c1cfdb8221458d3519cdbc598d17b692",
+  "content_sha256": "fcba216ca1e4139b1b2a467ad8c8df539b87b5eea35ee7476c9939e6a72c412c",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1122,7 +1122,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 132
+          "line": 290
         }
       ],
       "to": "flow:voice",
@@ -1147,7 +1147,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 127
+          "line": 285
         }
       ],
       "to": "h1:dialogue_frame",
@@ -11264,7 +11264,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 127
+          "line": 285
         }
       ],
       "statement": "Persönliche Episoden liegen append-only; der löschbare persönliche Vault ist noch ein H1-Vertrag."
@@ -11330,7 +11330,7 @@
         {
           "file": "docs/SECURITY_MODEL.md",
           "kind": "curated",
-          "line": 46
+          "line": 47
         }
       ],
       "statement": "Backups sind funktional und physisch getrennt, aber Ziel und Dateien benötigen einen eigenen 0700/0600-Vertrag für Defense in Depth."
@@ -11364,7 +11364,7 @@
         {
           "file": "docs/SECURITY_MODEL.md",
           "kind": "curated",
-          "line": 119
+          "line": 120
         }
       ],
       "statement": "Der private Elternpfad ist 0700, einzelne State-, Log- und Ledgerdateien besitzen aber keinen einheitlichen 0600-Eigenvertrag."
@@ -11403,7 +11403,7 @@
         {
           "file": "docs/SECURITY_MODEL.md",
           "kind": "curated",
-          "line": 103
+          "line": 104
         }
       ],
       "statement": "Der netzaktive Learner teilt den Benutzer und damit einen breiten Ausfallradius mit Ledger und privatem Membranzustand."
@@ -12515,7 +12515,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 132
+          "line": 290
         }
       ],
       "stage": 7,
@@ -12558,7 +12558,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 127
+          "line": 285
         }
       ],
       "stage": 2,

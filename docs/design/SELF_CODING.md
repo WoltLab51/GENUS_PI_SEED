@@ -1,7 +1,7 @@
 # GENUS · Beaufsichtigtes Selbst-Codieren
 
-> **Status:** active design · **Owner:** ADR-0004 / Change Trust
-> **Zuletzt verifiziert:** 2026-07-19
+> **Status:** active design · **Owner:** ADR-0004, ADR-0009 / Change Trust
+> **Zuletzt verifiziert:** 2026-08-09
 
 GENUS codiert sich nicht, indem ein Modell freien Zugriff auf sein Repository erhält. Er lernt
 den Entwicklungsprozess als Folge kleiner, beweisbarer Zustände. Am Anfang begleitet ein Mensch
@@ -51,6 +51,29 @@ optionalen Provider benutzen.
 Budgets werden mit steigendem Risiko kleiner. Ein Modell darf keine neue Datei außerhalb der
 erlaubten Liste „entdecken“. Deterministisch neu erzeugte Kartografieartefakte sind getrennt vom
 Modellscope ausgewiesen.
+
+## A0-Lane-Grenze
+
+[ADR-0009](../decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) ergänzt ADR-0004
+für die Dauer von A0:
+
+- A0 ist der einzige mergefähige Produktänderungspfad in `GENUS_PI_SEED`.
+- Kritische Implementierung in Schema, Ledger, Replay, Integrity, Sealing,
+  Anchors, Key Custody, Repair, Governance und kritischen Publish-/Deploypfaden
+  ist human-owned. KI darf Auditbefunde auswerten, Gegenbeispiele und Tests
+  entwerfen sowie Verträge dokumentieren; kritischer Quelltext und kritische
+  Implementierungsdiffs bleiben außerhalb des Modellscopes. Deren Review und
+  Freigabe führt der Mensch durch.
+- Der Entwicklerloop darf parallel nur auf synthetischen Repositories,
+  isolierten Worktrees, `GENUS_EGG`, `GENUS_CORE` oder nicht produktiv gemergten
+  unkritischen Übungen lernen.
+- Diese Lernlinie erhält weder Produktdaten noch kritischen Scope, Secrets,
+  zusätzliche Rechte oder automatische Beförderung in die Produktlinie.
+
+Damit bleibt die v1-Mechanik sichtbar und nutzbar, ohne eine zweite
+Produkt-Mergespur neben A0 zu eröffnen. Eine spätere Lockerung verlangt eine
+neue ausdrückliche menschliche Entscheidung; Erfolg erweitert Rechte nie
+automatisch.
 
 ## Bedienung
 

@@ -2,7 +2,7 @@
 
 > **Status:** canonical
 > **Owner:** Kernvertrag
-> **Zuletzt verifiziert:** 2026-07-15
+> **Zuletzt verifiziert:** 2026-08-09
 > **Besitzt:** Systemgrenzen, Schichten, Abhängigkeiten und technische Invarianten
 
 ## Ein Satz
@@ -300,6 +300,37 @@ aufrufen. Der Worker kennt keinen Commit-, Merge-, Push- oder Deploypfad. Kritis
 (Ledger, Schema, Siegel, Governance und kritische Deploypfade) verlassen v1 nie als Modellprompt. Der genaue
 Vertrag steht in [design/SELF_CODING.md](design/SELF_CODING.md) und
 [ADR-0004](decisions/ADR-0004-SUPERVISED-SELF-CODING.md).
+
+### Angenommene A0-Evolutionsgrenze
+
+Die folgenden Architekturgrenzen sind angenommen, aber noch **keine** Aussage
+über implementierte Runtime-Fähigkeiten:
+
+- Bestehende Datenbanken werden künftig beim normalen Connect oder Startup
+  read-only auf Version und Fingerprint geprüft. Schemaänderungen gehören nur in
+  einen expliziten, menschlich ausgelösten Migrationspfad
+  ([ADR-0005](decisions/ADR-0005-EXPLICIT-SCHEMA-EVOLUTION.md)).
+- Vor Migration und endgültiger Replay-Topologie steht ein synthetisches Golden
+  Ledger mit unabhängig gepflegtem Oracle
+  ([ADR-0006](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md)).
+- Replay und Integrity verarbeiten einen fixierten Head speicherbegrenzt und
+  schreiben keine Ledger-Events. Ob der Live-Rebuild in einer atomaren
+  Transaktion oder über Shadow-Projektionen sichtbar wird, entscheidet erst das
+  vollständige Golden-, Pi-, Peak-RAM-, WAL-, Reader-/Writer-, Kill/Reopen- und
+  Recovery-Gate
+  ([ADR-0007](decisions/ADR-0007-BOUNDED-REPLAY-INTEGRITY.md)).
+- Der Pi erzeugt nur unsigned Anchor Candidates. Externe Signatur, Key Custody,
+  Witness und sichtbare Repair-Transitions liegen außerhalb seiner alleinigen
+  Autorität
+  ([ADR-0008](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md)).
+- A0 ist die human-owned Critical Lane und der einzige mergefähige
+  Produktänderungspfad. Der Entwicklerloop darf parallel nur nichtproduktiv und
+  isoliert lernen
+  ([ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md)).
+
+Bis eine einzelne A0-Scheibe ihre Golden-, Sicherheits- und Laufzeitgates
+besteht, bleibt der heutige Code ihr Ist-Zustand. Eine angenommene ADR ist keine
+automatische Migration, Signatur, Reparatur oder Produktfreigabe.
 
 ## 9. Abhängigkeitsrichtung
 

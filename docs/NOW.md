@@ -2,27 +2,33 @@
 
 > **Status:** aktueller Arbeitsstand
 >
-> **Stand:** 13. Juli 2026
+> **Stand:** 13. August 2026
 >
-> **Verifizierte Funktionsbasis:** `068f0ca`
+> **Verifizierte Entscheidungsbasis:** `8322b1f` (Promotion-Baseline)
+>
+> **Letzter hier belegter Laufzeit-Snapshot:** 13. Juli 2026 auf `068f0ca`
 >
 > **Zweck:** in zwei Minuten verstehen, wo GENUS steht und worauf der nächste
 > saubere Schritt zielt
 
-GENUS hat heute einen gehärteten, replaybaren Kern und läuft dauerhaft auf dem
-Pi. Jetzt geht es nicht darum, möglichst viel anzubauen. Es geht darum, aus dem
-stabilen Organismus einen hilfreichen Begleiter zu machen, der neue Fähigkeiten
-kontrolliert **verdient**.
+Der zuletzt hier belegte Pi-Snapshot zeigt einen gehärteten, replaybaren Kern im
+Dauerbetrieb. Seit dem 9. August besitzt GENUS außerdem angenommene A0-Verträge
+für Schema, Golden Ledger, Replay, externe Anchors und kritische
+Änderungsautorität. Der Golden-JSONL-/Replay-Oracle-Teil von A0.2 ist seit dem
+13. August menschlich angenommenes, versioniertes Testfundament. Das separat
+gegatete historische SQLite-Artefakt bleibt vor dem ersten Migration-Runner offen.
 
 ## Das Bild in einem Satz
 
-> Der Boden trägt. Als Nächstes vermessen wir seinen Ereignisfluss im Dauerbetrieb,
-> sichern seinen Wahrheitszeugen außerhalb des Pi und geben dem Begleiter mehr
-> Zusammenhang, Stimme und generalisierendes Können.
+> A0 ist der einzige mergefähige Produktpfad; sein erster Schritt ist ein
+> datenschutzfreies Golden Ledger mit unabhängigem Replay-Oracle.
 
 ## Was heute belastbar ist
 
-| Bereich | Stand |
+Die folgende Tabelle ist der datierte Abnahme-Snapshot vom 13. Juli 2026, keine
+Behauptung über ungeprüfte Veränderungen danach.
+
+| Bereich | Letzter hier belegter Stand |
 |---|---|
 | Kern | gehärtet; Herkunft, Projektionen, Replay und Unsicherheit bleiben getrennt |
 | Linux-Nachweis | 1.318 Tests auf dem Pi bestanden |
@@ -35,56 +41,59 @@ kontrolliert **verdient**.
 | Datenschutz | Owner-Direktchat; neue Logs/Tagespuffer rohtextfrei; Nachtrotation atomar; Chat-Wortlernen opt-in |
 | Telegram-Abnahme | fünf reale Fehlgriffklassen read-only mit Live-Ledgerkopie und echtem Pi-Deuter bestanden |
 
-**Privilegierte Runtime abgenommen:** Die root-eigene Watchdog-Kopie unter
+**Am 13. Juli privilegierte Runtime abgenommen:** Die root-eigene Watchdog-Kopie unter
 `/usr/local/libexec/genus` ist bytegleich mit dem geprüften Repository-Skript, der Timer ist aktiv
 und die Unit führt ausschließlich diese root-eigene Kopie aus. Damit ist auch das Pause-Gate auf
 dem produktiven Pi angekommen.
 
 Die Zahlen sind ein **Abnahme-Snapshot**, keine automatisch gepflegten
-Live-Metriken. Aktuelle Strukturzahlen stehen in
+Live-Metriken. Aktuelle Repository-Strukturzahlen stehen in
 [generated/ATLAS_FACTS.md](generated/ATLAS_FACTS.md); die lange Baugeschichte
 liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### 1. Betrieb und Ereignisfluss sichtbar machen
+### A0.2 · Golden Ledger und unabhängiges Replay-Oracle
 
-Ein read-only 24/48/72-Stunden-Profil soll zeigen, welche Prozesse Ereignisse anhängen, ob diese
-Ereignisse neue Evidenz, notwendige Betriebsspur oder vermeidbare Wiederholung sind, ob die
-behobene Relationsflut wirklich aus dem Messfenster fällt und welches tägliche Budget im
-Normalbetrieb realistisch ist. Ein größeres Ledger ist dabei **kein** Erfolgskriterium.
+A0 ist nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
+human-owned Critical Lane und der einzige mergefähige Produktänderungspfad. Der
+erste Implementierungsschritt ist
+[ADR-0006](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md): eine synthetische,
+datenschutzfreie JSONL-Eventfixture mit nichtleerem Legacy-Präfix, Epoche und
+versiegeltem Tail sowie ein statisches, unabhängig geprüftes Oracle-Manifest.
+Eine temporäre SQLite-Datenbank wird daraus nur als Testsubstrat abgeleitet; eine
+kleine historische SQLite-Altfixture ergänzt spätere Migrationstests.
 
-**Der Lauf ist aktiv.** Die private Baseline wurde am 13. Juli 2026 um
-08:55:46 UTC (10:55:46 CEST) bei Event-ID 938.616 aufgenommen: 160.986
-Ereignisse lagen im rollierenden 24-Stunden-Fenster. Der vollständige
-Präfixanker wurde gebildet, Dateien und Manifest sind geprüft und der Capture
-lief read-only. Der nächste Messpunkt `h24` ist am 14. Juli um 08:55:46 UTC
-fällig; `h48` und `h72` folgen disjunkt. Der fixierte Vorbefund und die
-Messmethodik stehen im
-[H0.1-Baseline-Report](reports/2026-07-13-h0-1-baseline/report.html).
+**Fertig, wenn:** Corpus und Oracle alle Pflichtfälle, erwarteten Projektionen
+und Digests versioniert binden; Integrity, Seal und historischer Anchor grün
+sind; zwei Replays weder Events noch Drift erzeugen; Tamper-Fälle anschlagen;
+und kein erwarteter Wert ausschließlich aus dem Runtime-Code unter Test stammt.
 
-**Fertig, wenn:** drei vergleichbare Messpunkte, Verursacher je Ereignistyp,
-WAL-Kontext und ein begründetes Betriebsbudget dokumentiert sind – mit dem Leitmaß
-**mehr belegbares Können pro gespeichertem Ereignis**.
+**Heute belastbar:** Der synthetische Golden Corpus V2, das statische Oracle,
+Import- und Prüfwerkzeug sowie das fokussierte Test-Gate sind hashgebunden,
+unabhängig geprüft und von Ronny menschlich angenommen. Der
+[Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) hält die
+Entscheidung getrennt vom byteidentischen Kandidatenpaket fest. Offen bleibt das
+historische SQLite-Artefakt als eigener aktiver A0.2-Teilschritt.
 
-### 2. Den Wahrheitszeugen nach außen bringen
+### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 
-Der aktuelle Offline-Anker darf nicht nur auf demselben Pi leben wie Ledger und
-Siegel. Eine getrennte, prüfbare Kopie macht Manipulation oder Verlust sichtbar.
+Die am 13. Juli aufgenommene H0.1-Baseline und ihre damaligen Folgetermine
+bleiben im
+[datierten Baseline-Report](reports/2026-07-13-h0-1-baseline/report.html)
+erhalten. Dieses Dokument behauptet weder den Abschluss der Messreihe noch
+aktuelle Live-Werte. Rein read-only Messungen, Sicherungen und die Untersuchung
+des umstrittenen `system.load`-Beliefs dürfen fortgesetzt werden, sofern sie
+keinen Produktzustand verändern und keine zweite Merge-Linie öffnen.
 
-**Fertig, wenn:** der jüngste Anker extern verwahrt, sein Abruf getestet und die
-Wiederherstellungsprüfung als kurzer Ablauf dokumentiert ist.
-
-### 3. `system.load` verstehen
-
-Dieser Belief ist weiterhin umstritten. GENUS soll den Konflikt nicht wegmitteln,
-sondern Quellen, Zeitfenster, Schwellen und Gegenbelege so aufschlüsseln, dass
-eine fachliche Entscheidung möglich wird.
-
-**Fertig, wenn:** Ursache und Semantik geklärt, der passende Fix oder die
-begründete Enthaltung getestet und Replay-stabil sind.
+Der Entwickler-Loop darf daneben ausschließlich in der isolierten,
+nichtproduktiven Lernlinie aus ADR-0009 üben. Ergebnisse daraus werden nicht
+automatisch in `GENUS_PI_SEED` übernommen.
 
 ## Danach: die fühlbare Wachstumsachse
+
+H1.2 bleibt sichtbar als Produktziel, ist während A0 aber als mergefähiger
+Produktpfad pausiert.
 
 ### Begleiter und „Seele der Antworten“
 
@@ -114,6 +123,13 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ## Gerade ausdrücklich nicht
 
+- keine Produktmigration vor Golden Oracle und den A0-Gates
+- keine produktive Replay-/Integrity-Aktivierung und keine endgültige
+  Topologiewahl vor unabhängiger Semantik- und Pi-Abnahme; isolierte Prototypen
+  gegen Fixtures und Kopien sind Teil dieses Gates
+- kein Anchor v2, keine Signatur und kein privater Signaturschlüssel auf dem Pi
+- kein Production-Reseal; die angenommene Notfallausnahme ist technisch noch
+  nicht erfüllbar
 - keine automatische Ausführung von Vorschlägen oder Codeänderungen
 - kein ungeprüftes Verschieben von quarantänisierten Ereignissen ins Produkt-Ledger
 - kein stilles Löschen historischer Telegram-Logs ohne ausdrückliche Retention-Entscheidung
@@ -133,6 +149,8 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** der fällige `h24`-Messpunkt am 14. Juli 2026. Bis dahin
-schreibt der Profiler nichts ins Ledger und bleibt zwischen den Messpunkten
-still.
+**Nächster Blick:** Das historische SQLite-Artefakt als separates A0.2-Gate
+fertigstellen. Danach folgen read-only Schemaerkennung und das experimentelle
+ADR-0007-Gate zwischen Option B und dem verbindlichen Fallback C. Read-only
+Messungen dürfen parallel laufen, öffnen aber keinen zweiten verändernden
+Produktpfad.

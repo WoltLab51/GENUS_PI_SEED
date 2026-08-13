@@ -1,0 +1,582 @@
+{
+  "canonicalization": {
+    "projection_digest_schema": "genus-golden-ledger-projection-digest-v1",
+    "projection_digest_set_schema": "genus-golden-ledger-projection-digest-set-v1",
+    "projection_rows_schema": "genus-golden-ledger-projection-rows-v1",
+    "read_model_schema": "genus-golden-ledger-belief-epistemic-read-model-v1"
+  },
+  "expected": {
+    "epoch": {
+      "algo": "sha256-chain-v1",
+      "event_id": 6
+    },
+    "event_count": 42,
+    "head": {
+      "created_at": "2026-01-01T02:27:00.000000+00:00",
+      "event_id": 42,
+      "event_type": "response_feedback_recorded",
+      "seal": "a59827af1fa5dde6af5d230e687477e3cf4a70fb2b45a9739fb34833aad19eb2"
+    },
+    "integrity": {
+      "issues": [],
+      "ok": true
+    },
+    "legacy_prefix": {
+      "event_count": 5,
+      "genesis_digest": "e00cfc2eceb1397011d967b5f2a56c4b62b3e2667ae7d6f6eab07994d74f3606",
+      "max_event_id": 5
+    }
+  },
+  "expected_anchor_v1": {
+    "artifact_file": "anchor_v1.json",
+    "cases": {
+      "historical_head_with_later_tail": {
+        "accepted": true
+      },
+      "wrong_core_id": {
+        "accepted": false
+      },
+      "wrong_head_event_id": {
+        "accepted": false
+      },
+      "wrong_head_seal": {
+        "accepted": false
+      }
+    },
+    "verification_core_id": "golden-ledger-v1"
+  },
+  "expected_projections": {
+    "belief_projection": {
+      "columns": [
+        "id",
+        "claim_key",
+        "claim_value",
+        "state",
+        "derivation",
+        "supporting_events",
+        "contradicting_events",
+        "created_at",
+        "last_updated_at",
+        "superseded_by"
+      ],
+      "rows": [
+        {
+          "claim_key": "synthetic.supported",
+          "claim_value": "steady",
+          "contradicting_events": "[]",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "derivation": "manual:golden-v1",
+          "id": 1,
+          "last_updated_at": "2026-01-01T00:00:00.000000+00:00",
+          "state": "active",
+          "superseded_by": null,
+          "supporting_events": "[1,2]"
+        },
+        {
+          "claim_key": "synthetic.contested",
+          "claim_value": "candidate-a",
+          "contradicting_events": "[4,5]",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "derivation": "manual:golden-v1",
+          "id": 2,
+          "last_updated_at": "2026-01-01T00:00:00.000000+00:00",
+          "state": "active",
+          "superseded_by": null,
+          "supporting_events": "[3]"
+        },
+        {
+          "claim_key": "synthetic.rule.status",
+          "claim_value": "proposed",
+          "contradicting_events": "[]",
+          "created_at": "2026-01-01T02:09:00.000000+00:00",
+          "derivation": "manual:golden-v1",
+          "id": 3,
+          "last_updated_at": "2026-01-01T02:19:00.000000+00:00",
+          "state": "superseded",
+          "superseded_by": 4,
+          "supporting_events": "[22]"
+        },
+        {
+          "claim_key": "synthetic.rule.status",
+          "claim_value": "active",
+          "contradicting_events": "[]",
+          "created_at": "2026-01-01T02:19:00.000000+00:00",
+          "derivation": "manual:golden-v1",
+          "id": 4,
+          "last_updated_at": "2026-01-01T02:19:00.000000+00:00",
+          "state": "active",
+          "superseded_by": null,
+          "supporting_events": "[33]"
+        }
+      ],
+      "sha256": "7c0a73219d093cf9c46b28c6c0b5b18a363ca8107b83c183b77c7a59a9b43f48",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "experience_log": {
+      "columns": [
+        "id",
+        "experience_key",
+        "experience_type",
+        "subject_key",
+        "pattern",
+        "supporting_events",
+        "derivation",
+        "summary",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "created_at": "2026-01-01T02:06:00.000000+00:00",
+          "derivation": "rule:activity_daily_rhythm_v1",
+          "experience_key": "activity_daily_rhythm:system.activity:active",
+          "experience_type": "ActivityDailyRhythm",
+          "id": 1,
+          "pattern": "{\"bucket\":\"hour_of_day_utc\",\"contrasting_hours\":[{\"bucket_ratio\":1.0,\"contrast\":0.4,\"count\":3,\"global_ratio\":0.6,\"hour_utc\":0,\"supporting_events\":[12,14,16]}],\"count\":3,\"hours_utc\":[0],\"value\":\"active\"}",
+          "subject_key": "system.activity",
+          "summary": "system.activity is disproportionately active during UTC hour(s) 00:00 (3 contrasting observations)",
+          "supporting_events": "[12,14,16]"
+        }
+      ],
+      "sha256": "a08f32f034740b019091d37344af07a79a063ed7b18ded034ef89e1b92beeddd",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "governance_log": {
+      "columns": [
+        "id",
+        "action",
+        "target_type",
+        "target_id",
+        "decision",
+        "override",
+        "policy_results",
+        "reason",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "action": "proposal.review",
+          "created_at": "2026-01-01T02:13:00.000000+00:00",
+          "decision": "allowed",
+          "id": 1,
+          "override": 0,
+          "policy_results": "[{\"policy_key\":\"policy:pressure_guard_v1\",\"reason\":\"system.pressure is not elevated\",\"result\":\"pass\"}]",
+          "reason": "governance checks passed",
+          "target_id": 1,
+          "target_type": "proposal"
+        },
+        {
+          "action": "rule.activate",
+          "created_at": "2026-01-01T02:17:00.000000+00:00",
+          "decision": "allowed",
+          "id": 2,
+          "override": 0,
+          "policy_results": "[]",
+          "reason": "governance checks passed",
+          "target_id": 1,
+          "target_type": "proposal"
+        }
+      ],
+      "sha256": "15e824116b4681ccb4750d4e03b192f19aff99b0d5ce9016223173f4894a38aa",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "inquiry_log": {
+      "columns": [
+        "id",
+        "inquiry_type",
+        "claim_key",
+        "source_belief",
+        "source_event",
+        "question_key",
+        "payload",
+        "state",
+        "created_at",
+        "answer",
+        "resolved_at"
+      ],
+      "rows": [
+        {
+          "answer": "Independent synthetic sources explicitly support candidate-b.",
+          "claim_key": "synthetic.contested",
+          "created_at": "2026-01-01T02:22:00.000000+00:00",
+          "id": 1,
+          "inquiry_type": "SourceContradiction",
+          "payload": "{\"candidates\":{\"synthetic.source-beta\":\"candidate-a\",\"synthetic.source-delta\":\"candidate-b\",\"synthetic.source-gamma\":\"candidate-b\"},\"claim_key\":\"synthetic.contested\",\"review_recommended\":true}",
+          "question_key": "source.contradiction",
+          "resolved_at": "2026-01-01T02:23:00.000000+00:00",
+          "source_belief": null,
+          "source_event": 36,
+          "state": "resolved"
+        }
+      ],
+      "sha256": "99d0cd1a1a5335f2cc515321830e42879bee19effc1cfe94601847bdfb225670",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "operation_log": {
+      "columns": [
+        "id",
+        "operation_type",
+        "check_key",
+        "status",
+        "target",
+        "payload",
+        "derivation",
+        "source_event",
+        "created_at",
+        "last_updated_at"
+      ],
+      "rows": [
+        {
+          "check_key": "synthetic.health",
+          "created_at": "2026-01-01T02:25:00.000000+00:00",
+          "derivation": "operation_check:v1",
+          "id": 1,
+          "last_updated_at": "2026-01-01T02:25:00.000000+00:00",
+          "operation_type": "check",
+          "payload": "{\"latency_ms\":1}",
+          "source_event": 40,
+          "status": "ok",
+          "target": "synthetic.endpoint"
+        }
+      ],
+      "sha256": "4f4f821b41ad615c7c946efadc5504944346d898409705c0267c45186bccecee",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "proposal_log": {
+      "columns": [
+        "id",
+        "proposal_type",
+        "claim_key",
+        "claim_value",
+        "source_belief",
+        "source_event",
+        "payload",
+        "state",
+        "decision",
+        "reviewed_at",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "claim_key": "system.activity",
+          "claim_value": "activity_expectation_v1",
+          "created_at": "2026-01-01T02:08:00.000000+00:00",
+          "decision": "accepted",
+          "id": 1,
+          "payload": "{\"action_required\":false,\"derivation\":\"maturation:activity_expectation_v1\",\"description\":\"Activate rule: expect activity=active around 00:00 UTC, learned from experience #1\",\"review_recommended\":true,\"rule_key\":\"activity_expectation:system.activity:00:active\",\"rule_type\":\"activity_expectation_v1\",\"source_experience\":1,\"spec\":{\"expected_value\":\"active\",\"hour_utc\":0}}",
+          "proposal_type": "RuleProposal",
+          "reviewed_at": "2026-01-01T02:14:00.000000+00:00",
+          "source_belief": null,
+          "source_event": 22,
+          "state": "accepted"
+        }
+      ],
+      "sha256": "1227719bf21ce334861748fb26e5fa4f92bfc3943a6605e20b30d5d2ce55bc89",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "relation_projection": {
+      "columns": [
+        "id",
+        "subject",
+        "predicate",
+        "object",
+        "source",
+        "derivation",
+        "created_at",
+        "last_updated_at"
+      ],
+      "rows": [
+        {
+          "created_at": "2026-01-01T02:20:00.000000+00:00",
+          "derivation": "manual:golden-v1",
+          "id": 1,
+          "last_updated_at": "2026-01-01T02:20:00.000000+00:00",
+          "object": "synthetic.beta",
+          "predicate": "verwandt",
+          "source": "synthetic.graph-source",
+          "subject": "synthetic.alpha"
+        }
+      ],
+      "sha256": "d8f40f03b97e2b3dac1ebc0974b1f4a1cbea249cd49578ddee9e0b40142a4fd1",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "response_feedback_log": {
+      "columns": [
+        "feedback_event_id",
+        "response_id",
+        "signal",
+        "corrected_intent",
+        "source",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "corrected_intent": null,
+          "created_at": "2026-01-01T02:27:00.000000+00:00",
+          "feedback_event_id": 42,
+          "response_id": 41,
+          "signal": "positive",
+          "source": "owner_explicit"
+        }
+      ],
+      "sha256": "fc43fc435ec6297fe2775ef5b0dc63a4681413582ad159bd16372a6163076a2c",
+      "sort_by": [
+        "feedback_event_id"
+      ]
+    },
+    "response_outcome_log": {
+      "columns": [
+        "response_id",
+        "channel",
+        "outcome",
+        "readings",
+        "answer_mode",
+        "feedback_eligible",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "answer_mode": "core",
+          "channel": "telegram",
+          "created_at": "2026-01-01T02:26:00.000000+00:00",
+          "feedback_eligible": 1,
+          "outcome": "answered",
+          "readings": "[\"status\"]",
+          "response_id": 41
+        }
+      ],
+      "sha256": "622e587e0eda5c739744eba1b8628e2235876513665c883acc4d643b1250c463",
+      "sort_by": [
+        "response_id"
+      ]
+    },
+    "rule_projection": {
+      "columns": [
+        "id",
+        "rule_key",
+        "rule_type",
+        "subject_key",
+        "spec",
+        "status",
+        "source_proposal",
+        "derivation",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "created_at": "2026-01-01T02:18:00.000000+00:00",
+          "derivation": "maturation:activity_expectation_v1",
+          "id": 1,
+          "rule_key": "activity_expectation:system.activity:00:active",
+          "rule_type": "activity_expectation_v1",
+          "source_proposal": 1,
+          "spec": "{\"expected_value\":\"active\",\"hour_utc\":0}",
+          "status": "active",
+          "subject_key": "system.activity"
+        }
+      ],
+      "sha256": "f3606a591e61cf2ff59fba32e46cbda47f6efa23366bf9d9422409db2359d719",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "state_projection": {
+      "columns": [
+        "id",
+        "state_key",
+        "state_value",
+        "status",
+        "derivation",
+        "supporting_beliefs",
+        "components",
+        "reason",
+        "created_at",
+        "last_updated_at",
+        "superseded_by"
+      ],
+      "rows": [
+        {
+          "components": "{\"rule_status\":\"active\",\"supported_signal\":\"steady\"}",
+          "created_at": "2026-01-01T02:24:00.000000+00:00",
+          "derivation": "manual:golden-v1",
+          "id": 1,
+          "last_updated_at": "2026-01-01T02:24:00.000000+00:00",
+          "reason": "Supported signal and governed rule are active.",
+          "state_key": "synthetic.system.state",
+          "state_value": "nominal",
+          "status": "active",
+          "superseded_by": null,
+          "supporting_beliefs": "[1,4]"
+        }
+      ],
+      "sha256": "c066184c431ec9f3aa82753b6b42d81ba5ec2e7bc88b1c5f80005c596e7d955f",
+      "sort_by": [
+        "id"
+      ]
+    },
+    "value_projection": {
+      "columns": [
+        "event_id",
+        "claim_key",
+        "value",
+        "source",
+        "created_at"
+      ],
+      "rows": [
+        {
+          "claim_key": "synthetic.supported",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "event_id": 1,
+          "source": "synthetic.source-alpha",
+          "value": "steady"
+        },
+        {
+          "claim_key": "synthetic.supported",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "event_id": 2,
+          "source": "synthetic.source-caf\u00e9",
+          "value": "steady"
+        },
+        {
+          "claim_key": "synthetic.contested",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "event_id": 3,
+          "source": "synthetic.source-beta",
+          "value": "candidate-a"
+        },
+        {
+          "claim_key": "synthetic.contested",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "event_id": 4,
+          "source": "synthetic.source-gamma",
+          "value": "candidate-b"
+        },
+        {
+          "claim_key": "synthetic.contested",
+          "created_at": "2026-01-01T00:00:00.000000+00:00",
+          "event_id": 5,
+          "source": "synthetic.source-delta",
+          "value": "candidate-b"
+        },
+        {
+          "claim_key": "system.activity",
+          "created_at": "2026-01-01T00:01:00.000000+00:00",
+          "event_id": 12,
+          "source": "synthetic.activity-alpha",
+          "value": 1.0
+        },
+        {
+          "claim_key": "system.activity",
+          "created_at": "2026-01-01T00:05:00.000000+00:00",
+          "event_id": 14,
+          "source": "synthetic.activity-beta",
+          "value": 1.0
+        },
+        {
+          "claim_key": "system.activity",
+          "created_at": "2026-01-01T00:10:00.000000+00:00",
+          "event_id": 16,
+          "source": "synthetic.activity-gamma",
+          "value": 1.0
+        },
+        {
+          "claim_key": "system.activity",
+          "created_at": "2026-01-01T02:00:00.000000+00:00",
+          "event_id": 18,
+          "source": "synthetic.activity-delta",
+          "value": 0.0
+        },
+        {
+          "claim_key": "system.activity",
+          "created_at": "2026-01-01T02:05:00.000000+00:00",
+          "event_id": 20,
+          "source": "synthetic.activity-epsilon",
+          "value": 0.0
+        }
+      ],
+      "sha256": "84afca111e1257e8261f1e9170d30975d7234d4379f0a8ec23170d3fdae386a8",
+      "sort_by": [
+        "event_id"
+      ]
+    }
+  },
+  "expected_read_models": {
+    "belief_epistemic_state_v1": {
+      "as_of": "2026-01-01T00:00:00.000Z",
+      "cases": [
+        {
+          "belief_id": 1,
+          "contradicting_event_ids": [],
+          "expected_confidence": 0.667,
+          "expected_epistemic_state": "supported",
+          "supporting_event_ids": [
+            1,
+            2
+          ]
+        },
+        {
+          "belief_id": 2,
+          "contradicting_event_ids": [
+            4,
+            5
+          ],
+          "expected_confidence": 0.25,
+          "expected_epistemic_state": "contested",
+          "supporting_event_ids": [
+            3
+          ]
+        }
+      ],
+      "halflife_seconds": 3600.0
+    }
+  },
+  "fixture_schema_version": "genus-golden-ledger-fixture-v1",
+  "format_version": 1,
+  "projection_digest_set_sha256": "a0b60c847573beae7ac085d32d34e9aba7ca2b984c28372e9f862af41aa0656d",
+  "provenance": {
+    "baseline_commit": "1a102979b3a53d68207a86147005e137e6b0a5db",
+    "derivation": "a0_2:human_supervised_golden_ledger_candidate:v1",
+    "governing_documents": [
+      "docs/ARCHITECTURE.md",
+      "docs/EVENT_CONTRACT.md",
+      "docs/QUALITY.md",
+      "docs/SECURITY_MODEL.md",
+      "docs/decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md",
+      "docs/decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md",
+      "docs/decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md",
+      "docs/decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md",
+      "docs/reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md",
+      "docs/reviews/A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md"
+    ],
+    "repository": "WoltLab51/GENUS_PI_SEED",
+    "roles": {
+      "canonicalization_digest_contract_owner": "Ronny",
+      "corpus_owner": "Ronny",
+      "human_implementer_committer": "Ronny",
+      "non_authoritative_model_assistant": "Codex",
+      "oracle_reviewer": "Ronny",
+      "privacy_reviewer": "Ronny"
+    }
+  },
+  "schema": "genus-golden-ledger-replay-oracle-v1",
+  "source_bindings": {
+    "event_stream_digest_schema": "genus-golden-ledger-event-stream-digest-v1",
+    "event_stream_sha256": "7d9e8f98b84dad6b9c627328f668c302e5b2df12d7620229f1c46c7385380595",
+    "events_file": "events.jsonl",
+    "fixture_sha256": "950a39ea033f7867b2ad45e9807806c0ecd9f08f6bb4ef5a6504934a518ce839"
+  },
+  "status": "candidate_pending_human_review"
+}

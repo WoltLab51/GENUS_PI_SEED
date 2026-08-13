@@ -11,6 +11,9 @@ Diese Seite ist der Lotse. Ausführbare Anweisungen werden nicht mehrfach gepfle
 |---|---|
 | Pi erstmals einrichten | [Sicheres First Setup](../../deploy/README.md#sicheres-first-setup) |
 | auf `main` aktualisieren | [Deploy](../../deploy/README.md) |
+| vom Handy diagnostizieren und sicher aktualisieren | [Safe-Update](../../deploy/README.md#manuelles-safe-update) |
+| privaten Tailscale-Zugang einrichten | [Fernzugriff](REMOTE_ACCESS.md) |
+| realen Pi-Betriebszustand nachlesen | [Remote-Update-Audit](../reports/2026-07-19-pi-remote-update-audit.md) |
 | Dienste prüfen | [Systemd-Dienste](../../deploy/README.md#systemd-dienste) |
 | 24/48/72-Profil starten oder prüfen | [Betriebsprofil](../../deploy/README.md#244872-stunden-betriebsprofil) |
 | Antwortqualität hermetisch prüfen | [Alltagsprobe](../design/ANSWER_QUALITY.md) |

@@ -1,7 +1,7 @@
 # Die GENUS-Dokumentation
 
 > **Status:** kanonischer Index
-> **Zuletzt verifiziert:** 2026-07-13
+> **Zuletzt verifiziert:** 2026-08-10
 > **Regel:** Jede Aussage hat genau einen autoritativen Wohnort.
 
 Willkommen in der Werkstatt. Diese Bibliothek trennt bewusst zwischen dem, was GENUS
@@ -64,6 +64,13 @@ Sie gehören nicht in zeitlose Verträge.
 - [ADR-0002 — Change Trust](decisions/ADR-0002-CHANGE-TRUST.md)
 - [ADR-0003 — Wachstum als Kreislauf](decisions/ADR-0003-GROWTH-LOOP.md)
 - [ADR-0004 — Beaufsichtigtes Selbst-Codieren](decisions/ADR-0004-SUPERVISED-SELF-CODING.md)
+- [ADR-0005 — Explizite Schema-Evolution](decisions/ADR-0005-EXPLICIT-SCHEMA-EVOLUTION.md)
+- [ADR-0006 — Golden Ledger und unabhängiges Replay-Oracle](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md)
+- [ADR-0007 — Bounded Replay und Integrity](decisions/ADR-0007-BOUNDED-REPLAY-INTEGRITY.md)
+- [ADR-0008 — Externes Anchor-Vertrauen und Ledger-Reparatur](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md)
+- [ADR-0009 — Human-owned Critical Lane](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md)
+- [ADR-0010 — Menschlich geführte Modellassistenz ausschließlich in A0.2](decisions/ADR-0010-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0.md)
+- [ADR-0011 — Golden-Ledger-Kanonisierung und Belief-Coverage](decisions/ADR-0011-GOLDEN-LEDGER-CANONICALIZATION-AND-BELIEF-COVERAGE.md)
 
 Neue ADRs werden nur für Entscheidungen angelegt, die mehrere Module oder spätere
 Builds binden. Kleine lokale Entscheidungen bleiben bei Code und Tests.
@@ -100,6 +107,8 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [H0.1-Vorabprofil und Messdesign vom 2026-07-13](reports/2026-07-13-h0-1-baseline/report.html)
 - [Runtime-Kartografie und Pi-Audit vom 2026-07-13](reports/2026-07-13-cartography-runtime-audit.md)
 - [H1-Pilot und erster geschlossener Antwortkreis vom 2026-07-13](reports/2026-07-13-h1-response-loop.md)
+- [A0-Wahrheitsfundament-Audit vom 2026-08-09](reports/2026-08-09-a0-foundation-audit.md)
+- [A0-Entscheidungspaket vom 2026-08-09](reports/2026-08-09-a0-decision-packet.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 
@@ -108,6 +117,16 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
 - [Alltagsprobe v1](reviews/ALLTAGSPROBE_V1.json) — hashgebundene Einzelwertungen für Ton
   und Nutzen; ein leerer Reviewbestand ist ein ehrlicher offener Status, kein Fehler im
   Dokument.
+- [A0.2 Golden Ledger Entry Contract](reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md) —
+  angenommene Rollen, Corpus-, Kanonisierungs-, Digest- und Stop-Grenzen vor dem
+  ersten Golden-Artefakt; die spätere Oracle-Checkliste bleibt bis Ronnys
+  getrenntem Review offen.
+- [A0.2 Golden Ledger Artifact Schema Contract](reviews/A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md) —
+  angenommene mechanische Supporting Specification für exakte Artefaktnamen,
+  JSON-Feldmengen, Dateibytes und Digestbindungen des A0.2-Kandidaten.
+- [A0.2 Golden Ledger V2 · menschlicher Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) —
+  Ronnys hashgebundene Annahme des byteidentischen Golden-JSONL-/Replay-Oracle-
+  Kandidaten als versioniertes Testfundament; das historische SQLite-Gate bleibt offen.
 
 Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
 exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.

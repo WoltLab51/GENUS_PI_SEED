@@ -1,7 +1,7 @@
 # GENUS Quality
 
 > **Status:** canonical
-> **Zuletzt verifiziert:** 2026-07-13
+> **Zuletzt verifiziert:** 2026-08-09
 > **Besitzt:** Plan-, Bau-, Abnahme-, Dokumentations- und Laufzeitgates
 
 Qualität bedeutet bei GENUS nicht „viele grüne Tests“. Qualität heißt: Die Behauptung
@@ -82,6 +82,33 @@ Für neue Fähigkeiten zusätzlich:
   Artefakte erweitern den Modellscope nicht.
 - Automatische Gates enden bei `ready_for_human_review`; `merge_ready` bleibt falsch.
 - Bestätigte Fehlschläge dürfen künftige Rechte nur verschärfen. Erfolg erweitert sie nie.
+
+### A0-Fundament-Gates
+
+Angenommene Architektur ist noch keine implementierte Fähigkeit. Für Schema,
+Ledger, Replay, Integrity, Siegel, Anchor, Key Custody, Repair und kritische
+Publish-/Deploypfade gilt zusätzlich:
+
+- A0 bleibt human-owned critical scope; Audit-Auswertung und Dokumentation durch
+  KI ersetzen weder Implementierungsautor noch menschliches Review und Merge.
+  Kritischer Quelltext und kritische Implementierungsdiffs bleiben außerhalb
+  des Modellscopes.
+- Golden Ledger und unabhängiges Oracle aus
+  [ADR-0006](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md) stehen vor einem
+  verändernden Migration Runner und vor der endgültigen Replay-Topologie.
+- Schemaerkennung ist read-only und fail-closed; ein normaler Connect oder
+  Startup darf eine bestehende Datenbank nicht migrieren.
+- Replay- und Integrity-Abnahme vergleicht alle Projektionen, hält den Ledger
+  exakt unverändert und misst Peak RAM, WAL, Leser, Writer, Kill/Reopen und
+  Recovery auf dem Ziel-Pi gegen vorher menschlich festgelegte Budgets.
+- Ein privater Anchor-Signaturschlüssel liegt nie auf dem Pi. Unsigned Candidates
+  werden nicht als unabhängige kryptografische Bezeugung bezeichnet.
+- Production-Reseal bleibt gesperrt, solange externe Signatur, Recovery-Custody,
+  separater Approver und der vollständige Incident-Vertrag aus
+  [ADR-0008](decisions/ADR-0008-EXTERNAL-ANCHOR-TRUST.md) fehlen.
+- Die Reihenfolge und der einzige aktive Produktpfad stehen in
+  [ROADMAP.md](ROADMAP.md) und [NOW.md](NOW.md); eine isolierte Lernlinie ist
+  kein zweiter Mergepfad.
 
 ### Antwortqualität braucht zwei Schlüssel
 

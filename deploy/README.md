@@ -20,6 +20,9 @@ Weiterführend: [Betriebsübersicht](../docs/operations/README.md) ·
 | einen neuen Pi aufsetzen | [Sicheres First Setup](#sicheres-first-setup) |
 | von Windows aus aktualisieren | [Deploy von Windows](#deploy-von-windows) |
 | direkt auf dem Pi aktualisieren | [Deploy auf dem Pi](#deploy-auf-dem-pi) |
+| konservativ mit Backup und Rollback aktualisieren | [Manuelles Safe-Update](#manuelles-safe-update) |
+| vom Handy diagnostizieren | [Kompakter Status](#kompakter-status) |
+| privaten Fernzugriff einrichten | [Tailscale-Runbook](../docs/operations/REMOTE_ACCESS.md) |
 | den Dauerbetrieb aktivieren | [Cron-Rhythmus](#cron-rhythmus) |
 | Dienste und Grenzen installieren | [Systemd-Dienste](#systemd-dienste) |
 | Anker und Status veröffentlichen | [Status und Anker](#status-und-anker) |
@@ -164,6 +167,36 @@ Gezielte Umgebungsoptionen sind `GENUS_DEPLOY_BRANCH`, `GENUS_DEPLOY_SKIP_TESTS=
 `GENUS_DEPLOY_SKIP_ANCHOR=1` sowie `PYTHON_BIN`. Ein normaler Deploy sollte keine Skip-Option
 benötigen. Ein Fehler lässt den Pause-Schalter durch einen `trap` wieder frei; die Fehlermeldung
 bleibt trotzdem bindend.
+
+## Manuelles Safe-Update
+
+Für die Fernwartung ist der konservative Wrapper der bevorzugte Einstieg. Er ergänzt den
+historischen Deployweg um ein zwingendes verifiziertes Zweitmedium-Backup, eine private
+Konfigurationskopie, bedarfsabhängige Dependency-Installation und Code-Rollback:
+
+```bash
+cd "$HOME/GENUS_PI_SEED"
+./deploy/pi_safe_update.sh --dry-run
+./deploy/pi_safe_update.sh
+```
+
+Der Dry-Run führt weder `git fetch` noch Backup oder Neustart aus. Der echte Lauf akzeptiert nur
+den sauberen Branch `main` und einen Fast-Forward von `origin/main`. Tests laufen vor dem Neustart;
+ein roter Test oder Healthcheck stellt den vorherigen Commit mit `git reset --keep` wieder her.
+Ledger und Konfiguration werden beim Rollback weder ersetzt noch gelöscht. Vollständiger Vertrag
+und Live-Befund: [Pi-Remote-Update-Audit](../docs/reports/2026-07-19-pi-remote-update-audit.md).
+
+## Kompakter Status
+
+Für eine schmale SSH-Sitzung vom Telefon:
+
+```bash
+cd "$HOME/GENUS_PI_SEED"
+./deploy/genus_status.sh
+```
+
+Die Ausgabe bündelt Version/Git, Unit-Zustände, die letzten fünf Journalfehler, CPU, RAM,
+Speicher, Temperatur, Ledger und jüngstes feststellbares Backup.
 
 Nach den hermetischen Tests gleicht der Deploy die deklarativen Graph-Saaten automatisch ab:
 `seed_verstehen.sh` ergänzt fehlende Rasterkanten, `gleiche_ziele_ab.sh` reconciliert Ziel- und

@@ -1,0 +1,27 @@
+{
+  "bundle_digest_schema": "genus-golden-ledger-bundle-digest-v1",
+  "bundle_sha256": "4db7306c912ae50f32895f7e3764355e28b72e23c083484475eea9f64f933c0e",
+  "counts": {
+    "expected_event_count": 42,
+    "imported_event_count": 42
+  },
+  "digests": {
+    "anchor_v1_sha256": "60465e92a9c3238247d6bbea1181662e11cf6605572d53fe74263867986e4e22",
+    "event_stream_sha256": "7d9e8f98b84dad6b9c627328f668c302e5b2df12d7620229f1c46c7385380595",
+    "fixture_sha256": "950a39ea033f7867b2ad45e9807806c0ecd9f08f6bb4ef5a6504934a518ce839",
+    "manifest_sha256": "63acb12564d8089adf5c8c49e900233130e1b3205d79b77404fe989a5f2d86bc",
+    "oracle_sha256": "b11b1ab61b81015ce27aa3d1546f4516fafbaad60744d959fbaff51e9e9c4869",
+    "projection_digest_set_sha256": "a0b60c847573beae7ac085d32d34e9aba7ca2b984c28372e9f862af41aa0656d"
+  },
+  "event_stream_digest_schema": "genus-golden-ledger-event-stream-digest-v1",
+  "fixture_schema_version": "genus-golden-ledger-fixture-v1",
+  "format_version": 1,
+  "schema": "genus-golden-ledger-import-receipt-v1",
+  "source_files": {
+    "anchor_v1": "anchor_v1.json",
+    "events": "events.jsonl",
+    "manifest": "manifest.json",
+    "oracle": "oracle.json"
+  },
+  "status": "candidate_pending_human_review"
+}
