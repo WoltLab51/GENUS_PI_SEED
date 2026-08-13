@@ -52,8 +52,8 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## A0 · Wahrheitsfundament vor Migration
 
-**Status:** einziger mergefähiger aktiver Produktpfad; A0.2 ist der eine aktive
-Implementierungsschritt.
+**Status:** einziger mergefähiger aktiver Produktpfad; in A0.2 ist nach Annahme
+des Golden-JSONL-/Replay-Oracle-Teils nur noch das historische SQLite-Gate aktiv.
 
 **Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
 besitzt es eine unabhängige semantische Beweisbasis, explizite
@@ -71,6 +71,11 @@ Auditkapitel.
 ### A0.2 · Golden Ledger und unabhängiges Oracle
 
 **Abhängigkeit:** angenommene ADRs und menschliches Fixture-/Oracle-Ownership.
+
+**Stand 13. August 2026:** Golden Ledger V2 und unabhängiges Replay-Oracle sind
+hashgebunden, menschlich angenommen und als versioniertes Testfundament
+abgeschlossen. Das historische SQLite-Artefakt bleibt der aktive, separat
+abzunehmende A0.2-Teilschritt; A0.2 insgesamt ist deshalb noch nicht abgeschlossen.
 
 **Arbeit:** Eine kanonische synthetische JSONL-Eventfixture, ein statisches,
 unabhängig geprüftes Oracle-Manifest und eine daraus erzeugte temporäre
@@ -414,8 +419,9 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** A0.2 schafft zuerst Golden Ledger und unabhängiges Oracle.
-Danach folgen read-only Schemaerkennung und das A0.3-Experiment zwischen Option
-B und dem verbindlichen Fallback C. H1.2 bleibt Produktziel, ist aber kein
-paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
-nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.
+**Aktive Baulinie:** In A0.2 folgt auf das angenommene Golden Ledger mit
+unabhängigem Oracle das separat gegatete historische SQLite-Artefakt. Danach
+folgen read-only Schemaerkennung und das A0.3-Experiment zwischen Option B und
+dem verbindlichen Fallback C. H1.2 bleibt Produktziel, ist aber kein paralleler
+mergefähiger Pfad. Rein read-only Messungen und die isolierte nichtproduktive
+Lernlinie dürfen nach Regel 1 weiterlaufen.

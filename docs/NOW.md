@@ -2,9 +2,9 @@
 
 > **Status:** aktueller Arbeitsstand
 >
-> **Stand:** 9. August 2026
+> **Stand:** 13. August 2026
 >
-> **Verifizierte Entscheidungsbasis:** `5df94de`
+> **Verifizierte Entscheidungsbasis:** `8322b1f` (Promotion-Baseline)
 >
 > **Letzter hier belegter Laufzeit-Snapshot:** 13. Juli 2026 auf `068f0ca`
 >
@@ -14,8 +14,9 @@
 Der zuletzt hier belegte Pi-Snapshot zeigt einen gehärteten, replaybaren Kern im
 Dauerbetrieb. Seit dem 9. August besitzt GENUS außerdem angenommene A0-Verträge
 für Schema, Golden Ledger, Replay, externe Anchors und kritische
-Änderungsautorität. Diese Verträge sind noch nicht implementiert. Deshalb wird
-das Wahrheitsfundament jetzt vor weiterer Produktfunktion abgesichert.
+Änderungsautorität. Der Golden-JSONL-/Replay-Oracle-Teil von A0.2 ist seit dem
+13. August menschlich angenommenes, versioniertes Testfundament. Das separat
+gegatete historische SQLite-Artefakt bleibt vor dem ersten Migration-Runner offen.
 
 ## Das Bild in einem Satz
 
@@ -68,9 +69,12 @@ und Digests versioniert binden; Integrity, Seal und historischer Anchor grün
 sind; zwei Replays weder Events noch Drift erzeugen; Tamper-Fälle anschlagen;
 und kein erwarteter Wert ausschließlich aus dem Runtime-Code unter Test stammt.
 
-**Heute belastbar:** Die acht Entscheidungen, ADRs und Reihenfolge sind
-angenommen. Golden Corpus, Oracle, Importwerkzeug, CI-Gate und alle folgenden
-A0-Implementierungen existieren noch nicht.
+**Heute belastbar:** Der synthetische Golden Corpus V2, das statische Oracle,
+Import- und Prüfwerkzeug sowie das fokussierte Test-Gate sind hashgebunden,
+unabhängig geprüft und von Ronny menschlich angenommen. Der
+[Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) hält die
+Entscheidung getrennt vom byteidentischen Kandidatenpaket fest. Offen bleibt das
+historische SQLite-Artefakt als eigener aktiver A0.2-Teilschritt.
 
 ### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 
@@ -145,8 +149,8 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** ADR-0006 als unabhängige Golden-Beweisbasis ausführbar
-machen. Danach folgen read-only Schemaerkennung und das experimentelle
+**Nächster Blick:** Das historische SQLite-Artefakt als separates A0.2-Gate
+fertigstellen. Danach folgen read-only Schemaerkennung und das experimentelle
 ADR-0007-Gate zwischen Option B und dem verbindlichen Fallback C. Read-only
 Messungen dürfen parallel laufen, öffnen aber keinen zweiten verändernden
 Produktpfad.

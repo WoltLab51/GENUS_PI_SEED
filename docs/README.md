@@ -124,6 +124,9 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
 - [A0.2 Golden Ledger Artifact Schema Contract](reviews/A0_2_GOLDEN_LEDGER_ARTIFACT_SCHEMA.md) —
   angenommene mechanische Supporting Specification für exakte Artefaktnamen,
   JSON-Feldmengen, Dateibytes und Digestbindungen des A0.2-Kandidaten.
+- [A0.2 Golden Ledger V2 · menschlicher Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) —
+  Ronnys hashgebundene Annahme des byteidentischen Golden-JSONL-/Replay-Oracle-
+  Kandidaten als versioniertes Testfundament; das historische SQLite-Gate bleibt offen.
 
 Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
 exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.

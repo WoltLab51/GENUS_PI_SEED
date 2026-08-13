@@ -1,0 +1,46 @@
+{
+  "canonicalization": {
+    "bundle_digest_schema": "genus-golden-ledger-bundle-digest-v1",
+    "event_stream_digest_schema": "genus-golden-ledger-event-stream-digest-v1",
+    "projection_digest_schema": "genus-golden-ledger-projection-digest-v1",
+    "projection_digest_set_schema": "genus-golden-ledger-projection-digest-set-v1"
+  },
+  "counts": {
+    "event_count": 42,
+    "legacy_prefix_event_count": 5,
+    "projection_target_count": 12,
+    "sealed_tail_event_count": 36
+  },
+  "digests": {
+    "anchor_v1_sha256": "60465e92a9c3238247d6bbea1181662e11cf6605572d53fe74263867986e4e22",
+    "event_stream_sha256": "7d9e8f98b84dad6b9c627328f668c302e5b2df12d7620229f1c46c7385380595",
+    "fixture_sha256": "950a39ea033f7867b2ad45e9807806c0ecd9f08f6bb4ef5a6504934a518ce839",
+    "oracle_sha256": "b11b1ab61b81015ce27aa3d1546f4516fafbaad60744d959fbaff51e9e9c4869",
+    "projection_digest_set_sha256": "a0b60c847573beae7ac085d32d34e9aba7ca2b984c28372e9f862af41aa0656d"
+  },
+  "epoch": {
+    "algo": "sha256-chain-v1",
+    "event_id": 6,
+    "genesis_digest": "e00cfc2eceb1397011d967b5f2a56c4b62b3e2667ae7d6f6eab07994d74f3606",
+    "prefix_count": 5,
+    "prefix_max_id": 5
+  },
+  "files": {
+    "anchor_v1": "anchor_v1.json",
+    "events": "events.jsonl",
+    "human_review": "ORACLE_REVIEW.md",
+    "import_receipt": "import_receipt.json",
+    "oracle": "oracle.json",
+    "readme": "README.md"
+  },
+  "fixture_schema_version": "genus-golden-ledger-fixture-v1",
+  "format_version": 1,
+  "head": {
+    "created_at": "2026-01-01T02:27:00.000000+00:00",
+    "event_id": 42,
+    "event_type": "response_feedback_recorded",
+    "seal": "a59827af1fa5dde6af5d230e687477e3cf4a70fb2b45a9739fb34833aad19eb2"
+  },
+  "schema": "genus-golden-ledger-manifest-v1",
+  "status": "candidate_pending_human_review"
+}
