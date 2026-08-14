@@ -67,10 +67,7 @@ from genus.cli_format import (
     _print_state_explanation,
     _print_surprisal,
 )
-
-
-def get_conn():
-    return db.connect(os.environ.get("GENUS_DB_PATH", "genus.sqlite3"))
+from genus.cli_startup import get_conn
 
 
 def get_diagnostic_conn():

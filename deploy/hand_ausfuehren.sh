@@ -35,9 +35,9 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
-from genus import db, hand
+from genus import hand, startup
 
-conn = db.connect(os.environ["GENUS_DB_PATH"])
+conn = startup.connect(os.environ["GENUS_DB_PATH"])
 jetzt = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 token = os.environ["HAND_TOKEN"]
 chat_id = os.environ["HAND_CHAT"]

@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from genus import db, integrity, learning, query, sealing
+from genus import integrity, learning, query, sealing, startup
 
 
 def main() -> int:
@@ -21,7 +21,7 @@ def main() -> int:
 
     db_path = os.environ.get("GENUS_DB_PATH", "genus.sqlite3")
     output_path = Path(sys.argv[1])
-    conn = db.connect(db_path)
+    conn = startup.connect(db_path)
     try:
         check = integrity.check(conn)
         head = sealing.head(conn)

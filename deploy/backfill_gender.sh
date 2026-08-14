@@ -29,8 +29,9 @@ log() { printf '[GENBACK] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
 has_gender() {
     GENUS_DB_PATH="$DB_PATH" "$REPO_DIR/.venv/bin/python" - "$1" <<'PY'
-import sqlite3, os, sys
-c = sqlite3.connect(os.environ["GENUS_DB_PATH"])
+import os, sys
+from genus import db
+c = db.connect_readonly(os.environ["GENUS_DB_PATH"])
 subj = sys.argv[1] + "@de"
 n = c.execute(
     "SELECT COUNT(*) FROM relation_projection WHERE subject=? AND predicate='grammatical_gender'",

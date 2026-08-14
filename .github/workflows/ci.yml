@@ -45,6 +45,11 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
+      - name: Provision explicit current-schema CI database
+        env:
+          GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3
+        run: python -c "import os; from genus import db; c = db.connect(os.environ['GENUS_DB_PATH']); c.close()"
+
       - name: Replay empty CI database
         env:
           GENUS_DB_PATH: ${{ runner.temp }}/genus-ci.sqlite3

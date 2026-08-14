@@ -16,9 +16,9 @@ DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 cd "$REPO_DIR"
 "$REPO_DIR/.venv/bin/python" - "$DB_PATH" <<'PY'
 import sys
-from genus import db, verstehen
+from genus import startup, verstehen
 
-conn = db.connect(sys.argv[1])
+conn = startup.connect(sys.argv[1])
 sown = verstehen.seed_raster(conn)
 conn.commit()
 kinds = sorted(verstehen.kinds(conn))

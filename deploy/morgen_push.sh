@@ -42,7 +42,7 @@ nachricht="$(GENUS_DB_PATH="$DB_PATH" GENUS_MORGEN_BERICHT="$BERICHT" \
 import json
 import os
 
-from genus import db, konsolidierung
+from genus import konsolidierung, startup
 
 bericht = None
 try:
@@ -51,7 +51,7 @@ try:
 except (FileNotFoundError, ValueError):
     pass
 
-conn = db.connect(os.environ["GENUS_DB_PATH"])
+conn = startup.connect(os.environ["GENUS_DB_PATH"])
 print(konsolidierung.morgen_nachricht(conn, bericht))
 conn.close()
 EOF

@@ -260,11 +260,15 @@ def test_schmiede_gibt_none_bei_leitplanken_bruch(monkeypatch):
     assert schmied.schmiede("weltfrage") is None
 
 
-def test_kern_nimmt_membran_code_mit_ehrlicher_herkunft_an(conn, tmp_path):
+def test_kern_nimmt_membran_code_mit_ehrlicher_herkunft_an(
+    monkeypatch, cli_conn, tmp_path
+):
     code_datei = tmp_path / "geschmiedet.py"
     code_datei.write_text(GUTER_CODE, encoding="utf-8")
     from click.testing import CliRunner
     from genus import cli
+
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
 
     result = CliRunner().invoke(
         cli.main, ["werkstatt", "entwerfe", "weltfrage",
@@ -341,10 +345,12 @@ def test_gefuegter_code_besteht_auch_die_schmied_leitplanke():
         assert schmied._ast_leitplanke(code, blatt) == code, blatt
 
 
-def test_cli_fuegt_bauplan_zum_entwurf(conn, tmp_path):
+def test_cli_fuegt_bauplan_zum_entwurf(monkeypatch, cli_conn, tmp_path):
     import json as _json
     from click.testing import CliRunner
     from genus import cli
+
+    monkeypatch.setattr(cli, "get_conn", lambda: cli_conn)
 
     plan_datei = tmp_path / "plan.json"
     plan_datei.write_text(_json.dumps(BENCHMARK_BAUPLAENE["thema-echo"]),

@@ -27,7 +27,7 @@ import os
 import fcntl
 import sys
 
-from genus import db, konsolidierung
+from genus import konsolidierung, startup
 
 puffer = os.environ["GENUS_TAGESPUFFER"]
 verarbeitung = puffer + ".nacht"
@@ -73,7 +73,7 @@ try:
 except FileNotFoundError:
     pass
 
-conn = db.connect(os.environ["GENUS_DB_PATH"])
+conn = startup.connect(os.environ["GENUS_DB_PATH"])
 bericht = konsolidierung.konsolidiere(conn, zuege)
 conn.close()
 

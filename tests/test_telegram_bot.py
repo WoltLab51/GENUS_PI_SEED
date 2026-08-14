@@ -916,13 +916,13 @@ def test_main_stops_before_db_and_network_when_poll_lock_is_owned(monkeypatch, t
 
 
 def test_main_treats_telegram_409_as_a_competing_poller_and_stops(monkeypatch, tmp_path):
-    from genus import db
+    from genus import startup
 
     monkeypatch.setattr(telegram_bot, "_token", lambda: "test-token")
     monkeypatch.setattr(telegram_bot, "_allowed_ids", lambda: {42})
     monkeypatch.setattr(telegram_bot, "LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setattr(telegram_bot, "_acquire_instance_lock", lambda: object())
-    monkeypatch.setattr(db, "connect", lambda path: object())
+    monkeypatch.setattr(startup, "connect", lambda path: object())
     monkeypatch.setattr(telegram_bot, "_load_offset", lambda: 0)
 
     def konflikt(token, offset):
@@ -934,14 +934,12 @@ def test_main_treats_telegram_409_as_a_competing_poller_and_stops(monkeypatch, t
     assert telegram_bot.main() == 0
 
 
-def test_bot_verbindet_ueber_genus_db_connect_nicht_roh():
-    # Phase 0 der Ziel-Architektur: der Bot bekommt dieselben Pragmas (WAL, busy_timeout)
-    # und Spalten-Migrationen wie die CLI. Ein roher sqlite3.connect in main() hiess:
-    # dieser eine Zugang konnte sich auf einer frischen/unmigrierten DB anders verhalten
-    # als jeder andere. Struktur-Gate wie test_membrane_purity: der Quelltext selbst
-    # wird geprueft, damit die Abweichung nicht zurueckschleichen kann.
+def test_bot_verbindet_ueber_das_gemeinsame_startup_gate_nicht_roh():
+    # A0.1b: Der Bot nutzt dieselbe read-only Vorprüfung wie die CLI. Erst bei current
+    # erreicht startup.connect den bisherigen db.connect-Pfad.
     quelle = (ROOT / "deploy" / "telegram_bot.py").read_text(encoding="utf-8")
-    assert "db.connect(" in quelle
+    assert "startup.connect(" in quelle
+    assert "db.connect(" not in quelle
     assert "sqlite3.connect(" not in quelle
 
 

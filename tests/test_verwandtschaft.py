@@ -24,6 +24,12 @@ def _fresh():
     return conn
 
 
+def _provision_current(path: Path) -> None:
+    conn = sqlite3.connect(path)
+    init_schema(conn)
+    conn.close()
+
+
 def _rel(conn, s, p, o):
     reactors.observe_relation(conn, s, p, o, "wikidata")
 
@@ -91,6 +97,7 @@ def test_verwandt_pair_has_one_canonical_orientation():
 def test_relate_bulk_schreibt_viele_kanten_in_einem_lauf(tmp_path, monkeypatch):
     # der Nachtlauf-Schreibweg: JSONL auf stdin -> viele gewichtete Kanten in EINEM Prozess
     db = tmp_path / "genus.sqlite3"
+    _provision_current(db)
     monkeypatch.setenv("GENUS_DB_PATH", str(db))
     jsonl = "\n".join([
         '{"subject":"Q144","predicate":"verwandt","object":"Q18498","source":"model:embedder","derivation":"cos=0.71"}',
@@ -123,6 +130,7 @@ def test_relate_bulk_schreibt_viele_kanten_in_einem_lauf(tmp_path, monkeypatch):
 
 def test_relate_bulk_deduplicates_inside_one_open_chunk(tmp_path, monkeypatch):
     db = tmp_path / "genus.sqlite3"
+    _provision_current(db)
     monkeypatch.setenv("GENUS_DB_PATH", str(db))
     edge = (
         '{"subject":"Q9","predicate":"verwandt","object":"Q1",'
@@ -146,6 +154,7 @@ def test_relate_bulk_deduplicates_inside_one_open_chunk(tmp_path, monkeypatch):
 
 def test_bad_bulk_row_does_not_rollback_prior_valid_rows(tmp_path, monkeypatch):
     db = tmp_path / "genus.sqlite3"
+    _provision_current(db)
     monkeypatch.setenv("GENUS_DB_PATH", str(db))
     lines = [
         '{"subject":"A","predicate":"is_a","object":"B"}',
@@ -179,6 +188,7 @@ def test_bulk_writer_returns_actual_written_count(monkeypatch, capsys):
 
 def test_relate_cli_reports_canonical_noop_truthfully(tmp_path, monkeypatch):
     db = tmp_path / "genus.sqlite3"
+    _provision_current(db)
     monkeypatch.setenv("GENUS_DB_PATH", str(db))
     args = [
         "relate", "Q9", "verwandt", "Q1", "--source", "model:embedder",
@@ -411,6 +421,7 @@ def test_relate_cli_speichert_das_gewicht_in_der_herleitung(tmp_path, monkeypatc
     # der Schreibweg der Weberei: `genus relate ... --derivation cos=..` muss das Gewicht ablegen,
     # und das Lese-Ende (verwandt) muss es zurücklesen -- der End-zu-End-Vertrag der Kante
     db = tmp_path / "genus.sqlite3"
+    _provision_current(db)
     monkeypatch.setenv("GENUS_DB_PATH", str(db))
     r = CliRunner().invoke(cli.main, ["relate", "Q144", "verwandt", "Q18498",
                                       "--source", "model:embedder", "--derivation", "cos=0.71"])

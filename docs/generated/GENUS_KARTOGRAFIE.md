@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `a0042e2b28ede7d9` · Regeneration: `genus kartografie build`
+> **Inhalt:** `064a431744bcd980` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,7 +14,7 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 271 | 719 | 105 | 39 | 23 / 16 | 12 | 3 | 16 |
+| 273 | 724 | 107 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
@@ -119,13 +119,13 @@ Runtime-Verträge und keine behauptete vollständige Shell-Sprachanalyse.
 | Ring | Module |
 |---|---:|
 | `antwort` | 9 |
-| `domaene` | 36 |
+| `domaene` | 37 |
 | `fundament` | 5 |
 | `lernen` | 8 |
 | `membranen` | 20 |
 | `projektionen` | 8 |
 | `querschnitt` | 2 |
-| `schnittstellen` | 14 |
+| `schnittstellen` | 15 |
 | `wahrheitsmechanik` | 3 |
 
 ### Sichtbare Importzyklen

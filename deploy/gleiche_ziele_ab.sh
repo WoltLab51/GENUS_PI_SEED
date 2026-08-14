@@ -14,9 +14,9 @@ DB_PATH="${GENUS_DB_PATH:-$HOME/.genus/genus.sqlite3}"
 GENUS_DB_PATH="$DB_PATH" "$REPO_DIR/.venv/bin/python" - << 'EOF'
 import os
 
-from genus import db, ziele
+from genus import startup, ziele
 
-conn = db.connect(os.environ["GENUS_DB_PATH"])
+conn = startup.connect(os.environ["GENUS_DB_PATH"])
 abgleich = ziele.gleiche_seed_ab(conn)
 neu = ziele.seed_ziele(conn)
 print(f"[ZIELE-ABGLEICH] {abgleich['zurueckgenommen']} veraltete Kante(n) zurückgenommen, "
