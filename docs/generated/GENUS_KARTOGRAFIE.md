@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `c43bf6ecb8d0024d` · Regeneration: `genus kartografie build`
+> **Inhalt:** `a8790d699b1bec6b` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
@@ -14,7 +14,7 @@ Daten in [GENUS_KARTOGRAFIE.json](GENUS_KARTOGRAFIE.json).
 
 | Knoten | Kanten | Python-Module | Events | projiziert / roh | Projektionstabellen | H1-Lücken | Pi-Knoten |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 269 | 715 | 103 | 39 | 23 / 16 | 12 | 3 | 16 |
+| 271 | 719 | 105 | 39 | 23 / 16 | 12 | 3 | 16 |
 
 ## Kausales Urteil
 
@@ -119,13 +119,13 @@ Runtime-Verträge und keine behauptete vollständige Shell-Sprachanalyse.
 | Ring | Module |
 |---|---:|
 | `antwort` | 9 |
-| `domaene` | 35 |
+| `domaene` | 36 |
 | `fundament` | 5 |
 | `lernen` | 8 |
 | `membranen` | 20 |
 | `projektionen` | 8 |
 | `querschnitt` | 2 |
-| `schnittstellen` | 13 |
+| `schnittstellen` | 14 |
 | `wahrheitsmechanik` | 3 |
 
 ### Sichtbare Importzyklen
@@ -166,5 +166,5 @@ verbindet sich aber nicht live mit dem Pi. Der vollständige Befund steht im
   Quellenreferenzen und generierten Dateien.
 - Live-Zahlen gehören nicht in diesen deterministischen Kern. Ein Pi-Befund bleibt
   ein datierter Report; die Betriebsansicht zeigt den deploybaren Sollpfad.
-- 25 dynamische SQL-Aufrufe bleiben explizit
+- 28 dynamische SQL-Aufrufe bleiben explizit
   als Analysegrenze im JSON sichtbar; Tabellenziele werden dort nicht geraten.

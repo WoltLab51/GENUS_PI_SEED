@@ -192,6 +192,36 @@
         }
       },
       {
+        "function": "_schema_inventory",
+        "method": "execute",
+        "module": "genus.schema_detection",
+        "source": {
+          "file": "genus/schema_detection.py",
+          "kind": "ast",
+          "line": 96
+        }
+      },
+      {
+        "function": "_schema_inventory",
+        "method": "execute",
+        "module": "genus.schema_detection",
+        "source": {
+          "file": "genus/schema_detection.py",
+          "kind": "ast",
+          "line": 98
+        }
+      },
+      {
+        "function": "_schema_inventory",
+        "method": "execute",
+        "module": "genus.schema_detection",
+        "source": {
+          "file": "genus/schema_detection.py",
+          "kind": "ast",
+          "line": 105
+        }
+      },
+      {
         "function": "reseal",
         "method": "execute",
         "module": "genus.sealing",
@@ -256,7 +286,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "c43bf6ecb8d0024d1fb6326f90207a1129f1de0b3c9972b494fc3294627eb162",
+  "content_sha256": "a8790d699b1bec6b80629781bd00807d48b9f2e58e57760365c634f6749e1281",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -2872,6 +2902,18 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
+          "line": 51
+        }
+      ],
+      "to": "module:genus.cli_schema_detection",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli",
+      "sources": [
+        {
+          "file": "genus/cli.py",
+          "kind": "ast",
           "line": 10
         }
       ],
@@ -3790,6 +3832,42 @@
         }
       ],
       "to": "module:genus.sources",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_schema_detection",
+      "sources": [
+        {
+          "file": "genus/cli_schema_detection.py",
+          "kind": "ast",
+          "line": 6
+        }
+      ],
+      "to": "external:click",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_schema_detection",
+      "sources": [
+        {
+          "file": "genus/cli_schema_detection.py",
+          "kind": "ast",
+          "line": 8
+        }
+      ],
+      "to": "module:genus.db",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_schema_detection",
+      "sources": [
+        {
+          "file": "genus/cli_schema_detection.py",
+          "kind": "ast",
+          "line": 8
+        }
+      ],
+      "to": "module:genus.schema_detection",
       "type": "imports_eager"
     },
     {
@@ -13313,6 +13391,22 @@
       "type": "module"
     },
     {
+      "id": "module:genus.cli_schema_detection",
+      "label": "genus.cli_schema_detection",
+      "ring": "schnittstellen",
+      "roles": [
+        "module"
+      ],
+      "sources": [
+        {
+          "file": "genus/cli_schema_detection.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
       "id": "module:genus.companion",
       "label": "genus.companion",
       "ring": "antwort",
@@ -14073,6 +14167,24 @@
       "sources": [
         {
           "file": "genus/rules.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
+      "id": "module:genus.schema_detection",
+      "label": "genus.schema_detection",
+      "ring": "domaene",
+      "roles": [
+        "module",
+        "sql_consumer",
+        "dynamic_sql"
+      ],
+      "sources": [
+        {
+          "file": "genus/schema_detection.py",
           "kind": "ast",
           "line": 1
         }
@@ -15781,14 +15893,14 @@
     "curated causal contracts"
   ],
   "summary": {
-    "dynamic_sql_calls": 25,
-    "edges": 715,
+    "dynamic_sql_calls": 28,
+    "edges": 719,
     "event_types": 39,
     "external_dependencies": 6,
     "import_cycles": 3,
     "missing_h1_contracts": 3,
-    "modules": 103,
-    "nodes": 269,
+    "modules": 105,
+    "nodes": 271,
     "projected_events": 23,
     "projection_tables": 12,
     "raw_events": 16,
@@ -16115,6 +16227,7 @@
         "module:genus.cli_inquiries",
         "module:genus.cli_kartografie",
         "module:genus.cli_relations",
+        "module:genus.cli_schema_detection",
         "module:genus.companion",
         "module:genus.confidence",
         "module:genus.constants",
@@ -16160,6 +16273,7 @@
         "module:genus.relation_semantics",
         "module:genus.response_outcomes",
         "module:genus.rules",
+        "module:genus.schema_detection",
         "module:genus.sealing",
         "module:genus.selbstbild",
         "module:genus.self_calibration",
