@@ -2,7 +2,7 @@
 
 > **Status:** aktuelle Zukunftsplanung
 >
-> **Stand:** 9. August 2026
+> **Stand:** 14. August 2026
 >
 > **Enthält:** Reihenfolge, Abhängigkeiten und Definition of Done – keine
 > Bauchronik und keine flüchtigen Live-Zahlen
@@ -32,7 +32,8 @@ Menschen.
 ## Die Abhängigkeiten
 
 ```text
-A0.2 Golden Ledger + Oracle ──> A0.1 read-only Schemaerkennung
+A0.2 Golden Ledger + Oracle + historische SQLite-Fixture
+                              └──> A0.1a read-only Schemaerkennung
 A0.1 + A0.2 ──────────────────> A0.3 B/C-Experiment
 
 A0.1 + A0.2 + A0.3 ──> Migration Runner nur auf Kopien
@@ -52,8 +53,8 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## A0 · Wahrheitsfundament vor Migration
 
-**Status:** einziger mergefähiger aktiver Produktpfad; in A0.2 ist nach Annahme
-des Golden-JSONL-/Replay-Oracle-Teils nur noch das historische SQLite-Gate aktiv.
+**Status:** einziger mergefähiger aktiver Produktpfad; A0.2 ist vollständig
+abgeschlossen, A0.1a read-only Schemaerkennung ist der aktive Schritt.
 
 **Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
 besitzt es eine unabhängige semantische Beweisbasis, explizite
@@ -72,15 +73,16 @@ Auditkapitel.
 
 **Abhängigkeit:** angenommene ADRs und menschliches Fixture-/Oracle-Ownership.
 
-**Stand 13. August 2026:** Golden Ledger V2 und unabhängiges Replay-Oracle sind
-hashgebunden, menschlich angenommen und als versioniertes Testfundament
-abgeschlossen. Das historische SQLite-Artefakt bleibt der aktive, separat
-abzunehmende A0.2-Teilschritt; A0.2 insgesamt ist deshalb noch nicht abgeschlossen.
+**Stand 14. August 2026 — abgeschlossen:** Golden Ledger V2, unabhängiges
+Replay-Oracle und die historische SQLite-Fixture sind hashgebunden, menschlich
+angenommen, auf GitHub gemergt und auf dem Pi geprüft. Git-Attribute halten die
+bytegebundenen Golden-Artefakte plattformübergreifend auf LF und die SQLite-Datei
+binär. A0.2 öffnet keinen weiteren Implementierungsschritt.
 
-**Arbeit:** Eine kanonische synthetische JSONL-Eventfixture, ein statisches,
-unabhängig geprüftes Oracle-Manifest und eine daraus erzeugte temporäre
-SQLite-Testdatenbank aufbauen. Eine kleine statische historische
-SQLite-Altfixture ergänzt die reale Schema-Migrationsmatrix und wird vor dem
+**Abgeschlossene Arbeit:** Eine kanonische synthetische JSONL-Eventfixture, ein
+statisches, unabhängig geprüftes Oracle-Manifest und eine daraus erzeugte
+temporäre SQLite-Testdatenbank aufbauen. Eine kleine statische historische
+SQLite-Altfixture ergänzt die reale Schema-Migrationsmatrix und wurde vor dem
 ersten Migration-Runner als eigenes A0.2-Gate fertiggestellt.
 
 **Definition of Done**
@@ -108,16 +110,35 @@ ersten Migration-Runner als eigenes A0.2-Gate fertiggestellt.
 read-only Version-/Fingerprint-Erkennung darf danach als nichtmutierende Scheibe
 entstehen; sie autorisiert keine Migration.
 
-**Arbeit:** Normale Connect-/Startup-Pfade von Schemaänderung trennen,
-Schema-Version und Fingerprint fail-closed erkennen und anschließend einen
-manuell aufgerufenen, nummerierten Runner nur gegen Kopien entwickeln.
+#### A0.1a · Read-only Schemaerkennung — aktiv
+
+**Arbeit:** Normale Connect-/Startup-Pfade von Schemaänderung trennen und
+Schema-Version sowie Fingerprint ausschließlich read-only und fail-closed
+erkennen. Dieser Schritt baut keinen Migration Runner und wendet kein DDL an.
 
 **Definition of Done**
 
-- Statusabfrage verändert Datei, Schema und Ledger nicht
+- `genus db status` klassifiziert aktuelle, bekannte historische, unbekannte und
+  unvollständige Schemaformen mit verständlichem Status
+- Statusabfrage verändert Datei, Schema, Pragmas und Ledger nicht
+- normaler Connect und Dienststart führen an bestehenden Datenbanken keine DDL aus
+- migrationspflichtige und unbekannte Zustände stoppen fail-closed
+- Erkennung ist gegen aktuelle Datenbank, historische A0.2-Fixture und
+  synthetische unbekannte/teilweise Zustände getestet
+- Bytehash, Dateigröße, mtime und Sidecarfreiheit bleiben vor und nach der
+  Erkennung identisch
+- keine Migration und kein Produkt-Cutover wird durch A0.1a freigegeben
+
+#### Spätere Migration Boundary — erst nach A0.3
+
+**Arbeit:** Erst nach der angenommenen A0.1a-Erkennung und dem A0.3-Gate einen
+manuell aufgerufenen, nummerierten Runner ausschließlich gegen Datenbankkopien
+entwickeln.
+
+**Definition of Done**
+
 - alte, neue, unbekannte und teilweise migrierte Schemas werden eindeutig
   erkannt und verständlich verweigert
-- normaler Connect und Dienststart führen an bestehenden Datenbanken keine DDL aus
 - Migrationen sind nummeriert, deterministisch, idempotent und menschlich ausgelöst
 - Backup, Restore-Probe, Integrity und Seal sind Vorbedingungen; ein gültiger
   externer Anchor ist zusätzliches Gate jedes späteren Produktlaufs nach A0.4,
@@ -419,9 +440,9 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** In A0.2 folgt auf das angenommene Golden Ledger mit
-unabhängigem Oracle das separat gegatete historische SQLite-Artefakt. Danach
-folgen read-only Schemaerkennung und das A0.3-Experiment zwischen Option B und
-dem verbindlichen Fallback C. H1.2 bleibt Produktziel, ist aber kein paralleler
-mergefähiger Pfad. Rein read-only Messungen und die isolierte nichtproduktive
-Lernlinie dürfen nach Regel 1 weiterlaufen.
+**Aktive Baulinie:** A0.2 ist vollständig abgeschlossen. A0.1a read-only
+Schemaerkennung ist jetzt der einzige mergefähige Produktpfad; danach folgt das
+A0.3-Experiment zwischen Option B und dem verbindlichen Fallback C und erst dann
+der Migration Runner nur gegen Kopien. H1.2 bleibt Produktziel, ist aber kein
+paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
+nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.
