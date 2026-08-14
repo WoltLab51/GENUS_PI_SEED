@@ -109,6 +109,7 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [H1-Pilot und erster geschlossener Antwortkreis vom 2026-07-13](reports/2026-07-13-h1-response-loop.md)
 - [A0-Wahrheitsfundament-Audit vom 2026-08-09](reports/2026-08-09-a0-foundation-audit.md)
 - [A0-Entscheidungspaket vom 2026-08-09](reports/2026-08-09-a0-decision-packet.md)
+- [A0.3a Measurement Harness und Pi-Baseline vom 2026-08-14](reports/2026-08-14-a0-3a-measurement-harness-baseline.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 
@@ -127,6 +128,9 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
 - [A0.2 Golden Ledger V2 · menschlicher Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) —
   Ronnys hashgebundene Annahme des byteidentischen Golden-JSONL-/Replay-Oracle-
   Kandidaten als versioniertes Testfundament; das historische SQLite-Gate bleibt offen.
+- [A0.3a Measurement und Topologie · menschlicher Entscheidungsbeleg](reviews/2026-08-14-a0-3a-topology-decision.md) —
+  angenommene Pi-Budgets, verworfene Option B für den Livebetrieb und Auswahl
+  von Option C als ausschließlich experimentell weiter zu beweisender Live-Kandidat.
 
 Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
 exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.
