@@ -1,0 +1,5 @@
+*.json text eol=lf
+*.jsonl text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.sqlite3 binary

@@ -1,0 +1,4 @@
+tests/fixtures/golden_ledger_v1/events.jsonl text eol=lf
+tests/fixtures/golden_ledger_v1/*.json text eol=lf
+tests/fixtures/golden_ledger_v1/*.md text eol=lf
+tests/fixtures/historical_sqlite_v1/*.sqlite3 binary
