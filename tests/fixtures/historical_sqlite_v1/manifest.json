@@ -1,0 +1,287 @@
+{
+  "current_schema_comparison": {
+    "current_commit": "0f6074707642d0b58543f122fbae18ff44a46ff6",
+    "current_schema_sha256": "3aea8c5bbd126f8b6f99e34cf8eda0f54a91f717636e6a57d43dbeaeec042066",
+    "current_schema_sha256_domain": "repository text normalized to LF",
+    "missing_event_log_columns": [],
+    "missing_indexes": [
+      "idx_event_log_metric",
+      "idx_operation_log_check",
+      "idx_relation_object",
+      "idx_relation_predicate",
+      "idx_relation_subject",
+      "idx_response_feedback_response",
+      "idx_response_outcome_channel_created",
+      "idx_value_claim",
+      "idx_value_source"
+    ],
+    "missing_tables": [
+      "operation_log",
+      "relation_projection",
+      "response_feedback_log",
+      "response_outcome_log",
+      "value_projection"
+    ]
+  },
+  "digests": {
+    "event_stream_digest_schema": "genus-golden-ledger-event-stream-digest-v1",
+    "event_stream_sha256": "cf80f53802594f48eb09e00f694fabacbd2d9b9a6eb969ce174bd8a3f9dcecbb",
+    "events_jsonl_sha256": "fd6dfe2eb4a8ec8c022c6e25d494f59d9cc4397ea2f47777d81c8a736ff0efaf",
+    "schema_fingerprint_schema": "genus-sqlite-schema-inventory-v1",
+    "schema_fingerprint_sha256": "e73837d56217169b1365a75ca404d6512ff7c9655d3e5dc993ba12b368d446a3",
+    "schema_sql_sha256": "1ef8229402abb6203623f38fbc3a7fb35cf74c6c60bb4c6908c62d36cd9c5ddb",
+    "sqlite_sha256": "459e266c3fcc40f7ea9df21aa4e2fd0fc6106210266b9d7032cfeab721a36682"
+  },
+  "files": {
+    "database": "legacy_v1.sqlite3",
+    "events": "events.jsonl",
+    "human_review": "HUMAN_REVIEW.md",
+    "readme": "README.md",
+    "schema": "schema.sql"
+  },
+  "fixture_schema": "genus-historical-sqlite-fixture-v1",
+  "format_version": 1,
+  "human_review": {
+    "decision": "accept",
+    "review_date": "2026-08-14",
+    "reviewer": "Ronny"
+  },
+  "inventory": {
+    "indexes": [
+      {
+        "columns": [
+          "claim_key",
+          "claim_value",
+          "state"
+        ],
+        "name": "idx_belief_projection_claim",
+        "partial": false,
+        "table": "belief_projection",
+        "unique": false
+      },
+      {
+        "columns": [
+          "created_at"
+        ],
+        "name": "idx_event_log_created",
+        "partial": false,
+        "table": "event_log",
+        "unique": false
+      },
+      {
+        "columns": [
+          "event_type"
+        ],
+        "name": "idx_event_log_type",
+        "partial": false,
+        "table": "event_log",
+        "unique": false
+      },
+      {
+        "columns": [
+          "subject_key",
+          "experience_type"
+        ],
+        "name": "idx_experience_log_subject",
+        "partial": false,
+        "table": "experience_log",
+        "unique": false
+      },
+      {
+        "columns": [
+          "target_type",
+          "target_id"
+        ],
+        "name": "idx_governance_log_target",
+        "partial": false,
+        "table": "governance_log",
+        "unique": false
+      },
+      {
+        "columns": [
+          "state"
+        ],
+        "name": "idx_inquiry_log_state",
+        "partial": false,
+        "table": "inquiry_log",
+        "unique": false
+      },
+      {
+        "columns": [
+          "state"
+        ],
+        "name": "idx_proposal_log_state",
+        "partial": false,
+        "table": "proposal_log",
+        "unique": false
+      },
+      {
+        "columns": [
+          "rule_type",
+          "status"
+        ],
+        "name": "idx_rule_projection_type_status",
+        "partial": false,
+        "table": "rule_projection",
+        "unique": false
+      },
+      {
+        "columns": [
+          "state_key",
+          "status"
+        ],
+        "name": "idx_state_projection_key_status",
+        "partial": false,
+        "table": "state_projection",
+        "unique": false
+      }
+    ],
+    "tables": {
+      "belief_projection": [
+        "id",
+        "claim_key",
+        "claim_value",
+        "state",
+        "derivation",
+        "supporting_events",
+        "contradicting_events",
+        "created_at",
+        "last_updated_at",
+        "superseded_by"
+      ],
+      "event_log": [
+        "id",
+        "event_type",
+        "payload",
+        "created_at",
+        "prev_seal",
+        "seal"
+      ],
+      "experience_log": [
+        "id",
+        "experience_key",
+        "experience_type",
+        "subject_key",
+        "pattern",
+        "supporting_events",
+        "derivation",
+        "summary",
+        "created_at"
+      ],
+      "governance_log": [
+        "id",
+        "action",
+        "target_type",
+        "target_id",
+        "decision",
+        "override",
+        "policy_results",
+        "reason",
+        "created_at"
+      ],
+      "inquiry_log": [
+        "id",
+        "inquiry_type",
+        "claim_key",
+        "source_belief",
+        "source_event",
+        "question_key",
+        "payload",
+        "state",
+        "created_at",
+        "answer",
+        "resolved_at"
+      ],
+      "proposal_log": [
+        "id",
+        "proposal_type",
+        "claim_key",
+        "claim_value",
+        "source_belief",
+        "source_event",
+        "payload",
+        "state",
+        "decision",
+        "reviewed_at",
+        "created_at"
+      ],
+      "rule_projection": [
+        "id",
+        "rule_key",
+        "rule_type",
+        "subject_key",
+        "spec",
+        "status",
+        "source_proposal",
+        "derivation",
+        "created_at"
+      ],
+      "state_projection": [
+        "id",
+        "state_key",
+        "state_value",
+        "status",
+        "derivation",
+        "supporting_beliefs",
+        "components",
+        "reason",
+        "created_at",
+        "last_updated_at",
+        "superseded_by"
+      ]
+    },
+    "triggers": [
+      {
+        "name": "prevent_event_log_delete",
+        "table": "event_log"
+      },
+      {
+        "name": "prevent_event_log_update",
+        "table": "event_log"
+      }
+    ]
+  },
+  "source": {
+    "commit": "2bf67e6ded3164ad5d4a977954639cc294568633",
+    "commit_date": "2026-06-12T11:33:48+02:00",
+    "commit_message": "Implement v1.1 ledger sealing",
+    "repository": "WoltLab51/GENUS_PI_SEED",
+    "schema_path": "schema.sql"
+  },
+  "sqlite": {
+    "application_id": 0,
+    "builder_sqlite_version": "3.53.1",
+    "encoding": "UTF-8",
+    "freelist_count": 0,
+    "journal_mode": "delete",
+    "page_count": 23,
+    "page_size": 4096,
+    "user_version": 0
+  },
+  "status": "accepted",
+  "synthetic_content": {
+    "belief_projection_rows": 1,
+    "epoch_event_id": 4,
+    "event_count": 7,
+    "event_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "event_types": [
+      "observation_created",
+      "evidence_recorded",
+      "belief_created",
+      "ledger_epoch_opened",
+      "observation_created",
+      "evidence_recorded",
+      "belief_confirmed"
+    ],
+    "legacy_prefix_event_count": 3,
+    "sealed_tail_event_count": 3
+  }
+}
