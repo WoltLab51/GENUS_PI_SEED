@@ -4,7 +4,7 @@
 >
 > **Stand:** 14. August 2026
 >
-> **Verifizierte Entscheidungsbasis:** `21fb237` (A0.2 vollständig promoviert)
+> **Verifizierte Entscheidungsbasis:** `3c7fb7b` (A0.1a vollständig promoviert)
 >
 > **Letzter hier belegter Laufzeit-Snapshot:** 13. Juli 2026 auf `068f0ca`
 >
@@ -17,13 +17,16 @@ für Schema, Golden Ledger, Replay, externe Anchors und kritische
 Änderungsautorität. A0.2 ist seit dem 14. August vollständig abgeschlossen:
 Golden JSONL, unabhängiges Replay-Oracle und eine echte historische
 SQLite-Fixture sind menschlich angenommen, auf GitHub gemergt und auf dem Pi
-geprüft. Der einzige aktive Produktpfad ist jetzt A0.1a, die ausschließlich
-read-only arbeitende Schemaerkennung.
+geprüft. A0.1a ist seit dem 14. August ebenfalls abgeschlossen: GENUS erkennt
+seine aktuelle Produkt-DB, die historische v1.1-Fixture und fremde SQLite-
+Strukturen ausschließlich read-only. Der einzige aktive Produktpfad ist jetzt
+A0.1b, die Startup-Grenze vor unbekannten oder migrationspflichtigen Schemas.
 
 ## Das Bild in einem Satz
 
-> A0 ist der einzige mergefähige Produktpfad; A0.1a erkennt bekannte, aktuelle
-> und unbekannte Schemafassungen fail-closed, ohne die Datenbank zu verändern.
+> A0 ist der einzige mergefähige Produktpfad; A0.1a erkennt Schemafassungen
+> ohne Veränderung, A0.1b setzt diese Erkenntnis vor jedem normalen Start
+> fail-closed durch.
 
 ## Was heute belastbar ist
 
@@ -55,27 +58,27 @@ liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### A0.1a · Read-only Schemaerkennung
+### A0.1b · Startup Fail-Closed
 
 A0 bleibt nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
 human-owned Critical Lane und der einzige mergefähige Produktänderungspfad.
-A0.2 liefert dafür jetzt die unabhängige Beweisbasis: Golden Corpus,
-Replay-Oracle und eine aus dem echten Commit `2bf67e6` konservierte historische
-SQLite-Speicherform. A0.1a darf diese Materialien nur lesen und klassifizieren.
+A0.1a liefert jetzt die sichere Diagnosemembran: `genus db status` klassifiziert
+`current`, `historical-v1.1` und `unknown`, ohne Datei, mtime oder Sidecars zu
+verändern. A0.1b darf diese Diagnose erstmals in normale Startup-Pfade
+einbauen, aber weiterhin keine Migration ausführen.
 
-**Fertig, wenn:** `genus db status` bekannte historische, aktuelle, unbekannte
-und unvollständige Schemaformen reproduzierbar unterscheidet; Statusabfrage und
-normaler Dienststart dabei weder Datei, Schema noch Ledger verändern; unbekannte
-oder migrationspflichtige Zustände verständlich und fail-closed stoppen; und
-Tests die Byteidentität vor und nach jeder Erkennung beweisen.
+**Fertig, wenn:** Normale Starts lassen ausschließlich `current` bis zum
+schreibfähigen Connect passieren. `historical-v1.1` stoppt vorher mit
+„Migration erforderlich“, `unknown` mit „unbekanntes Schema“. Kein Pfad ruft
+vor dieser Entscheidung `init_schema()` auf, erzeugt eine Datenbank oder führt
+DDL aus; automatische Migration bleibt ausgeschlossen.
 
-**Heute belastbar:** A0.2 ist vollständig grün. Golden Corpus und Oracle sind
-hashgebunden und menschlich angenommen; die historische SQLite-Fixture bindet
-Commit, Schemahash, Binärhash, Inventar und read-only Eventstromgleichheit. Der
-[Golden-Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) und
-der [SQLite-Annahmebeleg](../tests/fixtures/historical_sqlite_v1/HUMAN_REVIEW.md)
-dokumentieren die beiden Human Gates. GitHub-CI bestand unter Python 3.11 und
-3.12; auf dem Pi bestanden beide A0.2-Gates gemeinsam mit 29 Tests.
+**Heute belastbar:** A0.1a ist menschlich angenommen, als PR #8 gemergt und auf
+dem Pi geprüft. Die echte Produkt-DB wurde als `current`, die eingefrorene
+Fixture als `historical-v1.1` und eine synthetische Fremd-DB als `unknown`
+erkannt. Hauptdatei-Hash, Größe und mtime blieben jeweils identisch; Detection
+erzeugte keine Sidecars. GitHub-CI bestand unter Python 3.11 und 3.12. A0.2
+bleibt unveränderte Prüfinfrastruktur.
 
 ### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 
@@ -124,7 +127,8 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ## Gerade ausdrücklich nicht
 
-- keine Migration in A0.1a; Schemaerkennung bleibt strikt read-only
+- keine Migration in A0.1b; die neue Startup-Grenze verweigert nur und
+  verändert kein Schema
 - keine produktive Replay-/Integrity-Aktivierung und keine endgültige
   Topologiewahl vor unabhängiger Semantik- und Pi-Abnahme; isolierte Prototypen
   gegen Fixtures und Kopien sind Teil dieses Gates
@@ -150,8 +154,8 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** A0.1a baut ausschließlich die read-only Schemaerkennung und
-die fail-closed Startgrenze. Danach folgt das experimentelle ADR-0007-Gate
+**Nächster Blick:** A0.1b baut ausschließlich die fail-closed Startgrenze auf
+der read-only Erkennung aus A0.1a. Danach folgt das experimentelle ADR-0007-Gate
 zwischen Option B und dem verbindlichen Fallback C; erst anschließend beginnt
 der Migration Runner nur gegen Kopien. Read-only Messungen dürfen parallel
 laufen, öffnen aber keinen zweiten verändernden Produktpfad.
