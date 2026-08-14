@@ -54,8 +54,9 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## A0 · Wahrheitsfundament vor Migration
 
-**Status:** einziger mergefähiger aktiver Produktpfad; A0.2 und A0.1a sind
-vollständig abgeschlossen, A0.1b Startup Fail-Closed ist der aktive Schritt.
+**Status:** einziger mergefähiger aktiver Produktpfad; A0.2, A0.1a und A0.1b
+sind vollständig abgeschlossen, A0.3 Bounded Replay und Integrity ist der
+aktive Schritt.
 
 **Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
 besitzt es eine unabhängige semantische Beweisbasis, explizite
@@ -131,7 +132,16 @@ historische Fixture und synthetische Fremd-DB ohne Byte-/mtime-Änderung geprüf
   Detection erzeugt keine Sidecars
 - keine Migration und kein Produkt-Cutover wird durch A0.1a freigegeben
 
-#### A0.1b · Startup Fail-Closed — aktiv
+#### A0.1b · Startup Fail-Closed — abgeschlossen
+
+**Stand 14. August 2026 — abgeschlossen:** Der menschlich angenommene Kandidat
+öffnet eine bestehende SQLite-Datei genau einmal, aktiviert vor der
+A0.1a-Erkennung `query_only` und gibt ausschließlich `current` auf derselben
+Connection für `init_schema()` frei. `historical-v1.1`, `unknown`, Near-Miss und
+fehlende Dateien stoppen vor Datei-, DDL-, Ledger- oder Sidecarwirkung. PR #10
+ist unter Python 3.11/3.12 grün gemergt; der Pi-Safe-Updater bestätigte Backup,
+Fast-Forward auf `0d9ea06`, 1.554 Tests, kontrollierten Dienstneustart sowie
+Doctor, Integrity und Seal.
 
 **Arbeit:** Die angenommene A0.1a-Erkennung vor normale Connect- und
 Dienststartpfade setzen. Nur `current` darf die schreibfähige Öffnung erreichen;
@@ -170,7 +180,7 @@ entwickeln.
   Human-Go; nach Cutover bleibt der Dienst bis zum grünen read-only
   Post-Cutover-Receipt gestoppt
 
-### A0.3 · Bounded Replay und Integrity topologiegegated entscheiden
+### A0.3 · Bounded Replay und Integrity topologiegegated entscheiden — aktiv
 
 **Abhängigkeit:** A0.2 ist grün; A0.1a erkennt fremde Datenbanken und A0.1b
 verweigert ihren normalen Start. Ein verändernder Migration Runner wartet auf
@@ -460,9 +470,9 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** A0.2 und A0.1a sind vollständig abgeschlossen. A0.1b
-Startup Fail-Closed ist jetzt der einzige mergefähige Produktpfad; danach folgt
-das A0.3-Experiment zwischen Option B und dem verbindlichen Fallback C und erst
-dann der Migration Runner nur gegen Kopien. H1.2 bleibt Produktziel, ist aber
-kein paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
-nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.
+**Aktive Baulinie:** A0.2, A0.1a und A0.1b sind vollständig abgeschlossen. Das
+A0.3-Experiment zwischen Option B und dem verbindlichen Fallback C ist jetzt der
+einzige mergefähige Produktpfad; erst danach folgt der Migration Runner nur
+gegen Kopien. H1.2 bleibt Produktziel, ist aber kein paralleler mergefähiger
+Pfad. Rein read-only Messungen und die isolierte nichtproduktive Lernlinie
+dürfen nach Regel 1 weiterlaufen.

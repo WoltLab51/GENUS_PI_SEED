@@ -4,9 +4,9 @@
 >
 > **Stand:** 14. August 2026
 >
-> **Verifizierte Entscheidungsbasis:** `3c7fb7b` (A0.1a vollständig promoviert)
+> **Verifizierte Entscheidungsbasis:** `0d9ea06` (A0.1b vollständig promoviert)
 >
-> **Letzter hier belegter Laufzeit-Snapshot:** 13. Juli 2026 auf `068f0ca`
+> **Letzter hier belegter Laufzeit-Snapshot:** 14. August 2026 auf `0d9ea06`
 >
 > **Zweck:** in zwei Minuten verstehen, wo GENUS steht und worauf der nächste
 > saubere Schritt zielt
@@ -19,14 +19,17 @@ Golden JSONL, unabhängiges Replay-Oracle und eine echte historische
 SQLite-Fixture sind menschlich angenommen, auf GitHub gemergt und auf dem Pi
 geprüft. A0.1a ist seit dem 14. August ebenfalls abgeschlossen: GENUS erkennt
 seine aktuelle Produkt-DB, die historische v1.1-Fixture und fremde SQLite-
-Strukturen ausschließlich read-only. Der einzige aktive Produktpfad ist jetzt
-A0.1b, die Startup-Grenze vor unbekannten oder migrationspflichtigen Schemas.
+Strukturen ausschließlich read-only. A0.1b ist nun ebenfalls vollständig
+promoviert: Normale Starts lassen ausschließlich das aktuelle Schema auf genau
+der zuvor geprüften Connection bis zur schreibfähigen Initialisierung passieren.
+Der einzige aktive Produktpfad ist jetzt A0.3, das topologiegegatede Experiment
+für bounded Replay und Integrity.
 
 ## Das Bild in einem Satz
 
-> A0 ist der einzige mergefähige Produktpfad; A0.1a erkennt Schemafassungen
-> ohne Veränderung, A0.1b setzt diese Erkenntnis vor jedem normalen Start
-> fail-closed durch.
+> A0 ist der einzige mergefähige Produktpfad; A0.1b schützt normale Starts
+> fail-closed, A0.3 entscheidet nun messbar zwischen bounded Option B und dem
+> verbindlichen Shadow-Fallback C.
 
 ## Was heute belastbar ist
 
@@ -58,27 +61,30 @@ liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### A0.1b · Startup Fail-Closed
+### A0.3 · Bounded Replay und Integrity
 
 A0 bleibt nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
 human-owned Critical Lane und der einzige mergefähige Produktänderungspfad.
-A0.1a liefert jetzt die sichere Diagnosemembran: `genus db status` klassifiziert
-`current`, `historical-v1.1` und `unknown`, ohne Datei, mtime oder Sidecars zu
-verändern. A0.1b darf diese Diagnose erstmals in normale Startup-Pfade
-einbauen, aber weiterhin keine Migration ausführen.
+A0.1b schützt jetzt alle normalen Startpfade mit der angenommenen
+Schemaerkennung. A0.3 ersetzt als nächster Schritt vollständiges `fetchall()`
+durch einen fixed-head, deterministisch geordneten und speicherbegrenzten
+Eventstrom. Option B darf nur nach den vorab festgelegten Pi-, Reader-, Writer-,
+WAL-, Kill- und Recovery-Gates gewählt werden; andernfalls gilt Option C mit
+Shadow-Projektionen und atomarem Wechsel.
 
-**Fertig, wenn:** Normale Starts lassen ausschließlich `current` bis zum
-schreibfähigen Connect passieren. `historical-v1.1` stoppt vorher mit
-„Migration erforderlich“, `unknown` mit „unbekanntes Schema“. Kein Pfad ruft
-vor dieser Entscheidung `init_schema()` auf, erzeugt eine Datenbank oder führt
-DDL aus; automatische Migration bleibt ausgeschlossen.
+**Fertig, wenn:** Replay und Integrity arbeiten mit festem Head und begrenzten
+Batches, Golden Oracle und zweiter Replay bleiben driftfrei, und die gewählte
+Topologie besteht die vereinbarten Pi-Budgets sowie Reader-, Writer-, Kill- und
+Recovery-Faults. Event-Log, Genesis, Epoche, Seal und Anchor bleiben unverändert;
+Migration und Produkt-Cutover bleiben ausgeschlossen.
 
-**Heute belastbar:** A0.1a ist menschlich angenommen, als PR #8 gemergt und auf
-dem Pi geprüft. Die echte Produkt-DB wurde als `current`, die eingefrorene
-Fixture als `historical-v1.1` und eine synthetische Fremd-DB als `unknown`
-erkannt. Hauptdatei-Hash, Größe und mtime blieben jeweils identisch; Detection
-erzeugte keine Sidecars. GitHub-CI bestand unter Python 3.11 und 3.12. A0.2
-bleibt unveränderte Prüfinfrastruktur.
+**Heute belastbar:** A0.1b ist menschlich angenommen, als PR #10 unter Python
+3.11 und 3.12 grün gemergt und per Safe-Updater auf dem Pi promoviert. Der Lauf
+erzeugte ein verifiziertes Backup, bestand 1.554 Tests und startete Learner und
+Telegram kontrolliert neu; Doctor, Integrity und Seal blieben grün. Die echte
+Produkt-DB passiert als `current`; historische und unbekannte Kopien stoppen vor
+Wirkung und bleiben einschließlich Hash, mtime und Sidecars unverändert. A0.1a
+und A0.2 bleiben eingefrorene Prüfinfrastruktur; A0.1b führt keine Migration aus.
 
 ### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 
@@ -127,8 +133,8 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ## Gerade ausdrücklich nicht
 
-- keine Migration in A0.1b; die neue Startup-Grenze verweigert nur und
-  verändert kein Schema
+- keine Migration und kein Produkt-Cutover in A0.3; der aktive Schritt
+  entscheidet ausschließlich Replay-/Integrity-Mechanik und Topologie
 - keine produktive Replay-/Integrity-Aktivierung und keine endgültige
   Topologiewahl vor unabhängiger Semantik- und Pi-Abnahme; isolierte Prototypen
   gegen Fixtures und Kopien sind Teil dieses Gates
@@ -154,8 +160,7 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** A0.1b baut ausschließlich die fail-closed Startgrenze auf
-der read-only Erkennung aus A0.1a. Danach folgt das experimentelle ADR-0007-Gate
-zwischen Option B und dem verbindlichen Fallback C; erst anschließend beginnt
-der Migration Runner nur gegen Kopien. Read-only Messungen dürfen parallel
-laufen, öffnen aber keinen zweiten verändernden Produktpfad.
+**Nächster Blick:** A0.3 führt das experimentelle ADR-0007-Gate zwischen Option
+B und dem verbindlichen Fallback C aus. Erst nach seiner menschlichen Abnahme
+beginnt der Migration Runner ausschließlich gegen Kopien. Read-only Messungen
+dürfen parallel laufen, öffnen aber keinen zweiten verändernden Produktpfad.
