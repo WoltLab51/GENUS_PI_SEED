@@ -134,10 +134,10 @@ def explainable(conn, term: str) -> bool:
 
 
 def _finish(term: str, db_path: str) -> bool:
-    from genus import db
+    from genus import startup
 
     normalized = normalize_term(term)
-    conn = db.connect(db_path)
+    conn = startup.connect(db_path)
     try:
         learned = explainable(conn, normalized)
     finally:

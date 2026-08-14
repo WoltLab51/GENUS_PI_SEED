@@ -286,7 +286,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "a0042e2b28ede7d954d87b6d2266c1adbdca13c3eef269781ecad1d529d77704",
+  "content_sha256": "064a431744bcd9800ad25d03496e6fd71a9cc1725925be887319bc77a8b62909",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1509,7 +1509,7 @@
           "line": 137
         }
       ],
-      "to": "module:genus.db",
+      "to": "module:genus.startup",
       "type": "imports_lazy"
     },
     {
@@ -1627,18 +1627,6 @@
           "line": 9
         }
       ],
-      "to": "module:genus.db",
-      "type": "imports_eager"
-    },
-    {
-      "from": "module:deploy.export_pi_status",
-      "sources": [
-        {
-          "file": "deploy/export_pi_status.py",
-          "kind": "ast",
-          "line": 9
-        }
-      ],
       "to": "module:genus.integrity",
       "type": "imports_eager"
     },
@@ -1676,6 +1664,18 @@
         }
       ],
       "to": "module:genus.sealing",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:deploy.export_pi_status",
+      "sources": [
+        {
+          "file": "deploy/export_pi_status.py",
+          "kind": "ast",
+          "line": 9
+        }
+      ],
+      "to": "module:genus.startup",
       "type": "imports_eager"
     },
     {
@@ -1884,7 +1884,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 1026
+          "line": 1024
         }
       ],
       "to": "module:deploy.deuter",
@@ -1961,18 +1961,6 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "ast",
-          "line": 1024
-        }
-      ],
-      "to": "module:genus.db",
-      "type": "imports_lazy"
-    },
-    {
-      "from": "module:deploy.telegram_bot",
-      "sources": [
-        {
-          "file": "deploy/telegram_bot.py",
-          "kind": "ast",
           "line": 156
         }
       ],
@@ -2018,6 +2006,18 @@
         }
       ],
       "to": "module:genus.response_outcomes",
+      "type": "imports_lazy"
+    },
+    {
+      "from": "module:deploy.telegram_bot",
+      "sources": [
+        {
+          "file": "deploy/telegram_bot.py",
+          "kind": "ast",
+          "line": 1022
+        }
+      ],
+      "to": "module:genus.startup",
       "type": "imports_lazy"
     },
     {
@@ -2722,7 +2722,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 933
+          "line": 930
         }
       ],
       "to": "module:deploy.deuter",
@@ -2734,7 +2734,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 327
+          "line": 324
         }
       ],
       "to": "module:genus",
@@ -2782,7 +2782,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.auskunft",
@@ -2914,6 +2914,18 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
+          "line": 70
+        }
+      ],
+      "to": "module:genus.cli_startup",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli",
+      "sources": [
+        {
+          "file": "genus/cli.py",
+          "kind": "ast",
           "line": 10
         }
       ],
@@ -2926,7 +2938,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.companion",
@@ -2938,7 +2950,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.constants",
@@ -3034,7 +3046,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.experience",
@@ -3166,7 +3178,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.maturation",
@@ -3262,7 +3274,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.rechnen",
@@ -3286,7 +3298,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.rules",
@@ -3346,7 +3358,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 403
+          "line": 400
         }
       ],
       "to": "module:genus.thermometer",
@@ -3370,7 +3382,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.verstehen",
@@ -3406,7 +3418,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.werkzeug",
@@ -3430,7 +3442,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.werkzeuge_seed",
@@ -3442,7 +3454,7 @@
         {
           "file": "genus/cli.py",
           "kind": "ast",
-          "line": 328
+          "line": 325
         }
       ],
       "to": "module:genus.ziele",
@@ -3454,12 +3466,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2082
+          "line": 2079
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2083
+          "line": 2080
         }
       ],
       "to": "table:belief_projection",
@@ -3471,17 +3483,17 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 1829
+          "line": 1826
+        },
+        {
+          "file": "genus/cli.py",
+          "kind": "sql_literal",
+          "line": 1826
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
           "line": 1829
-        },
-        {
-          "file": "genus/cli.py",
-          "kind": "sql_literal",
-          "line": 1832
         }
       ],
       "to": "table:event_log",
@@ -3493,12 +3505,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2107
+          "line": 2104
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2108
+          "line": 2105
         }
       ],
       "to": "table:experience_log",
@@ -3510,12 +3522,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2123
+          "line": 2120
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2124
+          "line": 2121
         }
       ],
       "to": "table:governance_log",
@@ -3527,12 +3539,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2099
+          "line": 2096
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2100
+          "line": 2097
         }
       ],
       "to": "table:inquiry_log",
@@ -3544,12 +3556,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2131
+          "line": 2128
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2132
+          "line": 2129
         }
       ],
       "to": "table:operation_log",
@@ -3561,12 +3573,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2091
+          "line": 2088
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2092
+          "line": 2089
         }
       ],
       "to": "table:proposal_log",
@@ -3578,12 +3590,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2139
+          "line": 2136
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2140
+          "line": 2137
         }
       ],
       "to": "table:rule_projection",
@@ -3595,12 +3607,12 @@
         {
           "file": "genus/cli.py",
           "kind": "sql_call",
-          "line": 2115
+          "line": 2112
         },
         {
           "file": "genus/cli.py",
           "kind": "sql_literal",
-          "line": 2116
+          "line": 2113
         }
       ],
       "to": "table:state_projection",
@@ -3868,6 +3880,30 @@
         }
       ],
       "to": "module:genus.schema_detection",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_startup",
+      "sources": [
+        {
+          "file": "genus/cli_startup.py",
+          "kind": "ast",
+          "line": 5
+        }
+      ],
+      "to": "external:click",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.cli_startup",
+      "sources": [
+        {
+          "file": "genus/cli_startup.py",
+          "kind": "ast",
+          "line": 7
+        }
+      ],
+      "to": "module:genus.startup",
       "type": "imports_eager"
     },
     {
@@ -9144,6 +9180,30 @@
       "type": "reads_table"
     },
     {
+      "from": "module:genus.startup",
+      "sources": [
+        {
+          "file": "genus/startup.py",
+          "kind": "ast",
+          "line": 6
+        }
+      ],
+      "to": "module:genus.db",
+      "type": "imports_eager"
+    },
+    {
+      "from": "module:genus.startup",
+      "sources": [
+        {
+          "file": "genus/startup.py",
+          "kind": "ast",
+          "line": 6
+        }
+      ],
+      "to": "module:genus.schema_detection",
+      "type": "imports_eager"
+    },
+    {
       "from": "module:genus.state",
       "sources": [
         {
@@ -11307,7 +11367,7 @@
         {
           "file": "deploy/telegram_bot.py",
           "kind": "curated",
-          "line": 1095
+          "line": 1093
         },
         {
           "file": "docs/reports/2026-07-13-h1-response-loop.md",
@@ -13407,6 +13467,22 @@
       "type": "module"
     },
     {
+      "id": "module:genus.cli_startup",
+      "label": "genus.cli_startup",
+      "ring": "schnittstellen",
+      "roles": [
+        "module"
+      ],
+      "sources": [
+        {
+          "file": "genus/cli_startup.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
       "id": "module:genus.companion",
       "label": "genus.companion",
       "ring": "antwort",
@@ -14285,6 +14361,23 @@
       "sources": [
         {
           "file": "genus/sprachsignal.py",
+          "kind": "ast",
+          "line": 1
+        }
+      ],
+      "type": "module"
+    },
+    {
+      "id": "module:genus.startup",
+      "label": "genus.startup",
+      "ring": "domaene",
+      "roles": [
+        "module",
+        "sql_consumer"
+      ],
+      "sources": [
+        {
+          "file": "genus/startup.py",
           "kind": "ast",
           "line": 1
         }
@@ -15894,13 +15987,13 @@
   ],
   "summary": {
     "dynamic_sql_calls": 28,
-    "edges": 719,
+    "edges": 724,
     "event_types": 39,
     "external_dependencies": 6,
     "import_cycles": 3,
     "missing_h1_contracts": 3,
-    "modules": 105,
-    "nodes": 271,
+    "modules": 107,
+    "nodes": 273,
     "projected_events": 23,
     "projection_tables": 12,
     "raw_events": 16,
@@ -16228,6 +16321,7 @@
         "module:genus.cli_kartografie",
         "module:genus.cli_relations",
         "module:genus.cli_schema_detection",
+        "module:genus.cli_startup",
         "module:genus.companion",
         "module:genus.confidence",
         "module:genus.constants",
@@ -16280,6 +16374,7 @@
         "module:genus.sensor",
         "module:genus.sources",
         "module:genus.sprachsignal",
+        "module:genus.startup",
         "module:genus.state",
         "module:genus.thermometer",
         "module:genus.umsetzung",

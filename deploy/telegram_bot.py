@@ -1017,12 +1017,10 @@ def main() -> int:
         f"Chat-Wortlernen={'on' if _chat_wortlernen_aktiv() else 'off'}"
     )
 
-    # Über genus.db.connect statt rohem sqlite3.connect (Phase 0 der Ziel-Architektur):
-    # der Bot bekommt damit dieselben Pragmas (WAL, busy_timeout, foreign_keys) und
-    # Spalten-Migrationen wie die CLI -- vorher konnte dieser Pfad sich auf einer
-    # frischen oder unmigrierten DB anders verhalten als jeder andere Zugang.
-    from genus import db
-    conn = db.connect(DB_PATH)
+    # Dieselbe Fail-Closed-Grenze wie die CLI entscheidet read-only, bevor der bisherige
+    # schreibfähige db.connect-Pfad und dessen Initialisierung erreichbar werden.
+    from genus import startup
+    conn = startup.connect(DB_PATH)
     import deuter
 
     offset = _load_offset()
