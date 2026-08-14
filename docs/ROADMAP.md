@@ -34,7 +34,8 @@ Menschen.
 ```text
 A0.2 Golden Ledger + Oracle + historische SQLite-Fixture
                               └──> A0.1a read-only Schemaerkennung
-A0.1 + A0.2 ──────────────────> A0.3 B/C-Experiment
+                                         └──> A0.1b Startup Fail-Closed
+A0.1b + A0.2 ─────────────────> A0.3 B/C-Experiment
 
 A0.1 + A0.2 + A0.3 ──> Migration Runner nur auf Kopien
 A0.2 ──> A0.4 Custody-/Anchor-v2-Vertrag ──> Witness ──> Signatur
@@ -53,8 +54,8 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## A0 · Wahrheitsfundament vor Migration
 
-**Status:** einziger mergefähiger aktiver Produktpfad; A0.2 ist vollständig
-abgeschlossen, A0.1a read-only Schemaerkennung ist der aktive Schritt.
+**Status:** einziger mergefähiger aktiver Produktpfad; A0.2 und A0.1a sind
+vollständig abgeschlossen, A0.1b Startup Fail-Closed ist der aktive Schritt.
 
 **Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
 besitzt es eine unabhängige semantische Beweisbasis, explizite
@@ -110,24 +111,43 @@ ersten Migration-Runner als eigenes A0.2-Gate fertiggestellt.
 read-only Version-/Fingerprint-Erkennung darf danach als nichtmutierende Scheibe
 entstehen; sie autorisiert keine Migration.
 
-#### A0.1a · Read-only Schemaerkennung — aktiv
+#### A0.1a · Read-only Schemaerkennung — abgeschlossen
 
-**Arbeit:** Normale Connect-/Startup-Pfade von Schemaänderung trennen und
-Schema-Version sowie Fingerprint ausschließlich read-only und fail-closed
-erkennen. Dieser Schritt baut keinen Migration Runner und wendet kein DDL an.
+**Stand 14. August 2026 — abgeschlossen:** Ein gepinntes strukturelles Inventar
+klassifiziert `current`, `historical-v1.1` und `unknown`. `genus db status`
+öffnet ausschließlich über `connect_readonly`; die Erkennung verweigert eine
+normale writable Connection und führt nur `SELECT` und `PRAGMA` aus. PR #8 ist
+unter Python 3.11/3.12 grün gemergt. Auf dem Pi wurden echte Produkt-DB,
+historische Fixture und synthetische Fremd-DB ohne Byte-/mtime-Änderung geprüft.
 
 **Definition of Done**
 
 - `genus db status` klassifiziert aktuelle, bekannte historische, unbekannte und
-  unvollständige Schemaformen mit verständlichem Status
+  strukturell abweichende Schemaformen mit verständlichem Status
 - Statusabfrage verändert Datei, Schema, Pragmas und Ledger nicht
-- normaler Connect und Dienststart führen an bestehenden Datenbanken keine DDL aus
-- migrationspflichtige und unbekannte Zustände stoppen fail-closed
 - Erkennung ist gegen aktuelle Datenbank, historische A0.2-Fixture und
   synthetische unbekannte/teilweise Zustände getestet
-- Bytehash, Dateigröße, mtime und Sidecarfreiheit bleiben vor und nach der
-  Erkennung identisch
+- Bytehash, Dateigröße und mtime bleiben vor und nach der Erkennung identisch;
+  Detection erzeugt keine Sidecars
 - keine Migration und kein Produkt-Cutover wird durch A0.1a freigegeben
+
+#### A0.1b · Startup Fail-Closed — aktiv
+
+**Arbeit:** Die angenommene A0.1a-Erkennung vor normale Connect- und
+Dienststartpfade setzen. Nur `current` darf die schreibfähige Öffnung erreichen;
+bekannte historische und unbekannte Schemas werden vorher verständlich
+verweigert. Dieser Schritt migriert, repariert und normalisiert nichts.
+
+**Definition of Done**
+
+- `current` erlaubt den unveränderten normalen Start
+- `historical-v1.1` stoppt vor Wirkung mit „Migration erforderlich“
+- `unknown` stoppt vor Wirkung mit „unbekanntes Schema“
+- fehlende Datenbank, bekannte Altform und fremde Struktur erzeugen weder Datei,
+  DDL, Ledgerereignis noch neue Sidecars
+- kein abgewiesener Pfad erreicht `db.connect()` oder `init_schema()`
+- CLI, Worker und produktive Dienststarts teilen dieselbe getestete Grenze
+- automatische Migration bleibt ausdrücklich ausgeschlossen
 
 #### Spätere Migration Boundary — erst nach A0.3
 
@@ -152,8 +172,8 @@ entwickeln.
 
 ### A0.3 · Bounded Replay und Integrity topologiegegated entscheiden
 
-**Abhängigkeit:** A0.2 ist grün; die read-only Schemaerkennung aus A0.1 steht vor
-Replay einer fremden Datenbank. Ein verändernder Migration Runner wartet auf
+**Abhängigkeit:** A0.2 ist grün; A0.1a erkennt fremde Datenbanken und A0.1b
+verweigert ihren normalen Start. Ein verändernder Migration Runner wartet auf
 Golden Oracle und die A0.3-Abnahme.
 
 **Arbeit:** Vollständiges `fetchall()` durch einen fixed-head, deterministisch
@@ -440,9 +460,9 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** A0.2 ist vollständig abgeschlossen. A0.1a read-only
-Schemaerkennung ist jetzt der einzige mergefähige Produktpfad; danach folgt das
-A0.3-Experiment zwischen Option B und dem verbindlichen Fallback C und erst dann
-der Migration Runner nur gegen Kopien. H1.2 bleibt Produktziel, ist aber kein
-paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
+**Aktive Baulinie:** A0.2 und A0.1a sind vollständig abgeschlossen. A0.1b
+Startup Fail-Closed ist jetzt der einzige mergefähige Produktpfad; danach folgt
+das A0.3-Experiment zwischen Option B und dem verbindlichen Fallback C und erst
+dann der Migration Runner nur gegen Kopien. H1.2 bleibt Produktziel, ist aber
+kein paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
 nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.
