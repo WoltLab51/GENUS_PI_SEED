@@ -2,9 +2,9 @@
 
 > **Status:** aktueller Arbeitsstand
 >
-> **Stand:** 13. August 2026
+> **Stand:** 14. August 2026
 >
-> **Verifizierte Entscheidungsbasis:** `8322b1f` (Promotion-Baseline)
+> **Verifizierte Entscheidungsbasis:** `21fb237` (A0.2 vollständig promoviert)
 >
 > **Letzter hier belegter Laufzeit-Snapshot:** 13. Juli 2026 auf `068f0ca`
 >
@@ -14,14 +14,16 @@
 Der zuletzt hier belegte Pi-Snapshot zeigt einen gehärteten, replaybaren Kern im
 Dauerbetrieb. Seit dem 9. August besitzt GENUS außerdem angenommene A0-Verträge
 für Schema, Golden Ledger, Replay, externe Anchors und kritische
-Änderungsautorität. Der Golden-JSONL-/Replay-Oracle-Teil von A0.2 ist seit dem
-13. August menschlich angenommenes, versioniertes Testfundament. Das separat
-gegatete historische SQLite-Artefakt bleibt vor dem ersten Migration-Runner offen.
+Änderungsautorität. A0.2 ist seit dem 14. August vollständig abgeschlossen:
+Golden JSONL, unabhängiges Replay-Oracle und eine echte historische
+SQLite-Fixture sind menschlich angenommen, auf GitHub gemergt und auf dem Pi
+geprüft. Der einzige aktive Produktpfad ist jetzt A0.1a, die ausschließlich
+read-only arbeitende Schemaerkennung.
 
 ## Das Bild in einem Satz
 
-> A0 ist der einzige mergefähige Produktpfad; sein erster Schritt ist ein
-> datenschutzfreies Golden Ledger mit unabhängigem Replay-Oracle.
+> A0 ist der einzige mergefähige Produktpfad; A0.1a erkennt bekannte, aktuelle
+> und unbekannte Schemafassungen fail-closed, ohne die Datenbank zu verändern.
 
 ## Was heute belastbar ist
 
@@ -53,28 +55,27 @@ liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### A0.2 · Golden Ledger und unabhängiges Replay-Oracle
+### A0.1a · Read-only Schemaerkennung
 
-A0 ist nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
-human-owned Critical Lane und der einzige mergefähige Produktänderungspfad. Der
-erste Implementierungsschritt ist
-[ADR-0006](decisions/ADR-0006-GOLDEN-LEDGER-ORACLE.md): eine synthetische,
-datenschutzfreie JSONL-Eventfixture mit nichtleerem Legacy-Präfix, Epoche und
-versiegeltem Tail sowie ein statisches, unabhängig geprüftes Oracle-Manifest.
-Eine temporäre SQLite-Datenbank wird daraus nur als Testsubstrat abgeleitet; eine
-kleine historische SQLite-Altfixture ergänzt spätere Migrationstests.
+A0 bleibt nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
+human-owned Critical Lane und der einzige mergefähige Produktänderungspfad.
+A0.2 liefert dafür jetzt die unabhängige Beweisbasis: Golden Corpus,
+Replay-Oracle und eine aus dem echten Commit `2bf67e6` konservierte historische
+SQLite-Speicherform. A0.1a darf diese Materialien nur lesen und klassifizieren.
 
-**Fertig, wenn:** Corpus und Oracle alle Pflichtfälle, erwarteten Projektionen
-und Digests versioniert binden; Integrity, Seal und historischer Anchor grün
-sind; zwei Replays weder Events noch Drift erzeugen; Tamper-Fälle anschlagen;
-und kein erwarteter Wert ausschließlich aus dem Runtime-Code unter Test stammt.
+**Fertig, wenn:** `genus db status` bekannte historische, aktuelle, unbekannte
+und unvollständige Schemaformen reproduzierbar unterscheidet; Statusabfrage und
+normaler Dienststart dabei weder Datei, Schema noch Ledger verändern; unbekannte
+oder migrationspflichtige Zustände verständlich und fail-closed stoppen; und
+Tests die Byteidentität vor und nach jeder Erkennung beweisen.
 
-**Heute belastbar:** Der synthetische Golden Corpus V2, das statische Oracle,
-Import- und Prüfwerkzeug sowie das fokussierte Test-Gate sind hashgebunden,
-unabhängig geprüft und von Ronny menschlich angenommen. Der
-[Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) hält die
-Entscheidung getrennt vom byteidentischen Kandidatenpaket fest. Offen bleibt das
-historische SQLite-Artefakt als eigener aktiver A0.2-Teilschritt.
+**Heute belastbar:** A0.2 ist vollständig grün. Golden Corpus und Oracle sind
+hashgebunden und menschlich angenommen; die historische SQLite-Fixture bindet
+Commit, Schemahash, Binärhash, Inventar und read-only Eventstromgleichheit. Der
+[Golden-Annahmebeleg](reviews/2026-08-13-a0-2-golden-ledger-acceptance.md) und
+der [SQLite-Annahmebeleg](../tests/fixtures/historical_sqlite_v1/HUMAN_REVIEW.md)
+dokumentieren die beiden Human Gates. GitHub-CI bestand unter Python 3.11 und
+3.12; auf dem Pi bestanden beide A0.2-Gates gemeinsam mit 29 Tests.
 
 ### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 
@@ -123,7 +124,7 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ## Gerade ausdrücklich nicht
 
-- keine Produktmigration vor Golden Oracle und den A0-Gates
+- keine Migration in A0.1a; Schemaerkennung bleibt strikt read-only
 - keine produktive Replay-/Integrity-Aktivierung und keine endgültige
   Topologiewahl vor unabhängiger Semantik- und Pi-Abnahme; isolierte Prototypen
   gegen Fixtures und Kopien sind Teil dieses Gates
@@ -149,8 +150,8 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** Das historische SQLite-Artefakt als separates A0.2-Gate
-fertigstellen. Danach folgen read-only Schemaerkennung und das experimentelle
-ADR-0007-Gate zwischen Option B und dem verbindlichen Fallback C. Read-only
-Messungen dürfen parallel laufen, öffnen aber keinen zweiten verändernden
-Produktpfad.
+**Nächster Blick:** A0.1a baut ausschließlich die read-only Schemaerkennung und
+die fail-closed Startgrenze. Danach folgt das experimentelle ADR-0007-Gate
+zwischen Option B und dem verbindlichen Fallback C; erst anschließend beginnt
+der Migration Runner nur gegen Kopien. Read-only Messungen dürfen parallel
+laufen, öffnen aber keinen zweiten verändernden Produktpfad.
