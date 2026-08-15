@@ -2,7 +2,8 @@
 
 > **Status:** accepted · **Datum:** 2026-08-09
 >
-> **Decision Owner:** Ronny · **Umsetzung:** noch nicht begonnen
+> **Decision Owner:** Ronny · **Umsetzung:** A0.3a angenommen; A0.3b aktiv;
+> Produktpfade unverändert
 >
 > **Quelle:** D-A0.3 im [A0 Decision Packet](../reports/2026-08-09-a0-decision-packet.md)
 
@@ -14,6 +15,37 @@ Writer-Blockade ist belegt, Concurrent-Reader-, Kill-, WAL-, Peak-RAM- und
 Pi-Budgets sind nicht experimentell bewiesen. Ein Ledger mit mehr als einer
 Million Events darf nicht von unbegrenztem residentem Speicher oder unklarer
 Abbruchsemantik abhängen.
+
+## A0.3a — aufgelöstes Experimentgate
+
+Ronny hat am 14. August 2026 den
+[A0.3a-Messreport](../reports/2026-08-14-a0-3a-measurement-harness-baseline.md)
+und den getrennten
+[menschlichen Entscheidungsbeleg](../reviews/2026-08-14-a0-3a-topology-decision.md)
+angenommen.
+
+Option B reduzierte auf der Produktkopie den Peak RSS von 978.894.848 B beim
+heutigen Replay auf 38.387.712 B und blieb mit 106,775489 s Laufzeit sowie
+151.636.632 B WAL innerhalb der angenommenen Zeit-/Speicherbudgets. Die einzelne
+`BEGIN IMMEDIATE`-Transaktion blockierte den realen Writer jedoch bis zu dessen
+Timeout nach 5,003508 s und verfehlte damit die verbindliche Grenze von 2,0 s
+ohne Timeout oder Starvation.
+
+Damit ist Option B als konkurrierende Live-Topologie verworfen. Sie bleibt für
+Wartung bei bewusst gestoppten Writern, Datenbankkopien, Migrationstests und
+forensische/offline Prüfungen zulässig. Option C mit versionierten
+Shadow-Projektionen, bounded Aufbau, Catch-up und geprüftem atomarem Cutover ist
+der verbindliche Live-Kandidat für A0.3b.
+
+Angenommen sind höchstens 256 MiB Peak RSS, 180 s für den vollständigen
+1M-Shadow-Rebuild, 256 MiB WAL, 2,0 s einzelne Writer-Blockade ohne Timeout oder
+Starvation sowie höchstens 10 s Recovery mit ausschließlich vollständig altem
+oder vollständig neuem Zustand. Die 180 s sind kein Writer-Blockadebudget. Das
+Shadow-Speicherplatzbudget folgt erst aus A0.3b.
+
+Diese Auflösung wählt eine experimentell weiter zu beweisende Topologie. Sie
+aktiviert weder Option C noch einen neuen Replay-/Integrity-Produktpfad. Vor
+jedem Live-Cutover bleibt ein weiteres ausdrückliches Human-Go erforderlich.
 
 ## Entscheidung
 
@@ -103,6 +135,8 @@ Betriebsbeweis fest:
 
 ## Noch nicht umgesetzt
 
-Der heutige Replay-/Integrity-Code erfüllt diesen Vertrag noch nicht. Dieser ADR
-ändert keine Transaktion, Tabelle, CLI, Deploysequenz oder Benchmark und
-autorisiert keinen produktiven Replay-Umbau.
+Der heutige produktive Replay-/Integrity-Code erfüllt diesen Vertrag noch
+nicht. A0.3a lieferte ausschließlich Harness, Evidenz und Topologieentscheidung;
+A0.3b muss Shadow-Generation, Catch-up, atomaren Cutover, Faults und Budgets
+zunächst auf Fixtures und Kopien beweisen. Dieser ADR autorisiert keinen
+produktiven Replay-Umbau oder Cutover.

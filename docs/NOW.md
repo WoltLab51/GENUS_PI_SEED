@@ -22,14 +22,15 @@ seine aktuelle Produkt-DB, die historische v1.1-Fixture und fremde SQLite-
 Strukturen ausschließlich read-only. A0.1b ist nun ebenfalls vollständig
 promoviert: Normale Starts lassen ausschließlich das aktuelle Schema auf genau
 der zuvor geprüften Connection bis zur schreibfähigen Initialisierung passieren.
-Der einzige aktive Produktpfad ist jetzt A0.3, das topologiegegatede Experiment
-für bounded Replay und Integrity.
+Der einzige aktive Produktpfad ist jetzt A0.3b: versionierte
+Shadow-Projektionen, Catch-up und atomarer Cutover werden zunächst ausschließlich
+als isolierter Prototyp gegen Fixtures und Datenbankkopien bewiesen.
 
 ## Das Bild in einem Satz
 
-> A0 ist der einzige mergefähige Produktpfad; A0.1b schützt normale Starts
-> fail-closed, A0.3 entscheidet nun messbar zwischen bounded Option B und dem
-> verbindlichen Shadow-Fallback C.
+> A0 ist der einzige mergefähige Produktpfad; A0.3a hat Option B als
+> Live-Topologie am Writer-Gate verworfen, und A0.3b muss nun Option C innerhalb
+> der angenommenen Pi-Budgets beweisen.
 
 ## Was heute belastbar ist
 
@@ -61,24 +62,33 @@ liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### A0.3 · Bounded Replay und Integrity
+### A0.3b · Shadow Generation & Atomic Cutover Prototype
 
 A0 bleibt nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
 human-owned Critical Lane und der einzige mergefähige Produktänderungspfad.
-A0.1b schützt jetzt alle normalen Startpfade mit der angenommenen
-Schemaerkennung. A0.3 ersetzt als nächster Schritt vollständiges `fetchall()`
-durch einen fixed-head, deterministisch geordneten und speicherbegrenzten
-Eventstrom. Option B darf nur nach den vorab festgelegten Pi-, Reader-, Writer-,
-WAL-, Kill- und Recovery-Gates gewählt werden; andernfalls gilt Option C mit
-Shadow-Projektionen und atomarem Wechsel.
+A0.1b schützt alle normalen Startpfade mit der angenommenen Schemaerkennung.
+A0.3a ist menschlich angenommen: Der bounded Eventstrom senkte auf der Pi-Kopie
+den Peak RSS auf 38.387.712 B, doch die einzelne Option-B-Transaktion dauerte
+106,775489 s und ließ den realen Writer nach 5,003508 s timeouten. Die
+verbindliche Writer-Grenze beträgt 2,0 s ohne Timeout oder Starvation. Option B
+ist deshalb für den konkurrierenden Livebetrieb verworfen und bleibt nur für
+Wartung mit gestoppten Writern, Kopien, Migrationstests und Offline-Prüfungen
+zulässig.
 
-**Fertig, wenn:** Replay und Integrity arbeiten mit festem Head und begrenzten
-Batches, Golden Oracle und zweiter Replay bleiben driftfrei, und die gewählte
-Topologie besteht die vereinbarten Pi-Budgets sowie Reader-, Writer-, Kill- und
-Recovery-Faults. Event-Log, Genesis, Epoche, Seal und Anchor bleiben unverändert;
-Migration und Produkt-Cutover bleiben ausgeschlossen.
+**Fertig, wenn:** Eine aktive Generation G1 und eine versionierte Shadow-
+Generation G2 bestehen gleichzeitig; G2 wird bounded bis zu einem festen Head
+aufgebaut, holt neue Events ohne Writer-Starvation nach und wechselt nach einer
+höchstens 2,0 s langen finalen Writer-Grenze atomar. Golden Oracle und alle zwölf
+Projektionsdigests stimmen, Crash/Reopen ergibt ausschließlich vollständig alt
+oder vollständig neu, und die angenommenen Grenzen von 256 MiB Peak RSS,
+180 s Gesamtbuild, 256 MiB WAL und 10 s Recovery werden eingehalten. Event-Log,
+Genesis, Epoche, Seal und Anchor bleiben unverändert.
 
-**Heute belastbar:** A0.1b ist menschlich angenommen, als PR #10 unter Python
+**Heute belastbar:** A0.3a Measurement Harness und Pi-Baseline sind menschlich
+angenommen; [Entscheidungsbeleg](reviews/2026-08-14-a0-3a-topology-decision.md)
+und [Messreport](reports/2026-08-14-a0-3a-measurement-harness-baseline.md)
+binden Budgets und die Auswahl von Option C. Der bestehende produktive Replay-/
+Integrity-Pfad bleibt unverändert. A0.1b ist menschlich angenommen, als PR #10 unter Python
 3.11 und 3.12 grün gemergt und per Safe-Updater auf dem Pi promoviert. Der Lauf
 erzeugte ein verifiziertes Backup, bestand 1.554 Tests und startete Learner und
 Telegram kontrolliert neu; Doctor, Integrity und Seal blieben grün. Die echte
@@ -135,9 +145,9 @@ neuer Regexe, Sonderfälle oder Handler.
 
 - keine Migration und kein Produkt-Cutover in A0.3; der aktive Schritt
   entscheidet ausschließlich Replay-/Integrity-Mechanik und Topologie
-- keine produktive Replay-/Integrity-Aktivierung und keine endgültige
-  Topologiewahl vor unabhängiger Semantik- und Pi-Abnahme; isolierte Prototypen
-  gegen Fixtures und Kopien sind Teil dieses Gates
+- keine produktive Shadow-, Replay- oder Integrity-Aktivierung vor dem
+  vollständigen A0.3b-Prototyp und einem zweiten ausdrücklichen Human-Go;
+  Option C ist ausgewählter Kandidat, noch keine Live-Implementierung
 - kein Anchor v2, keine Signatur und kein privater Signaturschlüssel auf dem Pi
 - kein Production-Reseal; die angenommene Notfallausnahme ist technisch noch
   nicht erfüllbar
@@ -160,7 +170,10 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** A0.3 führt das experimentelle ADR-0007-Gate zwischen Option
-B und dem verbindlichen Fallback C aus. Erst nach seiner menschlichen Abnahme
-beginnt der Migration Runner ausschließlich gegen Kopien. Read-only Messungen
-dürfen parallel laufen, öffnen aber keinen zweiten verändernden Produktpfad.
+**Nächster Blick:** A0.3b vergleicht Catch-up mit kurzer finaler Fence,
+begrenztes Dual-Write oder eine andere Generationstechnik, ohne eine davon
+vorwegzunehmen. Erst der innerhalb aller Budgets grüne Shadow-/Cutover-Prototyp
+und ein zweites Human-Go dürfen einen späteren Produkt-Cutover vorbereiten. Der
+Migration Runner bleibt bis zum vollständigen A0.3-Abschluss aufgeschoben.
+Read-only Messungen dürfen parallel laufen, öffnen aber keinen zweiten
+verändernden Produktpfad.

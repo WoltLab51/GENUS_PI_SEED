@@ -35,7 +35,7 @@ Menschen.
 A0.2 Golden Ledger + Oracle + historische SQLite-Fixture
                               └──> A0.1a read-only Schemaerkennung
                                          └──> A0.1b Startup Fail-Closed
-A0.1b + A0.2 ─────────────────> A0.3 B/C-Experiment
+A0.1b + A0.2 ──> A0.3a B/C-Messung ──> A0.3b Shadow-/Cutover-Prototyp
 
 A0.1 + A0.2 + A0.3 ──> Migration Runner nur auf Kopien
 A0.2 ──> A0.4 Custody-/Anchor-v2-Vertrag ──> Witness ──> Signatur
@@ -54,9 +54,9 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## A0 · Wahrheitsfundament vor Migration
 
-**Status:** einziger mergefähiger aktiver Produktpfad; A0.2, A0.1a und A0.1b
-sind vollständig abgeschlossen, A0.3 Bounded Replay und Integrity ist der
-aktive Schritt.
+**Status:** einziger mergefähiger aktiver Produktpfad; A0.2, A0.1a, A0.1b und
+A0.3a sind vollständig abgeschlossen. A0.3b Shadow Generation & Atomic Cutover
+Prototype ist der aktive Schritt.
 
 **Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
 besitzt es eine unabhängige semantische Beweisbasis, explizite
@@ -180,40 +180,65 @@ entwickeln.
   Human-Go; nach Cutover bleibt der Dienst bis zum grünen read-only
   Post-Cutover-Receipt gestoppt
 
-### A0.3 · Bounded Replay und Integrity topologiegegated entscheiden — aktiv
+### A0.3 · Bounded Replay und Integrity
 
-**Abhängigkeit:** A0.2 ist grün; A0.1a erkennt fremde Datenbanken und A0.1b
-verweigert ihren normalen Start. Ein verändernder Migration Runner wartet auf
-Golden Oracle und die A0.3-Abnahme.
+#### A0.3a · Measurement Harness und Topologieentscheidung — abgeschlossen
 
-**Arbeit:** Vollständiges `fetchall()` durch einen fixed-head, deterministisch
-geordneten und speicherbegrenzten Eventstrom ersetzen. Option B als kleinsten
-Live-Kandidaten in einer atomaren Transaktion prüfen. Nur wenn B alle vorab
-menschlich beschlossenen Pi-, Reader-, Writer-, WAL-, Kill- und
-Recovery-Budgets besteht, wird B gewählt; sonst folgt Option C mit
-Shadow-Projektionen und atomarem Wechsel. Option D validiert Migrationen und
-forensische Kopien, entscheidet aber keinen Live-Cutover.
+Der [Messreport](reports/2026-08-14-a0-3a-measurement-harness-baseline.md) und
+der getrennte
+[menschliche Entscheidungsbeleg](reviews/2026-08-14-a0-3a-topology-decision.md)
+sind angenommen. Option B senkte den Pi-Peak-RSS auf 38.387.712 B, blockierte
+den Writer aber ungefähr 107 s und löste dessen Timeout nach 5,003508 s aus.
+
+Verbindlich gelten höchstens 256 MiB Peak RSS, 180 s für den vollständigen
+1M-Rebuild, 256 MiB WAL, 2,0 s einzelne Writer-Blockade ohne Timeout oder
+Starvation und 10 s Recovery mit ausschließlich vollständig altem oder
+vollständig neuem Ergebnis. Option B ist als Live-Topologie verworfen, bleibt
+aber für Wartung mit gestoppten Writern, Kopien, Migrationstests und
+forensische/offline Prüfungen zulässig. Option C ist der verbindliche
+Live-Kandidat.
+
+#### A0.3b · Shadow Generation & Atomic Cutover Prototype — aktiv
+
+**Abhängigkeit:** A0.3a ist menschlich angenommen. A0.2 liefert Golden Oracle
+und historische Fixture; A0.1a/A0.1b erkennen und verweigern falsche
+Schemaformen. Ein verändernder Migration Runner und jeder produktive Cutover
+warten auf den A0.3b-Beweis und ein weiteres Human-Go.
+
+**Arbeit:** Versionierte aktive und Shadow-Projektionen gleichzeitig betreiben.
+G2 wird über den bounded Eventstrom bis zu einem festen H0 aufgebaut und
+vollständig geprüft. Während normale Writer weiterlaufen, zieht G2 Events nach
+H0 nach. Eine höchstens 2,0 s lange finale Writer-Grenze erfasst H*, zieht den
+letzten Tail nach und schaltet atomar G1 → G2. Catch-up mit kurzer Fence,
+begrenztes Dual-Write und andere Generationstechniken werden experimentell
+verglichen; keine davon ist vorab gewählt.
 
 **Definition of Done**
 
-- kein Replay-/Integrity-Pfad materialisiert den vollständigen Ledger im RAM
-- fixer Head, stabile Reihenfolge, begrenzte Batchgröße und payloadfreier
-  Fortschritt sind explizit
+- G1 und G2 bestehen versioniert gleichzeitig; Reader sehen vor Cutover
+  ausschließlich die vollständige aktive G1
+- fixer H0, stabile Reihenfolge, begrenzte Batch-/Bytebeobachtung und
+  payloadfreier Fortschritt sind explizit
+- normale Writer laufen während des Hintergrundbuilds ohne Timeout oder
+  Starvation weiter
+- Catch-up verkleinert den Abstand zum Live-Head; die finale Writer-Grenze ist
+  höchstens 2,0 s
+- Golden Oracle und alle zwölf Projektionsdigests stimmen vor Cutover
 - Event-Log, Präfix, Genesis, Epoche, Head, Seal und Anchor bleiben exakt gleich
-- Golden Oracle und Digests aller Projektionen stimmen; zweiter Replay erzeugt
-  weder Events noch Drift
-- 0/1/Batchgrenzen sowie 10k, 100k und 1M Events sind gemessen
-- Ziel-Pi-Receipts binden Peak RSS, Laufzeit, Datei-/WAL-Hochwasser,
-  Reader-Kohärenz, Writer-Block/-Timeout und Recoveryzeit
-- Projector-Fehler, konkurrierender Leser/Writer, Kill, Reopen und Retry sind
-  fault-injected; Leser sehen nur einen vollständigen alten oder neuen Stand
-- Projector-, Oracle- und Validierungsfehler prüfen vor Commit/Cutover und rollen
-  vollständig auf alt zurück; nur ein Crash an der atomaren Grenze darf nach
-  Reopen eindeutig alt oder den vollständig geprüften neuen Stand ergeben
-- B ist nur nach vollständig bestandenem Gate grün; andernfalls ist C samt
-  Generation-, Cutover-, Cleanup- und Recovery-Vertrag grün
-- die gemessene Wahl B oder C und die vorab akzeptierten Budgets ergänzen
-  ADR-0007 als versioniertes Receipt
+- der Generationenwechsel ist atomar; Crash vor Cutover ergibt vollständig alt,
+  Crash danach vollständig neu, nie eine halbe Generation
+- Reopen, Retry und zweiter Replay sind deterministisch und driftfrei
+- Golden Ledger, 1M-Synthetic und eine Produkt-DB-Kopie halten 256 MiB Peak RSS,
+  180 s Gesamtbuild, 256 MiB WAL und 10 s Recovery ein
+- Projector-/Oracle-/Validierungsfehler, ungültiges Event, konkurrierende
+  Reader/Writer, Long-Reader/WAL-Pinning, ENOSPC und produktgroßer Kill sind
+  fault-injected
+- ein Shadow-/Scratch-Speicherplatzbudget wird aus der Messung abgeleitet und
+  vor einer Live-Auswahl menschlich angenommen
+- Cleanup-/Rollbackvertrag bewahrt die alte Generation bis zur nachgewiesenen
+  neuen Gültigkeit
+- der bestehende produktive Replay-/Integrity-Pfad bleibt unverändert; kein
+  Live-Cutover ohne getrenntes Human-Go
 
 ### A0.4 · Externes Anchor-Vertrauen und erklärbare Reparatur
 
@@ -470,9 +495,9 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** A0.2, A0.1a und A0.1b sind vollständig abgeschlossen. Das
-A0.3-Experiment zwischen Option B und dem verbindlichen Fallback C ist jetzt der
-einzige mergefähige Produktpfad; erst danach folgt der Migration Runner nur
-gegen Kopien. H1.2 bleibt Produktziel, ist aber kein paralleler mergefähiger
-Pfad. Rein read-only Messungen und die isolierte nichtproduktive Lernlinie
-dürfen nach Regel 1 weiterlaufen.
+**Aktive Baulinie:** A0.2, A0.1a, A0.1b und A0.3a sind vollständig
+abgeschlossen. A0.3b Shadow Generation & Atomic Cutover Prototype ist jetzt der
+einzige mergefähige Produktpfad; erst nach vollständigem A0.3-Abschluss folgt
+der Migration Runner nur gegen Kopien. H1.2 bleibt Produktziel, ist aber kein
+paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
+nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.
