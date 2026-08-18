@@ -2,9 +2,10 @@
 
 > **Status:** aktueller Arbeitsstand
 >
-> **Stand:** 14. August 2026
+> **Stand:** 18. August 2026
 >
-> **Verifizierte Entscheidungsbasis:** `0d9ea06` (A0.1b vollständig promoviert)
+> **Verifizierte Entscheidungsbasis:** `123ab6b` (A0.3a vollständig promoviert;
+> A0.3b-Baseline)
 >
 > **Letzter hier belegter Laufzeit-Snapshot:** 14. August 2026 auf `0d9ea06`
 >
@@ -22,15 +23,18 @@ seine aktuelle Produkt-DB, die historische v1.1-Fixture und fremde SQLite-
 Strukturen ausschließlich read-only. A0.1b ist nun ebenfalls vollständig
 promoviert: Normale Starts lassen ausschließlich das aktuelle Schema auf genau
 der zuvor geprüften Connection bis zur schreibfähigen Initialisierung passieren.
-Der einzige aktive Produktpfad ist jetzt A0.3b: versionierte
-Shadow-Projektionen, Catch-up und atomarer Cutover werden zunächst ausschließlich
-als isolierter Prototyp gegen Fixtures und Datenbankkopien bewiesen.
+A0.3b ist nun als isolierter Prototyp menschlich angenommen: Option C mit
+Final-Sync Mode A und Batchgröße 3072 bestand lokal und auf einer
+Pi-Produktdatenbankkopie alle angenommenen Gates. Diese Annahme ist kein
+Live-Go. Der einzige aktive Produktpfad ist jetzt A0.3c: Die tatsächlich von
+GENUS verwendete Python-SQLite-Runtime und drei konsekutive Pi-Kopienläufe
+müssen Live-Readiness beweisen.
 
 ## Das Bild in einem Satz
 
-> A0 ist der einzige mergefähige Produktpfad; A0.3a hat Option B als
-> Live-Topologie am Writer-Gate verworfen, und A0.3b muss nun Option C innerhalb
-> der angenommenen Pi-Budgets beweisen.
+> A0 ist der einzige mergefähige Produktpfad; A0.3b beweist Option C und Mode A
+> als Prototyp, während A0.3c die unsichere Python-SQLite-Runtime und die noch
+> fehlende Wiederholbarkeit vor jedem Live-Go fail-closed auflöst.
 
 ## Was heute belastbar ist
 
@@ -62,39 +66,45 @@ liegt im [history/BUILD_JOURNAL.md](history/BUILD_JOURNAL.md).
 
 ## Der aktive Fokus
 
-### A0.3b · Shadow Generation & Atomic Cutover Prototype
+### A0.3c · Runtime Prerequisite & Live Readiness
 
 A0 bleibt nach [ADR-0009](decisions/ADR-0009-HUMAN-OWNED-CRITICAL-LANE.md) die
 human-owned Critical Lane und der einzige mergefähige Produktänderungspfad.
-A0.1b schützt alle normalen Startpfade mit der angenommenen Schemaerkennung.
-A0.3a ist menschlich angenommen: Der bounded Eventstrom senkte auf der Pi-Kopie
-den Peak RSS auf 38.387.712 B, doch die einzelne Option-B-Transaktion dauerte
-106,775489 s und ließ den realen Writer nach 5,003508 s timeouten. Die
-verbindliche Writer-Grenze beträgt 2,0 s ohne Timeout oder Starvation. Option B
-ist deshalb für den konkurrierenden Livebetrieb verworfen und bleibt nur für
-Wartung mit gestoppten Writern, Kopien, Migrationstests und Offline-Prüfungen
-zulässig.
+A0.3b ist als Prototyp abgeschlossen. Der akzeptierte Pi-Kopienlauf baute G2 in
+`169.746161856 s`, begrenzte die längste Schreibtransaktion auf
+`1.656518293 s`, den finalen Fence auf `0.008216829 s`, Peak RSS auf
+`42303488 B`, WAL auf `19994392 B` und Recovery auf `0.460784818 s`.
+Alle zwölf Projektionen und neun Sequenzen stimmten; das Ledger blieb
+unverändert, und Mode A benötigte keinen Fallback. Der vorausgehende rote
+4096er Lauf mit `2.167361215 s` bleibt Teil der Evidenz.
 
-**Fertig, wenn:** Eine aktive Generation G1 und eine versionierte Shadow-
-Generation G2 bestehen gleichzeitig; G2 wird bounded bis zu einem festen Head
-aufgebaut, holt neue Events ohne Writer-Starvation nach und wechselt nach einer
-höchstens 2,0 s langen finalen Writer-Grenze atomar. Golden Oracle und alle zwölf
-Projektionsdigests stimmen, Crash/Reopen ergibt ausschließlich vollständig alt
-oder vollständig neu, und die angenommenen Grenzen von 256 MiB Peak RSS,
-180 s Gesamtbuild, 256 MiB WAL und 10 s Recovery werden eingehalten. Event-Log,
-Genesis, Epoche, Seal und Anchor bleiben unverändert.
+Live bleibt gesperrt: Die GENUS-Python-Runtime auf dem Pi meldet SQLite 3.46.1
+und damit keine bestätigte WAL-reset-sichere Version. Außerdem existiert noch
+kein generation-aware Produktpfad. Ein aktualisiertes `sqlite3`-CLI allein
+beweist nichts; entscheidend ist `sqlite3.sqlite_version` aus demselben
+Python-Executable und Environment wie der betroffene GENUS-Prozess.
 
-**Heute belastbar:** A0.3a Measurement Harness und Pi-Baseline sind menschlich
-angenommen; [Entscheidungsbeleg](reviews/2026-08-14-a0-3a-topology-decision.md)
-und [Messreport](reports/2026-08-14-a0-3a-measurement-harness-baseline.md)
-binden Budgets und die Auswahl von Option C. Der bestehende produktive Replay-/
-Integrity-Pfad bleibt unverändert. A0.1b ist menschlich angenommen, als PR #10 unter Python
-3.11 und 3.12 grün gemergt und per Safe-Updater auf dem Pi promoviert. Der Lauf
-erzeugte ein verifiziertes Backup, bestand 1.554 Tests und startete Learner und
-Telegram kontrolliert neu; Doctor, Integrity und Seal blieben grün. Die echte
-Produkt-DB passiert als `current`; historische und unbekannte Kopien stoppen vor
-Wirkung und bleiben einschließlich Hash, mtime und Sidecars unverändert. A0.1a
-und A0.2 bleiben eingefrorene Prüfinfrastruktur; A0.1b führt keine Migration aus.
+**Fertig, wenn:** Der konkrete Runtimepfad ist reproduzierbar auf eine
+WAL-reset-sichere SQLite-Version gebracht und durch `sys.executable`,
+`sqlite3.sqlite_version` und `sqlite3.sqlite_version_info` gebunden; die volle
+GENUS-Suite und die A0.2-Golden-/SQLite-Gates sind dort grün. Danach bestehen
+mindestens drei aufeinanderfolgende frische Pi-Kopienläufe mit unverändertem
+Kandidaten, unveränderter Runtime und Batchgröße 3072 jedes Gate einzeln:
+höchstens 2,0 s je Schreibtransaktion und finalem Fence, null Writer-Timeouts,
+keine Starvation, höchstens 256 MiB RSS/WAL, höchstens 180 s Build und 10 s
+Recovery, 12/12 Projektionen, 9/9 Sequenzen, unverändertes Ledger,
+ausschließlich vollständig alt oder neu sowie Mode A ohne Fallback. Jeder rote
+Lauf setzt die konsekutive Serie zurück. Das offene Shadow-/Scratch-
+Speicherbudget wird getrennt menschlich entschieden. Erst danach darf ein
+weiteres ausdrückliches Human-Go über Live-Aktivierung entscheiden.
+
+**Heute belastbar:** Der unveränderte
+[A0.3b-Prototypreport](reports/2026-08-15-a0-3b-shadow-cutover-prototype.md)
+und der getrennte
+[menschliche Annahmebeleg](reviews/2026-08-18-a0-3b-prototype-acceptance.md)
+binden Kandidat, grüne und rote Receipts sowie die Live-Sperre. Der bestehende
+produktive Replay-/Integrity-Pfad und die Produktdatenbank bleiben unverändert.
+A0.2, A0.1a und A0.1b bleiben eingefrorene Prüfinfrastruktur.
 
 ### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 
@@ -143,11 +153,14 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ## Gerade ausdrücklich nicht
 
-- keine Migration und kein Produkt-Cutover in A0.3; der aktive Schritt
-  entscheidet ausschließlich Replay-/Integrity-Mechanik und Topologie
-- keine produktive Shadow-, Replay- oder Integrity-Aktivierung vor dem
-  vollständigen A0.3b-Prototyp und einem zweiten ausdrücklichen Human-Go;
-  Option C ist ausgewählter Kandidat, noch keine Live-Implementierung
+- keine Migration, Shadow-Tabellen oder Generationenmetadaten in der
+  Produktdatenbank; A0.3c arbeitet ausschließlich mit Runtimebeweisen,
+  Fixtures und read-only erworbenen Kopien
+- keine produktive Shadow-, Catch-up-, Cutover-, Replay- oder
+  Integrity-Aktivierung vor vollständig grünem A0.3c und einem weiteren
+  ausdrücklichen Human-Go
+- kein SQLite-Versionsnachweis nur über das CLI; maßgeblich ist die vom
+  GENUS-Pythonprozess tatsächlich verwendete Bibliothek
 - kein Anchor v2, keine Signatur und kein privater Signaturschlüssel auf dem Pi
 - kein Production-Reseal; die angenommene Notfallausnahme ist technisch noch
   nicht erfüllbar
@@ -170,10 +183,9 @@ neuer Regexe, Sonderfälle oder Handler.
 
 ---
 
-**Nächster Blick:** A0.3b vergleicht Catch-up mit kurzer finaler Fence,
-begrenztes Dual-Write oder eine andere Generationstechnik, ohne eine davon
-vorwegzunehmen. Erst der innerhalb aller Budgets grüne Shadow-/Cutover-Prototyp
-und ein zweites Human-Go dürfen einen späteren Produkt-Cutover vorbereiten. Der
-Migration Runner bleibt bis zum vollständigen A0.3-Abschluss aufgeschoben.
-Read-only Messungen dürfen parallel laufen, öffnen aber keinen zweiten
-verändernden Produktpfad.
+**Nächster Blick:** A0.3c bestimmt und härtet die tatsächliche Python-SQLite-
+Runtime, führt die vollständigen Golden-/SQLite-Gates dort aus und verlangt drei
+konsekutive grüne Pi-Kopienläufe ohne Zwischentuning. Bis zu einem danach erneut
+ausdrücklich gebundenen Human-Go bleibt jede Live-Aktivierung gesperrt. Der
+Migration Runner bleibt bis zum vollständigen A0.3-Abschluss aufgeschoben;
+read-only Messungen öffnen keinen zweiten verändernden Produktpfad.

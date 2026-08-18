@@ -110,6 +110,7 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [A0-Wahrheitsfundament-Audit vom 2026-08-09](reports/2026-08-09-a0-foundation-audit.md)
 - [A0-Entscheidungspaket vom 2026-08-09](reports/2026-08-09-a0-decision-packet.md)
 - [A0.3a Measurement Harness und Pi-Baseline vom 2026-08-14](reports/2026-08-14-a0-3a-measurement-harness-baseline.md)
+- [A0.3b Shadow Generation & Atomic Cutover Prototype vom 2026-08-18](reports/2026-08-15-a0-3b-shadow-cutover-prototype.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 
@@ -131,6 +132,9 @@ Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und ve
 - [A0.3a Measurement und Topologie · menschlicher Entscheidungsbeleg](reviews/2026-08-14-a0-3a-topology-decision.md) —
   angenommene Pi-Budgets, verworfene Option B für den Livebetrieb und Auswahl
   von Option C als ausschließlich experimentell weiter zu beweisender Live-Kandidat.
+- [A0.3b Shadow Generation & Atomic Cutover · menschlicher Annahmebeleg](reviews/2026-08-18-a0-3b-prototype-acceptance.md) —
+  angenommener Option-C-/Mode-A-Prototyp mit Batchgröße 3072; Live-Aktivierung
+  bleibt bis zu A0.3c und einem weiteren Human-Go gesperrt.
 
 Reviews sind keine neue Wissensquelle und kein Trainingssignal. Sie bestätigen nur den
 exakten synthetischen Wortlaut, dessen Fall- und Antwort-Hash in derselben Zeile steht.

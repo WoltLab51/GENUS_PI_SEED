@@ -2,7 +2,7 @@
 
 > **Status:** aktuelle Zukunftsplanung
 >
-> **Stand:** 14. August 2026
+> **Stand:** 18. August 2026
 >
 > **Enthält:** Reihenfolge, Abhängigkeiten und Definition of Done – keine
 > Bauchronik und keine flüchtigen Live-Zahlen
@@ -36,6 +36,8 @@ A0.2 Golden Ledger + Oracle + historische SQLite-Fixture
                               └──> A0.1a read-only Schemaerkennung
                                          └──> A0.1b Startup Fail-Closed
 A0.1b + A0.2 ──> A0.3a B/C-Messung ──> A0.3b Shadow-/Cutover-Prototyp
+                  └────────────────────> A0.3c Runtime/Live-Readiness
+                                               └──> separates Human Live-Go
 
 A0.1 + A0.2 + A0.3 ──> Migration Runner nur auf Kopien
 A0.2 ──> A0.4 Custody-/Anchor-v2-Vertrag ──> Witness ──> Signatur
@@ -54,9 +56,10 @@ aber nicht als Produktpfad geöffnet werden, bevor seine Abhängigkeiten grün s
 
 ## A0 · Wahrheitsfundament vor Migration
 
-**Status:** einziger mergefähiger aktiver Produktpfad; A0.2, A0.1a, A0.1b und
-A0.3a sind vollständig abgeschlossen. A0.3b Shadow Generation & Atomic Cutover
-Prototype ist der aktive Schritt.
+**Status:** einziger mergefähiger aktiver Produktpfad; A0.2, A0.1a, A0.1b,
+A0.3a und der A0.3b-Prototyp sind vollständig abgeschlossen. A0.3c Runtime
+Prerequisite & Live Readiness ist der aktive Schritt. Live-Aktivierung bleibt
+gesperrt.
 
 **Ziel:** Bevor GENUS Schema, Replay, Integrity, Seals oder Anchors verändert,
 besitzt es eine unabhängige semantische Beweisbasis, explizite
@@ -198,22 +201,34 @@ aber für Wartung mit gestoppten Writern, Kopien, Migrationstests und
 forensische/offline Prüfungen zulässig. Option C ist der verbindliche
 Live-Kandidat.
 
-#### A0.3b · Shadow Generation & Atomic Cutover Prototype — aktiv
+#### A0.3b · Shadow Generation & Atomic Cutover Prototype — abgeschlossen
 
-**Abhängigkeit:** A0.3a ist menschlich angenommen. A0.2 liefert Golden Oracle
-und historische Fixture; A0.1a/A0.1b erkennen und verweigern falsche
-Schemaformen. Ein verändernder Migration Runner und jeder produktive Cutover
-warten auf den A0.3b-Beweis und ein weiteres Human-Go.
+Der unveränderte
+[Prototypreport](reports/2026-08-15-a0-3b-shadow-cutover-prototype.md) und der
+getrennte
+[menschliche Annahmebeleg](reviews/2026-08-18-a0-3b-prototype-acceptance.md)
+sind angenommen. Option C mit Final-Sync Mode A und Batchgröße 3072 bestand den
+lokalen 1M-Lauf und einen auditierten Pi-Produktkopienlauf. Im Pi-Lauf lagen
+Build bei `169.746161856 s`, Peak RSS bei `42303488 B`, WAL bei `19994392 B`,
+die längste Schreibtransaktion bei `1.656518293 s`, der finale Fence bei
+`0.008216829 s` und Recovery bei `0.460784818 s`. Alle zwölf Projektionen und
+neun Sequenzen stimmten; das Ledger blieb unverändert, und es gab keinen
+Fallback.
 
-**Arbeit:** Versionierte aktive und Shadow-Projektionen gleichzeitig betreiben.
-G2 wird über den bounded Eventstrom bis zu einem festen H0 aufgebaut und
-vollständig geprüft. Während normale Writer weiterlaufen, zieht G2 Events nach
-H0 nach. Eine höchstens 2,0 s lange finale Writer-Grenze erfasst H*, zieht den
-letzten Tail nach und schaltet atomar G1 → G2. Catch-up mit kurzer Fence,
-begrenztes Dual-Write und andere Generationstechniken werden experimentell
-verglichen; keine davon ist vorab gewählt.
+Der vorherige rote 4096er Pi-Lauf mit einer `2.167361215 s` langen
+Schreibtransaktion bleibt Teil der Messgeschichte. Die Annahme gilt nur für den
+Prototyp gegen Fixtures, synthetische Ledger und Produktdatenbankkopien. Sie ist
+kein Live-Go.
 
-**Definition of Done**
+**Abgeschlossener Beweis:** Versionierte aktive und Shadow-Projektionen bestehen
+gleichzeitig. G2 wird über den bounded Eventstrom bis zu einem festen H0
+aufgebaut und vollständig geprüft. Während normale Writer weiterlaufen, zieht
+G2 Events nach H0 nach. Eine kurze finale Writer-Grenze erfasst H*, zieht den
+letzten Tail nach und schaltet atomar G1 → G2. Mode A ist der angenommene
+Prototyppfad; Mode B bleibt ein explizit geprüfter Fault-/Recovery-Pfad und kein
+automatischer Fallback.
+
+**Erfüllte Definition of Done**
 
 - G1 und G2 bestehen versioniert gleichzeitig; Reader sehen vor Cutover
   ausschließlich die vollständige aktive G1
@@ -233,12 +248,57 @@ verglichen; keine davon ist vorab gewählt.
 - Projector-/Oracle-/Validierungsfehler, ungültiges Event, konkurrierende
   Reader/Writer, Long-Reader/WAL-Pinning, ENOSPC und produktgroßer Kill sind
   fault-injected
-- ein Shadow-/Scratch-Speicherplatzbudget wird aus der Messung abgeleitet und
-  vor einer Live-Auswahl menschlich angenommen
+- ein Shadow-/Scratch-Speicherplatzbudget wurde als Messvorschlag abgeleitet;
+  seine menschliche Annahme bleibt vor jedem Live-Go offen
 - Cleanup-/Rollbackvertrag bewahrt die alte Generation bis zur nachgewiesenen
   neuen Gültigkeit
 - der bestehende produktive Replay-/Integrity-Pfad bleibt unverändert; kein
   Live-Cutover ohne getrenntes Human-Go
+
+#### A0.3c · Runtime Prerequisite & Live Readiness — aktiv
+
+**Abhängigkeit:** Der A0.3b-Prototyp ist menschlich angenommen, aber nicht live
+autorisiert. Die derzeit für GENUS auf dem Pi verwendete Python-Runtime meldet
+SQLite 3.46.1 und damit keine nachweislich WAL-reset-sichere Version.
+Produktreader und Produktwriter sind weiterhin nicht generation-aware.
+
+**Arbeit:** Den exakten Python-Executable- und Environment-Pfad der betroffenen
+GENUS-Prozesse bestimmen, einen reproduzierbaren Installations- und
+Rollbackpfad auf eine WAL-reset-sichere SQLite-Runtime festlegen und die
+tatsächlich geladene Bibliothek über `sqlite3.sqlite_version` nachweisen. Unter
+genau dieser Runtime folgen die vollständige Suite, die A0.2-Golden-/SQLite-
+Gates und ein konsekutiver Pi-Kopienbeweis. A0.3c erzeugt keine Shadow-Tabellen
+in der Produktdatenbank und führt keinen produktiven Cutover aus.
+
+**Definition of Done**
+
+- `sys.executable`, `sqlite3.sqlite_version` und
+  `sqlite3.sqlite_version_info` stammen aus demselben Pythonpfad und Environment
+  wie der jeweilige GENUS-Prozess; die `sqlite3`-CLI-Version ist kein Ersatz
+- die Runtime enthält nachweislich den WAL-reset-Fix; Ziel ist eine aktuelle
+  3.53.x-Linie, die normale fail-closed Mindestgrenze ist
+  `sqlite3.sqlite_version_info >= (3, 51, 3)`
+- Installations-, Pinning-, Verifikations- und Rollbackpfad sind reproduzierbar
+- vollständige GENUS-Suite und A0.2-Golden-/SQLite-Gates sind unter genau dieser
+  Runtime grün
+- mindestens drei aufeinanderfolgende Läufe verwenden jeweils eine frische,
+  read-only erworbene Pi-Produktdatenbankkopie, denselben Kandidaten, dieselbe
+  Runtime, dieselben Gates und Batchgröße 3072; zwischen den Läufen gibt es kein
+  Tuning und keine Code- oder Konfigurationsänderung
+- jeder der drei Läufe hält einzeln höchstens 2,0 s je Schreibtransaktion und
+  finalem Fence, null Writer-Timeouts, keine Starvation, höchstens 256 MiB RSS
+  und WAL, höchstens 180 s Build sowie höchstens 10 s Recovery
+- jeder Lauf beweist 12/12 Projektionsdigests, 9/9 Sequenzzustände,
+  unverändertes Ledger, ausschließlich vollständig alten oder vollständig neuen
+  Zustand sowie Mode A ohne Fallback
+- ein roter Lauf setzt die konsekutive Serie zurück; Retuning eröffnet einen
+  neuen Messkandidaten und ist kein stiller Fallback
+- Shadow-/Scratch-Platz, vollständige Backup-Kopie und Betriebsreserve besitzen
+  vor einem Live-Go ein getrennt menschlich angenommenes Speicherbudget; der
+  512-MiB-Vorschlag aus A0.3b ist noch nicht verbindlich
+- A0.3c endet mit einem gebundenen Readiness-Receipt und stoppt vor
+  Produktintegration; jede Live-Aktivierung braucht ein weiteres ausdrückliches
+  Human-Go
 
 ### A0.4 · Externes Anchor-Vertrauen und erklärbare Reparatur
 
@@ -495,9 +555,11 @@ Wenn eine Antwort fehlt, ist der Schritt nicht klein genug oder noch nicht reif.
 
 ---
 
-**Aktive Baulinie:** A0.2, A0.1a, A0.1b und A0.3a sind vollständig
-abgeschlossen. A0.3b Shadow Generation & Atomic Cutover Prototype ist jetzt der
-einzige mergefähige Produktpfad; erst nach vollständigem A0.3-Abschluss folgt
-der Migration Runner nur gegen Kopien. H1.2 bleibt Produktziel, ist aber kein
-paralleler mergefähiger Pfad. Rein read-only Messungen und die isolierte
-nichtproduktive Lernlinie dürfen nach Regel 1 weiterlaufen.
+**Aktive Baulinie:** A0.2, A0.1a, A0.1b, A0.3a und der angenommene
+A0.3b-Prototyp sind vollständig abgeschlossen. A0.3c Runtime Prerequisite &
+Live Readiness ist jetzt der einzige mergefähige Produktpfad; Live-Aktivierung
+bleibt bis zu einem weiteren ausdrücklichen Human-Go gesperrt. Erst nach
+vollständigem A0.3-Abschluss folgt der Migration Runner nur gegen Kopien. H1.2
+bleibt Produktziel, ist aber kein paralleler mergefähiger Pfad. Rein read-only
+Messungen und die isolierte nichtproduktive Lernlinie dürfen nach Regel 1
+weiterlaufen.
