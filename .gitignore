@@ -5,6 +5,12 @@ __pycache__/
 *.sqlite3-wal
 *.sqlite3-shm
 .venv/
+
+# A0.3c: Legacy-Venv-Sicherung der Runtime-Migration liegt aus
+# Atomaritaetsgruenden neben dem Pointer im selben Dateisystem. Ohne diesen
+# Eintrag waere sie untracked und wuerde das exakt-clean-Gate des Boot-Guards
+# dauerhaft brechen (Dienste starten dann auch nach Reboot nicht mehr).
+.venv.a03c-legacy-*
 build/
 dist/
 *.egg-info/

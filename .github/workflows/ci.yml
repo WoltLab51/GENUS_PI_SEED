@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - name: Check out repository
@@ -32,8 +32,8 @@ jobs:
 
       - name: Static correctness and dependency consistency
         run: |
-          python -m compileall -q genus deploy
-          ruff check genus deploy tests
+          python -m compileall -q genus deploy experiments
+          ruff check genus deploy experiments tests
           python -m pip check
 
       - name: Validate deployment shell syntax

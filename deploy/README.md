@@ -21,6 +21,7 @@ Weiterführend: [Betriebsübersicht](../docs/operations/README.md) ·
 | von Windows aus aktualisieren | [Deploy von Windows](#deploy-von-windows) |
 | direkt auf dem Pi aktualisieren | [Deploy auf dem Pi](#deploy-auf-dem-pi) |
 | konservativ mit Backup und Rollback aktualisieren | [Manuelles Safe-Update](#manuelles-safe-update) |
+| die A0.3c-Runtime vorbereiten und prüfen | [A0.3c-Runtime und Live-Readiness](#a03c-runtime-und-live-readiness) |
 | vom Handy diagnostizieren | [Kompakter Status](#kompakter-status) |
 | privaten Fernzugriff einrichten | [Tailscale-Runbook](../docs/operations/REMOTE_ACCESS.md) |
 | den Dauerbetrieb aktivieren | [Cron-Rhythmus](#cron-rhythmus) |
@@ -185,6 +186,369 @@ den sauberen Branch `main` und einen Fast-Forward von `origin/main`. Tests laufe
 ein roter Test oder Healthcheck stellt den vorherigen Commit mit `git reset --keep` wieder her.
 Ledger und Konfiguration werden beim Rollback weder ersetzt noch gelöscht. Vollständiger Vertrag
 und Live-Befund: [Pi-Remote-Update-Audit](../docs/reports/2026-07-19-pi-remote-update-audit.md).
+
+## A0.3c-Runtime und Live-Readiness
+
+A0.3c trennt die **Runtime-Bereitstellung** von ihrer **Aktivierung** und beide
+von einem späteren A0.3b-Live-Cutover. Das Verfahren darf weder Shadow-Tabellen
+in der Produktdatenbank erzeugen noch Produktreader oder -writer umschalten.
+Auch eine vollständig grüne Readiness-Serie ist deshalb noch kein Live-Go.
+
+Der Runtime-Kandidat ist vollständig gepinnt:
+
+| Bestandteil | Gebundener Wert |
+| --- | --- |
+| CPython | `3.13.15`, Archiv `Python-3.13.15.tar.xz` |
+| CPython SHA-256 | `1e66a7945a48390ee4c2a4268a0e4185884059a13c4aab6d148aa208deea4a76` |
+| SQLite | `3.53.4`, Archiv `sqlite-autoconf-3530400.tar.gz` |
+| SQLite SHA3-256 | `454e45f61c6bd75b7420e7190732dea03ce6639c63ada47bbc592f67fc340338` |
+| SQLite Source ID | `2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc` |
+| installierte Runtime | `/opt/genus/runtime/cpython-3.13.15-sqlite-3.53.4` |
+
+[`pi_a0_3c_runtime.sh`](pi_a0_3c_runtime.sh) prüft nicht die Version des
+`sqlite3`-CLI, sondern `sys.executable`, `sqlite3.sqlite_version` und
+`sqlite3.sqlite_version_info` im tatsächlich gestarteten Python. Das normale
+Gate bleibt fail-closed unter SQLite `3.51.3`; dieser Kandidat muss exakt
+`3.53.4` und die gebundene Source ID melden.
+Der Operator bleibt der normale Pi-Login; nur die Installation in den
+root-eigenen `/opt/genus/runtime`-Prefix überschreitet eng die `sudo`-Grenze.
+Runtime-State und beide Venvs bleiben Eigentum des unprivilegierten Logins.
+
+### Runtime-Sets und beide Venvs
+
+Jeder Stage-Lauf bindet Runtime-Pins und aufgelöste Requirements in eine
+deterministische Manifest-ID. Die ID wird vom Skript berechnet und wird nicht
+von Hand erfunden. Ein Set liegt unter
+`/home/ronny/.genus/runtime-a0.3c/sets/<manifest>/` und enthält getrennt:
+
+- `core`: das produktive GENUS-Venv;
+- `embed`: das Embedder-Venv.
+
+Genau ein atomar ausgetauschter Symlink
+`/home/ronny/.genus/runtime-a0.3c/active` wählt beide Venvs gemeinsam aus. Die
+vorhandenen Aufrufpfade bleiben kompatibel: Die realen Pointer-Verzeichnisse
+`/home/ronny/GENUS_PI_SEED/.venv` und `/home/ronny/.genus/embed-venv` besitzen
+je einen `current`-Link auf `.../active/core` beziehungsweise
+`.../active/embed`; `bin`, `lib`, `include` und `pyvenv.cfg` verweisen von dort
+auf das aktive Venv. Das beim ersten Stage vorgefundene Venv-Paar wird als
+Legacy-Set gebunden, damit ein Runtime-Rollback keinen Code- oder
+Ledger-Rollback benötigt.
+
+### Stufe 1: stage, Gates und Readiness-Manifest
+
+Auf dem exakt sauberen Pi-Checkout zuerst nur bereitstellen und prüfen. `stage`
+ist bewusst **zweiphasig**: Der erste Aufruf baut die gepinnte Runtime und lädt
+alle Artefakte, hält dann aber an, *bevor* fremder Build-Code läuft, und druckt
+die Supply-Versiegelung. Erst ein zweiter Aufruf mit exakt dieser Versiegelung
+autorisiert den Wheel-Bau.
+
+```bash
+cd /home/ronny/GENUS_PI_SEED
+EXPECTED_COMMIT="$(git rev-parse HEAD)"
+./deploy/pi_a0_3c_runtime.sh status
+
+# Phase 1 baut Runtime und Artefakte und endet planmäßig mit Status 78 sowie
+# der Zeile "[A0.3c] SUPPLY_SEAL=<64 Hexzeichen>" auf der Fehlerausgabe.
+./deploy/pi_a0_3c_runtime.sh stage
+
+# Phase 2 gibt genau diese Versiegelung frei und liefert die Manifest-ID auf
+# der Standardausgabe.
+MANIFEST_ID="$(./deploy/pi_a0_3c_runtime.sh stage <SUPPLY_SEAL aus Phase 1>)"
+./deploy/pi_a0_3c_runtime.sh status --json
+./deploy/pi_a0_3c_runtime.sh verify "$MANIFEST_ID"
+```
+
+`stage` baut die gepinnte Runtime und beide versionierten Venvs und gibt auf
+Standardausgabe ausschließlich die deterministisch berechnete Set-Manifest-ID
+aus. Es ändert weder `active` noch das vorhandene `.venv` oder einen laufenden
+Prozess. `status --json` macht Kandidat und aktives Set getrennt
+maschinenlesbar. `verify [<manifest>|active|staged]` prüft Runtime, Manifest,
+Venv-Ziele und Abhängigkeiten ohne Aktivierung.
+
+Beide Phasen brauchen `sudo` — für den apt-Bootstrap am Anfang und für die
+root-eigene Veröffentlichung nach `/opt` am Ende. Dazwischen liegt der lange
+unprivilegierte Übersetzungslauf, in dem die sudo-Freigabe ablaufen und die
+nächste Root-Stufe nach einem Passwort fragen kann. `stage` gehört deshalb in
+eine interaktive Sitzung mit wachgehaltener Freigabe, etwa:
+
+```bash
+sudo -v && ( while sleep 60; do sudo -n true || exit; done ) &
+KEEPALIVE=$!
+./deploy/pi_a0_3c_runtime.sh stage; kill "$KEEPALIVE"
+```
+
+**Lieferkette: Wheel vor Quelle.** Der Akquirierer bevorzugt ein bereits
+veröffentlichtes Wheel, sobald dessen Tags zur Zielplattform passen, und nimmt
+die sdist nur als Rückfall. Das ist keine Bequemlichkeit, sondern notwendig:
+Die netzlose Build-Sandbox besitzt weder `rustc` noch Zugang zu crates.io,
+weshalb Rust-Erweiterungen wie `tokenizers`, `py_rust_stemmers` und `hf-xet`
+dort grundsätzlich nicht aus Quelle baubar sind — ihre manylinux-Wheels sind
+zugleich exakt die Artefakte, die der Pi heute schon ausführt. Die
+Herkunftsbindung bleibt für Wheel und sdist identisch: fester Index, feste
+Datei-Origin `files.pythonhosted.org` und der vom Index ausgewiesene SHA-256.
+Akzeptiert werden nur `manylinux`-Wheels der Zielarchitektur, deren
+glibc-Untergrenze das System erfüllt, sowie reine Python-Wheels; `musllinux`,
+fremde Architekturen und zu junge Interpreter-Tags fallen fail-closed heraus.
+Aus dem heutigen Pin-Satz bleibt genau `llama_cpp_python` ein Quellbau, dessen
+Backends offline im Wheelhouse liegen und dessen `cmake`/`ninja` aus dem
+apt-Bootstrap kommen.
+
+Die drei festen Gates laufen direkt unter dem noch nicht aktiven
+Kandidaten-Python. Jeder Aufruf bindet zusätzlich den lexikalisch erwarteten
+Aufrufpfad; freie Testkommandos sind keine A0.3c-Gate-Evidenz:
+
+```bash
+CANDIDATE_CORE_PY="/home/ronny/.genus/runtime-a0.3c/sets/$MANIFEST_ID/core/bin/python"
+READINESS_ID="$EXPECTED_COMMIT-$(date -u +%Y%m%dT%H%M%SZ)"
+EVIDENCE_ROOT="/home/ronny/.genus/a0.3c/readiness/$READINESS_ID"
+install -d -m 700 "$EVIDENCE_ROOT"
+umask 077
+mkdir -m 700 "$EVIDENCE_ROOT/scratch-full-suite"
+mkdir -m 700 "$EVIDENCE_ROOT/scratch-a0-2-golden"
+mkdir -m 700 "$EVIDENCE_ROOT/scratch-a0-2-historical-sqlite"
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c gate \
+  --gate full_suite --candidate-commit "$EXPECTED_COMMIT" \
+  --scratch-root "$EVIDENCE_ROOT/scratch-full-suite" \
+  --receipt "$EVIDENCE_ROOT/full-suite.json" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c gate \
+  --gate a0_2_golden --candidate-commit "$EXPECTED_COMMIT" \
+  --scratch-root "$EVIDENCE_ROOT/scratch-a0-2-golden" \
+  --receipt "$EVIDENCE_ROOT/a0-2-golden.json" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c gate \
+  --gate a0_2_historical_sqlite --candidate-commit "$EXPECTED_COMMIT" \
+  --scratch-root "$EVIDENCE_ROOT/scratch-a0-2-historical-sqlite" \
+  --receipt "$EVIDENCE_ROOT/a0-2-historical-sqlite.json" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+```
+
+Danach bindet derselbe Kandidatenpfad Commit, exakten Runtime-Fingerprint,
+A0.3b-/A0.3c-Code und die drei grünen Gate-Receipts in das externe private
+Readiness-Manifest. Die getrennte Verifikation muss vor jeder Aktivierung grün
+sein:
+
+```bash
+MANIFEST_JSON="$EVIDENCE_ROOT/manifest.json"
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c manifest-create \
+  --candidate-commit "$EXPECTED_COMMIT" \
+  --full-suite-receipt "$EVIDENCE_ROOT/full-suite.json" \
+  --a0-2-golden-receipt "$EVIDENCE_ROOT/a0-2-golden.json" \
+  --a0-2-historical-sqlite-receipt "$EVIDENCE_ROOT/a0-2-historical-sqlite.json" \
+  --receipt "$MANIFEST_JSON" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c manifest-verify \
+  --manifest "$MANIFEST_JSON" \
+  --receipt "$EVIDENCE_ROOT/manifest-verify-candidate.json" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+```
+
+Alle Evidence-Ziele müssen neu und außerhalb des Checkouts liegen. Ein rotes
+Gate, ein unsauberer Worktree oder ein abweichender Invocation-Pfad stoppt
+geschlossen; weder einen teilweise gebauten Set-Pfad noch einen selbst
+gewählten Symlink als Ersatz aktivieren.
+
+### Stufe 2: Drei journalgebundene Pi-Kopienläufe
+
+Die Serie ist Readiness-Evidenz und läuft deshalb **vor** jeder Aktivierung
+unter genau dem Kandidatenpfad aus Stufe 1 — der Produktpfad bleibt dabei
+unangetastet, und ein grüner Abschluss ist weiterhin kein Live-Go.
+
+Das append-only Serienjournal besitzt einen eigenen frischen Root. Seine
+externe Init-Kopie und alle Datenbankkopien liegen als Geschwister außerhalb;
+im Journal-Root selbst erzeugt der CLI ausschließlich `series-init.json` und
+das Verzeichnis `journal/`:
+
+```bash
+SERIES_PARENT="/home/ronny/.genus/a0.3c/series/$READINESS_ID"
+JOURNAL_ROOT="$SERIES_PARENT/journal-root"
+SERIES_INIT_COPY="$SERIES_PARENT/series-init-receipt.json"
+FINAL_SERIES_RECEIPT="$SERIES_PARENT/final-series.json"
+install -d -m 700 /home/ronny/.genus/a0.3c/series
+mkdir -m 700 "$SERIES_PARENT"
+mkdir -m 700 "$JOURNAL_ROOT"
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c series-init \
+  --root "$JOURNAL_ROOT" \
+  --manifest "$MANIFEST_JSON" \
+  --receipt "$SERIES_INIT_COPY" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+INTERNAL_SERIES_INIT="$JOURNAL_ROOT/series-init.json"
+```
+
+Jeder `acquire`-Aufruf öffnet die Produktdatenbank read-only und legt zwei
+Arbeitskopien in einem neuen privaten Root an. Core-ID und Anchor-Verzeichnis
+werden begrenzt gelesen; genau ein vorhandener gültiger Anchor wird privat in
+der Kopienevidenz gebunden. Die drei Acquisition-Roots sind Geschwister des
+Journal-Roots, niemals dessen Kinder. In derselben dafür vorbereiteten
+Maintenance-Shell:
+
+```bash
+set -Eeuo pipefail
+umask 077
+for SEQUENCE in 1 2 3; do
+  ACQUISITION_ROOT="$(mktemp -d "$SERIES_PARENT/acquisition-$SEQUENCE.XXXXXX")"
+  "$CANDIDATE_CORE_PY" -m experiments.a0_3c acquire \
+    --source /home/ronny/.genus/genus.sqlite3 \
+    --core-id-file /home/ronny/.genus/core_id \
+    --anchor-dir /home/ronny/.genus/anchors \
+    --root "$ACQUISITION_ROOT" \
+    --manifest "$MANIFEST_JSON" \
+    --receipt "$ACQUISITION_ROOT/acquisition.json" \
+    --expected-invocation "$CANDIDATE_CORE_PY"
+  "$CANDIDATE_CORE_PY" -m experiments.a0_3c run \
+    --root "$ACQUISITION_ROOT" \
+    --manifest "$MANIFEST_JSON" \
+    --acquisition "$ACQUISITION_ROOT/acquisition.json" \
+    --series-root "$JOURNAL_ROOT" \
+    --series-init "$INTERNAL_SERIES_INIT" \
+    --sequence "$SEQUENCE" \
+    --receipt "$ACQUISITION_ROOT/run.json" \
+    --expected-invocation "$CANDIDATE_CORE_PY"
+done
+```
+
+Ein roter oder abgebrochener Run beendet die Maintenance-Shell. Für den neuen
+Versuch bleiben Journal und alte Kopienevidenz erhalten; mit drei neuen
+Acquisition-Roots wieder bei Sequenz 1 beginnen. Der Journalvertrag schließt
+den alten Versuch als Reset und akzeptiert nur die jüngste, exakt konsekutive
+grüne Folge 1, 2, 3. Code, Runtime, Manifest, Konfiguration und Tuning bleiben
+dabei unverändert.
+
+Das abschließende Receipt liegt ebenfalls außerhalb des Journal-Roots. Der CLI
+liest ausschließlich die vollständige Journal-Kette; einzelne `--run`-Dateien
+können nicht ausgewählt oder ausgelassen werden:
+
+```bash
+"$CANDIDATE_CORE_PY" -m experiments.a0_3c verify-series \
+  --manifest "$MANIFEST_JSON" \
+  --series-root "$JOURNAL_ROOT" \
+  --series-init "$INTERNAL_SERIES_INIT" \
+  --receipt "$FINAL_SERIES_RECEIPT" \
+  --expected-invocation "$CANDIDATE_CORE_PY"
+```
+
+Jeder Lauf verwendet Mode A und Batchgröße 3072 und muss alle A0.3c-Budgets
+einzeln erfüllen: höchstens 2,0 Sekunden je Schreibtransaktion und finalem
+Fence, null Writer-Timeouts und keine Starvation, höchstens 256 MiB Peak RSS
+und WAL, höchstens 180 Sekunden Build sowie höchstens 10 Sekunden Recovery;
+außerdem 12/12 Projektionsdigests, 9/9 Sequenzzustände, unverändertes Ledger,
+nur vollständig alten oder vollständig neuen Zustand und keinen Fallback.
+
+Nach grüner Serie bleiben Shadow-/Scratch-Platz, vollständige Backup-Kopie und
+Betriebsreserve eine getrennte menschliche Speicherbudgetentscheidung; der
+frühere 512-MiB-Vorschlag ist nicht automatisch angenommen. A0.3c endet mit
+einem gebundenen Readiness-Receipt. Shadow-Aufbau, Catch-up, Cutover und jede
+Produktintegration bleiben bis zu einem weiteren ausdrücklichen **Human
+Live-Go** gesperrt.
+
+### Stufe 3: Runtime aktivieren und produktiven Prozesspfad beweisen
+
+Erst nach den grünen Kandidaten-Gates darf genau dieses Set als
+**Python-/SQLite-Runtime** aktiviert werden. Commit, externes Readiness-Manifest
+und Set-Manifest-ID sind drei getrennte Pflichtbindungen:
+
+```bash
+./deploy/pi_a0_3c_runtime.sh activate \
+  "$EXPECTED_COMMIT" "$MANIFEST_JSON" "$MANIFEST_ID"
+./deploy/pi_a0_3c_runtime.sh status
+./deploy/pi_a0_3c_runtime.sh verify active
+```
+
+`activate` verifiziert das Readiness-Manifest erneut unter dem Set-Python,
+erzeugt ein frisches geprüftes Ledger-Backup samt Konfigurationsinventar,
+pausiert und stoppt Cron, Watchdog, Learner und Bot kontrolliert und verweigert
+alte Runtime- oder Datenbank-Handles. Erst dann tauscht es den gemeinsamen
+`active`-Selector atomar und startet ausschließlich die zuvor aktiven Prozesse.
+Core und Embedder werden nie einzeln gemischt.
+
+Nach dem Wechsel müssen Runtime-Identität und Manifest erneut über genau den
+stabilen Pfad grün sein, den die produktiven GENUS-Einstiege verwenden:
+
+```bash
+ACTIVE_CORE_PY="/home/ronny/GENUS_PI_SEED/.venv/bin/python"
+ACTIVE_GENUS="/home/ronny/GENUS_PI_SEED/.venv/bin/genus"
+"$ACTIVE_CORE_PY" -m experiments.a0_3c identity \
+  --receipt "$EVIDENCE_ROOT/active-identity.json" \
+  --expected-invocation "$ACTIVE_CORE_PY"
+"$ACTIVE_CORE_PY" -m experiments.a0_3c manifest-verify \
+  --manifest "$MANIFEST_JSON" \
+  --receipt "$EVIDENCE_ROOT/manifest-verify-active.json" \
+  --expected-invocation "$ACTIVE_CORE_PY"
+```
+
+Der Script-Postflight verlangt drei aufeinanderfolgende stabile Dienstproben,
+attestiert den privaten Bot-Runtimepfad sowie den gepinnten Learner-Einstieg und
+schreibt private Receipts unter
+`/home/ronny/.genus/runtime-a0.3c/receipts/`. Das abschließende
+`genus-a0.3c-runtime-activation-v2`-Receipt bindet insbesondere:
+
+- das frische Backup-Receipt;
+- Readiness-Manifest und dessen Kandidaten-Verifikation;
+- das Identitäts-Receipt der dann aktiven Runtime;
+- den Dienst-Postflight und seinen Zustands-Hash;
+- Commit sowie vorheriges und aktiviertes Set-Manifest mit Pfad und Hash;
+- falls vorhanden das Operator-Reauthorization-Receipt.
+
+Diese Aktivierung ändert nur Python/SQLite und beide Venv-Selectoren. Sie
+aktiviert **keine** A0.3b-Shadow-Generation, keinen Catch-up und keinen Cutover.
+
+Doctor, Integrity und Seal-Verifikation dürfen während dieses Schritts nicht
+gegen die aktive WAL-Produktdatenbank laufen. Der Aktivierungslauf legt seinen
+Snapshot selbst an und protokolliert dessen Pfad **nicht** im Log, sondern
+ausschließlich im Backup-Receipt unter
+`/home/ronny/.genus/runtime-a0.3c/receipts/backup-*.json`. Von dort wird der
+Pfad gelesen; die schweren Gates laufen ausschließlich gegen diese bereits
+verifizierte Kopie:
+
+```bash
+BACKUP_RECEIPT="$(ls -1t /home/ronny/.genus/runtime-a0.3c/receipts/backup-*.json | head -1)"
+VERIFIED_BACKUP="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ledger_path"])' "$BACKUP_RECEIPT")"
+test -f "$VERIFIED_BACKUP" && test ! -L "$VERIFIED_BACKUP"
+GENUS_DB_PATH="$VERIFIED_BACKUP" "$ACTIVE_GENUS" doctor
+GENUS_DB_PATH="$VERIFIED_BACKUP" "$ACTIVE_GENUS" integrity check
+GENUS_DB_PATH="$VERIFIED_BACKUP" "$ACTIVE_GENUS" ledger verify
+```
+
+Die produktive Datei `/home/ronny/.genus/genus.sqlite3` ist für diese drei
+Kommandos ausdrücklich kein zulässiges Ziel. Scheitern Runtime-Aktivierung,
+Prozessidentität, Dienst-Postflight oder diese Backup-Healthchecks, wird nur auf
+das gebundene vorherige Runtime-Set zurückgeschaltet:
+
+```bash
+./deploy/pi_a0_3c_runtime.sh rollback "$EXPECTED_COMMIT"
+./deploy/pi_a0_3c_runtime.sh status
+./deploy/pi_a0_3c_runtime.sh verify active
+```
+
+Rollback verändert weder `main` noch die Produktdatenbank und führt kein
+Reseal aus. Ein fehlendes oder nicht vollständig gebundenes Legacy-Set ist ein
+Abbruchsignal. Ein roter späterer Kopienlauf blockiert dagegen die
+Readiness-Serie, löst aber nicht automatisch einen Runtime-Rollback aus.
+
+### Update-Lifecycle: `reauthorize`
+
+Nach einer Aktivierung bindet der Boot-Guard jeden Dienststart an den freigegebenen
+Commit und einen exakt sauberen Checkout — ein gewöhnlicher Fast-Forward auf
+`main` würde die Units also beim nächsten Start aussperren. Genau dafür gibt es
+`reauthorize`:
+
+```bash
+./deploy/pi_a0_3c_runtime.sh reauthorize "$ALTER_COMMIT" "$NEUER_COMMIT"
+```
+
+Der Aufruf akzeptiert ausschließlich einen sauberen Fast-Forward, dessen Diff
+nur nicht live-importierbare Pfade berührt (`deploy/pi_a0_3c_runtime.sh`,
+`deploy/README.md`, `docs/`, `tests/`, `experiments/`, `.github/`,
+`README*`, `CONTRIBUTING.md`). Er schreibt ein Receipt und einen Token, der
+**genau einen** nachfolgenden `stage`-plus-`activate`-Durchgang autorisiert;
+ein `rollback` ist unter Reauthorisierung ausdrücklich gesperrt. Die
+Boot-Freigabe bleibt dabei bewusst auf dem alten Stand: Wer zwischen
+Reauthorisierung und Aktivierung neu startet, findet die Dienste fail-closed
+statt halb umgestellt vor.
+
+Berührt ein Fast-Forward dagegen `genus/`, `schema.sql` oder andere produktiv
+importierte Pfade, ist er kein A0.3c-Update, sondern eine Produktänderung — er
+läuft dann über den normalen Deploypfad und eine erneute menschliche Freigabe.
 
 ## Kompakter Status
 

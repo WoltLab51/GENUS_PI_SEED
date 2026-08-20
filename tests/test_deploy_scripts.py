@@ -145,6 +145,34 @@ def test_cron_directly_invoked_scripts_are_executable_in_git():
             f"(nicht ausfuehrbar) -> der Tick scheitert still mit Permission denied")
 
 
+def test_documented_directly_invoked_scripts_are_executable_in_git():
+    # Gleiche Klasse, weiterer Kreis (Fund 2026-08-20): Der Cron ist nicht der einzige
+    # Ort, an dem ein Skript DIREKT via ./deploy/x.sh aufgerufen wird -- das Betriebs-
+    # handbuch tut es auch, und ein dort dokumentierter Aufruf scheitert mit dem
+    # gleichen stillen "Permission denied". Der Waechter deckt deshalb auch die
+    # Handbuch-Aufrufe ab. Die negativen Lookbehinds halten `bash ./deploy/...` und
+    # Markdown-Links wie `../../deploy/x.sh` heraus -- beide sind keine Direktaufrufe.
+    handbuch = (ROOT / "deploy" / "README.md").read_text(encoding="utf-8")
+    direkt = set(re.findall(r"(?<!bash )(?<![\w.])\./deploy/([A-Za-z0-9_.-]+\.sh)", handbuch))
+    assert {"pi_a0_3c_runtime.sh", "pi_install_telegram_bot.sh"} <= direkt
+
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git nicht verfuegbar")
+    out = subprocess.run([git, "ls-files", "-s", "--", "deploy"],
+                         cwd=ROOT, capture_output=True, text=True)
+    if out.returncode != 0:
+        pytest.skip("kein git-Checkout")
+    modus = {}
+    for zeile in out.stdout.splitlines():
+        teil, _, pfad = zeile.partition("	")
+        modus[Path(pfad).name] = teil.split()[0]
+    for skript in sorted(direkt):
+        assert modus.get(skript) == "100755", (
+            f"{skript} wird im Handbuch direkt aufgerufen, ist im git aber {modus.get(skript)} "
+            f"(nicht ausfuehrbar) -> der Aufruf scheitert still mit Permission denied")
+
+
 def test_news_membrane_fetches_headlines_to_a_buffer_at_the_edge():
     script = (ROOT / "deploy" / "observe_news.sh").read_text(encoding="utf-8")
 
