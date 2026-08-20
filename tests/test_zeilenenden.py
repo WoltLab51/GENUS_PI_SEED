@@ -97,8 +97,9 @@ def test_byte_verglichene_artefakte_liegen_im_arbeitsbaum_als_lf():
         if not datei.exists():
             continue
         assert b"\r" not in datei.read_bytes(), (
-            f"{pfad} liegt im Arbeitsbaum mit CR -- nach dem Setzen des Attributs muss die "
-            f"Datei neu materialisiert werden (`git rm --cached -r . && git checkout -- .`)"
+            f"{pfad} liegt im Arbeitsbaum mit CR -- ein neu gesetztes eol-Attribut wirkt erst "
+            f"beim naechsten Auschecken, vorhandene Dateien bleiben unveraendert liegen. "
+            f"Gezielt neu materialisieren: `rm {pfad} && git checkout -- {pfad}`"
         )
 
 
