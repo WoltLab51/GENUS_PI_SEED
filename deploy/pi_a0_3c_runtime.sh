@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 # A0.3c installs one versioned, private CPython/SQLite runtime and stages two
 # package environments as a single manifest-bound activation unit.  It never
-# replaces a distribution library and never relies on LD_LIBRARY_PATH/LD_PRELOAD.
+# replaces a distribution library. The published runtime never relies on
+# LD_LIBRARY_PATH/LD_PRELOAD; it resolves libsqlite3 through its own RUNPATH.
 
 PYTHON_VERSION="3.13.15"
 PYTHON_ARCHIVE="Python-${PYTHON_VERSION}.tar.xz"
@@ -727,12 +728,23 @@ build_runtime() {
     )
     (
         cd "$python_src"
+        # CPython prueft nach dem Bau jedes Modul auf Importierbarkeit.
+        # _sqlite3 traegt bereits den RUNPATH auf den finalen Prefix, der zu
+        # diesem Zeitpunkt noch nicht veroeffentlicht ist -- ohne bauzeitlichen
+        # Suchpfad scheitert der Import, CPython benennt das Modul in
+        # *_failed.so um und der Install bricht ab (live belegt 2026-08-20).
+        # Der Suchpfad gilt ausschliesslich hier im Bau; das ausgelieferte
+        # Artefakt loest libsqlite3 weiterhin allein ueber seinen RUNPATH auf,
+        # was runtime_probe anschliessend erzwingt.
+        export LD_LIBRARY_PATH="$stage$RUNTIME_PREFIX/lib"
         CPPFLAGS="-I$stage$RUNTIME_PREFIX/include" \
         LDFLAGS="-L$stage$RUNTIME_PREFIX/lib -Wl,--enable-new-dtags,-rpath,$RUNTIME_PREFIX/lib" \
         PKG_CONFIG_PATH="$stage$RUNTIME_PREFIX/lib/pkgconfig" \
             ./configure --prefix="$RUNTIME_PREFIX" --with-ensurepip=install
         "$MAKE_BIN" -j"$jobs"
         "$MAKE_BIN" DESTDIR="$stage" install
+        "$stage$RUNTIME_PREFIX/bin/python3.13" -c 'import _sqlite3' \
+            || fail "CPython wurde ohne _sqlite3 gebaut" 70
     )
     install -d -m 0755 "$stage$RUNTIME_PREFIX/share/genus"
     install -m 0644 "$bootstrap_lock" "$stage$RUNTIME_PREFIX/share/genus/BUILD-BOOTSTRAP.lock"
@@ -1073,6 +1085,20 @@ for _ in range(128):
     print(path); break
 else: raise SystemExit("cannot allocate unique build scratch")
 PY
+}
+
+# Der RETURN-Trap in build_runtime raeumt nur den Erfolgsfall auf: bei errexit
+# oder exit feuert er nicht. Ein abgebrochener Bau liess so 851 MB im State-Root
+# liegen (live belegt 2026-08-20). Unter der Operator-Sperre kann kein zweiter
+# Lauf aktiv sein -- vorgefundene Baureste sind deshalb immer Altlasten.
+recover_stale_state_builds() {
+    local path
+    for path in "$STATE_ROOT"/build.*; do
+        [ -d "$path" ] || continue
+        [ ! -L "$path" ] || fail "Baurest ist ein Symlink" 70
+        log "entferne Baurest $(basename -- "$path")"
+        rm -rf -- "$path"
+    done
 }
 
 recover_stale_build_scratch() {
@@ -1621,6 +1647,7 @@ stage_set() (
     # Reste eines per SIGKILL/Stromausfall abgebrochenen Sandbox-Baus gehoeren dem
     # root-Benutzer; der EXIT-Trap des Sandbox-Baus hat sie dann nie erreicht.
     recover_stale_build_scratch
+    recover_stale_state_builds
     assert_expected_commit "$(repo_commit)"
     # Auch bei bereits vorhandenem Prefix kann ein Publikationsmarker offen sein
     # (Abbruch zwischen Rename und Markerentfernung); Recovery laeuft deshalb in

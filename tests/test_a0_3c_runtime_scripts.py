@@ -125,7 +125,13 @@ def test_runtime_is_private_and_never_injects_loader_environment():
     assert "/opt/genus/runtime/cpython-${PYTHON_VERSION}-sqlite-${SQLITE_VERSION}" in script
     assert '--prefix="$RUNTIME_PREFIX"' in script
     assert "Library runpath: [$RUNTIME_PREFIX/lib]" in script
-    assert not re.search(r"(?m)^\s*(?:export\s+)?LD_(?:LIBRARY_PATH|PRELOAD)=", script)
+    # Genau eine bewusste Ausnahme (Live-Fund 2026-08-20): Der Bau braucht einen
+    # bauzeitlichen Suchpfad auf den GESTAGTEN Prefix, weil CPythons Import-Pruefung
+    # sonst am noch unveroeffentlichten RUNPATH scheitert. Die veroeffentlichte
+    # Runtime bleibt davon unberuehrt und loest allein ueber ihren RUNPATH auf.
+    loader = re.findall(r"(?m)^\s*(?:export\s+)?LD_(?:LIBRARY_PATH|PRELOAD)=.*", script)
+    assert loader == ['        export LD_LIBRARY_PATH="$stage$RUNTIME_PREFIX/lib"'], loader
+    assert loader[0].strip() in _function("build_runtime")
     for forbidden in ("/usr/lib/libsqlite", "/lib/libsqlite", "ldconfig"):
         assert forbidden not in script
 
@@ -1212,3 +1218,36 @@ def test_reauthorize_allows_the_a0_3c_operator_documentation():
     for row in allowlists:
         assert "deploy/README.md" in row
         assert "genus/" not in row
+
+
+def test_cpython_build_can_import_sqlite_before_the_prefix_exists():
+    build = _function("build_runtime")
+    # Live-Fund 2026-08-20: _sqlite3 traegt schon beim Bau den RUNPATH auf den
+    # finalen Prefix. Der existiert dann noch nicht, CPythons Import-Pruefung
+    # scheitert, das Modul landet als *_failed.so und der Install bricht ab.
+    # Der bauzeitliche Suchpfad zeigt deshalb auf den gestagten Prefix.
+    assert 'export LD_LIBRARY_PATH="$stage$RUNTIME_PREFIX/lib"' in build
+    assert build.index("LD_LIBRARY_PATH") < build.index("--with-ensurepip=install")
+    # ...und der Bau beweist den Import selbst, statt ihn dem Install zu ueberlassen.
+    assert "import _sqlite3" in build
+    assert 'fail "CPython wurde ohne _sqlite3 gebaut"' in build
+
+
+def test_published_runtime_never_resolves_libraries_through_the_environment():
+    script = _script()
+    # Der bauzeitliche Suchpfad ist die EINZIGE Stelle; die veroeffentlichte
+    # Runtime loest libsqlite3 ausschliesslich ueber ihren RUNPATH auf.
+    for forbidden in ("LD_PRELOAD", "ldconfig"):
+        assert forbidden not in _function("runtime_probe")
+        assert forbidden not in _function("verify_runtime_prefix")
+
+
+def test_stage_sweeps_leftover_build_trees():
+    sweep = _function("recover_stale_state_builds")
+    stage = _function("stage_set")
+    # Der RETURN-Trap von build_runtime feuert bei errexit/exit nicht; ohne Sweep
+    # bleibt ein abgebrochener Bau als Gigabyte-Rest im State-Root liegen.
+    assert '"$STATE_ROOT"/build.*' in sweep
+    assert '[ ! -L "$path" ]' in sweep
+    assert "recover_stale_state_builds" in stage
+    assert stage.index("recover_stale_state_builds") < stage.index("capture_locks")
