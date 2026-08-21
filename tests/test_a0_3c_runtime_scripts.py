@@ -1251,3 +1251,27 @@ def test_stage_sweeps_leftover_build_trees():
     assert '[ ! -L "$path" ]' in sweep
     assert "recover_stale_state_builds" in stage
     assert stage.index("recover_stale_state_builds") < stage.index("capture_locks")
+
+
+def test_permission_scans_cannot_trip_over_symlink_modes():
+    script = _script()
+    # Live-Fund 2026-08-21: Symlinks tragen unter Linux immer lrwxrwxrwx. Ein
+    # Rechte-Scan ohne Typfilter meldet deshalb jeden Symlink als welt-schreibbar
+    # -- die Runtime-Verifikation konnte nie bestehen. Klassen-Waechter: JEDER
+    # -perm-Scan muss entweder Symlinks ausschliessen, auf regulaere Dateien bzw.
+    # Verzeichnisse filtern, oder mit -L die Ziele bewerten.
+    scans = [row.strip() for row in script.splitlines() if "-perm /" in row]
+    assert len(scans) >= 6, scans
+    for scan in scans:
+        assert ("! -type l" in scan or "-type f" in scan or "-type d" in scan
+                or "find -L" in scan), scan
+
+
+def test_runtime_verification_accepts_the_cpython_symlinks():
+    verify = _function("verify_runtime_prefix")
+    # bin/python3 -> python3.13 und acht weitere gehoeren zu jedem CPython-Baum.
+    assert '! -type l -perm /022' in verify
+    # Die Garantie bleibt: Eigentum wird weiterhin ueber den ganzen Baum geprueft,
+    # und das Inventar bindet jedes Symlink-Ziel.
+    assert "! -user root" in verify
+    assert "target" in _function("runtime_tree_inventory")

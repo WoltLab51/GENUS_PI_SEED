@@ -666,7 +666,14 @@ verify_runtime_prefix() {
     [ "$status" -eq 0 ] && [ -z "$output" ] \
         || fail "Runtime-Tree ist nicht vollstaendig root-owned/lesbar" 65
     set +e
-    output="$(as_root "$ROOT_FIND_BIN" "$RUNTIME_PREFIX" -xdev -perm /022 -print -quit 2>&1)"; status=$?
+    # Symlinks tragen unter Linux immer lrwxrwxrwx; ihre Modusbits sind bedeutungslos,
+    # der Kernel entscheidet am Ziel, und `chmod -R go-w` fasst sie deshalb nicht an.
+    # Ohne diesen Ausschluss meldet der Scan die neun CPython-Symlinks (bin/python3 &
+    # Co.) als welt-schreibbar und die Runtime kann nie verifiziert werden (live belegt
+    # 2026-08-21). Die Garantie bleibt: Symlink-Eigentum deckt der ! -user root-Scan ab,
+    # die Ziele deckt derselbe Scan als reale Dateien ab, und runtime_tree_inventory
+    # bindet jedes Symlink-Ziel, sodass ein umgehaengtes Ziel auffliegt.
+    output="$(as_root "$ROOT_FIND_BIN" "$RUNTIME_PREFIX" -xdev ! -type l -perm /022 -print -quit 2>&1)"; status=$?
     set -e
     [ "$status" -eq 0 ] && [ -z "$output" ] \
         || fail "Runtime ist gruppen-/welt-schreibbar" 65
