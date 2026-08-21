@@ -1324,3 +1324,23 @@ def test_silent_errexit_aborts_name_their_place():
         assert token in trap_line[0], token
     # Der Trap steht vor jeder Arbeit, sonst deckt er die fruehen Schritte nicht ab.
     assert script.index("trap 'genus_a03c_status=") < script.index("harden_privileged_boundary()")
+
+
+def test_sandbox_paths_never_live_in_the_privatetmp_hierarchy():
+    script = _script()
+    sandbox = _function("sandbox_run")
+    # Live-Fund 2026-08-21: PrivateTmp=yes ersetzt /tmp UND /var/tmp durch frische,
+    # leere tmpfs. Lag das Arbeitsverzeichnis dort, war es im Namensraum unsichtbar
+    # und systemd brach mit 226/NAMESPACE ab ("Failed to set up mount namespacing").
+    # Klassen-Waechter: Solange die Sandbox PrivateTmp setzt, darf KEIN gebundener
+    # Pfad unter /tmp oder /var/tmp liegen.
+    assert "PrivateTmp=yes" in sandbox
+    # Kommentare duerfen den Fund benennen; gebunden wird nur wirksamer Code.
+    wirksam = chr(10).join(
+        row for row in script.splitlines() if not row.lstrip().startswith("#")
+    )
+    assert "/var/tmp" not in wirksam and '"/tmp' not in wirksam
+    # ...und PrivateTmp bleibt, weil ProtectSystem=strict sonst kein beschreibbares
+    # /tmp fuer die Build-Backends uebrig laesst.
+    assert "ProtectSystem=strict" in sandbox
+    assert "^/var/lib/genus-a03c-build" in script

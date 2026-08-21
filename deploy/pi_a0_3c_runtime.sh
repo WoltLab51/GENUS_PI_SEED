@@ -1099,11 +1099,18 @@ finally: os.close(fd)
 PY
 }
 
+# Der Build-Scratch liegt bewusst NICHT unter /var/tmp: Die Sandbox setzt
+# PrivateTmp=yes, und das ersetzt /tmp UND /var/tmp durch frische, leere tmpfs.
+# Das Arbeitsverzeichnis waere im Namensraum dann unsichtbar, ReadOnlyPaths
+# scheiterte, und systemd brach mit 226/NAMESPACE ab (live belegt 2026-08-21:
+# "Failed to set up mount namespacing: .../input: No such file or directory").
+# PrivateTmp zu streichen waere der falsche Ausweg -- zusammen mit
+# ProtectSystem=strict haette der Bau dann kein beschreibbares /tmp mehr.
 create_build_scratch() {
     as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
         "$STATE_ROOT" "$(id -u)" <<'PY'
 import json, os, pathlib, secrets, sys
-parent=pathlib.Path("/var/tmp"); state=sys.argv[1]; uid=int(sys.argv[2])
+parent=pathlib.Path("/var/lib"); state=sys.argv[1]; uid=int(sys.argv[2])
 for _ in range(128):
     path=parent/f"genus-a03c-build.{secrets.token_hex(12)}"
     try: os.mkdir(path,0o700)
@@ -1144,7 +1151,7 @@ recover_stale_build_scratch() {
     output="$(as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
         "$STATE_ROOT" "$(id -u)" <<'PY'
 import json, os, pathlib, re, stat, sys
-parent=pathlib.Path("/var/tmp"); state=sys.argv[1]; uid=int(sys.argv[2]); candidates=[]
+parent=pathlib.Path("/var/lib"); state=sys.argv[1]; uid=int(sys.argv[2]); candidates=[]
 for path in parent.iterdir():
     if not re.fullmatch(r"genus-a03c-build\.[0-9a-f]{24}",path.name): continue
     info=path.lstat()
@@ -1173,10 +1180,10 @@ PY
     [ "$status" -eq 0 ] || fail "stale Build-Scratch konnte nicht sicher inventarisiert werden" 70
     while IFS= read -r path; do
         [ -z "$path" ] && continue
-        [[ "$path" =~ ^/var/tmp/genus-a03c-build\.[0-9a-f]{24}$ ]] \
+        [[ "$path" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]] \
             || fail "stale Build-Scratch-Ausgabe ist ungueltig" 70
         as_root "$ROOT_RM_BIN" -rf -- "$path"
-        as_root "$ROOT_SYNC_BIN" -f /var/tmp
+        as_root "$ROOT_SYNC_BIN" -f /var/lib
     done <<< "$output"
 }
 
@@ -1240,15 +1247,15 @@ build_wheelhouse() (
         || fail "dedizierte Build-Identitaet nobody:nogroup fehlt" 69
     [ "$nobody_uid" -ne "$(id -u)" ] || fail "Build-Identitaet ist nicht vom Operator getrennt" 70
     scratch="$(create_build_scratch)"
-    [[ "$scratch" =~ ^/var/tmp/genus-a03c-build\.[0-9a-f]{24}$ ]] \
-        || fail "Build-Scratch liegt nicht unter dem fixen /var/tmp-Root" 70
+    [[ "$scratch" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]] \
+        || fail "Build-Scratch liegt nicht unter dem fixen /var/lib-Root" 70
     cleanup_build_scratch() {
         local status=$?
         trap - EXIT
         set +e
-        if [[ "$scratch" =~ ^/var/tmp/genus-a03c-build\.[0-9a-f]{24}$ ]]; then
+        if [[ "$scratch" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]]; then
             as_root "$ROOT_RM_BIN" -rf -- "$scratch"
-            as_root "$ROOT_SYNC_BIN" -f /var/tmp
+            as_root "$ROOT_SYNC_BIN" -f /var/lib
         fi
         exit "$status"
     }
@@ -1291,7 +1298,7 @@ build_wheelhouse() (
         || fail "Wheel-Output driftete beim Rueckkopieren aus Sandbox" 70
     rm -f -- "$verify_inventory"
     as_root "$ROOT_RM_BIN" -rf -- "$scratch"
-    as_root "$ROOT_SYNC_BIN" -f /var/tmp
+    as_root "$ROOT_SYNC_BIN" -f /var/lib
     scratch=""
     trap - EXIT
 )
