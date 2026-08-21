@@ -952,3 +952,8 @@ def test_cli_parser_has_only_fixed_contract_commands() -> None:
     }
     with pytest.raises(ValueError):
         parser.parse_args(["run", "--sequence", "4"])
+    for command in choices.values():
+        expected = next(
+            action for action in command._actions if action.dest == "expected_invocation"
+        )
+        assert expected.required is True

@@ -91,6 +91,36 @@ def _source(tmp_path: Path, command: str, *, extra_env: dict[str, str] | None = 
     )
 
 
+def _fake_systemctl(tmp_path: Path) -> Path:
+    fake = tmp_path / "fake-systemctl"
+    fake.write_text(
+        """#!/usr/bin/env bash
+set -eu
+service="${2:-}"
+property=""
+shift 2 || true
+while [ "$#" -gt 0 ]; do
+    if [ "$1" = -p ]; then property="$2"; shift 2; else shift; fi
+done
+if [ "$property" = ActiveState ] && [ "$service" = "${FAKE_BROKEN_SERVICE:-}" ]; then
+    exit 42
+fi
+case "$property" in
+    ActiveState) printf 'active\\n' ;;
+    InvocationID) printf 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n' ;;
+    ActiveEnterTimestampMonotonic) printf '200\\n' ;;
+    MainPID) printf '222\\n' ;;
+    NRestarts) printf '%s\\n' "${FAKE_RESTARTS:-0}" ;;
+    *) exit 43 ;;
+esac
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+    fake.chmod(0o755)
+    return fake
+
+
 def test_script_is_strict_and_syntactically_valid():
     assert "set -Eeuo pipefail" in _script()
     result = subprocess.run(
@@ -282,7 +312,7 @@ def test_resume_failure_stops_services_before_pointer_restore():
     assert normal.index(" resume") < normal.index("SERVICES_RESTARTED=0")
 
 
-def test_quiescence_covers_cron_fallback_handles_maps_and_nrestarts():
+def test_quiescence_covers_cron_fallback_handles_maps_and_restart_identity():
     script = _script()
     services = re.search(r"(?m)^SERVICES=\(([^)]*)\)", script)
     assert services is not None and "cron.service" not in services.group(1)
@@ -294,13 +324,73 @@ def test_quiescence_covers_cron_fallback_handles_maps_and_nrestarts():
     assert 'entry / "maps"' in script and 'entry / "exe"' in script
     assert "prove_no_old_runtime_processes" in _function("switch_with_quiescence")
     assert "prove_no_db_handles" in _function("switch_with_quiescence")
-    assert 'restarts" != "${old_restarts[$index]}' in script
+    assert '[ "$restarts" != 0 ]' in _function("start_previous_services")
+    assert '[ "$restarts" != 0 ]' in _function("attest_restarted_services")
+    assert '"$invocation" = "${old_invocations[$index]}"' in script
+    assert '"$entered" = "${old_active_enters[$index]}"' in script
     process_probe = _function("prove_no_old_runtime_processes")
     assert '"$SYSTEM_PYTHON_BIN" -I -P' in process_probe
     assert 'as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin' in process_probe
     assert 'as_root env -i PATH=/usr/bin:/bin "$CORE_POINTER/bin/python"' not in script
     assert "inspection_errors" in process_probe
     assert 'raise SystemExit("process inspection was incomplete")' in process_probe
+
+
+def test_controlled_service_start_accepts_reset_counter_and_rejects_auto_restart(tmp_path):
+    fake = _fake_systemctl(tmp_path)
+    command = rf'''
+SYSTEMCTL_BIN="{_bash_path(fake)}"
+systemctl_root() {{ :; }}
+active_services=(example.service)
+stopped_services=(example.service)
+old_pids=(111)
+old_restarts=(3)
+old_invocations=(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+old_active_enters=(100)
+set +e
+( start_previous_services )
+status=$?
+set -e
+printf '%s\n' "$status"
+'''
+    reset = _source(tmp_path, command, extra_env={"FAKE_RESTARTS": "0"})
+    assert reset.returncode == 0, reset.stderr
+    assert reset.stdout.strip().splitlines()[-1] == "0"
+    restarted = _source(tmp_path, command, extra_env={"FAKE_RESTARTS": "1"})
+    assert restarted.returncode == 0, restarted.stderr
+    assert restarted.stdout.strip().splitlines()[-1] == "70"
+    assert "startete waehrend des Wechsels erneut" in restarted.stderr
+
+
+def test_service_inventory_fails_closed_on_one_unreadable_unit(tmp_path):
+    fake = _fake_systemctl(tmp_path)
+    command = rf'''
+SYSTEMCTL_BIN="{_bash_path(fake)}"
+SERVICES=(good.service broken.service)
+set +e
+( remember_services )
+status=$?
+set -e
+printf '%s\n' "$status"
+'''
+    result = _source(
+        tmp_path,
+        command,
+        extra_env={"FAKE_BROKEN_SERVICE": "broken.service"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "70"
+    assert "nicht vollstaendig inventarisiert" in result.stderr
+
+
+def test_nonempty_service_inventory_is_required_before_persistent_guard_mutation():
+    switch = _function("switch_with_quiescence")
+    remembered = switch.index("remember_services")
+    required = switch.index("kein aktives GENUS-Service-Inventar", remembered)
+    cron = switch.index("capture_activation_crontab", remembered)
+    guard = switch.index("install_systemd_autostart_guard", remembered)
+    journal = switch.index("create_activation_journal", remembered)
+    assert remembered < required < cron < guard < journal
 
 
 def test_restore_handler_covers_explicit_exit_set_e_and_signals():
@@ -933,6 +1023,7 @@ def test_sandbox_canary_accepts_kernel_denial_but_never_visible_product_paths():
     for denied in ("errno.EACCES", "errno.ENOENT", "errno.EPERM"):
         assert denied in canary
     assert 'raise SystemExit("forbidden product path visible")' in canary
+    assert "except (FileNotFoundError, ProcessLookupError)" in canary
 
 
 def test_state_work_cleanup_unlocks_sealed_stage_directories(tmp_path):

@@ -513,7 +513,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     identity = sub.add_parser("identity")
     identity.add_argument("--receipt", type=Path, required=True)
-    identity.add_argument("--expected-invocation", type=Path)
+    identity.add_argument("--expected-invocation", type=Path, required=True)
     identity.set_defaults(handler=_cmd_identity)
 
     gate = sub.add_parser("gate")
@@ -522,7 +522,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--scratch-root", type=Path, required=True)
     gate.add_argument("--receipt", type=Path, required=True)
     gate.add_argument("--code-root", type=Path, default=Path("."))
-    gate.add_argument("--expected-invocation", type=Path)
+    gate.add_argument("--expected-invocation", type=Path, required=True)
     gate.set_defaults(handler=_cmd_gate)
 
     create = sub.add_parser("manifest-create")
@@ -532,14 +532,14 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--a0-2-historical-sqlite-receipt", type=Path, required=True)
     create.add_argument("--receipt", type=Path, required=True)
     create.add_argument("--code-root", type=Path, default=Path("."))
-    create.add_argument("--expected-invocation", type=Path)
+    create.add_argument("--expected-invocation", type=Path, required=True)
     create.set_defaults(handler=_cmd_manifest_create)
 
     verify = sub.add_parser("manifest-verify")
     verify.add_argument("--manifest", type=Path, required=True)
     verify.add_argument("--receipt", type=Path, required=True)
     verify.add_argument("--code-root", type=Path, default=Path("."))
-    verify.add_argument("--expected-invocation", type=Path)
+    verify.add_argument("--expected-invocation", type=Path, required=True)
     verify.set_defaults(handler=_cmd_manifest_verify)
 
     acquire = sub.add_parser("acquire")
@@ -550,7 +550,7 @@ def build_parser() -> argparse.ArgumentParser:
     acquire.add_argument("--manifest", type=Path, required=True)
     acquire.add_argument("--receipt", type=Path, required=True)
     acquire.add_argument("--code-root", type=Path, default=Path("."))
-    acquire.add_argument("--expected-invocation", type=Path)
+    acquire.add_argument("--expected-invocation", type=Path, required=True)
     acquire.set_defaults(handler=_cmd_acquire)
 
     series_init = sub.add_parser("series-init")
@@ -558,7 +558,7 @@ def build_parser() -> argparse.ArgumentParser:
     series_init.add_argument("--manifest", type=Path, required=True)
     series_init.add_argument("--receipt", type=Path, required=True)
     series_init.add_argument("--code-root", type=Path, default=Path("."))
-    series_init.add_argument("--expected-invocation", type=Path)
+    series_init.add_argument("--expected-invocation", type=Path, required=True)
     series_init.set_defaults(handler=_cmd_series_init)
 
     run = sub.add_parser("run")
@@ -570,7 +570,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--sequence", type=int, choices=(1, 2, 3), required=True)
     run.add_argument("--receipt", type=Path, required=True)
     run.add_argument("--code-root", type=Path, default=Path("."))
-    run.add_argument("--expected-invocation", type=Path)
+    run.add_argument("--expected-invocation", type=Path, required=True)
     run.set_defaults(handler=_cmd_run)
 
     series = sub.add_parser("verify-series")
@@ -579,7 +579,7 @@ def build_parser() -> argparse.ArgumentParser:
     series.add_argument("--series-init", type=Path, required=True)
     series.add_argument("--receipt", type=Path, required=True)
     series.add_argument("--code-root", type=Path, default=Path("."))
-    series.add_argument("--expected-invocation", type=Path)
+    series.add_argument("--expected-invocation", type=Path, required=True)
     series.set_defaults(handler=_cmd_verify_series)
     return parser
 

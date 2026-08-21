@@ -1252,7 +1252,10 @@ for path in forbidden:
 targets = []
 for fd in pathlib.Path("/proc/self/fd").iterdir():
     if fd.name not in {"0", "1", "2"}:
-        targets.append(os.readlink(fd))
+        try:
+            targets.append(os.readlink(fd))
+        except (FileNotFoundError, ProcessLookupError):
+            pass
 assert not any(any(str(path) in target for path in forbidden) for target in targets)
 assert not any(any(str(path) in value for path in forbidden) for value in os.environ.values())
 interfaces = {path.name for path in pathlib.Path("/sys/class/net").iterdir()}
@@ -2927,16 +2930,20 @@ remember_services() {
     local service pid restarts active invocation entered
     active_services=(); old_pids=(); old_restarts=(); old_invocations=(); old_active_enters=(); stopped_services=()
     for service in "${SERVICES[@]}"; do
-        active="$($SYSTEMCTL_BIN show "$service" -p ActiveState --value 2>/dev/null || true)"
-        if [ "$active" = active ]; then
+        if ! active="$($SYSTEMCTL_BIN show "$service" -p ActiveState --value 2>/dev/null)"; then
+            fail "Dienstzustand konnte nicht vollstaendig inventarisiert werden: $service" 70
+        fi
+        case "$active" in
+        active)
             [ "$service" != genus-telegram-bot-fallback.service ] \
                 || fail "aktive transiente Telegram-Fallback-Unit ist nicht verlustfrei restartbar" 70
             active_services+=("$service")
             invocation="$($SYSTEMCTL_BIN show "$service" -p InvocationID --value 2>/dev/null || true)"
             entered="$($SYSTEMCTL_BIN show "$service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || true)"
+            [[ "$invocation" =~ ^[0-9a-f]{32}$ ]] && [[ "$entered" =~ ^[0-9]+$ ]] \
+                || fail "Dienstidentitaet unlesbar: $service" 70
             if [[ "$service" = *.timer ]]; then
                 pid=0; restarts=0
-                [[ "$entered" =~ ^[0-9]+$ ]] || fail "Timerstatus unlesbar: $service" 70
             else
                 pid="$($SYSTEMCTL_BIN show "$service" -p MainPID --value)"
                 restarts="$($SYSTEMCTL_BIN show "$service" -p NRestarts --value)"
@@ -2947,7 +2954,10 @@ remember_services() {
             old_restarts+=("$restarts")
             old_invocations+=("$invocation")
             old_active_enters+=("$entered")
-        fi
+            ;;
+        inactive|failed) ;;
+        *) fail "unerwarteter/transienter Dienstzustand verhindert Activation: $service ($active)" 70 ;;
+        esac
     done
 }
 
@@ -2984,12 +2994,15 @@ start_previous_services() {
         fi
         invocation="$($SYSTEMCTL_BIN show "$service" -p InvocationID --value 2>/dev/null || true)"
         entered="$($SYSTEMCTL_BIN show "$service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || true)"
+        if ! [[ "$invocation" =~ ^[0-9a-f]{32}$ ]] \
+            || [ "$invocation" = "${old_invocations[$index]}" ] \
+            || ! [[ "$entered" =~ ^[0-9]+$ ]] \
+            || [ "$entered" = "${old_active_enters[$index]}" ]; then
+            printf '[A0.3c] FEHLER: Dienst-Invocation wurde nicht ersetzt: %s\n' "$service" >&2
+            return 70
+        fi
         if [[ "$service" = *.timer ]]; then
             pid=0; restarts=0
-            if ! [[ "$entered" =~ ^[0-9]+$ ]] || [ "$entered" = "${old_active_enters[$index]}" ]; then
-                printf '[A0.3c] FEHLER: Timer-Aktivierung wurde nicht ersetzt: %s\n' "$service" >&2
-                return 70
-            fi
             continue
         fi
         pid="$($SYSTEMCTL_BIN show "$service" -p MainPID --value)"
@@ -2998,8 +3011,10 @@ start_previous_services() {
             printf '[A0.3c] FEHLER: Dienststatus unlesbar: %s\n' "$service" >&2
             return 70
         fi
-        if [ "$restarts" != "${old_restarts[$index]}" ]; then
-            printf '[A0.3c] FEHLER: unerwarteter NRestarts-Drift: %s\n' "$service" >&2
+        # systemd setzt NRestarts bei einem kontrollierten manuellen Start auf
+        # null. Jeder positive Wert danach bedeutet einen automatischen Restart.
+        if [ "$restarts" != 0 ]; then
+            printf '[A0.3c] FEHLER: Dienst startete waehrend des Wechsels erneut: %s\n' "$service" >&2
             return 70
         fi
         if [ "${old_pids[$index]}" != 0 ] && [ "$pid" != 0 ]; then
@@ -3422,26 +3437,25 @@ attest_restarted_services() {
             [ "$active" = active ] || { sample_ok=0; break; }
             invocation="$($SYSTEMCTL_BIN show "$service" -p InvocationID --value 2>/dev/null || true)"
             entered="$($SYSTEMCTL_BIN show "$service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || true)"
+            if ! [[ "$invocation" =~ ^[0-9a-f]{32}$ ]] \
+                || [ "$invocation" = "${old_invocations[$index]}" ] \
+                || ! [[ "$entered" =~ ^[0-9]+$ ]] \
+                || [ "$entered" = "${old_active_enters[$index]}" ]; then
+                sample_ok=0
+                break
+            fi
             if [[ "$service" = *.timer ]]; then
                 pid=0; restarts=0
-                if ! [[ "$entered" =~ ^[0-9]+$ ]] || [ "$entered" = "${old_active_enters[$index]}" ]; then
-                    sample_ok=0
-                    break
-                fi
                 types+=(timer)
             else
                 pid="$($SYSTEMCTL_BIN show "$service" -p MainPID --value 2>/dev/null || true)"
                 restarts="$($SYSTEMCTL_BIN show "$service" -p NRestarts --value 2>/dev/null || true)"
                 if ! [[ "$pid" =~ ^[0-9]+$ ]] || ! [[ "$restarts" =~ ^[0-9]+$ ]] \
-                    || [ "$restarts" != "${old_restarts[$index]}" ]; then
+                    || [ "$restarts" != 0 ]; then
                     sample_ok=0
                     break
                 fi
                 types+=(service)
-            fi
-            if [ "$restarts" != "${old_restarts[$index]}" ]; then
-                sample_ok=0
-                break
             fi
             if [ "${old_pids[$index]}" != 0 ] && [ "$pid" != 0 ] \
                 && [ "$pid" = "${old_pids[$index]}" ]; then
@@ -4084,6 +4098,8 @@ switch_with_quiescence() {
         readiness_receipt="$(verify_readiness_manifest "$target_manifest" "$expected" "$readiness")"
     fi
     remember_services
+    [ "${#active_services[@]}" -gt 0 ] \
+        || fail "kein aktives GENUS-Service-Inventar; Activation bleibt vor jeder Mutation gesperrt" 70
     assert_not_previously_paused
     capture_activation_crontab
     install_systemd_autostart_guard
