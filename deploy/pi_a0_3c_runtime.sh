@@ -610,7 +610,18 @@ recover_runtime_publication() {
         quarantine_runtime_path "$RUNTIME_PENDING" "verwaiste Building-Runtime"
     fi
     if as_root "$ROOT_TEST_BIN" -e "$RUNTIME_PREFIX"; then
-        verify_runtime_prefix
+        # Auch der markerlose Fall heilt sich selbst. Ein hartes fail() beendete hier
+        # das ganze Skript, bevor der Quarantaene-Zweig in stage_set greifen konnte --
+        # jeder Fehlversuch haette dann eine root-Handaufraeumung gebraucht (live
+        # belegt 2026-08-21). Direkt darueber wird beim selben Fehler bereits
+        # quarantaeniert; dieser Zweig folgt derselben Regel.
+        set +e
+        ( set -Eeuo pipefail; verify_runtime_prefix )
+        verify_status=$?
+        set -e
+        if [ "$verify_status" -ne 0 ]; then
+            quarantine_runtime_path "$RUNTIME_PREFIX" "unbrauchbare markerlose Runtime"
+        fi
     fi
 }
 

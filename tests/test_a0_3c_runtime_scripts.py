@@ -1298,3 +1298,14 @@ def test_stage_quarantines_an_unusable_runtime_instead_of_blocking():
     assert "quarantine_runtime_path" in stage
     assert '( verify_runtime_prefix )' in stage
     assert stage.index("quarantine_runtime_path") < stage.index("build_runtime")
+
+
+def test_every_found_runtime_failure_quarantines_instead_of_blocking():
+    recover = _function("recover_runtime_publication")
+    # Live-Fund 2026-08-21: Der markerlose Zweig rief verify_runtime_prefix ohne
+    # Subshell auf; dessen fail() beendete das ganze Skript, bevor stage_set
+    # quarantaenieren konnte. Jeder Fehlversuch braeuchte sonst eine
+    # root-Handaufraeumung. Beide Zweige folgen jetzt derselben Regel.
+    assert recover.count("quarantine_runtime_path") >= 3
+    assert recover.count("( set -Eeuo pipefail; verify_runtime_prefix )") == 1
+    assert "unbrauchbare markerlose Runtime" in recover
