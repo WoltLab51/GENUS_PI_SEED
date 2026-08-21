@@ -78,6 +78,16 @@ Alle zwölf Projektionen und neun Sequenzen stimmten; das Ledger blieb
 unverändert, und Mode A benötigte keinen Fallback. Der vorausgehende rote
 4096er Lauf mit `2.167361215 s` bleibt Teil der Evidenz.
 
+Der erste A0.3c-Vollkopienlauf kombinierte erstmals die produktgroße Kopie mit
+dem Concurrency-Probe und blieb ausschließlich am WAL-Budget rot: Ein bereits
+vor dem Bulk-Replay geöffneter Langzeit-Reader pinnte den WAL bis auf
+`3483072752 B`. Das
+[technische Korrektur-Addendum](reports/2026-08-21-a0-3c-full-copy-wal-pinning-correction.md)
+trennt diesen neuen Kandidaten von der unveränderten historischen A0.3b-Annahme.
+Der Reader wird nun erst am `cutover_pre_commit`-Fence gebunden; das Receipt
+weist diesen Scope sowie den ungepinnten Bulk-Replay fail-closed nach. Der rote
+Lauf bleibt erhalten und erzwingt eine vollständig neue Drei-Lauf-Serie.
+
 Live bleibt gesperrt: Die GENUS-Python-Runtime auf dem Pi meldet SQLite 3.46.1
 und damit keine bestätigte WAL-reset-sichere Version. Außerdem existiert noch
 kein generation-aware Produktpfad. Ein aktualisiertes `sqlite3`-CLI allein
@@ -102,9 +112,11 @@ weiteres ausdrückliches Human-Go über Live-Aktivierung entscheiden.
 [A0.3b-Prototypreport](reports/2026-08-15-a0-3b-shadow-cutover-prototype.md)
 und der getrennte
 [menschliche Annahmebeleg](reviews/2026-08-18-a0-3b-prototype-acceptance.md)
-binden Kandidat, grüne und rote Receipts sowie die Live-Sperre. Der bestehende
-produktive Replay-/Integrity-Pfad und die Produktdatenbank bleiben unverändert.
-A0.2, A0.1a und A0.1b bleiben eingefrorene Prüfinfrastruktur.
+binden den damaligen Prototyp, seine grünen und roten Receipts sowie die
+Live-Sperre. Das Korrektur-Addendum bindet den getrennten A0.3c-Befund; seine
+neue Pi-Serie ist noch zu erbringen. Der bestehende produktive Replay-/
+Integrity-Pfad und die Produktdatenbank bleiben unverändert. A0.2, A0.1a und
+A0.1b bleiben eingefrorene Prüfinfrastruktur.
 
 ### Parallel erlaubt: read-only Beweise, kein zweiter Produktpfad
 

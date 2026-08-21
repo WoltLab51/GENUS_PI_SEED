@@ -48,6 +48,8 @@ REQUIRED_BATCH_EVENTS = 3_072
 REQUIRED_BATCH_BYTES = a03b.DEFAULT_BATCH_BYTES
 REQUIRED_WRITER_INTERVAL_SECONDS = 0.005
 REQUIRED_READER_INTERVAL_SECONDS = 0.003
+REQUIRED_LONG_READER_SNAPSHOT_SCOPE = "cutover_pre_commit_through_post_commit"
+REQUIRED_BULK_REPLAY_WAL_PINNED = False
 REQUIRED_CONSECUTIVE_RUNS = 3
 REQUIRED_FINAL_SYNC_DECISION_REASON = (
     "bounded admission tail and pointer CAS completed in one fence"
@@ -86,11 +88,17 @@ _A03C_FILES = {
     "harness": Path("experiments/a0_3c/harness.py"),
     "tests": Path("tests/test_a0_3c_runtime_readiness.py"),
 }
-ACCEPTED_A03B_CODE_SHA256 = {
+HUMAN_ACCEPTED_A03B_BASELINE_SHA256 = {
     "package": "c8fdd59854fa9822867aadf602ce2a9a2e5c2bf64e0d3f30930521a6ffaee871",
     "cli": "612e28134dfd3b9ab029628a824de93b29c4637892a23921ae3f783a9e99890e",
     "harness": "f8e31096637eaaf5abc44a77f10b0f09eb362ad3f4ea7c9d4e3f1d2cc895b579",
     "tests": "e90a10c87a599de6e1fc0bd9a5cabd56ad9d9cb7536ea41eb2e228a0ce37fcc6",
+}
+A03C_REQUIRED_A03B_CANDIDATE_SHA256 = {
+    "package": "c8fdd59854fa9822867aadf602ce2a9a2e5c2bf64e0d3f30930521a6ffaee871",
+    "cli": "612e28134dfd3b9ab029628a824de93b29c4637892a23921ae3f783a9e99890e",
+    "harness": "418a7169f9ee476c74fe4718033fe9af92c97991ea8c6f7e6bb6d91c5b30bb96",
+    "tests": "3f9a333d08957457a610bf5f27638c6de90d47776f0cdc372f08b886e7e67e35",
 }
 _WRITER_FREE_BUDGET_KEYS = {
     "peak_rss",
@@ -115,6 +123,24 @@ _RESOURCE_EVIDENCE_KEYS = {
     "concurrency_initialization",
     "concurrency_outer",
     "concurrency_recovery",
+}
+_CONCURRENCY_READER_KEYS = {
+    "short_transaction_count",
+    "retained_sample_count",
+    "samples_truncated",
+    "evidence_complete",
+    "generations_seen",
+    "failures",
+    "failure_count",
+    "failure_samples_truncated",
+    "reader_thread_alive_after_join",
+    "writer_thread_alive_after_join",
+    "long_reader_before",
+    "long_reader_after",
+    "fresh_reader_after",
+    "long_reader_snapshot_scope",
+    "bulk_replay_wal_pinned",
+    "coherent_old_or_new_only",
 }
 GATE_COMMANDS = {
     "full_suite": (
@@ -855,8 +881,8 @@ def a03b_code_hashes(code_root: Path | str) -> dict[str, str]:
         if target.is_symlink() or not target.is_file():
             raise RuntimeManifestError(f"A0.3b {role} is not a regular file")
         result[role] = _canonical_source_sha256(target)
-    if result != ACCEPTED_A03B_CODE_SHA256:
-        raise RuntimeManifestError("A0.3b code differs from accepted hashes")
+    if result != A03C_REQUIRED_A03B_CANDIDATE_SHA256:
+        raise RuntimeManifestError("A0.3b code differs from required A0.3c candidate hashes")
     return result
 
 
@@ -883,6 +909,8 @@ def required_candidate_config() -> dict[str, Any]:
         "batch_bytes": REQUIRED_BATCH_BYTES,
         "writer_interval_seconds": REQUIRED_WRITER_INTERVAL_SECONDS,
         "short_reader_interval_seconds": REQUIRED_READER_INTERVAL_SECONDS,
+        "long_reader_snapshot_scope": REQUIRED_LONG_READER_SNAPSHOT_SCOPE,
+        "bulk_replay_wal_pinned": REQUIRED_BULK_REPLAY_WAL_PINNED,
         "projection_count": 12,
         "sequence_count": 9,
         "budgets": {
@@ -2236,13 +2264,74 @@ def _writer_free_summary(
     }
 
 
+def _concurrency_reader_reconstruction(value: Any) -> dict[str, bool]:
+    reader = value if isinstance(value, Mapping) else {}
+    inventory_exact = bool(
+        isinstance(value, Mapping) and set(reader) == _CONCURRENCY_READER_KEYS
+    )
+    generations = reader.get("generations_seen")
+    generations_canonical = bool(
+        isinstance(generations, list)
+        and len(generations) > 0
+        and all(isinstance(item, str) for item in generations)
+        and generations == sorted(set(generations))
+        and set(generations) <= {"g1", "g2"}
+    )
+    short_count = reader.get("short_transaction_count")
+    retained_count = reader.get("retained_sample_count")
+    sample_counts_exact = bool(
+        isinstance(short_count, int)
+        and not isinstance(short_count, bool)
+        and short_count > 0
+        and isinstance(retained_count, int)
+        and not isinstance(retained_count, bool)
+        and retained_count == short_count
+    )
+    failure_count = reader.get("failure_count")
+    failures_exact = bool(
+        reader.get("failures") == []
+        and isinstance(failure_count, int)
+        and not isinstance(failure_count, bool)
+        and failure_count == 0
+    )
+    snapshot_scope_bound = bool(
+        reader.get("long_reader_snapshot_scope")
+        == REQUIRED_LONG_READER_SNAPSHOT_SCOPE
+        and reader.get("bulk_replay_wal_pinned")
+        is REQUIRED_BULK_REPLAY_WAL_PINNED
+    )
+    evidence_reconstructed = bool(
+        inventory_exact
+        and reader.get("long_reader_before") == "g1"
+        and reader.get("long_reader_after") == "g1"
+        and reader.get("fresh_reader_after") == "g2"
+        and generations_canonical
+        and sample_counts_exact
+        and reader.get("samples_truncated") is False
+        and reader.get("evidence_complete") is True
+        and failures_exact
+        and reader.get("failure_samples_truncated") is False
+        and reader.get("reader_thread_alive_after_join") is False
+        and reader.get("writer_thread_alive_after_join") is False
+        and reader.get("coherent_old_or_new_only") is True
+        and snapshot_scope_bound
+    )
+    return {
+        "reader_inventory_exact": inventory_exact,
+        "reader_snapshot_scope_bound": snapshot_scope_bound,
+        "reader_evidence_reconstructed": evidence_reconstructed,
+    }
+
+
 def _concurrency_summary(
     receipt: Mapping[str, Any], resources_receipt: Mapping[str, Any]
 ) -> dict[str, Any]:
     verify = receipt.get("verify") if isinstance(receipt.get("verify"), Mapping) else {}
     cutover = receipt.get("cutover") if isinstance(receipt.get("cutover"), Mapping) else {}
     latency = receipt.get("writer_latency") if isinstance(receipt.get("writer_latency"), Mapping) else {}
-    reader = receipt.get("reader") if isinstance(receipt.get("reader"), Mapping) else {}
+    reader_value = receipt.get("reader")
+    reader = reader_value if isinstance(reader_value, Mapping) else {}
+    reader_reconstruction = _concurrency_reader_reconstruction(reader_value)
     build = receipt.get("build") if isinstance(receipt.get("build"), Mapping) else {}
     catchup = receipt.get("catch_up") if isinstance(receipt.get("catch_up"), Mapping) else {}
     admission = verify.get("sync_admission") if isinstance(verify.get("sync_admission"), Mapping) else {}
@@ -2294,16 +2383,14 @@ def _concurrency_summary(
         and latency.get("within_max_block_budget") is True
         and rates
     )
-    reader_clean = bool(
-        reader.get("short_transaction_count", 0) > 0
-        and reader.get("evidence_complete") is True
-        and reader.get("samples_truncated") is False
-        and reader.get("failure_count") == 0
-        and reader.get("failure_samples_truncated") is False
-        and reader.get("reader_thread_alive_after_join") is False
-        and reader.get("writer_thread_alive_after_join") is False
-        and reader.get("coherent_old_or_new_only") is True
-    )
+    reader_inventory_exact = reader_reconstruction["reader_inventory_exact"]
+    reader_snapshot_scope_bound = reader_reconstruction[
+        "reader_snapshot_scope_bound"
+    ]
+    reader_evidence_reconstructed = reader_reconstruction[
+        "reader_evidence_reconstructed"
+    ]
+    reader_clean = reader_evidence_reconstructed
     storage = receipt.get("storage_highwater_bytes")
     handoff = receipt.get("writer_handoff")
     handoff = handoff if isinstance(handoff, Mapping) else {}
@@ -2382,7 +2469,13 @@ def _concurrency_summary(
         receipt.get("concurrency_gate_pass") is True
         and verify.get("all_twelve_match") is True
         and verify.get("all_nine_sequences_match") is True
-        and writer_clean and reader_clean and resources and no_fallback
+        and writer_clean
+        and reader_clean
+        and reader_inventory_exact
+        and reader_evidence_reconstructed
+        and reader_snapshot_scope_bound
+        and resources
+        and no_fallback
         and receipt.get("schema") == a03b.RECEIPT_SCHEMA
         and exhaustive_write_evidence
         and strict_outer_resources["gate_pass"] is True
@@ -2428,6 +2521,11 @@ def _concurrency_summary(
             "positive_and_complete": rates,
         },
         "reader_old_or_new_only": reader_clean,
+        "reader_inventory_exact": reader_inventory_exact,
+        "reader_evidence_reconstructed": reader_evidence_reconstructed,
+        "long_reader_snapshot_scope": reader.get("long_reader_snapshot_scope"),
+        "bulk_replay_wal_pinned": reader.get("bulk_replay_wal_pinned"),
+        "reader_snapshot_scope_bound": reader_snapshot_scope_bound,
         "all_experimental_write_max_seconds": overall_write_max,
         "final_fence_seconds": cutover.get("final_fence_seconds"),
         "peak_rss_bytes": receipt.get("peak_rss_bytes"),
@@ -2518,7 +2616,7 @@ def _raw_candidate_config_receipt(
 ) -> dict[str, Any]:
     code_hashes = run.get("a0_3b_code_sha256")
     if (
-        code_hashes != ACCEPTED_A03B_CODE_SHA256
+        code_hashes != A03C_REQUIRED_A03B_CANDIDATE_SHA256
         or run.get("candidate_config_sha256")
         != _sha256_json(required_candidate_config())
         or run.get("batch_events") != REQUIRED_BATCH_EVENTS
@@ -2557,6 +2655,14 @@ def _raw_candidate_config_receipt(
         or handoff.get("think_time_seconds") != REQUIRED_WRITER_INTERVAL_SECONDS
     ):
         raise RunEvidenceError("raw writer interval configuration differs")
+    reader = concurrency.get("reader")
+    reader_reconstruction = _concurrency_reader_reconstruction(reader)
+    if reader_reconstruction["reader_inventory_exact"] is not True:
+        raise RunEvidenceError("raw concurrency reader inventory differs")
+    if reader_reconstruction["reader_snapshot_scope_bound"] is not True:
+        raise RunEvidenceError("raw long-reader snapshot scope differs")
+    if reader_reconstruction["reader_evidence_reconstructed"] is not True:
+        raise RunEvidenceError("raw concurrency reader evidence differs")
     body = {
         "phase_bindings": phase_bindings,
         "canonical_batch_callsite_binding": {
@@ -2570,6 +2676,10 @@ def _raw_candidate_config_receipt(
         },
         "writer_interval_seconds": REQUIRED_WRITER_INTERVAL_SECONDS,
         "short_reader_interval_seconds": REQUIRED_READER_INTERVAL_SECONDS,
+        "long_reader_snapshot_scope": reader["long_reader_snapshot_scope"],
+        "bulk_replay_wal_pinned": reader["bulk_replay_wal_pinned"],
+        "reader_inventory_exact": True,
+        "reader_evidence_reconstructed": True,
         "candidate_config_sha256": _sha256_json(required_candidate_config()),
         "gate_pass": True,
     }

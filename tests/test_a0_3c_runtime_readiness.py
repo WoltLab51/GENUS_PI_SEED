@@ -564,7 +564,13 @@ def test_manifest_binds_runtime_code_config_and_real_green_gate_files(
     manifest, identity = _manifest(tmp_path, monkeypatch)
     assert manifest["runtime_identity"] == identity
     assert manifest["candidate_config"]["batch_events"] == 3_072
-    assert manifest["a0_3b_code_sha256"] == harness.ACCEPTED_A03B_CODE_SHA256
+    assert manifest["candidate_config"]["long_reader_snapshot_scope"] == (
+        "cutover_pre_commit_through_post_commit"
+    )
+    assert manifest["candidate_config"]["bulk_replay_wal_pinned"] is False
+    assert manifest["a0_3b_code_sha256"] == (
+        harness.A03C_REQUIRED_A03B_CANDIDATE_SHA256
+    )
     assert set(manifest["a0_3c_code_sha256"]) == {"package", "cli", "harness", "tests"}
     assert all(item["test_count"] > 0 for item in manifest["gate_evidence"].values())
     verified = harness.verify_runtime_manifest(
@@ -607,6 +613,52 @@ def test_manifest_and_gate_tampering_fail_closed(
     tampered = copy.deepcopy(manifest)
     tampered["candidate_config"]["batch_events"] = 4_096
     with pytest.raises(harness.RuntimeManifestError, match="digest"):
+        harness.verify_runtime_manifest(tampered, code_root=CODE_ROOT, identity=identity)
+
+
+def test_a03c_rejects_the_human_accepted_pre_wal_fix_a03b_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    baseline_by_path = {
+        str((CODE_ROOT / relative).resolve()): (
+            harness.HUMAN_ACCEPTED_A03B_BASELINE_SHA256[role]
+        )
+        for role, relative in harness._A03B_FILES.items()
+    }
+    assert harness.HUMAN_ACCEPTED_A03B_BASELINE_SHA256 != (
+        harness.A03C_REQUIRED_A03B_CANDIDATE_SHA256
+    )
+    monkeypatch.setattr(
+        harness,
+        "_canonical_source_sha256",
+        lambda path: baseline_by_path[str(path.resolve())],
+    )
+
+    with pytest.raises(harness.RuntimeManifestError, match="required A0.3c candidate"):
+        harness.a03b_code_hashes(CODE_ROOT)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("long_reader_snapshot_scope", "bulk_replay_through_post_commit"),
+        ("bulk_replay_wal_pinned", True),
+    ],
+)
+def test_manifest_rejects_resealed_reader_scope_config_tamper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    key: str,
+    value: Any,
+) -> None:
+    manifest, identity = _manifest(tmp_path, monkeypatch)
+    tampered = copy.deepcopy(manifest)
+    tampered["candidate_config"][key] = value
+    tampered["manifest_sha256"] = harness._sha256_json(
+        {item: content for item, content in tampered.items() if item != "manifest_sha256"}
+    )
+
+    with pytest.raises(harness.RuntimeManifestError, match="candidate configuration"):
         harness.verify_runtime_manifest(tampered, code_root=CODE_ROOT, identity=identity)
 
 
@@ -761,6 +813,13 @@ def test_real_candidate_run_on_golden_sibling_copies_is_green(
     assert receipt["writer_free"]["final_sync_decision"]["gate_pass"] is True
     assert receipt["concurrency_initialization"]["gate_pass"] is True
     assert receipt["concurrency"]["final_sync_decision"]["gate_pass"] is True
+    assert receipt["concurrency"]["reader_inventory_exact"] is True
+    assert receipt["concurrency"]["reader_evidence_reconstructed"] is True
+    assert receipt["concurrency"]["reader_snapshot_scope_bound"] is True
+    assert receipt["concurrency"]["long_reader_snapshot_scope"] == (
+        "cutover_pre_commit_through_post_commit"
+    )
+    assert receipt["concurrency"]["bulk_replay_wal_pinned"] is False
     assert receipt["concurrency_recovery"]["gate_pass"] is True
     harness.assert_receipt_safe(receipt)
 
@@ -1367,6 +1426,12 @@ def test_raw_evidence_resource_and_write_receipts_fail_closed_on_tamper(
     assert config["canonical_batch_callsite_binding"][
         "phases_receiving_same_batch_arguments"
     ] == ["build", "catch_up", "verify"]
+    assert config["long_reader_snapshot_scope"] == (
+        "cutover_pre_commit_through_post_commit"
+    )
+    assert config["bulk_replay_wal_pinned"] is False
+    assert config["reader_inventory_exact"] is True
+    assert config["reader_evidence_reconstructed"] is True
     extra_raw = copy.deepcopy(template)
     extra_raw["raw_evidence"]["foreign"] = {}
     with pytest.raises(harness.RunEvidenceError, match="inventory"):
@@ -1414,6 +1479,126 @@ def test_raw_evidence_resource_and_write_receipts_fail_closed_on_tamper(
     assert harness._strict_write_receipt(
         writes, expected_scope="run_shadow_prototype", require_claim=True
     )["gate_pass"] is False
+
+
+def _reseal_concurrency_tamper(
+    receipt: dict[str, Any],
+) -> dict[str, Any]:
+    raw_concurrency = receipt["raw_evidence"]["concurrency"]
+    summary = harness._concurrency_summary(
+        raw_concurrency, receipt["resource_evidence"]["concurrency_outer"]
+    )
+    receipt["concurrency"] = summary
+    receipt["raw_evidence_sha256"]["concurrency"] = harness._sha256_json(
+        raw_concurrency
+    )
+    body = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+    receipt["receipt_sha256"] = harness._sha256_json(body)
+    assert harness._verify_receipt_digest(receipt, "resealed concurrency tamper") == (
+        receipt["receipt_sha256"]
+    )
+    return summary
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "remove", "expected_error", "inventory_exact"),
+    [
+        ("long_reader_snapshot_scope", None, True, "reader inventory", False),
+        (
+            "long_reader_snapshot_scope",
+            "bulk_replay_through_post_commit",
+            False,
+            "snapshot scope",
+            True,
+        ),
+        ("bulk_replay_wal_pinned", None, True, "reader inventory", False),
+        ("bulk_replay_wal_pinned", True, False, "snapshot scope", True),
+    ],
+)
+def test_concurrency_receipt_fails_closed_on_reader_scope_tamper(
+    green_candidate_evidence: tuple[
+        dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+    ],
+    field: str,
+    value: Any,
+    remove: bool,
+    expected_error: str,
+    inventory_exact: bool,
+) -> None:
+    _, _, _, template = green_candidate_evidence
+    tampered = copy.deepcopy(template)
+    raw_concurrency = tampered["raw_evidence"]["concurrency"]
+    if remove:
+        raw_concurrency["reader"].pop(field)
+    else:
+        raw_concurrency["reader"][field] = value
+    summary = _reseal_concurrency_tamper(tampered)
+    assert summary["reader_inventory_exact"] is inventory_exact
+    assert summary["reader_evidence_reconstructed"] is False
+    assert summary["reader_snapshot_scope_bound"] is False
+    assert summary["gate_pass"] is False
+
+    with pytest.raises(harness.RunEvidenceError, match=expected_error):
+        harness._reconstruct_run_summaries(tampered)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("long_reader_before", "g2"),
+        ("long_reader_after", "g2"),
+        ("fresh_reader_after", "g1"),
+        ("generations_seen", []),
+        ("generations_seen", ["g2", "g1"]),
+        ("generations_seen", ["g1", "g1"]),
+        ("generations_seen", ["g3"]),
+        ("generations_seen", "g1"),
+        ("short_transaction_count", True),
+        ("short_transaction_count", 0),
+        ("retained_sample_count", 0),
+        ("samples_truncated", True),
+        ("failures", ["InjectedFault"]),
+        ("failure_count", False),
+        ("failure_samples_truncated", True),
+        ("reader_thread_alive_after_join", True),
+        ("writer_thread_alive_after_join", True),
+        ("coherent_old_or_new_only", 1),
+    ],
+)
+def test_concurrency_reader_evidence_rejects_resealed_tamper(
+    green_candidate_evidence: tuple[
+        dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+    ],
+    field: str,
+    value: Any,
+) -> None:
+    _, _, _, template = green_candidate_evidence
+    tampered = copy.deepcopy(template)
+    tampered["raw_evidence"]["concurrency"]["reader"][field] = value
+    summary = _reseal_concurrency_tamper(tampered)
+    assert summary["reader_inventory_exact"] is True
+    assert summary["reader_evidence_reconstructed"] is False
+    assert summary["gate_pass"] is False
+
+    with pytest.raises(harness.RunEvidenceError, match="reader evidence"):
+        harness._reconstruct_run_summaries(tampered)
+
+
+def test_concurrency_reader_inventory_rejects_resealed_extra_key(
+    green_candidate_evidence: tuple[
+        dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+    ],
+) -> None:
+    _, _, _, template = green_candidate_evidence
+    tampered = copy.deepcopy(template)
+    tampered["raw_evidence"]["concurrency"]["reader"]["foreign"] = False
+    summary = _reseal_concurrency_tamper(tampered)
+    assert summary["reader_inventory_exact"] is False
+    assert summary["reader_evidence_reconstructed"] is False
+    assert summary["gate_pass"] is False
+
+    with pytest.raises(harness.RunEvidenceError, match="reader inventory"):
+        harness._reconstruct_run_summaries(tampered)
 
 
 def test_admission_requires_no_sync_route_and_committed_complete_new(

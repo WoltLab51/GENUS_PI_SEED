@@ -303,6 +303,11 @@ def test_concurrency_probe_reports_writer_distribution_and_coherent_readers(
     assert receipt["reader"]["long_reader_before"] == "g1"
     assert receipt["reader"]["long_reader_after"] == "g1"
     assert receipt["reader"]["fresh_reader_after"] == "g2"
+    assert (
+        receipt["reader"]["long_reader_snapshot_scope"]
+        == "cutover_pre_commit_through_post_commit"
+    )
+    assert receipt["reader"]["bulk_replay_wal_pinned"] is False
     assert receipt["reader"]["short_transaction_count"] > 0
     assert receipt["reader"]["evidence_complete"] is True
     assert receipt["reader"]["samples_truncated"] is False
@@ -335,6 +340,131 @@ def test_concurrency_probe_reports_writer_distribution_and_coherent_readers(
     assert receipt["catch_up"]["catch_up_rate_events_per_second"] is not None
     assert receipt["catch_up"]["event_arrival_rate_events_per_second"] is not None
     assert receipt["concurrency_gate_pass"] is True
+
+
+def test_concurrency_long_reader_pins_only_the_atomic_cutover_fence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, _ = _synthetic(tmp_path, 65, label="concurrency-reader-fence")
+    harness.initialize_shadow(path, disposable_root=tmp_path)
+    original_verify = harness.verify_shadow
+    original_active_reader = harness.active_reader
+    original_admit = harness._admit_synchronous_writes
+    cutover_precommit_depth = 0
+    admission_attempts = 0
+    main_reader_phases: list[str] = []
+    main_readers: list[harness.ActiveReader] = []
+
+    def tracked_verify(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        original_fault = kwargs["fault"]
+
+        def tracked_fault(phase: str, evidence: Mapping[str, Any]) -> None:
+            nonlocal cutover_precommit_depth
+            if phase != "cutover_pre_commit":
+                original_fault(phase, evidence)
+                return
+            cutover_precommit_depth += 1
+            try:
+                original_fault(phase, evidence)
+            finally:
+                cutover_precommit_depth -= 1
+
+        kwargs["fault"] = tracked_fault
+        return original_verify(*args, **kwargs)
+
+    def tracked_active_reader(*args: Any, **kwargs: Any) -> harness.ActiveReader:
+        reader = original_active_reader(*args, **kwargs)
+        if threading.current_thread() is threading.main_thread():
+            main_reader_phases.append(
+                "cutover_pre_commit" if cutover_precommit_depth else "outside"
+            )
+            main_readers.append(reader)
+        return reader
+
+    def retry_first_admission(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        nonlocal admission_attempts
+        # Every reader from an earlier rolled-back fence must be gone before
+        # verify_shadow starts any retry work.
+        assert all(reader.closed for reader in main_readers)
+        admission_attempts += 1
+        if admission_attempts == 1:
+            kwargs["fault"]("cutover_pre_commit", {})
+            return {"outcome": "not_ready_fence_budget", "committed": False}
+        return original_admit(*args, **kwargs)
+
+    monkeypatch.setattr(harness, "verify_shadow", tracked_verify)
+    monkeypatch.setattr(harness, "active_reader", tracked_active_reader)
+    monkeypatch.setattr(harness, "_admit_synchronous_writes", retry_first_admission)
+    receipt = harness.run_concurrency_probe(
+        path,
+        disposable_root=tmp_path,
+        writer_interval_seconds=0.002,
+        short_reader_interval_seconds=0.002,
+        batch_events=8,
+        batch_bytes=BATCH_BYTES,
+    )
+
+    # Both old readers are opened exactly inside their atomic pre-commit hook.
+    # The first belongs to the forced non-committed attempt and is closed before
+    # attempt two; the final main-thread reader is the post-commit fresh check.
+    assert admission_attempts >= 2
+    assert main_reader_phases[-1] == "outside"
+    assert len(main_reader_phases) >= 3
+    assert set(main_reader_phases[:-1]) == {"cutover_pre_commit"}
+    assert all(reader.closed for reader in main_readers)
+    assert receipt["reader"]["long_reader_before"] == "g1"
+    assert receipt["reader"]["long_reader_after"] == "g1"
+    assert receipt["reader"]["fresh_reader_after"] == "g2"
+    assert (
+        receipt["reader"]["long_reader_snapshot_scope"]
+        == "cutover_pre_commit_through_post_commit"
+    )
+    assert receipt["reader"]["bulk_replay_wal_pinned"] is False
+    assert receipt["reader"]["coherent_old_or_new_only"] is True
+    assert receipt["verify"]["all_twelve_match"] is True
+    assert receipt["verify"]["all_nine_sequences_match"] is True
+
+
+def test_concurrency_closes_cutover_reader_when_precommit_hook_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, _ = _synthetic(tmp_path, 17, label="concurrency-reader-cleanup")
+    harness.initialize_shadow(path, disposable_root=tmp_path)
+    original_verify = harness.verify_shadow
+    original_active_reader = harness.active_reader
+    main_readers: list[harness.ActiveReader] = []
+
+    def tracked_active_reader(*args: Any, **kwargs: Any) -> harness.ActiveReader:
+        reader = original_active_reader(*args, **kwargs)
+        if threading.current_thread() is threading.main_thread():
+            main_readers.append(reader)
+        return reader
+
+    def failing_verify(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        original_fault = kwargs["fault"]
+
+        def failing_fault(phase: str, evidence: Mapping[str, Any]) -> None:
+            original_fault(phase, evidence)
+            if phase == "cutover_pre_commit":
+                raise harness.InjectedFault("after old reader binding")
+
+        kwargs["fault"] = failing_fault
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(harness, "active_reader", tracked_active_reader)
+    monkeypatch.setattr(harness, "verify_shadow", failing_verify)
+    with pytest.raises(harness.InjectedFault, match="old reader binding"):
+        harness.run_concurrency_probe(
+            path,
+            disposable_root=tmp_path,
+            writer_interval_seconds=0.002,
+            short_reader_interval_seconds=0.002,
+            batch_events=8,
+            batch_bytes=BATCH_BYTES,
+        )
+
+    assert len(main_readers) == 1
+    assert main_readers[0].closed is True
 
 
 def test_inter_batch_handoff_admits_a_continuously_queued_writer(

@@ -445,6 +445,12 @@ Fence, null Writer-Timeouts und keine Starvation, höchstens 256 MiB Peak RSS
 und WAL, höchstens 180 Sekunden Build sowie höchstens 10 Sekunden Recovery;
 außerdem 12/12 Projektionsdigests, 9/9 Sequenzzustände, unverändertes Ledger,
 nur vollständig alten oder vollständig neuen Zustand und keinen Fallback.
+Das Raw-Receipt muss zusätzlich exakt
+`long_reader_snapshot_scope=cutover_pre_commit_through_post_commit` und
+`bulk_replay_wal_pinned=false` binden. Dadurch überspannt der persistente
+G1-Reader weiterhin den atomaren Pointer-Commit, hält aber nicht den WAL des
+vorherigen G2-/G3-Bulk-Replays fest; fehlende oder abweichende Werte machen Run
+und Serien-Replay fail-closed rot.
 
 Nach grüner Serie bleiben Shadow-/Scratch-Platz, vollständige Backup-Kopie und
 Betriebsreserve eine getrennte menschliche Speicherbudgetentscheidung; der

@@ -3362,6 +3362,7 @@ def verify_shadow(
     max_admission_tail_bytes: int = DEFAULT_FINAL_TAIL_BYTES,
     fault: Callable[[str, Mapping[str, Any]], None] | None = None,
     _writer_handoff: Callable[[sqlite3.Connection], float] | None = None,
+    _on_uncommitted_atomic_cutover: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     """Verify at W, prove a bounded sync-forward, and arm routed triple-write."""
     _require_batch_caps(batch_events, batch_bytes)
@@ -3673,6 +3674,8 @@ def verify_shadow(
             )
             if admission["committed"]:
                 break
+            if atomic_cutover and _on_uncommitted_atomic_cutover is not None:
+                _on_uncommitted_atomic_cutover()
         if admission is None or not admission["committed"]:
             raise ShadowHarnessError(
                 "bounded routed-sync admission did not complete within 20 attempts"
@@ -4676,6 +4679,41 @@ def run_concurrency_probe(
     writer_handoff_commit_delta_total = 0
     writer_handoff_commit_delta_min: int | None = None
     writer_handoff_commit_delta_max = 0
+    long_reader: ActiveReader | None = None
+    long_generation_before: str | None = None
+
+    def bind_old_reader_at_cutover(
+        phase: str, _evidence: Mapping[str, Any]
+    ) -> None:
+        """Pin the old snapshot only across the atomic pointer commit.
+
+        A reader opened before the bulk G2/G3 replay prevents WAL frames older
+        than its end mark from being checkpointed.  On production-sized copies
+        that turns the concurrency proof itself into multi-gigabyte WAL growth.
+        The old-or-new claim only requires the transaction to straddle the
+        pointer commit, so establish it at the existing pre-commit fence.
+        """
+
+        nonlocal long_reader, long_generation_before
+        if phase != "cutover_pre_commit" or long_reader is not None:
+            return
+        reader = active_reader(path, disposable_root=disposable_root)
+        if reader.generation_id != "g1":
+            reader.close()
+            raise ShadowHarnessError(
+                "pre-cutover reader did not bind the old generation"
+            )
+        long_reader = reader
+        long_generation_before = reader.generation_id
+
+    def release_uncommitted_old_reader() -> None:
+        """Do not carry a rolled-back fence snapshot into its retry."""
+
+        nonlocal long_reader, long_generation_before
+        if long_reader is not None:
+            long_reader.close()
+        long_reader = None
+        long_generation_before = None
 
     def cooperative_writer_handoff(conn: sqlite3.Connection) -> float:
         nonlocal writer_handoff_requested, writer_handoff_completed
@@ -4795,8 +4833,6 @@ def run_concurrency_probe(
                     failures.append(type(exc).__name__)
             stop.wait(short_reader_interval_seconds)
 
-    long_reader = active_reader(path, disposable_root=disposable_root)
-    long_generation_before = long_reader.generation_id
     writer_thread = threading.Thread(target=writer_loop, daemon=True)
     reader_thread = threading.Thread(target=short_reader_loop, daemon=True)
     writer_thread.start()
@@ -4827,15 +4863,22 @@ def run_concurrency_probe(
                     batch_events=batch_events,
                     batch_bytes=batch_bytes,
                     atomic_cutover=True,
+                    fault=bind_old_reader_at_cutover,
                     _writer_handoff=cooperative_writer_handoff,
+                    _on_uncommitted_atomic_cutover=release_uncommitted_old_reader,
                 )
                 cutover = verify["cutover"]
                 if cutover["committed"]:
                     break
+                release_uncommitted_old_reader()
                 if final_sync_attempts >= 20:
                     raise ShadowHarnessError(
                         "A bounded final fence did not pass within 20 attempts"
                     )
+            if long_reader is None or long_generation_before is None:
+                raise ShadowHarnessError(
+                    "atomic cutover completed without a pre-commit old reader"
+                )
             long_reader.execute("SELECT COUNT(*) FROM value_projection").fetchone()
             long_generation_after = long_reader.generation_id
             with active_reader(path, disposable_root=disposable_root) as fresh_reader:
@@ -4858,7 +4901,8 @@ def run_concurrency_probe(
                 writer_handoff_condition.notify_all()
             writer_thread.join(timeout=5.0)
             reader_thread.join(timeout=5.0)
-            long_reader.close()
+            if long_reader is not None:
+                long_reader.close()
     observation_seconds = time.perf_counter() - probe_started
     pending_age = max(
         (float(item.get("queue_delay_seconds", 0.0)) for item in writer_samples),
@@ -5027,6 +5071,10 @@ def run_concurrency_probe(
             "long_reader_before": long_generation_before,
             "long_reader_after": long_generation_after,
             "fresh_reader_after": fresh_generation,
+            "long_reader_snapshot_scope": (
+                "cutover_pre_commit_through_post_commit"
+            ),
+            "bulk_replay_wal_pinned": False,
             "coherent_old_or_new_only": reader_coherent,
         },
         "peak_rss_bytes": sampler.peak_rss_bytes,

@@ -270,6 +270,15 @@ genau dieser Runtime folgen die vollständige Suite, die A0.2-Golden-/SQLite-
 Gates und ein konsekutiver Pi-Kopienbeweis. A0.3c erzeugt keine Shadow-Tabellen
 in der Produktdatenbank und führt keinen produktiven Cutover aus.
 
+Der erste Full-Copy-Concurrency-Lauf machte eine zuvor nicht gemessene Kopplung
+sichtbar: Der A0.3b-Langzeit-Reader pinnte den WAL bereits während des gesamten
+Bulk-Replays und erzeugte einen roten High-Water von `3483072752 B`. Der
+[Korrekturkandidat](reports/2026-08-21-a0-3c-full-copy-wal-pinning-correction.md)
+bindet den persistenten Reader erst am `cutover_pre_commit`-Fence und weist im
+Receipt explizit nach, dass der Bulk-Replay nicht durch ihn gepinnt wurde. Die
+historische A0.3b-Annahme bleibt unverändert; die alte A0.3c-Serie ist
+abgebrochen und darf nicht mit der neuen Kandidatenserie gemischt werden.
+
 **Definition of Done**
 
 - `sys.executable`, `sqlite3.sqlite_version` und
