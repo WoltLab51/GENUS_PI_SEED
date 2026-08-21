@@ -1309,3 +1309,18 @@ def test_every_found_runtime_failure_quarantines_instead_of_blocking():
     assert recover.count("quarantine_runtime_path") >= 3
     assert recover.count("( set -Eeuo pipefail; verify_runtime_prefix )") == 1
     assert "unbrauchbare markerlose Runtime" in recover
+
+
+def test_silent_errexit_aborts_name_their_place():
+    script = _script()
+    # Live-Fund 2026-08-21: Der Lauf endete nach der Supply-Freigabe ohne jede
+    # Meldung. Ein errexit-Abbruch ohne eigenen Text ist nicht diagnostizierbar --
+    # aus dem Log liess sich die Stelle nicht rekonstruieren. set -E vererbt den
+    # Trap in Funktionen und Subshells; fail() bleibt unberuehrt, weil exit kein
+    # ERR ausloest.
+    trap_line = [row for row in script.splitlines() if row.startswith("trap ") and "ERR" in row]
+    assert len(trap_line) == 1, trap_line
+    for token in ("$LINENO", "$BASH_COMMAND", "ABBRUCH", ">&2"):
+        assert token in trap_line[0], token
+    # Der Trap steht vor jeder Arbeit, sonst deckt er die fruehen Schritte nicht ab.
+    assert script.index("trap 'genus_a03c_status=") < script.index("harden_privileged_boundary()")

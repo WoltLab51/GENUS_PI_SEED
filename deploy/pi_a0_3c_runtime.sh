@@ -91,6 +91,12 @@ umask 077
 PRIVILEGED_BOUNDARY_READY=0
 OPERATOR_REAUTH_RECEIPT=""
 
+# Ein errexit-Abbruch ohne eigene Meldung ist nicht diagnostizierbar: Der Lauf
+# endet stumm, und aus dem Log laesst sich die Stelle nicht rekonstruieren (live
+# belegt 2026-08-21 nach der Supply-Freigabe). set -E vererbt diesen Trap in
+# Funktionen und Subshells; fail() bleibt unberuehrt, weil exit kein ERR ausloest.
+trap 'genus_a03c_status=$?; { printf "[A0.3c] ABBRUCH: Zeile %s, Kommando <%s>, Status %s" "$LINENO" "$BASH_COMMAND" "$genus_a03c_status"; echo; } >&2' ERR
+
 log() { printf '[A0.3c] %s\n' "$*"; }
 fail() { printf '[A0.3c] FEHLER: %s\n' "$1" >&2; exit "${2:-1}"; }
 
