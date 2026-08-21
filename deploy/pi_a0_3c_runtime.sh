@@ -1131,17 +1131,39 @@ else: raise SystemExit("cannot allocate unique build scratch")
 PY
 }
 
+remove_state_work() {
+    local work="$1" parent name
+    parent="${work%/*}"
+    name="${work##*/}"
+    [ "$parent" = "$STATE_ROOT" ] && [[ "$name" =~ ^(build|stage)\.[A-Za-z0-9]{6}$ ]] \
+        || { printf '[A0.3c] FEHLER: State-Arbeitsroot ist nicht exakt begrenzt\n' >&2; return 70; }
+    [ -d "$work" ] && [ ! -L "$work" ] && [ "$(stat -c %u "$work")" -eq "$(id -u)" ] \
+        || { printf '[A0.3c] FEHLER: State-Arbeitsroot ist nicht regulaer/operator-eigen\n' >&2; return 70; }
+    # Versiegelte Artefaktstores sind absichtlich 0500. Vor dem rekursiven
+    # Entfernen braucht nur der besitzende Operator Schreibrecht auf die
+    # Verzeichnisse; find folgt dabei keinen enthaltenen Symlinks.
+    find "$work" -type d -exec chmod u+rwx {} + \
+        || { printf '[A0.3c] FEHLER: State-Arbeitsroot konnte nicht entsiegelt werden\n' >&2; return 70; }
+    rm -rf -- "$work" \
+        || { printf '[A0.3c] FEHLER: State-Arbeitsroot konnte nicht entfernt werden\n' >&2; return 70; }
+    [ ! -e "$work" ] && [ ! -L "$work" ] \
+        || { printf '[A0.3c] FEHLER: State-Arbeitsroot blieb nach Cleanup bestehen\n' >&2; return 70; }
+    fsync_dir "$STATE_ROOT"
+}
+
 # Der RETURN-Trap in build_runtime raeumt nur den Erfolgsfall auf: bei errexit
 # oder exit feuert er nicht. Ein abgebrochener Bau liess so 851 MB im State-Root
-# liegen (live belegt 2026-08-20). Unter der Operator-Sperre kann kein zweiter
-# Lauf aktiv sein -- vorgefundene Baureste sind deshalb immer Altlasten.
+# liegen (live belegt 2026-08-20). Auch ein abgebrochener Stage-Lauf kann seine
+# absichtlich schreibgeschuetzten Artefaktstores nicht mit nacktem rm entfernen
+# (live belegt 2026-08-21). Unter der Operator-Sperre kann kein zweiter Lauf aktiv
+# sein -- vorgefundene Bau- und Stage-Reste sind deshalb immer Altlasten.
 recover_stale_state_builds() {
     local path
-    for path in "$STATE_ROOT"/build.*; do
+    for path in "$STATE_ROOT"/build.* "$STATE_ROOT"/stage.*; do
         [ -d "$path" ] || continue
         [ ! -L "$path" ] || fail "Baurest ist ein Symlink" 70
         log "entferne Baurest $(basename -- "$path")"
-        rm -rf -- "$path"
+        remove_state_work "$path"
     done
 }
 
@@ -1214,7 +1236,28 @@ sandbox_run() {
 sandbox_canary() {
     local scratch="$1"
     sandbox_run "$scratch" "$RUNTIME_PREFIX/bin/python3.13" -I -P -c \
-        'import os,pathlib,sys; forbidden=[pathlib.Path(p) for p in sys.argv[2:5]]; assert os.getuid()!=int(sys.argv[1]) and pathlib.Path.cwd()==pathlib.Path(sys.argv[5]) and os.environ.get("PATH")=="/usr/bin:/bin"; [(lambda p: (_ for _ in ()).throw(SystemExit("forbidden product path visible")) if p.exists() else None)(p) for p in forbidden]; targets=[]; [(targets.append(os.readlink(fd))) for fd in pathlib.Path("/proc/self/fd").iterdir() if fd.name not in {"0","1","2"}]; assert not any(any(str(p) in t for p in forbidden) for t in targets); assert not any(any(str(p) in value for p in forbidden) for value in os.environ.values()); interfaces={p.name for p in pathlib.Path("/sys/class/net").iterdir()}; assert interfaces <= {"lo"}; pathlib.Path(sys.argv[6]).write_text("isolated\n")' \
+        'import errno, os, pathlib, sys
+forbidden = [pathlib.Path(p) for p in sys.argv[2:5]]
+assert os.getuid() != int(sys.argv[1])
+assert pathlib.Path.cwd() == pathlib.Path(sys.argv[5])
+assert os.environ.get("PATH") == "/usr/bin:/bin"
+for path in forbidden:
+    try:
+        path.stat()
+    except OSError as exc:
+        if exc.errno not in {errno.EACCES, errno.ENOENT, errno.EPERM}:
+            raise
+    else:
+        raise SystemExit("forbidden product path visible")
+targets = []
+for fd in pathlib.Path("/proc/self/fd").iterdir():
+    if fd.name not in {"0", "1", "2"}:
+        targets.append(os.readlink(fd))
+assert not any(any(str(path) in target for path in forbidden) for target in targets)
+assert not any(any(str(path) in value for path in forbidden) for value in os.environ.values())
+interfaces = {path.name for path in pathlib.Path("/sys/class/net").iterdir()}
+assert interfaces <= {"lo"}
+pathlib.Path(sys.argv[6]).write_text("isolated\n")' \
         "$(id -u)" "$REPO_DIR" "$STATE_ROOT" "$DB_PATH" "$scratch/work" "$scratch/output/.canary"
     as_root "$ROOT_TEST_BIN" -f "$scratch/output/.canary" \
         || fail "Build-Sandbox konnte designated output nicht schreiben" 70
@@ -1709,7 +1752,20 @@ stage_set() (
         build_runtime
     fi
     work="$(mktemp -d "$STATE_ROOT/stage.XXXXXX")"
-    trap 'rm -rf -- "$work"' EXIT
+    cleanup_stage_work() {
+        local status=$? cleanup_status=0
+        trap - EXIT
+        set +e
+        if [ -n "$work" ]; then
+            remove_state_work "$work"
+            cleanup_status=$?
+        fi
+        [ "$cleanup_status" -eq 0 ] \
+            || printf '[A0.3c] FEHLER: Stage-Arbeitsroot blieb nach Abbruch bestehen\n' >&2
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$cleanup_status"
+    }
+    trap cleanup_stage_work EXIT
     capture_locks "$work"
     commit="$(repo_commit)"
     repo_tree="$("$GIT_BIN" -C "$REPO_DIR" rev-parse 'HEAD^{tree}')"
@@ -1815,7 +1871,8 @@ stage_set() (
     esac
     verify_set "$manifest" >/dev/null
     atomic_link "sets/$manifest" "$STAGED_LINK"
-    rm -rf -- "$work"
+    remove_state_work "$work"
+    work=""
     trap - EXIT
     printf '%s\n' "$manifest" >&3
 )

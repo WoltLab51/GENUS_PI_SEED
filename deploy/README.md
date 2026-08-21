@@ -272,10 +272,20 @@ nächste Root-Stufe nach einem Passwort fragen kann. `stage` gehört deshalb in
 eine interaktive Sitzung mit wachgehaltener Freigabe, etwa:
 
 ```bash
-sudo -v && ( while sleep 60; do sudo -n true || exit; done ) &
+sudo -v
+( while sleep 60; do sudo -n true || exit; done ) &
 KEEPALIVE=$!
-./deploy/pi_a0_3c_runtime.sh stage; kill "$KEEPALIVE"
+./deploy/pi_a0_3c_runtime.sh stage
+STAGE_STATUS=$?
+kill "$KEEPALIVE" 2>/dev/null || true
+wait "$KEEPALIVE" 2>/dev/null || true
+( exit "$STAGE_STATUS" )
 ```
+
+`sudo -v` muss als eigener Vordergrundbefehl laufen; ein angehängtes `&& ... &`
+würde die gesamte AND-Liste hintergründen und könnte die Passworteingabe stoppen.
+Für Phase 2 erhält der `stage`-Aufruf in derselben Hülle zusätzlich die zuvor
+ausgegebene Supply-Versiegelung als einziges Argument.
 
 **Lieferkette: Wheel vor Quelle.** Der Akquirierer bevorzugt ein bereits
 veröffentlichtes Wheel, sobald dessen Tags zur Zielplattform passen, und nimmt

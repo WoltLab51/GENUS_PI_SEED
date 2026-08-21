@@ -14,6 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy" / "pi_a0_3c_runtime.sh"
+DEPLOY_README = ROOT / "deploy" / "README.md"
 BASH = shutil.which("bash")
 if BASH is None and os.name == "nt":
     candidate = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/bin/bash.exe"
@@ -32,6 +33,10 @@ def _bash_path(path: Path) -> str:
 
 def _script() -> str:
     return SCRIPT.read_text(encoding="utf-8")
+
+
+def _deploy_readme() -> str:
+    return DEPLOY_README.read_text(encoding="utf-8")
 
 
 def _function(name: str) -> str:
@@ -92,6 +97,14 @@ def test_script_is_strict_and_syntactically_valid():
         [BASH, "-n", _bash_path(SCRIPT)], text=True, capture_output=True, check=False
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_documented_sudo_keepalive_authenticates_in_foreground():
+    readme = _deploy_readme()
+    assert "sudo -v && (" not in readme
+    assert "sudo -v\n( while sleep 60; do sudo -n true || exit; done ) &" in readme
+    assert 'STAGE_STATUS=$?' in readme
+    assert '( exit "$STAGE_STATUS" )' in readme
 
 
 def test_official_python_and_sqlite_artifacts_are_fully_pinned():
@@ -913,6 +926,39 @@ def test_supply_chain_is_two_phase_fixed_origin_offline_and_sandboxed():
     assert "sandbox_canary" in build
     assert "root_artifact_inventory" in build
     assert "--no-index" in build
+
+
+def test_sandbox_canary_accepts_kernel_denial_but_never_visible_product_paths():
+    canary = _function("sandbox_canary")
+    for denied in ("errno.EACCES", "errno.ENOENT", "errno.EPERM"):
+        assert denied in canary
+    assert 'raise SystemExit("forbidden product path visible")' in canary
+
+
+def test_state_work_cleanup_unlocks_sealed_stage_directories(tmp_path):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    work = state / "stage.Ab12xy"
+    sealed = work / "sealed"
+    sealed.mkdir(parents=True)
+    (sealed / "artifact.whl").write_bytes(b"sealed")
+    command = rf'''
+chmod 0500 "{_bash_path(sealed)}"
+fsync_dir() {{ :; }}
+remove_state_work "{_bash_path(work)}"
+test ! -e "{_bash_path(work)}"
+'''
+    result = _source(tmp_path, command)
+    assert result.returncode == 0, result.stderr
+    assert not work.exists()
+
+
+def test_stale_state_recovery_covers_build_and_stage_roots():
+    recovery = _function("recover_stale_state_builds")
+    assert '"$STATE_ROOT"/build.* "$STATE_ROOT"/stage.*' in recovery
+    assert 'remove_state_work "$path"' in recovery
+    stage = _function("stage_set")
+    assert "cleanup_stage_work" in stage
+    assert 'remove_state_work "$work"' in stage
 
 
 def test_manifest_binds_sources_backends_and_full_private_runtime():
