@@ -28,7 +28,9 @@ linux_only = pytest.mark.skipif(sys.platform != "linux", reason="validates Linux
 
 
 def _bash_path(path: Path) -> str:
-    value = path.resolve().as_posix()
+    # Preserve the lexical final component: security tests deliberately pass
+    # symlinks and the runtime must receive that link, not its resolved target.
+    value = path.absolute().as_posix()
     if os.name == "nt" and len(value) > 2 and value[1] == ":":
         return f"/{value[0].lower()}{value[2:]}"
     return value
@@ -64,12 +66,14 @@ def _env(tmp_path: Path) -> dict[str, str]:
     home = tmp_path / "home"
     repo = tmp_path / "repo"
     state = home / ".genus" / "runtime-a0.3c"
+    db = home / ".genus" / "genus.sqlite3"
     home.mkdir(exist_ok=True)
     repo.mkdir(exist_ok=True)
     return {
         **os.environ,
         "GENUS_USER": getpass.getuser(),
         "GENUS_HOME": _bash_path(home),
+        "GENUS_DB_PATH": _bash_path(db),
         "GENUS_REPO_DIR": _bash_path(repo),
         "GENUS_A03C_STATE_ROOT": _bash_path(state),
         "GENUS_A03C_RUNTIME_PREFIX": _bash_path(tmp_path / "private-runtime"),
@@ -506,7 +510,12 @@ def test_db_handle_probe_does_not_pass_missing_wal_or_shm(tmp_path):
     result = _source(
         tmp_path,
         "prove_no_db_handles",
-        extra_env={"GENUS_A03C_FUSER": _bash_path(fake), "CALL_LOG": _bash_path(log)},
+        extra_env={
+            "GENUS_A03C_FUSER": _bash_path(fake),
+            # Exercise as_root without depending on the CI user's sudo policy.
+            "GENUS_A03C_SUDO": "/usr/bin/env",
+            "CALL_LOG": _bash_path(log),
+        },
     )
     assert result.returncode == 0, result.stderr
     called = log.read_text()
@@ -877,7 +886,7 @@ done
 if [ "$unit" = genus-network-watchdog.timer ]; then
     case "$prop" in
         ActiveState) printf 'active\\n' ;;
-        InvocationID) printf 'timer-invocation\\n' ;;
+        InvocationID) printf 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n' ;;
         ActiveEnterTimestampMonotonic) printf '123456\\n' ;;
         MainPID|NRestarts) printf '%s\\n' "$prop" >> "$UNEXPECTED"; exit 70 ;;
     esac
@@ -1569,7 +1578,7 @@ def test_stale_set_recovery_rejects_an_invalid_marker_name(tmp_path):
 def test_set_reference_check_rejects_regular_selector_files(tmp_path):
     state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
     state.mkdir(parents=True)
-    active = state / "ACTIVE"
+    active = state / "active"
     active.write_text("sets/" + "a" * 64, encoding="utf-8")
 
     result = _source(tmp_path, f"set_is_referenced {'a' * 64}")
@@ -1583,7 +1592,7 @@ def test_set_reference_check_rejects_normalized_selector_targets(tmp_path):
     manifest = "a" * 64
     state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
     state.mkdir(parents=True)
-    active = state / "ACTIVE"
+    active = state / "active"
     active.symlink_to(f"sets/../sets/{manifest}")
 
     result = _source(tmp_path, f"set_is_referenced {manifest}")

@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import threading
@@ -35,11 +36,32 @@ def _code_root(path: Path) -> Path:
     return root
 
 
-def _git_head(root: Path) -> str:
+def _git_command(root: Path, *arguments: str) -> list[str]:
+    policy = harness.GATE_ENVIRONMENT_CONTRACT["git"]
+    git_dir = root / ".git"
+    if git_dir.is_symlink() or not git_dir.is_dir():
+        raise harness.RuntimeManifestError(
+            "code root Git metadata is not a local directory"
+        )
+    return [
+        policy["executable"],
+        *policy["argv_prefix"],
+        "--git-dir",
+        str(git_dir),
+        "--work-tree",
+        str(root),
+        *arguments,
+    ]
+
+
+def _git_head(
+    root: Path, git_env: Mapping[str, str] | None = None
+) -> str:
     completed = subprocess.run(
-        ["git", "rev-parse", "--verify", "HEAD"],
+        _git_command(root, "rev-parse", "--verify", "HEAD"),
         cwd=root,
         check=False,
+        env=dict(git_env) if git_env is not None else harness.git_environment(),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -51,11 +73,14 @@ def _git_head(root: Path) -> str:
     return value
 
 
-def _require_clean_git(root: Path) -> None:
+def _require_clean_git(
+    root: Path, git_env: Mapping[str, str] | None = None
+) -> None:
     completed = subprocess.run(
-        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        _git_command(root, "status", "--porcelain=v1", "--untracked-files=all"),
         cwd=root,
         check=False,
+        env=dict(git_env) if git_env is not None else harness.git_environment(),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -148,6 +173,40 @@ def _exclusive_output(path: Path):
     return stream
 
 
+def _gate_scratch_directories(scratch: Path) -> tuple[Path, Path]:
+    policy = harness.GATE_ENVIRONMENT_CONTRACT["scratch_directories"]
+    uid = getattr(os, "geteuid", lambda: -1)()
+    created: dict[str, Path] = {}
+    for variable in ("HOME", "TMPDIR"):
+        entry = policy[variable]
+        name = entry["relative_path"]
+        mode = int(entry["mode"], 8)
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", name) or mode != 0o700:
+            raise harness.RuntimeReadinessError(
+                "gate scratch directory policy is malformed"
+            )
+        path = scratch / name
+        try:
+            path.mkdir(mode=mode)
+            os.chmod(path, mode)
+        except OSError as exc:
+            raise harness.RuntimeReadinessError(
+                f"gate {variable} could not be created privately"
+            ) from exc
+        info = path.lstat()
+        if (
+            path.is_symlink()
+            or not stat.S_ISDIR(info.st_mode)
+            or stat.S_IMODE(info.st_mode) != mode
+            or info.st_uid != uid
+        ):
+            raise harness.RuntimeReadinessError(
+                f"gate {variable} is not a private operator directory"
+            )
+        created[variable] = path
+    return created["HOME"], created["TMPDIR"]
+
+
 def _run_gate_bounded(
     command: list[str],
     *,
@@ -169,6 +228,7 @@ def _run_gate_bounded(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=dict(gate_env),
+            umask=0o077,
         )
 
         def pump(source: Any, target: Any) -> None:
@@ -227,28 +287,27 @@ def _run_gate_bounded(
 
 def _cmd_gate(args: argparse.Namespace) -> int:
     root = _code_root(args.code_root)
-    _require_clean_git(root)
-    candidate = _git_head(root)
+    scratch, _ = harness._private_root(args.scratch_root, require_empty=True)
+    _require_external(scratch, root, "gate scratch root", existing=True)
+    _require_external(args.receipt, root, "gate receipt", existing=False)
+    gate_home, gate_tmp = _gate_scratch_directories(scratch)
+    gate_env = harness.gate_environment(home=gate_home, tmpdir=gate_tmp)
+    git_env = harness.git_environment(gate_env)
+    _require_clean_git(root, git_env)
+    candidate = _git_head(root, git_env)
     if candidate != args.candidate_commit.casefold():
         raise harness.RuntimeManifestError("gate candidate commit differs from Git HEAD")
     identity = _attested_identity(args)
     harness._validate_runtime_identity(identity, True)
-    scratch, _ = harness._private_root(args.scratch_root, require_empty=True)
-    _require_external(scratch, root, "gate scratch root", existing=True)
-    _require_external(args.receipt, root, "gate receipt", existing=False)
     basetemp = scratch / "pytest-basetemp"
     stdout_path = scratch / "stdout.bin"
     stderr_path = scratch / "stderr.bin"
     template = harness.gate_command_argv(args.gate)
     command = [
         sys.executable,
-        "-B",
+        *harness.GATE_ENVIRONMENT_CONTRACT["python_argv"],
         *(str(basetemp) if item == "{fresh_private_basetemp}" else item for item in template),
     ]
-    gate_env = os.environ.copy()
-    for key in harness.GATE_ENVIRONMENT_CONTRACT["removed"]:
-        gate_env.pop(key, None)
-    gate_env.update(harness.GATE_ENVIRONMENT_CONTRACT["set"])
     exit_status = _run_gate_bounded(
         command,
         root=root,
@@ -272,7 +331,7 @@ def _cmd_gate(args: argparse.Namespace) -> int:
         identity=identity,
     )
     harness.write_json_evidence(args.receipt, receipt)
-    _require_clean_git(root)
+    _require_clean_git(root, git_env)
     _print_result(
         {
             "receipt": Path(args.receipt).name,

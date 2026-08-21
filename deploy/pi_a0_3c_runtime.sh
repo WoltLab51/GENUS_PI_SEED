@@ -3607,9 +3607,14 @@ prove_no_db_handles() {
     for path in "${paths[@]}"; do
         [[ "$path" = /* ]] || fail "Produkt-DB-Pfad ist nicht absolut" 78
     done
-    set +e
-    output="$(as_root "$FUSER_BIN" "${paths[@]}" 2>&1)"; status=$?
-    set -e
+    # Put the expected fuser status in an if-condition so the global ERR trap
+    # cannot turn the normal "no matching process" status 1 into captured
+    # diagnostic output.  Any output or any other status remains fail-closed.
+    if output="$(as_root "$FUSER_BIN" "${paths[@]}" 2>&1)"; then
+        status=0
+    else
+        status=$?
+    fi
     [ "$status" -eq 1 ] && [ -z "$output" ] || fail "offene Produkt-DB-Handles verhindern den Pointerwechsel" 70
 }
 

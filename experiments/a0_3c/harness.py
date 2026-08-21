@@ -7,6 +7,7 @@ import json
 import math
 import os
 import platform
+import posixpath
 import re
 import sqlite3
 import stat
@@ -132,20 +133,73 @@ GATE_COMMANDS = {
     ),
 }
 GATE_ENVIRONMENT_CONTRACT = {
-    "python_no_bytecode_flag": True,
+    "schema": "genus-a0-3c-gate-environment-v2",
+    "base_environment": "empty",
+    "account": {
+        "source": "pwd.getpwuid(os.geteuid())",
+        "require_real_effective_uid_match": True,
+        "allow_root": False,
+        "mapping": {
+            "LOGNAME": "pw_name",
+            "USER": "pw_name",
+        },
+    },
+    "scratch_directories": {
+        "HOME": {"relative_path": "gate-home", "mode": "0700"},
+        "TMPDIR": {"relative_path": "gate-tmp", "mode": "0700"},
+    },
+    "cwd": "verified_code_root",
+    "subprocess_umask": "0077",
+    "python_argv": ["-B"],
     "set": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONHASHSEED": "0",
+        "PYTHONIOENCODING": "utf-8:strict",
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
+        "PYTHONUTF8": "1",
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "TZ": "UTC0",
     },
-    "removed": [
-        "GENUS_CORE_ID",
-        "GENUS_DB_PATH",
-        "GENUS_PAUSE_FILE",
-        "PYTEST_ADDOPTS",
-        "PYTEST_PLUGINS",
-        "PYTHONPATH",
-    ],
+    "git": {
+        "executable": "/usr/bin/git",
+        "argv_prefix": [
+            "--no-optional-locks",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+        ],
+        "repository_binding": {
+            "git_dir": "verified_code_root/.git-directory",
+            "work_tree": "verified_code_root",
+        },
+        "inherit_from_gate": [
+            "HOME",
+            "TMPDIR",
+            "PATH",
+            "LANG",
+            "LC_ALL",
+            "TZ",
+        ],
+        "standalone": {
+            "HOME": "/nonexistent",
+            "TMPDIR": "/tmp",
+            "PATH": "/usr/bin:/bin",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "TZ": "UTC0",
+        },
+        "set": {
+            "GIT_ATTR_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_TERMINAL_PROMPT": "0",
+        },
+    },
     "stdin": "devnull",
 }
 
@@ -168,6 +222,98 @@ class RunEvidenceError(RuntimeReadinessError):
 
 class SeriesEvidenceError(RuntimeReadinessError):
     """The three-run series is inconsistent."""
+
+
+def _posix_account() -> str:
+    """Return the effective POSIX account without consulting ambient variables."""
+    getuid = getattr(os, "getuid", None)
+    geteuid = getattr(os, "geteuid", None)
+    if getuid is None or geteuid is None:
+        raise RuntimeReadinessError("gate execution requires a POSIX account")
+    try:
+        uid = int(getuid())
+        effective_uid = int(geteuid())
+    except (OSError, TypeError, ValueError) as exc:
+        raise RuntimeReadinessError("effective POSIX UID is not resolvable") from exc
+    if uid != effective_uid or effective_uid == 0:
+        raise RuntimeReadinessError(
+            "gate execution requires one non-root real/effective POSIX account"
+        )
+    try:
+        import pwd
+
+        account = pwd.getpwuid(effective_uid)
+        account_uid = int(account.pw_uid)
+        user = account.pw_name
+    except (AttributeError, ImportError, KeyError, OSError, TypeError, ValueError) as exc:
+        raise RuntimeReadinessError("effective POSIX account is not resolvable") from exc
+    if account_uid != effective_uid:
+        raise RuntimeReadinessError("resolved POSIX account UID differs")
+    return user
+
+
+def gate_environment(*, home: Path | str, tmpdir: Path | str) -> dict[str, str]:
+    """Build the complete gate environment from the bound empty-base policy."""
+    user = _posix_account()
+    if (
+        not isinstance(user, str)
+        or not user
+        or any(character in user for character in "\x00\r\n=")
+    ):
+        raise RuntimeReadinessError("effective POSIX account name is unsafe")
+    dynamic = {"HOME": os.fspath(home), "TMPDIR": os.fspath(tmpdir)}
+    for label, value in dynamic.items():
+        if (
+            not isinstance(value, str)
+            or not value.startswith("/")
+            or value.startswith("//")
+            or posixpath.normpath(value) != value
+            or any(character in value for character in "\x00\r\n")
+        ):
+            raise RuntimeReadinessError(f"gate {label} is not a canonical POSIX path")
+    if dynamic["HOME"] == dynamic["TMPDIR"]:
+        raise RuntimeReadinessError("gate HOME and TMPDIR must be distinct")
+    fixed = GATE_ENVIRONMENT_CONTRACT["set"]
+    if not isinstance(fixed, Mapping) or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in fixed.items()
+    ):
+        raise RuntimeReadinessError("gate environment policy is malformed")
+    environment = dict(fixed)
+    environment.update(dynamic)
+    environment.update({"LOGNAME": user, "USER": user})
+    expected = set(fixed) | {"HOME", "TMPDIR", "LOGNAME", "USER"}
+    if set(environment) != expected:
+        raise RuntimeReadinessError("gate environment contains an unbound key")
+    return environment
+
+
+def git_environment(
+    gate: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Return an empty-base Git environment with no ambient repository override."""
+    policy = GATE_ENVIRONMENT_CONTRACT["git"]
+    if gate is None:
+        environment = dict(policy["standalone"])
+    else:
+        inherited = policy["inherit_from_gate"]
+        if not isinstance(inherited, list) or any(
+            not isinstance(key, str) or key not in gate for key in inherited
+        ):
+            raise RuntimeReadinessError("Git gate environment policy is malformed")
+        environment = {key: gate[key] for key in inherited}
+    environment.update(policy["set"])
+    expected = (
+        set(policy["standalone"])
+        if gate is None
+        else set(policy["inherit_from_gate"])
+    ) | set(policy["set"])
+    if set(environment) != expected or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in environment.items()
+    ):
+        raise RuntimeReadinessError("Git environment contains an unbound key")
+    return environment
 
 
 def _canonical_bytes(value: Any) -> bytes:

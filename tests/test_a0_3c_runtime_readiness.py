@@ -3,7 +3,10 @@ from __future__ import annotations
 import copy
 import json
 import os
+import stat
+import subprocess
 import sys
+import types
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator, Mapping
@@ -184,13 +187,352 @@ def test_gate_commands_are_fixed_and_use_external_placeholder() -> None:
     for command in harness.GATE_COMMANDS.values():
         assert "{fresh_private_basetemp}" in command
         assert all(".a03c-gate-tmp" not in item for item in command)
-    assert harness.GATE_ENVIRONMENT_CONTRACT["python_no_bytecode_flag"] is True
-    assert set(harness.GATE_ENVIRONMENT_CONTRACT["removed"]) >= {
-        "GENUS_DB_PATH",
-        "GENUS_CORE_ID",
-        "GENUS_PAUSE_FILE",
-        "PYTHONPATH",
+    contract = harness.GATE_ENVIRONMENT_CONTRACT
+    assert contract["schema"] == "genus-a0-3c-gate-environment-v2"
+    assert contract["base_environment"] == "empty"
+    assert contract["python_argv"] == ["-B"]
+    assert contract["account"] == {
+        "source": "pwd.getpwuid(os.geteuid())",
+        "require_real_effective_uid_match": True,
+        "allow_root": False,
+        "mapping": {
+            "LOGNAME": "pw_name",
+            "USER": "pw_name",
+        },
     }
+    assert contract["scratch_directories"] == {
+        "HOME": {"relative_path": "gate-home", "mode": "0700"},
+        "TMPDIR": {"relative_path": "gate-tmp", "mode": "0700"},
+    }
+    assert contract["cwd"] == "verified_code_root"
+    assert contract["subprocess_umask"] == "0077"
+    assert contract["set"] == {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONHASHSEED": "0",
+        "PYTHONIOENCODING": "utf-8:strict",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONUTF8": "1",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "TZ": "UTC0",
+    }
+    assert contract["git"]["executable"] == "/usr/bin/git"
+    assert contract["git"]["argv_prefix"] == [
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+    ]
+
+
+def test_gate_environment_uses_getpwuid_and_no_ambient_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ambient = {
+        "BASH_ENV": "/tmp/injected-bash-env",
+        "ENV": "/tmp/injected-sh-env",
+        "SHELLOPTS": "xtrace:verbose",
+        "BASHOPTS": "expand_aliases:sourcepath",
+        "CDPATH": "/tmp/injected-cdpath",
+        "GENUS_A03C_SYSTEMCTL": "/tmp/injected-systemctl",
+        "GENUS_DB_PATH": "/live/product.sqlite3",
+        "LD_PRELOAD": "/tmp/injected-loader.so",
+        "PYTHONHOME": "/tmp/injected-python",
+        "PYTHONPATH": "/tmp/injected-modules",
+        "PYTEST_ADDOPTS": "--ignore=tests",
+        "PYTEST_PLUGINS": "injected_plugin",
+        "PATH": "/tmp/injected-bin",
+        "HOME": "/tmp/injected-home",
+        "LOGNAME": "injected-logname",
+        "USER": "injected-user",
+        "LANG": "injected-locale",
+        "LC_ALL": "injected-locale",
+        "TZ": "injected-timezone",
+        "TMPDIR": "/tmp/injected-tmp",
+        "GIT_DIR": "/tmp/injected-git-dir",
+        "GIT_WORK_TREE": "/tmp/injected-work-tree",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_0": "/tmp/injected-fsmonitor",
+    }
+    for key, value in ambient.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(harness.os, "getuid", lambda: 1234, raising=False)
+    monkeypatch.setattr(harness.os, "geteuid", lambda: 1234, raising=False)
+    monkeypatch.setitem(
+        sys.modules,
+        "pwd",
+        types.SimpleNamespace(
+            getpwuid=lambda uid: types.SimpleNamespace(
+                pw_uid=uid,
+                pw_name="gate-user",
+            )
+        ),
+    )
+
+    environment = harness.gate_environment(
+        home="/evidence/gate-home", tmpdir="/evidence/gate-tmp"
+    )
+
+    assert environment == {
+        **harness.GATE_ENVIRONMENT_CONTRACT["set"],
+        "HOME": "/evidence/gate-home",
+        "TMPDIR": "/evidence/gate-tmp",
+        "LOGNAME": "gate-user",
+        "USER": "gate-user",
+    }
+    fixed_keys = {
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "LOGNAME",
+        "USER",
+        "LANG",
+        "LC_ALL",
+        "TZ",
+    }
+    assert set(environment).isdisjoint(set(ambient) - fixed_keys)
+    assert all("injected" not in value for value in environment.values())
+
+
+@pytest.mark.parametrize(
+    ("user", "home", "tmpdir"),
+    [
+        ("", "/evidence/home", "/evidence/tmp"),
+        ("gate\nuser", "/evidence/home", "/evidence/tmp"),
+        ("gate-user", "relative/home", "/evidence/tmp"),
+        ("gate-user", "/evidence/../tmp", "/evidence/tmp"),
+        ("gate-user", "/evidence/same", "/evidence/same"),
+    ],
+)
+def test_gate_environment_rejects_unsafe_account_values(
+    monkeypatch: pytest.MonkeyPatch, user: str, home: str, tmpdir: str
+) -> None:
+    monkeypatch.setattr(harness, "_posix_account", lambda: user)
+    with pytest.raises(harness.RuntimeReadinessError):
+        harness.gate_environment(home=home, tmpdir=tmpdir)
+
+
+@pytest.mark.parametrize(("uid", "effective_uid"), [(0, 0), (1000, 0), (1000, 1001)])
+def test_gate_account_rejects_root_or_identity_transitions(
+    monkeypatch: pytest.MonkeyPatch, uid: int, effective_uid: int
+) -> None:
+    monkeypatch.setattr(harness.os, "getuid", lambda: uid, raising=False)
+    monkeypatch.setattr(harness.os, "geteuid", lambda: effective_uid, raising=False)
+    with pytest.raises(harness.RuntimeReadinessError, match="non-root"):
+        harness._posix_account()
+
+
+def test_git_attestation_environment_and_command_ignore_ambient_injection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_KEY_0",
+        "GIT_CONFIG_VALUE_0",
+    ):
+        monkeypatch.setenv(key, f"injected-{key}")
+    gate = {
+        **harness.GATE_ENVIRONMENT_CONTRACT["set"],
+        "HOME": "/evidence/gate-home",
+        "TMPDIR": "/evidence/gate-tmp",
+        "LOGNAME": "gate-user",
+        "USER": "gate-user",
+    }
+
+    environment = harness.git_environment(gate)
+    command = cli._git_command(CODE_ROOT, "status", "--porcelain=v1")
+
+    assert environment == {
+        "HOME": "/evidence/gate-home",
+        "TMPDIR": "/evidence/gate-tmp",
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "TZ": "UTC0",
+        **harness.GATE_ENVIRONMENT_CONTRACT["git"]["set"],
+    }
+    assert not any(key.startswith("injected-") for key in environment.values())
+    assert not any(key.startswith("GIT_DIR") for key in environment)
+    assert command == [
+        "/usr/bin/git",
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "--git-dir",
+        str(CODE_ROOT / ".git"),
+        "--work-tree",
+        str(CODE_ROOT),
+        "status",
+        "--porcelain=v1",
+    ]
+
+
+def test_git_head_and_clean_check_pass_only_the_isolated_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, Any]]] = []
+    isolated = harness.git_environment()
+
+    def fake_run(command: list[str], **kwargs: Any):
+        calls.append((command, kwargs))
+        stdout = f"{COMMIT}\n".encode("ascii") if "rev-parse" in command else b""
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr=b"")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setenv("GIT_DIR", "/tmp/ambient-repository")
+    monkeypatch.setenv("PATH", "/tmp/fake-bin")
+
+    assert cli._git_head(CODE_ROOT) == COMMIT
+    cli._require_clean_git(CODE_ROOT)
+
+    assert len(calls) == 2
+    for command, kwargs in calls:
+        assert command[0] == "/usr/bin/git"
+        assert kwargs["cwd"] == CODE_ROOT
+        assert kwargs["env"] == isolated
+        assert "GIT_DIR" not in kwargs["env"]
+        assert kwargs["env"]["PATH"] == "/usr/bin:/bin"
+
+
+def test_cmd_gate_passes_the_exact_built_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    home = scratch / "gate-home"
+    temporary = scratch / "gate-tmp"
+    expected_environment = {"BOUND_GATE_ENV": "exact"}
+    expected_git_environment = {"BOUND_GIT_ENV": "exact"}
+    captured: dict[str, Any] = {}
+    clean_calls: list[dict[str, str]] = []
+
+    monkeypatch.setenv("BASH_ENV", "/tmp/ambient-injection")
+    monkeypatch.setattr(cli, "_code_root", lambda path: CODE_ROOT)
+    monkeypatch.setattr(cli, "_require_external", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        cli, "_gate_scratch_directories", lambda path: (home, temporary)
+    )
+    monkeypatch.setattr(
+        harness,
+        "gate_environment",
+        lambda **kwargs: dict(expected_environment),
+    )
+    monkeypatch.setattr(
+        harness,
+        "git_environment",
+        lambda gate=None: dict(expected_git_environment),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_require_clean_git",
+        lambda root, git_env=None: clean_calls.append(dict(git_env or {})),
+    )
+    monkeypatch.setattr(cli, "_git_head", lambda root, git_env=None: COMMIT)
+    monkeypatch.setattr(cli, "_attested_identity", lambda args: _target_identity())
+    monkeypatch.setattr(harness, "_validate_runtime_identity", lambda *args: ZERO)
+    monkeypatch.setattr(cli, "_print_result", lambda value: None)
+
+    def fake_gate_run(command: list[str], **kwargs: Any) -> int:
+        captured["command"] = command
+        captured["environment"] = dict(kwargs["gate_env"])
+        kwargs["stdout_path"].write_bytes(b"1 passed\n")
+        kwargs["stderr_path"].write_bytes(b"")
+        return 0
+
+    monkeypatch.setattr(cli, "_run_gate_bounded", fake_gate_run)
+    args = types.SimpleNamespace(
+        code_root=CODE_ROOT,
+        scratch_root=scratch,
+        receipt=tmp_path / "gate-receipt.json",
+        candidate_commit=COMMIT,
+        expected_invocation=None,
+        gate="full_suite",
+    )
+
+    assert cli._cmd_gate(args) == 0
+    assert captured["environment"] == expected_environment
+    assert "BASH_ENV" not in captured["environment"]
+    assert captured["command"][:2] == [sys.executable, "-B"]
+    assert clean_calls == [expected_git_environment, expected_git_environment]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="validates POSIX ownership and umask")
+def test_gate_scratch_and_child_umask_are_private(tmp_path: Path) -> None:
+    scratch = tmp_path / "scratch"
+    scratch.mkdir(mode=0o700)
+    os.chmod(scratch, 0o700)
+
+    home, temporary = cli._gate_scratch_directories(scratch)
+    environment = harness.gate_environment(home=home, tmpdir=temporary)
+    child_file = temporary / "child-created"
+    stdout = scratch / "stdout.bin"
+    stderr = scratch / "stderr.bin"
+    status_code = cli._run_gate_bounded(
+        [
+            sys.executable,
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[1]).touch(mode=0o666)",
+            str(child_file),
+        ],
+        root=CODE_ROOT,
+        gate_env=environment,
+        stdout_path=stdout,
+        stderr_path=stderr,
+    )
+
+    assert status_code == 0
+    assert home.parent == scratch and temporary.parent == scratch
+    assert home.name == "gate-home" and temporary.name == "gate-tmp"
+    assert stat.S_IMODE(home.stat().st_mode) == 0o700
+    assert stat.S_IMODE(temporary.stat().st_mode) == 0o700
+    assert stat.S_IMODE(child_file.stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(
+    os.name != "posix" or not Path("/usr/bin/git").is_file(),
+    reason="validates canonical POSIX Git behavior",
+)
+def test_git_clean_check_disables_configured_fsmonitor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    canary = tmp_path / "fsmonitor-ran"
+    monitor = tmp_path / "fsmonitor"
+    repository.mkdir()
+    monitor.write_text(
+        f"#!/bin/sh\n: > {canary}\nexit 0\n",
+        encoding="utf-8",
+    )
+    monitor.chmod(0o700)
+    subprocess.run(["/usr/bin/git", "init", "-q", str(repository)], check=True)
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "config",
+            "core.fsmonitor",
+            str(monitor),
+        ],
+        check=True,
+    )
+    monkeypatch.setenv("GIT_DIR", str(CODE_ROOT / ".git"))
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.fsmonitor")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(monitor))
+
+    cli._require_clean_git(repository)
+
+    assert not canary.exists()
 
 
 def test_gate_output_is_hard_capped_during_subprocess(
