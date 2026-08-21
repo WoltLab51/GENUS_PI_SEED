@@ -1275,3 +1275,26 @@ def test_runtime_verification_accepts_the_cpython_symlinks():
     # und das Inventar bindet jedes Symlink-Ziel.
     assert "! -user root" in verify
     assert "target" in _function("runtime_tree_inventory")
+
+
+def test_runtime_tree_is_built_readable_for_the_unprivileged_service_user():
+    build = _function("build_runtime")
+    verify = _function("verify_runtime_prefix")
+    # Live-Fund 2026-08-21: Das globale umask 077 des Skripts vererbt sich auf alles,
+    # was Python waehrend des Baus anlegt (pip-Installation, __pycache__). Nach dem
+    # chown auf root lagen 136 Verzeichnisse auf 0700 -- die GENUS-Dienste laufen
+    # aber unprivilegiert und haetten diese Runtime nie benutzen koennen.
+    assert build.count("umask 022") == 2, "beide Bau-Subshells brauchen den offenen umask"
+    assert build.index("umask 022") < build.index("./configure")
+    # Und die Verifikation faengt die Klasse ab, statt sie erst live auffliegen zu lassen.
+    assert "! -perm -o+r" in verify and "-type d ! -perm -o+x" in verify
+    assert "nicht lesbar" in verify
+
+
+def test_stage_quarantines_an_unusable_runtime_instead_of_blocking():
+    stage = _function("stage_set")
+    # Ohne diesen Zweig braeuchte jeder Fehlversuch eine root-Handaufraeumung:
+    # verify_runtime_prefix wuerde hart scheitern und den Lauf blockiert zuruecklassen.
+    assert "quarantine_runtime_path" in stage
+    assert '( verify_runtime_prefix )' in stage
+    assert stage.index("quarantine_runtime_path") < stage.index("build_runtime")

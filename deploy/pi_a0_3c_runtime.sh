@@ -677,6 +677,11 @@ verify_runtime_prefix() {
     set -e
     [ "$status" -eq 0 ] && [ -z "$output" ] \
         || fail "Runtime ist gruppen-/welt-schreibbar" 65
+    # Gegenprobe zur Schreibbarkeit: Die Dienste laufen unprivilegiert, eine nur
+    # fuer root lesbare Runtime ist wertlos (live belegt 2026-08-21: 136
+    # Verzeichnisse auf 0700, darunter site-packages/pip).
+    output="$(as_root "$ROOT_FIND_BIN" "$RUNTIME_PREFIX" -xdev ! -type l         \( ! -perm -o+r -o \( -type d ! -perm -o+x \) \) -print -quit 2>&1)"; status=$?
+    [ "$status" -eq 0 ] && [ -z "$output" ]         || fail "Runtime ist fuer den unprivilegierten Dienstbenutzer nicht lesbar" 65
     [ -f "$RUNTIME_INVENTORY" ] && [ ! -L "$RUNTIME_INVENTORY" ] \
         && [ "$(stat -c %U "$RUNTIME_INVENTORY")" = root ] \
         && [ "$(stat -c %a "$RUNTIME_INVENTORY")" = 644 ] \
@@ -729,12 +734,20 @@ build_runtime() {
     jobs="${GENUS_A03C_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN)}"
     (
         cd "$sqlite_src"
+        # Das globale umask 077 wuerde alles, was Python hier anlegt (pip-
+        # Installation, __pycache__), auf 0700 setzen. Nach dem chown auf root
+        # koennte der unprivilegierte Dienstbenutzer die Runtime dann nicht mehr
+        # lesen -- live belegt 2026-08-21 mit 136 unlesbaren Verzeichnissen.
+        # Der Runtime-Baum entsteht deshalb bewusst oeffentlich lesbar; State,
+        # Sets und Belege bleiben vom globalen umask geschuetzt.
+        umask 022
         CFLAGS='-O2 -fPIC' ./configure --prefix="$RUNTIME_PREFIX" --disable-static --enable-shared
         "$MAKE_BIN" -j"$jobs"
         "$MAKE_BIN" DESTDIR="$stage" install
     )
     (
         cd "$python_src"
+        umask 022
         # CPython prueft nach dem Bau jedes Modul auf Importierbarkeit.
         # _sqlite3 traegt bereits den RUNPATH auf den finalen Prefix, der zu
         # diesem Zeitpunkt noch nicht veroeffentlicht ist -- ohne bauzeitlichen
@@ -1660,7 +1673,17 @@ stage_set() (
     # (Abbruch zwischen Rename und Markerentfernung); Recovery laeuft deshalb in
     # beiden Zweigen und nicht nur im Neubau.
     recover_runtime_publication
-    if [ -e "$RUNTIME_PREFIX" ]; then verify_runtime_prefix; else build_runtime; fi
+    # Quarantaene statt Reparatur: Eine vorgefundene Runtime, die die Verifikation
+    # nicht besteht, wird beiseitegelegt und neu gebaut, statt den Lauf blockiert
+    # zurueckzulassen (sonst braeuchte jeder Fehlversuch eine root-Handaufraeumung).
+    if [ -e "$RUNTIME_PREFIX" ] && ( verify_runtime_prefix ); then
+        :
+    else
+        if [ -e "$RUNTIME_PREFIX" ]; then
+            quarantine_runtime_path "$RUNTIME_PREFIX" "vorgefundene Runtime besteht die Verifikation nicht"
+        fi
+        build_runtime
+    fi
     work="$(mktemp -d "$STATE_ROOT/stage.XXXXXX")"
     trap 'rm -rf -- "$work"' EXIT
     capture_locks "$work"
