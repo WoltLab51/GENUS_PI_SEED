@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import getpass
+import hashlib
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +24,7 @@ if BASH is None and os.name == "nt":
 
 pytestmark = pytest.mark.skipif(BASH is None, reason="needs bash")
 posix_only = pytest.mark.skipif(os.name == "nt", reason="validates POSIX filesystem semantics")
+linux_only = pytest.mark.skipif(sys.platform != "linux", reason="validates Linux mount semantics")
 
 
 def _bash_path(path: Path) -> str:
@@ -48,6 +51,13 @@ def _function(name: str) -> str:
         (item.start() for item in starts if item.start() > match.start()), len(script)
     )
     return script[match.end() : end]
+
+
+def test_all_embedded_python_blocks_compile():
+    blocks = re.findall(r"<<'PY'\n(.*?)\nPY", _script(), re.S)
+    assert blocks
+    for index, block in enumerate(blocks, start=1):
+        compile(block, f"<pi_a0_3c_runtime-heredoc-{index}>", "exec")
 
 
 def _env(tmp_path: Path) -> dict[str, str]:
@@ -210,6 +220,26 @@ def test_console_script_shebangs_are_bound_to_the_final_manifest_set():
     assert creation < editable < sealing
 
 
+def test_inventory_for_compare_is_safe_under_nounset(tmp_path):
+    fake_python = tmp_path / "fake-python"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\nprintf '%s\\n' '-e /controlled/repo' 'example==1.0'\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    fake_python.chmod(0o755)
+    target = tmp_path / "inventory.lock"
+
+    result = _source(
+        tmp_path,
+        f"inventory_for_compare '{_bash_path(fake_python)}' one '{_bash_path(target)}'",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert target.is_file()
+    assert not Path(f"{target}.raw").exists()
+
+
 def test_wheel_lock_tree_and_bootstrap_are_manifest_bound():
     script = _script()
     for contract in (
@@ -248,15 +278,46 @@ def test_runtime_publication_is_inventory_bound_durable_and_recoverable():
     assert 'runtime_probe "$stage$RUNTIME_PREFIX' not in build
 
 
-def test_activation_requires_external_private_readiness_manifest_and_invocation():
+def test_activation_requires_private_readiness_series_and_exact_invocation(tmp_path):
     script = _script()
-    assert "activate EXPECTED_COMMIT READINESS_MANIFEST [SET_MANIFEST]" in script
+    readme = _deploy_readme()
+    assert (
+        "activate EXPECTED_COMMIT READINESS_MANIFEST FINAL_SERIES_RECEIPT [SET_MANIFEST]"
+        in script
+    )
+    missing = _run(tmp_path, "activate", "a" * 40, "/readiness/manifest.json")
+    assert missing.returncode == 64
+    assert "FINAL_SERIES_RECEIPT" in missing.stderr
+    verify_series = readme.index("-m experiments.a0_3c verify-series")
+    activate = readme.index("./deploy/pi_a0_3c_runtime.sh activate", verify_series)
+    assert verify_series < activate
+    assert '"$MANIFEST_JSON" "$FINAL_SERIES_RECEIPT" "$MANIFEST_ID"' in readme
     verify = _function("verify_readiness_manifest")
     assert 'stat -c %a "$readiness")" = 600' in verify
     assert "experiments.a0_3c manifest-verify" in verify
     assert '--expected-invocation "$set/core/bin/python"' in verify
+    series = _function("verify_series_receipt")
+    assert 'stat -c %a "$series")" = 600' in series
+    assert 'stat -c %h "$series")" -eq 1' in series
+    assert 'root="$GENUS_HOME/.genus/a0.3c/series"' in series
+    assert '"$set/core/bin/python" - "$resolved" "$readiness"' in series
+    assert "harness.runtime_identity(expected_python)" in series
+    assert "harness.verify_final_series_receipt_chain" in series
+    assert "series_evidence_root=series_root" in series
+    assert 'verified.get("gate_pass") is not True' in series
+    assert 'verified.get("consecutive_green_runs") != 3' in series
+    assert 'readiness_before_stat["sha256"]' in series
+    assert "harness._decode_json_evidence(readiness_before)" in series
+    assert "harness.read_json_evidence(\n    readiness_path" not in series
+    assert 'VERIFIED_SERIES_READINESS_SHA256="$readiness_hash"' in series
     switch = _function("switch_with_quiescence")
-    assert switch.index("verify_readiness_manifest") < switch.index("fresh_backup_receipt")
+    readiness = switch.index("verify_readiness_manifest")
+    canonical_readiness = switch.index('readiness="$VERIFIED_READINESS_MANIFEST"', readiness)
+    final_series = switch.index("verify_series_receipt", canonical_readiness)
+    crossbind = switch.index('"$readiness_hash" = "$VERIFIED_SERIES_READINESS_SHA256"', final_series)
+    inventory = switch.index("remember_services", crossbind)
+    mutation = switch.index("capture_activation_crontab", inventory)
+    assert readiness < canonical_readiness < final_series < crossbind < inventory < mutation
 
 
 def test_activation_is_exact_clean_including_untracked_files():
@@ -419,6 +480,7 @@ def test_postflight_attests_live_bot_learner_and_activation_evidence():
         "activated_set_manifest",
         "backup_receipt_sha256",
         "readiness_manifest_sha256",
+        "series_receipt_sha256",
         "verification_receipt_sha256",
         "postflight_receipt_sha256",
         "service_state_sha256",
@@ -478,6 +540,69 @@ def test_operator_lock_rejects_a_concurrent_mutation(tmp_path):
     assert holder.wait(timeout=10) == 0
 
 
+def test_verify_acquires_operator_lock_before_resolving_or_inspecting_a_set():
+    main = _function("main")
+    verify = main[main.index("verify)") : main.index("activate)")]
+    assert verify.index("init_user_roots") < verify.index("acquire_operator_lock")
+    assert verify.index("acquire_operator_lock") < verify.index("resolve_manifest")
+    assert verify.index("resolve_manifest") < verify.index("verify_target")
+
+
+@linux_only
+def test_verify_command_cannot_enter_while_stage_lock_is_held(tmp_path):
+    env = _env(tmp_path)
+    env["GENUS_A03C_SOURCE_ONLY"] = "1"
+    source = f"source '{_bash_path(SCRIPT)}'"
+    holder = subprocess.Popen(
+        [BASH, "-c", f"{source}; init_user_roots; acquire_operator_lock; echo ready; read -r _"],
+        env=env,
+        text=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    sentinel = tmp_path / "verify-entered"
+    manifest = "a" * 64
+    contender_command = rf'''
+{source}
+resolve_manifest() {{ printf '%s\n' '{manifest}'; }}
+verify_target() {{ : > "$VERIFY_SENTINEL"; }}
+main verify active
+'''
+    verify_env = {
+        **env,
+        "OPERATOR_LOCK_HELD": "1",
+        "VERIFY_SENTINEL": _bash_path(sentinel),
+    }
+    try:
+        assert holder.stdout is not None and holder.stdout.readline().strip() == "ready"
+        contender = subprocess.run(
+            [BASH, "-c", contender_command],
+            env=verify_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert contender.returncode == 75
+        assert "Operator-Lock" in contender.stderr
+        assert not sentinel.exists(), "verify_target ran despite the held stage lock"
+    finally:
+        if holder.stdin is not None:
+            holder.stdin.write("done\n")
+            holder.stdin.flush()
+        holder.wait(timeout=10)
+
+    retry = subprocess.run(
+        [BASH, "-c", contender_command],
+        env=verify_env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert retry.returncode == 0, retry.stderr
+    assert sentinel.is_file()
+
+
 def test_stable_core_and_embed_invocations_are_both_attested():
     attest = _function("attest_active_pointer_unit")
     assert '"$CORE_POINTER/bin/python"' in attest
@@ -512,6 +637,8 @@ def test_activation_journal_and_autostart_approval_are_durable_and_bound():
         "candidate_commit",
         "target_manifest_sha256",
         "readiness_sha256",
+        "series_path",
+        "series_sha256",
         "active_manifest_sha256",
         "cron_original_sha256",
     ):
@@ -521,6 +648,12 @@ def test_activation_journal_and_autostart_approval_are_durable_and_bound():
         assert stat_gate in approval
     assert "ACTIVE binding differs" in validate
     assert "start authorization ACTIVE binding differs" in approval
+    assert "genus-a0.3c-runtime-activation-pending-v2" in create
+    assert "genus-a0.3c-runtime-start-authorization-v3" in create
+    assert "series receipt layout differs" in validate
+    assert "authorization series hash differs" in approval
+    assert "series journal chain differs" in validate
+    assert "series journal chain differs" in approval
     assert switch.index("create_activation_journal") < switch.index(" pause --reason")
     assert switch.index("disable_genus_cron_block") < switch.index(" pause --reason")
     assert switch.index("install_systemd_autostart_guard") < switch.index(" pause --reason")
@@ -532,12 +665,189 @@ def test_activation_journal_and_autostart_approval_are_durable_and_bound():
         "active_manifest_sha256",
         "target_manifest_sha256",
         "readiness_sha256",
+        "series_path",
+        "series_sha256",
         "st_nlink",
         "O_NOFOLLOW",
     ):
         assert contract in boot_guard
+    assert "series journal chain differs" in boot_guard
+    assert "journal_entry_sha256" in boot_guard
     assert "ExecCondition=%s" in systemd_payload
     assert "BOOT_GUARD_PATH" in systemd_payload
+
+
+@posix_only
+@pytest.mark.parametrize("drift", ["readiness", "series"])
+def test_activation_journal_rejects_evidence_drift_before_persistence(tmp_path, drift):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    state.mkdir(parents=True)
+    readiness = tmp_path / "readiness.json"
+    series = tmp_path / "final-series.json"
+    readiness.write_text("verified readiness\n", encoding="utf-8")
+    series.write_text("verified series\n", encoding="utf-8")
+    readiness.chmod(0o600)
+    series.chmod(0o600)
+    command = rf'''
+selector_manifest() {{ printf '%s\n' '{"a" * 64}'; }}
+manifest_file_hash() {{ printf '%s\n' '{"b" * 64}'; }}
+sha256_file() {{ sha256sum "$1" | awk '{{print $1}}'; }}
+active_services=(genus-learner.service)
+readiness_hash="$(sha256_file "$READINESS")"
+series_hash="$(sha256_file "$SERIES")"
+[ "$DRIFT" != readiness ] || readiness_hash='{"0" * 64}'
+[ "$DRIFT" != series ] || series_hash='{"0" * 64}'
+create_activation_journal '{"c" * 40}' '{"d" * 64}' activate \
+    "$READINESS" "$readiness_hash" "$SERIES" "$series_hash"
+'''
+    result = _source(
+        tmp_path,
+        command,
+        extra_env={
+            "DRIFT": drift,
+            "READINESS": _bash_path(readiness),
+            "SERIES": _bash_path(series),
+        },
+    )
+    assert result.returncode == 70
+    assert "driftete vor durablem Activation-Journal" in result.stderr
+    assert not (state / "activation.pending").exists()
+
+
+@posix_only
+def test_start_boundary_rejects_journal_tamper_with_unchanged_final_receipt(tmp_path):
+    def seal(body):
+        payload = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+        return {**body, "receipt_sha256": hashlib.sha256(payload).hexdigest()}
+
+    def write_private(path, value):
+        path.write_text(
+            json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        path.chmod(0o600)
+
+    home = tmp_path / "home"
+    state = home / ".genus" / "runtime-a0.3c"
+    sets = state / "sets"
+    manifest_id = "d" * 64
+    set_root = sets / manifest_id
+    set_root.mkdir(parents=True)
+    manifest_file = set_root / "manifest.json"
+    manifest_file.write_text("bound set manifest\n", encoding="utf-8")
+    manifest_hash = hashlib.sha256(manifest_file.read_bytes()).hexdigest()
+    readiness = home / ".genus" / "a0.3c" / "readiness" / "id" / "manifest.json"
+    readiness.parent.mkdir(parents=True)
+    readiness.write_text("bound readiness\n", encoding="utf-8")
+    readiness.chmod(0o600)
+    series_root = home / ".genus" / "a0.3c" / "series"
+    series_parent = series_root / "id"
+    journal_root = series_parent / "journal-root"
+    journal_dir = journal_root / "journal"
+    journal_dir.mkdir(parents=True)
+    for directory in (series_root, series_parent, journal_root, journal_dir):
+        directory.chmod(0o700)
+    series_init = seal({"schema": "test-series-init"})
+    init_path = journal_root / "series-init.json"
+    write_private(init_path, series_init)
+    entry = seal({
+        "schema": "test-journal-entry",
+        "index": 1,
+        "previous_entry_sha256": "0" * 64,
+        "series_init_sha256": series_init["receipt_sha256"],
+    })
+    entry_path = journal_dir / "00000001.json"
+    write_private(entry_path, entry)
+    final = seal({
+        "schema": "genus-a0-3c-readiness-series-v1",
+        "candidate_commit": "c" * 40,
+        "gate_pass": True,
+        "consecutive_green_runs": 3,
+        "series_init_sha256": series_init["receipt_sha256"],
+        "journal_entry_count": 1,
+        "journal_entry_sha256": [entry["receipt_sha256"]],
+        "journal_chain_tip_sha256": entry["receipt_sha256"],
+    })
+    final_path = series_parent / "final-series.json"
+    write_private(final_path, final)
+    original = state / "activation.crontab.original"
+    disabled = state / "activation.crontab.disabled"
+    state.mkdir(parents=True, exist_ok=True)
+    for path in (original, disabled):
+        path.write_text("cron snapshot\n", encoding="utf-8")
+        path.chmod(0o600)
+    file_hash = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    pending = {
+        "schema": "genus-a0.3c-runtime-activation-pending-v2",
+        "phase": "target-verified",
+        "candidate_commit": "c" * 40,
+        "mode": "activate",
+        "target_manifest": manifest_id,
+        "target_manifest_sha256": manifest_hash,
+        "readiness_path": str(readiness),
+        "readiness_sha256": file_hash(readiness),
+        "series_path": str(final_path),
+        "series_sha256": file_hash(final_path),
+        "active_manifest": manifest_id,
+        "active_manifest_sha256": manifest_hash,
+        "prior_active_manifest": manifest_id,
+        "prior_previous_manifest": manifest_id,
+        "prior_active_services": ["genus-learner.service"],
+        "cron_original_sha256": file_hash(original),
+        "cron_disabled_sha256": file_hash(disabled),
+        "activation_receipt_path": "",
+        "activation_receipt_sha256": "",
+    }
+    pending_path = state / "activation.pending"
+    write_private(pending_path, pending)
+    canary = state / "STARTED"
+    command = rf'''
+selector_manifest() {{ printf '%s\n' '{manifest_id}'; }}
+manifest_file_hash() {{ sha256_file "$SETS_ROOT/$1/manifest.json"; }}
+sha256_file() {{ sha256sum "$1" | awk '{{print $1}}'; }}
+repo_commit() {{ printf '%s\n' '{"c" * 40}'; }}
+journal_python() {{ printf '/usr/bin/python3\n'; }}
+validate_activation_journal
+touch '{_bash_path(canary)}'
+'''
+    valid = _source(tmp_path, command)
+    assert valid.returncode == 0, valid.stderr
+    assert canary.is_file()
+    canary.unlink()
+    tampered = dict(entry)
+    tampered.pop("receipt_sha256")
+    tampered["index"] = 2
+    write_private(entry_path, seal(tampered))
+    denied = _source(tmp_path, command)
+    assert denied.returncode != 0
+    assert "series journal chain differs" in denied.stderr
+    assert not canary.exists()
+
+
+@posix_only
+def test_completion_snapshot_detects_atomic_source_replacement(tmp_path):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    state.mkdir(parents=True)
+    source = state / "completion.json"
+    replacement = state / "replacement.json"
+    snapshot = state / "completion-validation.snapshot"
+    canary = state / "FINALIZED"
+    source.write_text('{"version":"A"}\n', encoding="utf-8")
+    replacement.write_text('{"version":"B"}\n', encoding="utf-8")
+    source.chmod(0o600)
+    replacement.chmod(0o600)
+    command = rf'''
+pin="$(pin_private_evidence_copy '{_bash_path(source)}' '{_bash_path(snapshot)}')"
+mv -f -- '{_bash_path(replacement)}' '{_bash_path(source)}'
+final="$(private_stable_sha256 '{_bash_path(source)}')"
+[ "$pin" = "$final" ] || exit 70
+touch '{_bash_path(canary)}'
+'''
+    result = _source(tmp_path, command)
+    assert result.returncode == 70
+    assert json.loads(snapshot.read_text(encoding="utf-8"))["version"] == "A"
+    assert json.loads(source.read_text(encoding="utf-8"))["version"] == "B"
+    assert not canary.exists()
 
 
 def test_preexisting_pause_is_blocked_and_identity_receipt_is_activation_bound():
@@ -947,7 +1257,7 @@ journal_field() {
     esac
 }
 sha256_file() { printf 'bound-hash\n'; }
-validate_completion_receipt() { :; }
+validate_completion_receipt() { VERIFIED_COMPLETION_RECEIPT_SHA256=bound-hash; }
 journal_service_lines() { printf 'genus-learner.service\n'; }
 attest_recovered_services() {
     if [ "$FAILURE" = attest ]; then printf 'attest-failed\n' >> "$EVENT_LOG"; return 83; fi
@@ -1026,9 +1336,13 @@ def test_sandbox_canary_accepts_kernel_denial_but_never_visible_product_paths():
     assert "except (FileNotFoundError, ProcessLookupError)" in canary
 
 
-def test_state_work_cleanup_unlocks_sealed_stage_directories(tmp_path):
+@pytest.mark.parametrize(
+    "work_name", ("stage.Ab12xy", "verify.Ab12xy", "legacy-verify.Ab12xy")
+)
+@linux_only
+def test_state_work_cleanup_unlocks_sealed_directories(tmp_path, work_name):
     state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
-    work = state / "stage.Ab12xy"
+    work = state / work_name
     sealed = work / "sealed"
     sealed.mkdir(parents=True)
     (sealed / "artifact.whl").write_bytes(b"sealed")
@@ -1043,13 +1357,112 @@ test ! -e "{_bash_path(work)}"
     assert not work.exists()
 
 
-def test_stale_state_recovery_covers_build_and_stage_roots():
+@linux_only
+def test_init_user_roots_rejects_a_symlinked_state_root(tmp_path):
+    state_parent = tmp_path / "home" / ".genus"
+    outside = tmp_path / "outside-state"
+    state_parent.mkdir(parents=True)
+    outside.mkdir()
+    sentinel = outside / "must-survive"
+    sentinel.write_text("untouched", encoding="utf-8")
+    (state_parent / "runtime-a0.3c").symlink_to(outside, target_is_directory=True)
+
+    result = _source(tmp_path, "init_user_roots")
+
+    assert result.returncode == 70
+    assert "State-Hierarchie" in result.stderr
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
+    assert (state_parent / "runtime-a0.3c").is_symlink()
+
+
+@linux_only
+def test_init_user_roots_rejects_a_non_private_state_root(tmp_path):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    state.mkdir(parents=True, mode=0o755)
+    state.chmod(0o755)
+
+    result = _source(tmp_path, "init_user_roots")
+
+    assert result.returncode == 70
+    assert "State-Hierarchie" in result.stderr
+    assert stat.S_IMODE(state.stat().st_mode) == 0o755
+
+
+def test_state_cleanup_rejects_mounts_before_any_recursive_mutation():
+    validator = _function("validate_state_work_cleanup")
+    cleanup = _function("remove_state_work")
+    build = _function("build_runtime")
+    assert "/proc/self/mountinfo" in validator
+    assert "mounted == root or root in mounted.parents" in validator
+    assert "child.st_dev != root_dev" in validator
+    assert "follow_symlinks=False" in validator
+    validation = cleanup.index('validate_state_work_cleanup "$work"')
+    chmod = cleanup.index('"$ROOT_FIND_BIN" -P "$work" -xdev')
+    removal = cleanup.index('"$ROOT_RM_BIN" -rf --one-file-system')
+    assert validation < chmod < removal
+    assert 'trap \'remove_state_work "$build"\' RETURN' in build
+    assert 'remove_state_work "$build"' in build
+    assert 'rm -rf -- "$build"' not in build
+    for verifier in (_function("verify_set"), _function("verify_legacy_set")):
+        assert 'remove_state_work "$tmp"' in verifier
+        assert 'rm -rf -- "$tmp"' not in verifier
+
+
+def test_build_return_trap_uses_the_bounded_cleanup_without_reentry(tmp_path):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    build = state / "build.Ab12xy"
+    build.mkdir(parents=True)
+    command = rf'''
+validate_state_work_cleanup() {{ :; }}
+fsync_dir() {{ :; }}
+exercise_build_return_trap() {{
+    local build="{_bash_path(build)}"
+    trap 'remove_state_work "$build"' RETURN
+    remove_state_work "$build"
+    trap - RETURN
+}}
+exercise_build_return_trap
+test ! -e "{_bash_path(build)}"
+'''
+
+    result = _source(tmp_path, command)
+
+    assert result.returncode == 0, result.stderr
+    assert not build.exists()
+
+
+def test_state_hierarchy_is_opened_without_following_links_and_must_be_private():
+    hierarchy = _function("ensure_private_state_hierarchy")
+    init = _function("init_user_roots")
+    assert "O_NOFOLLOW" in hierarchy and "O_DIRECTORY" in hierarchy
+    assert "dir_fd=parent" in hierarchy and "dir_fd=state_fd" in hierarchy
+    assert "os.mkdir" in hierarchy and "0o700" in hierarchy
+    assert "info.st_uid != uid" in hierarchy
+    assert "stat.S_IMODE(info.st_mode) != 0o700" in hierarchy
+    assert "install -d" not in init
+    assert "ensure_private_state_hierarchy" in init
+
+
+def test_stale_state_recovery_covers_build_stage_and_verify_roots():
     recovery = _function("recover_stale_state_builds")
-    assert '"$STATE_ROOT"/build.* "$STATE_ROOT"/stage.*' in recovery
+    for pattern in ("build.*", "stage.*", "verify.*", "legacy-verify.*"):
+        assert f'"$STATE_ROOT"/{pattern}' in recovery
     assert 'remove_state_work "$path"' in recovery
     stage = _function("stage_set")
     assert "cleanup_stage_work" in stage
     assert 'remove_state_work "$work"' in stage
+
+
+def test_stale_state_recovery_rejects_a_matching_non_directory(tmp_path):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    state.mkdir(parents=True)
+    residue = state / "verify.Ab12xy"
+    residue.write_text("do not remove", encoding="utf-8")
+
+    result = _source(tmp_path, "recover_stale_state_builds")
+
+    assert result.returncode == 70
+    assert residue.read_text(encoding="utf-8") == "do not remove"
 
 
 def test_manifest_binds_sources_backends_and_full_private_runtime():
@@ -1094,6 +1507,89 @@ def test_set_publication_uses_distinct_recovery_status_and_durable_order():
     remove = stage.index('rm -f -- "$building"', verify)
     staged = stage.index('atomic_link "sets/$manifest" "$STAGED_LINK"', remove)
     assert seal < durable < verify < remove < staged
+
+
+def test_stale_set_publications_are_recovered_before_new_stage_work():
+    recovery = _function("recover_stale_set_publications")
+    assert r"^\.building-" in recovery and "[a-f0-9]{64}" in recovery
+    assert "validate_set_publication_marker" in recovery
+    assert "recover_set_publication" in recovery
+    assert "set_is_referenced" in recovery
+    stage = _function("stage_set")
+    runtime = stage.index("recover_runtime_publication")
+    runtime_verify = stage.index("verify_runtime_prefix", runtime)
+    set_recovery = stage.index("recover_stale_set_publications", runtime_verify)
+    stage_work = stage.index('mktemp -d "$STATE_ROOT/stage.XXXXXX"', set_recovery)
+    assert runtime < runtime_verify < set_recovery < stage_work
+
+
+def test_stale_marker_without_a_set_is_removed_only_when_unreferenced(tmp_path):
+    manifest = "a" * 64
+    sets = tmp_path / "home" / ".genus" / "runtime-a0.3c" / "sets"
+    sets.mkdir(parents=True)
+    marker = sets / f".building-{manifest}"
+    marker.write_text("bound marker", encoding="utf-8")
+    command = rf'''
+validate_set_publication_marker() {{ :; }}
+recover_set_publication() {{ return 10; }}
+set_is_referenced() {{ return "${{FAKE_REFERENCED:-1}}"; }}
+fsync_dir() {{ :; }}
+recover_stale_set_publications
+'''
+
+    blocked = _source(
+        tmp_path,
+        command,
+        extra_env={"FAKE_REFERENCED": "0"},
+    )
+    assert blocked.returncode == 70
+    assert marker.is_file()
+
+    allowed = _source(
+        tmp_path,
+        command,
+        extra_env={"FAKE_REFERENCED": "1"},
+    )
+    assert allowed.returncode == 0, allowed.stderr
+    assert not marker.exists()
+
+
+def test_stale_set_recovery_rejects_an_invalid_marker_name(tmp_path):
+    sets = tmp_path / "home" / ".genus" / "runtime-a0.3c" / "sets"
+    sets.mkdir(parents=True)
+    marker = sets / ".building-not-a-manifest"
+    marker.write_text("do not remove", encoding="utf-8")
+
+    result = _source(tmp_path, "recover_stale_set_publications")
+
+    assert result.returncode == 70
+    assert marker.is_file()
+
+
+def test_set_reference_check_rejects_regular_selector_files(tmp_path):
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    state.mkdir(parents=True)
+    active = state / "ACTIVE"
+    active.write_text("sets/" + "a" * 64, encoding="utf-8")
+
+    result = _source(tmp_path, f"set_is_referenced {'a' * 64}")
+
+    assert result.returncode == 70
+    assert active.is_file()
+
+
+@posix_only
+def test_set_reference_check_rejects_normalized_selector_targets(tmp_path):
+    manifest = "a" * 64
+    state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
+    state.mkdir(parents=True)
+    active = state / "ACTIVE"
+    active.symlink_to(f"sets/../sets/{manifest}")
+
+    result = _source(tmp_path, f"set_is_referenced {manifest}")
+
+    assert result.returncode == 70
+    assert active.is_symlink()
 
 
 def test_set_recovery_does_not_mask_inner_durability_failure(tmp_path):
@@ -1170,14 +1666,18 @@ def test_backup_isolated_generation_is_immutable_complete_and_cron_ordered():
     assert switch.index("prove_no_backup_in_progress") < switch.index("fresh_backup_receipt")
 
 
-def test_activation_v2_deeply_crossbinds_all_evidence_and_exact_booleans():
+def test_activation_v3_deeply_crossbinds_all_evidence_and_exact_booleans():
     writer = _function("write_activation_receipt")
     validator = _function("validate_completion_receipt")
+    assert "genus-a0.3c-runtime-activation-v3" in writer
+    assert "genus-a0.3c-runtime-activation-v2" not in writer
+    assert "genus-a0.3c-runtime-activation-v3" in validator
     for evidence in (
         "activated_set_manifest_path",
         "previous_set_manifest_path",
         "backup_receipt_path",
         "readiness_manifest_path",
+        "series_receipt_path",
         "verification_receipt_path",
         "active_identity_receipt_path",
         "postflight_receipt_path",
@@ -1187,6 +1687,7 @@ def test_activation_v2_deeply_crossbinds_all_evidence_and_exact_booleans():
         assert evidence.replace("_path", "_sha256") in writer
     for crossbinding in (
         "verification/readiness crossbinding differs",
+        "series/readiness crossbinding differs",
         "active runtime/stable invocation differs",
         "postflight service inventory differs",
         "backup crossbinding differs",
@@ -1196,6 +1697,11 @@ def test_activation_v2_deeply_crossbinds_all_evidence_and_exact_booleans():
     assert 'top["core_embed_single_selector"] is not True' in validator
     assert 'top["database_rollback_performed"] is not False' in validator
     assert 'top["payloads_logged"] is not False' in validator
+    assert "pin_private_evidence_copy" in validator
+    assert 'RECEIPT_PIN="$receipt_pin"' in validator
+    assert 'VERIFIED_COMPLETION_RECEIPT_SHA256="$receipt_pin"' in validator
+    recovery = _function("recover_pending_activation")
+    assert '"$VERIFIED_COMPLETION_RECEIPT_SHA256" = "$receipt_hash"' in recovery
 
 
 def test_reauthorization_is_clean_ff_one_shot_and_never_boot_authorization():
@@ -1216,6 +1722,93 @@ def test_reauthorization_is_clean_ff_one_shot_and_never_boot_authorization():
     assert "consume_operator_reauthorization" in finalize
     boot_payload = _function("write_boot_guard_payload")
     assert "OPERATOR_REAUTH_TOKEN" not in boot_payload
+    legacy = _function("write_boot_guard_payload_from_commit")
+    migrate = _function("migrate_boot_guard_to_current")
+    assert 'rev-parse "$commit:deploy/pi_a0_3c_runtime.sh"' in legacy
+    assert 'show "$commit:deploy/pi_a0_3c_runtime.sh"' in legacy
+    assert 'hash-object "$source"' in legacy
+    assert migrate.index('systemd_autostart_guard_present "$old_commit"') < migrate.index(
+        '"$ROOT_INSTALL_BIN" -o root -g root -m 0755'
+    )
+    root_tmp = migrate.index('"$ROOT_MKTEMP_BIN" -p "$guard_dir"')
+    durable = migrate.index('"$ROOT_SYNC_BIN" -f "$root_tmp"', root_tmp)
+    publish = migrate.index('"$ROOT_MV_BIN" -Tf -- "$root_tmp" "$BOOT_GUARD_PATH"', durable)
+    directory = migrate.index('"$ROOT_SYNC_BIN" -f "$guard_dir"', publish)
+    assert root_tmp < durable < publish < directory
+    assert validator.index("validate_stale_autostart_approval") < validator.index(
+        "migrate_boot_guard_to_current"
+    )
+
+
+@linux_only
+def test_attested_v2_boot_guard_migrates_one_way_to_v3(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    legacy_repo = tmp_path / "legacy-repo"
+    legacy_script = legacy_repo / "deploy" / "pi_a0_3c_runtime.sh"
+    legacy_script.parent.mkdir(parents=True)
+    legacy_script.write_text(
+        """#!/usr/bin/env bash
+write_boot_guard_payload() {
+    local output="$1"
+    printf '%s\\n' '#!/usr/bin/python3 -I' 'genus-a0.3c-runtime-start-authorization-v2' > "$output"
+    chmod 0600 "$output"
+}
+""",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(legacy_repo), "init", "-q"], check=True)
+    subprocess.run(
+        ["git", "-C", str(legacy_repo), "config", "user.email", "a03c@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(legacy_repo), "config", "user.name", "A0.3c Test"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(legacy_repo), "add", "deploy/pi_a0_3c_runtime.sh"], check=True)
+    subprocess.run(["git", "-C", str(legacy_repo), "commit", "-qm", "legacy v2 guard"], check=True)
+    old_guard = state / "old-guard"
+    current_guard = state / "current-guard"
+    live_guard = state / "live-guard"
+    old = subprocess.run(
+        ["git", "-C", str(legacy_repo), "rev-parse", "HEAD"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+    command = rf'''
+BOOT_GUARD_PATH='{_bash_path(live_guard)}'
+write_boot_guard_payload_from_commit '{old}' '{_bash_path(old_guard)}'
+write_boot_guard_payload '{_bash_path(current_guard)}'
+grep -q 'runtime-start-authorization-v2' '{_bash_path(old_guard)}'
+grep -q 'runtime-start-authorization-v3' '{_bash_path(current_guard)}'
+! cmp -s '{_bash_path(old_guard)}' '{_bash_path(current_guard)}'
+install -m 0755 '{_bash_path(old_guard)}' "$BOOT_GUARD_PATH"
+systemd_autostart_guard_present() {{
+    if [ -n "${{1:-}}" ]; then cmp -s "$BOOT_GUARD_PATH" '{_bash_path(old_guard)}'
+    else cmp -s "$BOOT_GUARD_PATH" '{_bash_path(current_guard)}'
+    fi
+}}
+as_root() {{
+    if [ "$1" = "$ROOT_INSTALL_BIN" ]; then install -m 0755 "$8" "$9"
+    elif [ "$1" = "$ROOT_STAT_BIN" ] && [ "$3" = %u ]; then printf '0\n'
+    else "$@"
+    fi
+}}
+migrate_boot_guard_to_current '{old}'
+cmp -s "$BOOT_GUARD_PATH" '{_bash_path(current_guard)}'
+[ "$(stat -c %a "$BOOT_GUARD_PATH")" = 755 ]
+'''
+    result = _source(
+        tmp_path,
+        command,
+        extra_env={
+            "GENUS_REPO_DIR": _bash_path(legacy_repo),
+            "GENUS_A03C_STATE_ROOT": _bash_path(state),
+        },
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_guard_is_installed_before_first_durable_activation_journal():

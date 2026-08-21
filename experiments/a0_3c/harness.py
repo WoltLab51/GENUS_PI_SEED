@@ -307,7 +307,11 @@ def _stable_file_bytes(path: Path | str, limit: int) -> tuple[bytes, dict[str, A
         os.close(fd)
     data = b"".join(chunks)
     after = target.stat(follow_symlinks=False)
-    stamp = lambda item: (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns)
+    def stamp(item: os.stat_result) -> tuple[int, ...]:
+        common = (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns)
+        if os.name != "posix":
+            return common
+        return common + (item.st_mode, item.st_uid, item.st_gid, item.st_nlink)
     if stamp(before) != stamp(opened) or stamp(before) != stamp(opened_after) or stamp(before) != stamp(after):
         raise RuntimeReadinessError("evidence changed during bounded read")
     if len(data) != before.st_size or len(data) > limit:
@@ -316,18 +320,15 @@ def _stable_file_bytes(path: Path | str, limit: int) -> tuple[bytes, dict[str, A
         "sha256": hashlib.sha256(data).hexdigest(),
         "bytes": len(data),
         "mode": f"{stat.S_IMODE(before.st_mode):04o}",
+        "uid": int(before.st_uid),
         "links": int(before.st_nlink),
         "device": int(before.st_dev),
         "inode": int(before.st_ino),
     }
 
 
-def read_json_evidence(
-    path: Path | str, *, limit: int = MAX_RECEIPT_BYTES, require_private: bool = True
-) -> dict[str, Any]:
-    data, evidence = _stable_file_bytes(path, limit)
-    if evidence["links"] != 1 or (os.name == "posix" and require_private and evidence["mode"] != "0600"):
-        raise RuntimeReadinessError("evidence is not private and single-linked")
+def _decode_json_evidence(data: bytes) -> dict[str, Any]:
+    """Decode one already-pinned byte snapshot as strict evidence JSON."""
 
     def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -345,6 +346,19 @@ def read_json_evidence(
         raise RuntimeReadinessError("evidence root is not an object")
     assert_receipt_safe(value)
     return value
+
+
+def read_json_evidence(
+    path: Path | str, *, limit: int = MAX_RECEIPT_BYTES, require_private: bool = True
+) -> dict[str, Any]:
+    data, evidence = _stable_file_bytes(path, limit)
+    if evidence["links"] != 1 or (
+        os.name == "posix"
+        and require_private
+        and (evidence["mode"] != "0600" or evidence["uid"] != os.geteuid())
+    ):
+        raise RuntimeReadinessError("evidence is not private and single-linked")
+    return _decode_json_evidence(data)
 
 
 def write_json_evidence(
@@ -3294,6 +3308,198 @@ def verify_series_journal(
     receipt = _seal_receipt(body)
     assert_receipt_safe(receipt)
     return receipt
+
+
+def verify_final_series_receipt_chain(
+    final_receipt: Path | str,
+    *,
+    series_evidence_root: Path | str,
+    manifest: Mapping[str, Any],
+    code_root: Path | str,
+    expected_candidate_commit: str | None = None,
+    identity: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Replay the canonical journal and bind it to its persisted aggregate."""
+
+    def private_dir(raw: Path, label: str) -> Path:
+        if raw.is_symlink():
+            raise SeriesEvidenceError(f"{label} must not be a symlink")
+        try:
+            resolved = raw.resolve(strict=True)
+            info = raw.stat(follow_symlinks=False)
+        except (FileNotFoundError, OSError) as exc:
+            raise SeriesEvidenceError(f"{label} is missing") from exc
+        if resolved != raw or not stat.S_ISDIR(info.st_mode):
+            raise SeriesEvidenceError(f"{label} is not a canonical directory")
+        if os.name == "posix" and (
+            int(info.st_uid) != int(os.geteuid())
+            or stat.S_IMODE(info.st_mode) != 0o700
+        ):
+            raise SeriesEvidenceError(f"{label} must be user-owned mode 0700")
+        return resolved
+
+    base_raw = Path(series_evidence_root).expanduser().absolute()
+    base = private_dir(base_raw, "series evidence root")
+    supplied_raw = Path(final_receipt).expanduser().absolute()
+    if supplied_raw.name != "final-series.json" or supplied_raw.parent.parent != base:
+        raise SeriesEvidenceError("final series receipt layout differs")
+    parent = private_dir(supplied_raw.parent, "series parent")
+    if parent.parent != base:
+        raise SeriesEvidenceError("series parent is not directly below its fixed root")
+    supplied_path = parent / "final-series.json"
+    if supplied_path != supplied_raw or supplied_path.is_symlink():
+        raise SeriesEvidenceError("final series receipt is not canonical")
+    supplied_info = supplied_path.stat(follow_symlinks=False)
+    if (
+        not stat.S_ISREG(supplied_info.st_mode)
+        or supplied_info.st_nlink != 1
+        or (
+            os.name == "posix"
+            and (
+                int(supplied_info.st_uid) != int(os.geteuid())
+                or stat.S_IMODE(supplied_info.st_mode) != 0o600
+            )
+        )
+    ):
+        raise SeriesEvidenceError("final series receipt must be user-owned mode 0600 and single-linked")
+    journal_root = private_dir(parent / "journal-root", "series journal root")
+    init_path = journal_root / SERIES_INIT_FILE
+    if init_path.is_symlink() or not init_path.is_file():
+        raise SeriesEvidenceError("internal series init is not a regular file")
+    init_info = init_path.stat(follow_symlinks=False)
+    if (
+        init_info.st_nlink != 1
+        or (
+            os.name == "posix"
+            and (
+                int(init_info.st_uid) != int(os.geteuid())
+                or stat.S_IMODE(init_info.st_mode) != 0o600
+            )
+        )
+    ):
+        raise SeriesEvidenceError("internal series init must be user-owned mode 0600 and single-linked")
+    journal_dir = private_dir(journal_root / SERIES_JOURNAL_DIR, "series journal directory")
+
+    def evidence_snapshot() -> tuple[
+        dict[str, tuple[Any, ...]], str, str, list[str]
+    ]:
+        checked_dirs = (
+            private_dir(base_raw, "series evidence root"),
+            private_dir(parent, "series parent"),
+            private_dir(journal_root, "series journal root"),
+            private_dir(journal_dir, "series journal directory"),
+        )
+        journal_files = sorted(
+            journal_dir.iterdir(), key=lambda item: os.fsencode(item.name)
+        )
+        if len(journal_files) > MAX_JOURNAL_ENTRIES:
+            raise SeriesEvidenceError("journal entry cap exceeded")
+        indexed: list[tuple[int, Path]] = []
+        for entry in journal_files:
+            match = _JOURNAL_FILE.fullmatch(entry.name)
+            if match is None:
+                raise SeriesEvidenceError("journal contains a foreign entry")
+            indexed.append((int(match.group(1)), entry))
+        if [index for index, _ in indexed] != list(range(1, len(indexed) + 1)):
+            raise SeriesEvidenceError("journal indices are not contiguous")
+        files = [supplied_path, init_path, *(entry for _, entry in indexed)]
+        snapshot: dict[str, tuple[Any, ...]] = {}
+        pinned_bytes: dict[str, bytes] = {}
+        for directory in checked_dirs:
+            info = directory.stat(follow_symlinks=False)
+            snapshot[str(directory)] = (
+                int(info.st_dev), int(info.st_ino), int(info.st_uid), int(info.st_mode),
+                int(info.st_nlink), int(info.st_size), int(info.st_mtime_ns),
+            )
+        for entry in files:
+            data, evidence = _stable_file_bytes(entry, MAX_RECEIPT_BYTES)
+            if (
+                entry.is_symlink()
+                or evidence["links"] != 1
+                or (
+                    os.name == "posix"
+                    and (
+                        evidence["uid"] != int(os.geteuid())
+                        or evidence["mode"] != "0600"
+                    )
+                )
+            ):
+                raise SeriesEvidenceError("series evidence file privacy differs")
+            snapshot[str(entry)] = (
+                evidence["device"], evidence["inode"], evidence["uid"],
+                evidence["mode"], evidence["links"], evidence["bytes"],
+                evidence["sha256"],
+            )
+            pinned_bytes[str(entry)] = data
+        pinned_init = _decode_json_evidence(pinned_bytes[str(init_path)])
+        init_digest = _verify_receipt_digest(pinned_init, "pinned series init")
+        entry_digests = [
+            _verify_receipt_digest(
+                _decode_json_evidence(pinned_bytes[str(entry)]),
+                f"pinned journal entry {index}",
+            )
+            for index, entry in indexed
+        ]
+        return snapshot, snapshot[str(supplied_path)][-1], init_digest, entry_digests
+
+    privacy_before, pinned_final_hash, pinned_init_digest, pinned_entry_digests = (
+        evidence_snapshot()
+    )
+    before_bytes, before_stat = _stable_file_bytes(supplied_path, MAX_RECEIPT_BYTES)
+    if before_stat["sha256"] != pinned_final_hash:
+        raise SeriesEvidenceError("final series receipt differs from pinned evidence snapshot")
+    supplied = _decode_json_evidence(before_bytes)
+    supplied_digest = _verify_receipt_digest(supplied, "final series")
+    _parse_utc(supplied.get("verified_at_utc"))
+    series_init = read_json_evidence(
+        init_path, limit=MAX_RECEIPT_BYTES, require_private=True
+    )
+    replayed = verify_series_journal(
+        journal_root,
+        series_init=series_init,
+        manifest=manifest,
+        code_root=code_root,
+        expected_candidate_commit=expected_candidate_commit,
+        identity=identity,
+    )
+    if (
+        replayed.get("series_init_sha256") != pinned_init_digest
+        or replayed.get("journal_entry_sha256") != pinned_entry_digests
+    ):
+        raise SeriesEvidenceError("journal replay differs from pinned evidence inventory")
+    time_dependent = {"verified_at_utc", "receipt_sha256"}
+    supplied_static = {
+        key: value for key, value in supplied.items() if key not in time_dependent
+    }
+    replayed_static = {
+        key: value for key, value in replayed.items() if key not in time_dependent
+    }
+    if supplied_static != replayed_static:
+        raise SeriesEvidenceError("final series receipt differs from journal replay")
+    after_bytes, after_stat = _stable_file_bytes(supplied_path, MAX_RECEIPT_BYTES)
+    privacy_after, final_hash_after, init_digest_after, entry_digests_after = (
+        evidence_snapshot()
+    )
+    if (
+        before_bytes != after_bytes
+        or before_stat != after_stat
+        or after_stat["sha256"] != final_hash_after
+        or privacy_before != privacy_after
+        or pinned_init_digest != init_digest_after
+        or pinned_entry_digests != entry_digests_after
+    ):
+        raise SeriesEvidenceError("final series receipt changed during chain replay")
+    return {
+        "resolved_path": str(supplied_path),
+        "file_sha256": before_stat["sha256"],
+        "receipt_sha256": supplied_digest,
+        "manifest_sha256": replayed["manifest_sha256"],
+        "candidate_commit": replayed["candidate_commit"],
+        "runtime_identity_sha256": replayed["runtime_identity_sha256"],
+        "consecutive_green_runs": replayed["consecutive_green_runs"],
+        "gate_pass": replayed["gate_pass"],
+        "journal_chain_tip_sha256": replayed["journal_chain_tip_sha256"],
+    }
 
 
 def verify_run_series(

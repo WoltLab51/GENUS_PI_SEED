@@ -89,7 +89,15 @@ BOOTSTRAP_PACKAGES=(build-essential cmake ninja-build pkg-config ca-certificates
 umask 077
 
 PRIVILEGED_BOUNDARY_READY=0
+OPERATOR_LOCK_HELD=0
 OPERATOR_REAUTH_RECEIPT=""
+VERIFIED_READINESS_RECEIPT=""
+VERIFIED_READINESS_MANIFEST=""
+VERIFIED_READINESS_SHA256=""
+VERIFIED_SERIES_RECEIPT=""
+VERIFIED_SERIES_SHA256=""
+VERIFIED_SERIES_READINESS_SHA256=""
+VERIFIED_COMPLETION_RECEIPT_SHA256=""
 
 # Ein errexit-Abbruch ohne eigene Meldung ist nicht diagnostizierbar: Der Lauf
 # endet stumm, und aus dem Log laesst sich die Stelle nicht rekonstruieren (live
@@ -106,7 +114,7 @@ Aufruf:
   ./deploy/pi_a0_3c_runtime.sh status [--json]
   ./deploy/pi_a0_3c_runtime.sh stage [EXPECTED_SUPPLY_SEAL]
   ./deploy/pi_a0_3c_runtime.sh verify [active|MANIFEST]
-  ./deploy/pi_a0_3c_runtime.sh activate EXPECTED_COMMIT READINESS_MANIFEST [SET_MANIFEST]
+  ./deploy/pi_a0_3c_runtime.sh activate EXPECTED_COMMIT READINESS_MANIFEST FINAL_SERIES_RECEIPT [SET_MANIFEST]
   ./deploy/pi_a0_3c_runtime.sh rollback EXPECTED_COMMIT
   ./deploy/pi_a0_3c_runtime.sh reauthorize EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT
 
@@ -234,17 +242,80 @@ set_path() {
     printf '%s/%s\n' "$SETS_ROOT" "$1"
 }
 
+ensure_private_state_hierarchy() {
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$STATE_ROOT" "$SETS_ROOT" "$DOWNLOAD_ROOT" "$RECEIPT_ROOT" "$(id -u)" <<'PY'
+import os
+import pathlib
+import stat
+import sys
+
+state_raw, *child_raw, uid_raw = sys.argv[1:]
+uid = int(uid_raw)
+
+
+def lexical_parts(raw):
+    if not raw.startswith("/") or raw.startswith("//") or os.path.normpath(raw) != raw:
+        raise SystemExit("state path is not a canonical absolute lexical path")
+    return pathlib.PurePosixPath(raw).parts[1:]
+
+
+def validate_private(fd, label):
+    info = os.fstat(fd)
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid or stat.S_IMODE(info.st_mode) != 0o700:
+        raise SystemExit(f"{label} is not an operator-owned 0700 directory")
+
+
+flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+fds = [os.open("/", flags)]
+try:
+    for part in lexical_parts(state_raw):
+        parent = fds[-1]
+        try:
+            current = os.open(part, flags, dir_fd=parent)
+        except FileNotFoundError:
+            os.mkdir(part, 0o700, dir_fd=parent)
+            os.fsync(parent)
+            current = os.open(part, flags, dir_fd=parent)
+        fds.append(current)
+    state_fd = fds[-1]
+    validate_private(state_fd, "state root")
+    state = pathlib.PurePosixPath(state_raw)
+    for raw in child_raw:
+        child = pathlib.PurePosixPath(raw)
+        if lexical_parts(raw)[:-1] != lexical_parts(state_raw) or child.parent != state:
+            raise SystemExit("required state child escapes state root")
+        name = child.name
+        try:
+            child_fd = os.open(name, flags, dir_fd=state_fd)
+        except FileNotFoundError:
+            os.mkdir(name, 0o700, dir_fd=state_fd)
+            os.fsync(state_fd)
+            child_fd = os.open(name, flags, dir_fd=state_fd)
+        try:
+            validate_private(child_fd, f"state child {name}")
+            os.fsync(child_fd)
+        finally:
+            os.close(child_fd)
+    os.fsync(state_fd)
+finally:
+    for fd in reversed(fds):
+        os.close(fd)
+PY
+}
+
 init_user_roots() {
     [ "$(id -u)" -ne 0 ] || fail "Ganzskript-sudo ist verboten; als GENUS-Login starten" 77
     [ "$(id -un)" = "$GENUS_USER" ] || fail "GENUS_USER stimmt nicht mit dem ausfuehrenden Login ueberein" 77
     [ "$GENUS_USER" != root ] || [ "${GENUS_ALLOW_ROOT:-0}" = 1 ] \
         || fail "GENUS_USER=root ist ohne GENUS_ALLOW_ROOT=1 verboten" 77
     harden_privileged_boundary
-    install -d -m 0700 "$STATE_ROOT" "$SETS_ROOT" "$DOWNLOAD_ROOT" "$RECEIPT_ROOT"
+    ensure_private_state_hierarchy \
+        || fail "State-Hierarchie ist nicht kanonisch/operator-eigen/privat" 70
 }
 
 acquire_operator_lock() {
-    [ "${OPERATOR_LOCK_HELD:-0}" -eq 0 ] || return 0
+    [ "$OPERATOR_LOCK_HELD" -eq 0 ] || return 0
     require_command flock
     exec 9>"$LOCK_FILE"
     flock -n 9 || fail "ein anderer A0.3c-Lauf haelt den Operator-Lock" 75
@@ -740,7 +811,7 @@ build_runtime() {
     verify_archive "$DOWNLOAD_ROOT/$PYTHON_ARCHIVE" sha256 "$PYTHON_SHA256"
     verify_archive "$DOWNLOAD_ROOT/$SQLITE_ARCHIVE" sha3 "$SQLITE_SHA3_256"
     build="$(mktemp -d "$STATE_ROOT/build.XXXXXX")"
-    trap 'rm -rf -- "$build"' RETURN
+    trap 'remove_state_work "$build"' RETURN
     bootstrap_lock="$build/bootstrap.lock"
     bootstrap_build_dependencies "$bootstrap_lock"
     "$TAR_BIN" -xf "$DOWNLOAD_ROOT/$SQLITE_ARCHIVE" -C "$build"
@@ -814,12 +885,13 @@ build_runtime() {
     as_root "$ROOT_RM_BIN" -f -- "$RUNTIME_PUBLICATION"
     as_root "$ROOT_SYNC_BIN" -f "$RUNTIME_PARENT"
     publication_fault_point after-runtime-finalize
-    rm -rf -- "$build"
+    remove_state_work "$build"
     trap - RETURN
 }
 
 inventory_for_compare() {
-    local python="$1" policy="$2" target="$3" raw="${target}.raw"
+    local python="$1" policy="$2" target="$3" raw
+    raw="${target}.raw"
     "$python" -m pip freeze --all > "$raw"
     normalize_freeze "$raw" "$target" "$policy"
     rm -f -- "$raw"
@@ -1131,20 +1203,74 @@ else: raise SystemExit("cannot allocate unique build scratch")
 PY
 }
 
+validate_state_work_cleanup() {
+    local work="$1"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$work" "$(id -u)" <<'PY'
+import os
+import pathlib
+import re
+import stat
+import sys
+
+root = pathlib.Path(sys.argv[1])
+uid = int(sys.argv[2])
+info = root.lstat()
+if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or info.st_uid != uid:
+    raise SystemExit("state work root is not an operator-owned real directory")
+if not root.is_absolute() or os.path.normpath(str(root)) != str(root) or root.resolve(strict=True) != root:
+    raise SystemExit("state work root is not canonical")
+
+
+def mount_path(raw):
+    return pathlib.Path(re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), raw))
+
+
+mountinfo = pathlib.Path("/proc/self/mountinfo")
+if not mountinfo.is_file():
+    raise SystemExit("mount inventory is unavailable")
+for row in mountinfo.read_text(encoding="utf-8", errors="surrogateescape").splitlines():
+    fields = row.split()
+    if len(fields) < 6:
+        raise SystemExit("mount inventory is malformed")
+    mounted = mount_path(fields[4])
+    if mounted == root or root in mounted.parents:
+        raise SystemExit("state work tree contains a mount point")
+
+root_dev = info.st_dev
+pending = [root]
+while pending:
+    directory = pending.pop()
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            child = entry.stat(follow_symlinks=False)
+            if child.st_dev != root_dev:
+                raise SystemExit("state work tree crosses a filesystem boundary")
+            if stat.S_ISDIR(child.st_mode):
+                if child.st_uid != uid:
+                    raise SystemExit("state work tree contains a foreign-owned directory")
+                pending.append(pathlib.Path(entry.path))
+PY
+}
+
 remove_state_work() {
     local work="$1" parent name
     parent="${work%/*}"
     name="${work##*/}"
-    [ "$parent" = "$STATE_ROOT" ] && [[ "$name" =~ ^(build|stage)\.[A-Za-z0-9]{6}$ ]] \
+    [ "$parent" = "$STATE_ROOT" ] \
+        && [[ "$name" =~ ^(build|stage|verify|legacy-verify)\.[A-Za-z0-9]{6}$ ]] \
         || { printf '[A0.3c] FEHLER: State-Arbeitsroot ist nicht exakt begrenzt\n' >&2; return 70; }
     [ -d "$work" ] && [ ! -L "$work" ] && [ "$(stat -c %u "$work")" -eq "$(id -u)" ] \
         || { printf '[A0.3c] FEHLER: State-Arbeitsroot ist nicht regulaer/operator-eigen\n' >&2; return 70; }
+    validate_state_work_cleanup "$work" \
+        || { printf '[A0.3c] FEHLER: State-Arbeitsroot enthaelt Mount-/Dateisystem-Grenzen\n' >&2; return 70; }
     # Versiegelte Artefaktstores sind absichtlich 0500. Vor dem rekursiven
     # Entfernen braucht nur der besitzende Operator Schreibrecht auf die
-    # Verzeichnisse; find folgt dabei keinen enthaltenen Symlinks.
-    find "$work" -type d -exec chmod u+rwx {} + \
+    # Verzeichnisse; find folgt dabei keinen enthaltenen Symlinks und bleibt auf
+    # dem vorab geprueften Dateisystem.
+    "$ROOT_FIND_BIN" -P "$work" -xdev -type d -exec "$ROOT_CHMOD_BIN" u+rwx {} + \
         || { printf '[A0.3c] FEHLER: State-Arbeitsroot konnte nicht entsiegelt werden\n' >&2; return 70; }
-    rm -rf -- "$work" \
+    "$ROOT_RM_BIN" -rf --one-file-system -- "$work" \
         || { printf '[A0.3c] FEHLER: State-Arbeitsroot konnte nicht entfernt werden\n' >&2; return 70; }
     [ ! -e "$work" ] && [ ! -L "$work" ] \
         || { printf '[A0.3c] FEHLER: State-Arbeitsroot blieb nach Cleanup bestehen\n' >&2; return 70; }
@@ -1156,13 +1282,16 @@ remove_state_work() {
 # liegen (live belegt 2026-08-20). Auch ein abgebrochener Stage-Lauf kann seine
 # absichtlich schreibgeschuetzten Artefaktstores nicht mit nacktem rm entfernen
 # (live belegt 2026-08-21). Unter der Operator-Sperre kann kein zweiter Lauf aktiv
-# sein -- vorgefundene Bau- und Stage-Reste sind deshalb immer Altlasten.
+# sein -- vorgefundene Bau-, Stage- und Verify-Reste sind deshalb immer Altlasten.
 recover_stale_state_builds() {
     local path
-    for path in "$STATE_ROOT"/build.* "$STATE_ROOT"/stage.*; do
-        [ -d "$path" ] || continue
-        [ ! -L "$path" ] || fail "Baurest ist ein Symlink" 70
-        log "entferne Baurest $(basename -- "$path")"
+    for path in \
+        "$STATE_ROOT"/build.* "$STATE_ROOT"/stage.* \
+        "$STATE_ROOT"/verify.* "$STATE_ROOT"/legacy-verify.*; do
+        [ -e "$path" ] || [ -L "$path" ] || continue
+        [ -d "$path" ] && [ ! -L "$path" ] \
+            || fail "State-Arbeitsrest ist kein regulaeres Verzeichnis" 70
+        log "entferne State-Arbeitsrest $(basename -- "$path")"
         remove_state_work "$path"
     done
 }
@@ -1578,7 +1707,7 @@ for link in root.rglob("*"):
     if resolved != runtime and root not in resolved.parents and runtime not in resolved.parents:
         raise SystemExit("set symlink escapes both set and pinned runtime")
 PY
-    rm -rf -- "$tmp"
+    remove_state_work "$tmp"
     smoke_set "$set"
     printf '%s\n' "$manifest"
 }
@@ -1621,7 +1750,7 @@ data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 expected={"schema":"genus-a0.3c-legacy-set-v1","manifest_id":sys.argv[2],"requirements":{"core_sha256":sys.argv[3],"embed_sha256":sys.argv[4]},"tree_inventory_sha256":sys.argv[5],"runtime_inventory_sha256":sys.argv[6]}
 if data != expected: raise SystemExit("legacy manifest binding differs")
 PY
-    rm -rf -- "$tmp"
+    remove_state_work "$tmp"
     printf '%s\n' "$manifest"
 }
 
@@ -1668,11 +1797,17 @@ PY
 }
 
 set_is_referenced() {
-    local manifest="$1" link target
+    local manifest="$1" link target selected
     for link in "$ACTIVE_LINK" "$PREVIOUS_LINK" "$STAGED_LINK"; do
-        [ -L "$link" ] || continue
-        target="$(readlink "$link")"
-        [ "$target" != "sets/$manifest" ] || return 0
+        [ -e "$link" ] || [ -L "$link" ] || continue
+        [ -L "$link" ] || fail "Selector ist kein Symlink" 70
+        if ! target="$(readlink "$link")"; then
+            fail "Selector-Ziel ist nicht lesbar" 70
+        fi
+        [[ "$target" =~ ^sets/((legacy-)?[a-f0-9]{64})$ ]] \
+            || fail "Selector hat kein exaktes gebundenes Set-Ziel" 70
+        selected="${BASH_REMATCH[1]}"
+        [ "$selected" != "$manifest" ] || return 0
     done
     return 1
 }
@@ -1723,6 +1858,37 @@ recover_set_publication() {
     return 10
 }
 
+recover_stale_set_publications() {
+    local marker name manifest status
+    for marker in "$SETS_ROOT"/.building-*; do
+        [ -e "$marker" ] || [ -L "$marker" ] || continue
+        name="${marker##*/}"
+        [[ "$name" =~ ^\.building-([a-f0-9]{64})$ ]] \
+            || fail "Set-Publikationsmarker hat einen ungueltigen Namen" 70
+        manifest="${BASH_REMATCH[1]}"
+        validate_set_publication_marker "$manifest" \
+            || fail "Set-Publikationsmarker ist ungueltig" 70
+        set +e
+        ( set -Eeuo pipefail; recover_set_publication "$manifest" )
+        status=$?
+        set -e
+        case "$status" in
+            0) ;;
+            10)
+                if [ -e "$marker" ] || [ -L "$marker" ]; then
+                    set_is_referenced "$manifest" \
+                        && fail "Set-Publikationsmarker ohne Set ist noch referenziert" 70
+                    [ ! -e "$SETS_ROOT/$manifest" ] && [ ! -L "$SETS_ROOT/$manifest" ] \
+                        || fail "Set-Publikationsrecovery liess ein unvollstaendiges Set zurueck" 70
+                    rm -f -- "$marker"
+                    fsync_dir "$SETS_ROOT"
+                fi
+                ;;
+            *) fail "Set-Publikationsrecovery scheiterte" "$status" ;;
+        esac
+    done
+}
+
 stage_set() (
     local expected_supply="${1:-}" supply_seed supply_seal
     local work commit repo_tree core_hash embed_hash seed manifest set building probe probe_hash
@@ -1754,6 +1920,7 @@ stage_set() (
         fi
         build_runtime
     fi
+    recover_stale_set_publications
     work="$(mktemp -d "$STATE_ROOT/stage.XXXXXX")"
     cleanup_stage_work() {
         local status=$? cleanup_status=0
@@ -2271,13 +2438,13 @@ write_boot_guard_payload() {
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
         "$output" "$ACTIVATION_JOURNAL" "$AUTOSTART_APPROVAL" "$ACTIVE_LINK" \
         "$SETS_ROOT" "$REPO_DIR" "$GIT_BIN" "$(id -u)" "$(id -g)" "$STATE_ROOT" \
-        "$CORE_POINTER" "$EMBED_POINTER" <<'PY'
+        "$CORE_POINTER" "$EMBED_POINTER" "$GENUS_HOME/.genus/a0.3c/series" <<'PY'
 import pathlib, sys
 config = {
     "journal": sys.argv[2], "approval": sys.argv[3], "active": sys.argv[4],
     "sets": sys.argv[5], "repo": sys.argv[6], "git": sys.argv[7], "uid": int(sys.argv[8]),
     "gid": int(sys.argv[9]), "state": sys.argv[10], "core_pointer": sys.argv[11],
-    "embed_pointer": sys.argv[12],
+    "embed_pointer": sys.argv[12], "series_root": sys.argv[13],
 }
 program = r'''#!/usr/bin/python3 -I
 import hashlib
@@ -2291,7 +2458,7 @@ import sys
 
 CONFIG = __CONFIG__
 PENDING_KEYS = {"schema","phase","candidate_commit","mode","target_manifest","target_manifest_sha256",
- "readiness_path","readiness_sha256","active_manifest","active_manifest_sha256",
+ "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
  "prior_active_manifest","prior_previous_manifest","prior_active_services","cron_original_sha256",
  "cron_disabled_sha256","activation_receipt_path","activation_receipt_sha256"}
 
@@ -2378,6 +2545,60 @@ def manifest_bytes(manifest):
 
 def digest(payload): return hashlib.sha256(payload).hexdigest()
 
+def strict_json(payload):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise RuntimeError("duplicate evidence key")
+            result[key]=value
+        return result
+    value=json.loads(payload,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise RuntimeError("evidence root is not an object")
+    return value
+
+def sealed_digest(data):
+    claimed=data.get("receipt_sha256")
+    unsigned={key:value for key,value in data.items() if key!="receipt_sha256"}
+    payload=json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()
+    actual=digest(payload)
+    if not isinstance(claimed,str) or claimed!=actual: raise RuntimeError("series chain digest differs")
+    return actual
+
+def series_bytes(value, expected_commit=None):
+    root = safe_dir(CONFIG["series_root"], 0o700)
+    path = pathlib.Path(value)
+    if path.name != "final-series.json" or path.parent.parent != root:
+        raise RuntimeError("series receipt layout differs")
+    parent = safe_dir(path.parent, 0o700)
+    journal_root = safe_dir(parent / "journal-root", 0o700)
+    journal = safe_dir(journal_root / "journal", 0o700)
+    final_payload = regular_bytes(path, 0o600)
+    series = strict_json(final_payload)
+    sealed_digest(series)
+    inventory = series.get("journal_entry_sha256")
+    if (series.get("schema")!="genus-a0-3c-readiness-series-v1" or series.get("candidate_commit")!=expected_commit
+            or series.get("gate_pass") is not True
+            or series.get("consecutive_green_runs")!=3 or not isinstance(inventory,list)
+            or len(inventory)!=series.get("journal_entry_count") or not inventory):
+        raise RuntimeError("series aggregate is not a green journal binding")
+    init = strict_json(regular_bytes(journal_root / "series-init.json", 0o600))
+    init_sha = sealed_digest(init)
+    if init_sha!=series.get("series_init_sha256"): raise RuntimeError("series init digest differs")
+    names=sorted(item.name for item in journal.iterdir())
+    expected_names=[f"{index:08d}.json" for index in range(1,len(inventory)+1)]
+    if names!=expected_names: raise RuntimeError("series journal inventory differs")
+    previous="0"*64
+    for index,(name,expected_sha) in enumerate(zip(names,inventory),start=1):
+        entry=strict_json(regular_bytes(journal/name,0o600)); actual=sealed_digest(entry)
+        if (actual!=expected_sha or entry.get("index")!=index
+                or entry.get("previous_entry_sha256")!=previous
+                or entry.get("series_init_sha256")!=init_sha):
+            raise RuntimeError("series journal chain differs")
+        previous=actual
+    if previous!=series.get("journal_chain_tip_sha256"): raise RuntimeError("series journal tip differs")
+    if sorted(item.name for item in journal.iterdir())!=names: raise RuntimeError("series journal changed during validation")
+    return final_payload
+
 def drop_to_runtime_user():
     if os.geteuid() == 0:
         os.setgroups([])
@@ -2389,9 +2610,9 @@ def drop_to_runtime_user():
 def main():
     drop_to_runtime_user()
     approval = json.loads(regular_bytes(CONFIG["approval"], 0o600))
-    if set(approval) != {"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","reason"}:
+    if set(approval) != {"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","series_path","series_sha256","reason"}:
         raise RuntimeError("authorization schema differs")
-    if approval["schema"] != "genus-a0.3c-runtime-start-authorization-v2" or approval["reason"] not in {"activate","rollback","recovery"}:
+    if approval["schema"] != "genus-a0.3c-runtime-start-authorization-v3" or approval["reason"] not in {"activate","rollback","recovery"}:
         raise RuntimeError("authorization identity differs")
     if not re.fullmatch(r"[a-f0-9]{40}", approval["repo_commit"]):
         raise RuntimeError("authorization commit malformed")
@@ -2421,13 +2642,21 @@ def main():
             raise RuntimeError("readiness hash differs")
     elif approval["reason"] == "activate" or approval["readiness_sha256"]:
         raise RuntimeError("activate lacks readiness evidence")
+    series = approval["series_path"]
+    if series:
+        if digest(series_bytes(series, approval["repo_commit"])) != approval["series_sha256"]:
+            raise RuntimeError("series hash differs")
+    elif approval["reason"] == "activate" or approval["series_sha256"]:
+        raise RuntimeError("activate lacks series evidence")
+    if approval["reason"] != "activate" and (readiness or approval["readiness_sha256"] or series or approval["series_sha256"]):
+        raise RuntimeError("non-activate authorization carries readiness evidence")
     journal_path = pathlib.Path(CONFIG["journal"])
     try:
         journal_path.lstat()
     except FileNotFoundError:
         return
     journal = json.loads(regular_bytes(journal_path, 0o600))
-    if set(journal) != PENDING_KEYS or journal["schema"] != "genus-a0.3c-runtime-activation-pending-v1":
+    if set(journal) != PENDING_KEYS or journal["schema"] != "genus-a0.3c-runtime-activation-pending-v2":
         raise RuntimeError("pending schema differs")
     if journal["candidate_commit"] != approval["repo_commit"] or journal["active_manifest"] != approval["active_manifest"]:
         raise RuntimeError("pending authorization differs")
@@ -2436,8 +2665,8 @@ def main():
         raise RuntimeError("target manifest hash differs")
     if journal["active_manifest"] not in {journal["target_manifest"], journal["prior_active_manifest"]}:
         raise RuntimeError("ACTIVE is outside the journal transition")
-    if approval["reason"] == "activate" and (journal["active_manifest"] != journal["target_manifest"] or journal["readiness_path"] != approval["readiness_path"] or journal["readiness_sha256"] != approval["readiness_sha256"]):
-        raise RuntimeError("pending activate readiness differs")
+    if approval["reason"] == "activate" and (journal["active_manifest"] != journal["target_manifest"] or journal["readiness_path"] != approval["readiness_path"] or journal["readiness_sha256"] != approval["readiness_sha256"] or journal["series_path"] != approval["series_path"] or journal["series_sha256"] != approval["series_sha256"]):
+        raise RuntimeError("pending activate evidence differs")
     if journal["phase"] not in {"guarded","target-verified","resumed","postflight","receipt-written"}:
         raise RuntimeError("journal phase does not allow an autostart")
 
@@ -2452,6 +2681,38 @@ PY
     generator_status=$?
     [ "$generator_status" -eq 0 ] || return "$generator_status"
     chmod 0600 "$output"
+}
+
+write_boot_guard_payload_from_commit() {
+    local commit="$1" output="$2" source blob actual
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Legacy-Boot-Guard-Commit ist malformed" 70
+    source="$(mktemp "$STATE_ROOT/boot-guard-source.XXXXXX")"
+    blob="$("$GIT_BIN" -C "$REPO_DIR" rev-parse "$commit:deploy/pi_a0_3c_runtime.sh")" \
+        || { rm -f -- "$source"; fail "Legacy-Boot-Guard-Quelle fehlt im gebundenen Commit" 70; }
+    "$GIT_BIN" -C "$REPO_DIR" show "$commit:deploy/pi_a0_3c_runtime.sh" > "$source" \
+        || { rm -f -- "$source"; fail "Legacy-Boot-Guard-Quelle ist nicht lesbar" 70; }
+    chmod 0600 "$source"
+    actual="$("$GIT_BIN" -C "$REPO_DIR" hash-object "$source")"
+    [ "$actual" = "$blob" ] \
+        || { rm -f -- "$source"; fail "Legacy-Boot-Guard-Quelle driftet vom Git-Objekt" 70; }
+    (
+        export GENUS_A03C_SOURCE_ONLY=1 GENUS_REPO_DIR="$REPO_DIR" GENUS_USER GENUS_HOME
+        export GENUS_DB_PATH="$DB_PATH" GENUS_SD_BACKUP="$BACKUP_DIR"
+        export GENUS_A03C_BACKUP_SCRIPT="$BACKUP_SCRIPT" GENUS_A03C_RUNTIME_PREFIX="$RUNTIME_PREFIX"
+        export GENUS_A03C_STATE_ROOT="$STATE_ROOT" GENUS_A03C_SUDO="$SUDO_BIN"
+        export GENUS_A03C_SYSTEMCTL="$SYSTEMCTL_BIN" GENUS_A03C_FUSER="$FUSER_BIN"
+        export GENUS_A03C_GIT="$GIT_BIN" GENUS_A03C_CRONTAB="$CRONTAB_BIN"
+        export GENUS_A03C_SYSTEMD_GUARD_ROOT="$SYSTEMD_GUARD_ROOT"
+        export GENUS_A03C_BOOT_GUARD_PATH="$BOOT_GUARD_PATH"
+        # shellcheck disable=SC1090 -- exact source is read from the attested Git object above.
+        source "$source"
+        write_boot_guard_payload "$output"
+    )
+    actual=$?
+    rm -f -- "$source"
+    [ "$actual" -eq 0 ] || return "$actual"
+    [ -f "$output" ] && [ ! -L "$output" ] && [ "$(stat -c %a "$output")" = 600 ] \
+        || fail "Legacy-Boot-Guard konnte nicht deterministisch erzeugt werden" 70
 }
 
 systemd_guard_payload() {
@@ -2504,9 +2765,13 @@ install_systemd_autostart_guard() {
 }
 
 systemd_autostart_guard_present() {
-    local unit path expected boot_expected
+    local legacy_commit="${1:-}" unit path expected boot_expected
     boot_expected="$(mktemp "$STATE_ROOT/boot-guard-check.XXXXXX")"
-    write_boot_guard_payload "$boot_expected"
+    if [ -n "$legacy_commit" ]; then
+        write_boot_guard_payload_from_commit "$legacy_commit" "$boot_expected"
+    else
+        write_boot_guard_payload "$boot_expected"
+    fi
     if ! as_root "$ROOT_TEST_BIN" -f "$BOOT_GUARD_PATH" || as_root "$ROOT_TEST_BIN" -L "$BOOT_GUARD_PATH" \
         || [ "$(as_root "$ROOT_STAT_BIN" -c %u "$BOOT_GUARD_PATH" 2>/dev/null || printf 1)" -ne 0 ] \
         || [ "$(as_root "$ROOT_STAT_BIN" -c %a "$BOOT_GUARD_PATH" 2>/dev/null || true)" != 755 ] \
@@ -2532,6 +2797,38 @@ systemd_autostart_guard_present() {
     rm -f -- "$expected"
 }
 
+transition_boot_guard_present() {
+    local old_commit="$1"
+    systemd_autostart_guard_present && return 0
+    systemd_autostart_guard_present "$old_commit"
+}
+
+migrate_boot_guard_to_current() {
+    local old_commit="$1" expected guard_dir root_tmp
+    systemd_autostart_guard_present && return 0
+    systemd_autostart_guard_present "$old_commit" \
+        || fail "Boot-Guard ist weder das gebundene OLD- noch das aktuelle Format" 70
+    expected="$(mktemp "$STATE_ROOT/boot-guard-migrate.XXXXXX")"
+    write_boot_guard_payload "$expected"
+    guard_dir="$(dirname "$BOOT_GUARD_PATH")"
+    root_tmp="$(as_root "$ROOT_MKTEMP_BIN" -p "$guard_dir" '.genus-a0-3c-boot-guard.XXXXXX')"
+    case "$root_tmp" in "$guard_dir"/.genus-a0-3c-boot-guard.*) ;; *)
+        rm -f -- "$expected"; fail "root Boot-Guard-Temp entkommt Zielverzeichnis" 70 ;;
+    esac
+    as_root "$ROOT_TEST_BIN" -f "$root_tmp" && ! as_root "$ROOT_TEST_BIN" -L "$root_tmp" \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$root_tmp")" -eq 0 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$root_tmp")" = 600 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$root_tmp")" -eq 1 ] \
+        || { rm -f -- "$expected"; fail "root Boot-Guard-Temp ist nicht exklusiv/privat" 70; }
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0755 "$expected" "$root_tmp"
+    as_root "$ROOT_SYNC_BIN" -f "$root_tmp"
+    as_root "$ROOT_MV_BIN" -Tf -- "$root_tmp" "$BOOT_GUARD_PATH"
+    as_root "$ROOT_SYNC_BIN" -f "$guard_dir"
+    rm -f -- "$expected"
+    systemd_autostart_guard_present \
+        || fail "Boot-Guard-v2-zu-v3-Migration blieb unvollstaendig" 70
+}
+
 remove_systemd_autostart_guard() {
     local unit directory path result=0
     systemd_autostart_guard_present
@@ -2555,18 +2852,30 @@ journal_python() {
 }
 
 create_activation_journal() {
-    local expected="$1" target="$2" mode="$3" readiness="$4" readiness_hash active active_hash previous
-    local target_hash services_csv python
+    local expected="$1" target="$2" mode="$3" readiness="$4" readiness_hash="$5"
+    local series="$6" series_hash="$7" active active_hash previous target_hash services_csv python
     [ ! -e "$ACTIVATION_JOURNAL" ] || fail "Activation-Journal existiert bereits" 70
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     previous="$(selector_manifest "$PREVIOUS_LINK")"
     target_hash="$(manifest_file_hash "$target")"
-    readiness_hash=""; [ -z "$readiness" ] || readiness_hash="$(sha256_file "$readiness")"
+    if [ "$mode" = activate ]; then
+        [ -n "$readiness" ] && [[ "$readiness_hash" =~ ^[a-f0-9]{64}$ ]] \
+            && [ -n "$series" ] && [[ "$series_hash" =~ ^[a-f0-9]{64}$ ]] \
+            || fail "Activation-Journal verlangt Readiness und verifizierte Serienbindung" 70
+        [ "$(sha256_file "$readiness")" = "$readiness_hash" ] \
+            || fail "Readiness-Manifest driftete vor durablem Activation-Journal" 70
+        [ "$(sha256_file "$series")" = "$series_hash" ] \
+            || fail "Serien-Receipt driftete vor durablem Activation-Journal" 70
+    else
+        [ -z "$readiness$readiness_hash$series$series_hash" ] \
+            || fail "Rollback-Journal darf keine Readiness-/Serienbindung tragen" 70
+    fi
     [ "${#active_services[@]}" -gt 0 ] || fail "kein aktives GENUS-Service-Inventar fuer Recovery" 70
     services_csv="$(IFS=,; printf '%s' "${active_services[*]}")"
     python="$(journal_python)"
     EXPECTED="$expected" TARGET="$target" TARGET_HASH="$target_hash" MODE="$mode" \
     READINESS="$readiness" READINESS_HASH="$readiness_hash" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+    SERIES="$series" SERIES_HASH="$series_hash" \
     PREVIOUS="$previous" SERVICES_CSV="$services_csv" \
     CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
     CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
@@ -2574,10 +2883,11 @@ create_activation_journal() {
 import json, os, pathlib, sys
 path = pathlib.Path(sys.argv[1])
 data = {
-    "schema":"genus-a0.3c-runtime-activation-pending-v1", "phase":"prepared",
+    "schema":"genus-a0.3c-runtime-activation-pending-v2", "phase":"prepared",
     "candidate_commit":os.environ["EXPECTED"], "mode":os.environ["MODE"],
     "target_manifest":os.environ["TARGET"], "target_manifest_sha256":os.environ["TARGET_HASH"],
     "readiness_path":os.environ["READINESS"], "readiness_sha256":os.environ["READINESS_HASH"],
+    "series_path":os.environ["SERIES"], "series_sha256":os.environ["SERIES_HASH"],
     "active_manifest":os.environ["ACTIVE"], "active_manifest_sha256":os.environ["ACTIVE_HASH"],
     "prior_active_manifest":os.environ["ACTIVE"], "prior_previous_manifest":os.environ["PREVIOUS"],
     "prior_active_services":[item for item in os.environ["SERVICES_CSV"].split(",") if item],
@@ -2619,16 +2929,92 @@ validate_activation_journal() {
     python="$(journal_python)"
     COMMIT="$(repo_commit)" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
     ALLOW_ACTIVE_MISMATCH="$allow_active_mismatch" \
-    TARGET_ROOT="$SETS_ROOT" CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
+    TARGET_ROOT="$SETS_ROOT" SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" EXPECTED_UID="$(id -u)" \
+    CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
     CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
         "$python" - "$ACTIVATION_JOURNAL" <<'PY'
-import hashlib, json, os, pathlib, sys
-path = pathlib.Path(sys.argv[1]); data = json.loads(path.read_text())
+import hashlib, json, os, pathlib, stat, sys
+
+def regular_bytes(path, label):
+    path = pathlib.Path(path)
+    before = path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid != int(os.environ["EXPECTED_UID"])
+            or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1):
+        raise SystemExit(f"{label} is not private regular evidence")
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        opened = os.fstat(fd)
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise SystemExit(f"{label} changed before open")
+        chunks=[]
+        while True:
+            chunk=os.read(fd, 1024 * 1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(final,key) for key in fields):
+        raise SystemExit(f"{label} changed during read")
+    payload=b"".join(chunks)
+    if len(payload)!=before.st_size: raise SystemExit(f"{label} read was incomplete")
+    return payload
+
+def private_dir(path, label):
+    path=pathlib.Path(path)
+    info=path.lstat()
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != int(os.environ["EXPECTED_UID"])
+            or stat.S_IMODE(info.st_mode) != 0o700 or path.resolve(strict=True) != path):
+        raise SystemExit(f"{label} is not canonical private directory")
+    return path
+
+def strict_json(payload):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit("duplicate series evidence key")
+            result[key]=value
+        return result
+    value=json.loads(payload,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit("series evidence root is not an object")
+    return value
+
+def sealed_digest(data):
+    claimed=data.get("receipt_sha256"); unsigned={key:value for key,value in data.items() if key!="receipt_sha256"}
+    actual=hashlib.sha256(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+    if claimed!=actual: raise SystemExit("series chain digest differs")
+    return actual
+
+def series_bytes(value, expected_commit=None):
+    root=private_dir(pathlib.Path(os.environ["SERIES_ROOT"]), "series root")
+    path=pathlib.Path(value)
+    if path.name!="final-series.json" or path.parent.parent!=root:
+        raise SystemExit("series receipt layout differs")
+    parent=private_dir(path.parent, "series parent")
+    journal_root=private_dir(parent / "journal-root", "series journal root")
+    journal=private_dir(journal_root / "journal", "series journal directory")
+    final_payload=regular_bytes(path,"series receipt"); series=strict_json(final_payload); sealed_digest(series)
+    inventory=series.get("journal_entry_sha256")
+    if series.get("schema")!="genus-a0-3c-readiness-series-v1" or series.get("candidate_commit")!=expected_commit or series.get("gate_pass") is not True or series.get("consecutive_green_runs")!=3 or not isinstance(inventory,list) or len(inventory)!=series.get("journal_entry_count") or not inventory: raise SystemExit("series aggregate is not green")
+    init=strict_json(regular_bytes(journal_root/"series-init.json","series init")); init_sha=sealed_digest(init)
+    if init_sha!=series.get("series_init_sha256"): raise SystemExit("series init digest differs")
+    names=sorted(item.name for item in journal.iterdir()); expected=[f"{index:08d}.json" for index in range(1,len(inventory)+1)]
+    if names!=expected: raise SystemExit("series journal inventory differs")
+    previous="0"*64
+    for index,(name,expected_sha) in enumerate(zip(names,inventory),start=1):
+        entry=strict_json(regular_bytes(journal/name,"series journal entry")); actual=sealed_digest(entry)
+        if actual!=expected_sha or entry.get("index")!=index or entry.get("previous_entry_sha256")!=previous or entry.get("series_init_sha256")!=init_sha: raise SystemExit("series journal chain differs")
+        previous=actual
+    if previous!=series.get("journal_chain_tip_sha256"): raise SystemExit("series journal tip differs")
+    if sorted(item.name for item in journal.iterdir())!=names: raise SystemExit("series journal changed during validation")
+    return final_payload
+
+path = pathlib.Path(sys.argv[1]); data = json.loads(regular_bytes(path, "activation journal"))
 required = {"schema","phase","candidate_commit","mode","target_manifest","target_manifest_sha256",
- "readiness_path","readiness_sha256","active_manifest","active_manifest_sha256",
+ "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
  "prior_active_manifest","prior_previous_manifest","prior_active_services","cron_original_sha256",
  "cron_disabled_sha256","activation_receipt_path","activation_receipt_sha256"}
-if set(data) != required or data["schema"] != "genus-a0.3c-runtime-activation-pending-v1":
+if set(data) != required or data["schema"] != "genus-a0.3c-runtime-activation-pending-v2":
     raise SystemExit("activation journal schema differs")
 if data["candidate_commit"] != os.environ["COMMIT"]:
     raise SystemExit("activation journal commit differs")
@@ -2641,13 +3027,16 @@ if hashlib.sha256(target.read_bytes()).hexdigest() != data["target_manifest_sha2
     raise SystemExit("target manifest hash differs")
 readiness = data["readiness_path"]
 if readiness:
-    ready = pathlib.Path(readiness)
-    if ready.is_symlink() or not ready.is_file() or ready.stat().st_nlink != 1:
-        raise SystemExit("readiness manifest is not regular")
-    if hashlib.sha256(ready.read_bytes()).hexdigest() != data["readiness_sha256"]:
+    if hashlib.sha256(regular_bytes(readiness, "readiness manifest")).hexdigest() != data["readiness_sha256"]:
         raise SystemExit("readiness manifest hash differs")
 elif data["readiness_sha256"]:
     raise SystemExit("empty readiness path has a hash")
+series = data["series_path"]
+if series:
+    if hashlib.sha256(series_bytes(series, data["candidate_commit"])).hexdigest() != data["series_sha256"]:
+        raise SystemExit("series receipt hash differs")
+elif data["series_sha256"]:
+    raise SystemExit("empty series path has a hash")
 if data["cron_original_sha256"] != os.environ["CRON_ORIGINAL_HASH"] or data["cron_disabled_sha256"] != os.environ["CRON_DISABLED_HASH"]:
     raise SystemExit("crontab snapshot hash differs")
 allowed_services={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service","genus-telegram-bot-fallback.service"}
@@ -2656,6 +3045,10 @@ if not data["prior_active_services"] or len(data["prior_active_services"]) != le
 allowed = {"prepared","guarded","paused","stopped","legacy-ready","swapped","target-verified","resumed","postflight","receipt-written"}
 if data["phase"] not in allowed or data["mode"] not in {"activate","rollback"}:
     raise SystemExit("activation journal state differs")
+if data["mode"] == "activate" and (not readiness or not series):
+    raise SystemExit("activate journal lacks readiness or series evidence")
+if data["mode"] == "rollback" and (readiness or data["readiness_sha256"] or series or data["series_sha256"]):
+    raise SystemExit("rollback journal carries activation evidence")
 PY
 }
 
@@ -2696,12 +3089,18 @@ PY
 }
 
 update_activation_journal() {
-    local phase="$1" receipt="${2:-}" python active active_hash tmp
+    local phase="$1" receipt="${2:-}" expected_receipt_hash="${3:-}" python active active_hash tmp receipt_hash
     validate_activation_journal
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     python="$(journal_python)"; tmp="$ACTIVATION_JOURNAL.tmp.$$.$RANDOM"
+    receipt_hash=""
+    if [ -n "$receipt" ]; then
+        receipt_hash="$(sha256_file "$receipt")"
+        [ -z "$expected_receipt_hash" ] || [ "$receipt_hash" = "$expected_receipt_hash" ] \
+            || fail "Completion-Receipt driftete vor Journal-Bindung" 70
+    fi
     PHASE="$phase" ACTIVE="$active" ACTIVE_HASH="$active_hash" RECEIPT="$receipt" \
-    RECEIPT_HASH="$([ -z "$receipt" ] || sha256_file "$receipt")" \
+    RECEIPT_HASH="$receipt_hash" \
         "$python" - "$ACTIVATION_JOURNAL" "$tmp" <<'PY'
 import json, os, pathlib, sys
 source, target = map(pathlib.Path, sys.argv[1:3]); data = json.loads(source.read_text())
@@ -2748,9 +3147,12 @@ else:
     reason = "recovery"
 readiness_path = journal["readiness_path"] if reason == "activate" else ""
 readiness_hash = journal["readiness_sha256"] if reason == "activate" else ""
-data={"schema":"genus-a0.3c-runtime-start-authorization-v2","repo_commit":os.environ["COMMIT"],
+series_path = journal["series_path"] if reason == "activate" else ""
+series_hash = journal["series_sha256"] if reason == "activate" else ""
+data={"schema":"genus-a0.3c-runtime-start-authorization-v3","repo_commit":os.environ["COMMIT"],
       "active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
-      "readiness_path":readiness_path,"readiness_sha256":readiness_hash,"reason":reason}
+      "readiness_path":readiness_path,"readiness_sha256":readiness_hash,
+      "series_path":series_path,"series_sha256":series_hash,"reason":reason}
 flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL
 if hasattr(os,"O_NOFOLLOW"): flags|=os.O_NOFOLLOW
 fd=os.open(path,flags,0o600)
@@ -2776,32 +3178,107 @@ validate_autostart_approval() {
     fi
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"; python="$(journal_python)"
     ACTIVE="$active" ACTIVE_HASH="$active_hash" COMMIT="$(repo_commit)" HAS_JOURNAL="$has_journal" \
+    SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" EXPECTED_UID="$(id -u)" \
         "$python" - "$ACTIVATION_JOURNAL" "$AUTOSTART_APPROVAL" <<'PY'
-import hashlib, json, os, pathlib, sys
+import hashlib, json, os, pathlib, stat, sys
+
+def regular_bytes(path, label):
+    path=pathlib.Path(path); before=path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid!=int(os.environ["EXPECTED_UID"])
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1):
+        raise SystemExit(f"{label} is not private regular evidence")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd)
+        if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit(f"{label} changed before open")
+        chunks=[]
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(final,key) for key in fields): raise SystemExit(f"{label} changed during read")
+    payload=b"".join(chunks)
+    if len(payload)!=before.st_size: raise SystemExit(f"{label} read was incomplete")
+    return payload
+
+def private_dir(path, label):
+    path=pathlib.Path(path); info=path.lstat()
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid!=int(os.environ["EXPECTED_UID"])
+            or stat.S_IMODE(info.st_mode)!=0o700 or path.resolve(strict=True)!=path):
+        raise SystemExit(f"{label} is not canonical private directory")
+    return path
+
+def strict_json(payload):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit("duplicate series evidence key")
+            result[key]=value
+        return result
+    value=json.loads(payload,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit("series evidence root is not an object")
+    return value
+
+def sealed_digest(data):
+    claimed=data.get("receipt_sha256"); unsigned={key:value for key,value in data.items() if key!="receipt_sha256"}
+    actual=hashlib.sha256(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+    if claimed!=actual: raise SystemExit("series chain digest differs")
+    return actual
+
+def series_bytes(value, expected_commit=None):
+    root=private_dir(pathlib.Path(os.environ["SERIES_ROOT"]),"series root")
+    path=pathlib.Path(value)
+    if path.name!="final-series.json" or path.parent.parent!=root: raise SystemExit("series receipt layout differs")
+    parent=private_dir(path.parent,"series parent")
+    journal_root=private_dir(parent/"journal-root","series journal root")
+    journal=private_dir(journal_root/"journal","series journal directory")
+    final_payload=regular_bytes(path,"series receipt"); series=strict_json(final_payload); sealed_digest(series)
+    inventory=series.get("journal_entry_sha256")
+    if series.get("schema")!="genus-a0-3c-readiness-series-v1" or series.get("candidate_commit")!=expected_commit or series.get("gate_pass") is not True or series.get("consecutive_green_runs")!=3 or not isinstance(inventory,list) or len(inventory)!=series.get("journal_entry_count") or not inventory: raise SystemExit("series aggregate is not green")
+    init=strict_json(regular_bytes(journal_root/"series-init.json","series init")); init_sha=sealed_digest(init)
+    if init_sha!=series.get("series_init_sha256"): raise SystemExit("series init digest differs")
+    names=sorted(item.name for item in journal.iterdir()); expected=[f"{index:08d}.json" for index in range(1,len(inventory)+1)]
+    if names!=expected: raise SystemExit("series journal inventory differs")
+    previous="0"*64
+    for index,(name,expected_sha) in enumerate(zip(names,inventory),start=1):
+        entry=strict_json(regular_bytes(journal/name,"series journal entry")); actual=sealed_digest(entry)
+        if actual!=expected_sha or entry.get("index")!=index or entry.get("previous_entry_sha256")!=previous or entry.get("series_init_sha256")!=init_sha: raise SystemExit("series journal chain differs")
+        previous=actual
+    if previous!=series.get("journal_chain_tip_sha256"): raise SystemExit("series journal tip differs")
+    if sorted(item.name for item in journal.iterdir())!=names: raise SystemExit("series journal changed during validation")
+    return final_payload
+
 journal_path, approval_path = map(pathlib.Path, sys.argv[1:3])
-approval=json.loads(approval_path.read_text())
-if set(approval) != {"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","reason"}:
+approval=json.loads(regular_bytes(approval_path,"start authorization"))
+if set(approval) != {"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","series_path","series_sha256","reason"}:
     raise SystemExit("start authorization schema differs")
-if approval["schema"] != "genus-a0.3c-runtime-start-authorization-v2" or approval["repo_commit"] != os.environ["COMMIT"]:
+if approval["schema"] != "genus-a0.3c-runtime-start-authorization-v3" or approval["repo_commit"] != os.environ["COMMIT"]:
     raise SystemExit("start authorization commit differs")
 if approval["active_manifest"] != os.environ["ACTIVE"] or approval["active_manifest_sha256"] != os.environ["ACTIVE_HASH"]:
     raise SystemExit("start authorization ACTIVE binding differs")
 if approval["reason"] not in {"activate","rollback","recovery"}:
     raise SystemExit("start authorization reason differs")
 if approval["readiness_path"]:
-    ready=pathlib.Path(approval["readiness_path"])
-    if ready.is_symlink() or not ready.is_file() or ready.stat().st_nlink != 1:
-        raise SystemExit("authorization readiness is not regular")
-    if hashlib.sha256(ready.read_bytes()).hexdigest() != approval["readiness_sha256"]:
+    if hashlib.sha256(regular_bytes(approval["readiness_path"],"authorization readiness")).hexdigest() != approval["readiness_sha256"]:
         raise SystemExit("authorization readiness hash differs")
 elif approval["readiness_sha256"] or approval["reason"] == "activate":
     raise SystemExit("activate authorization lacks readiness")
+if approval["series_path"]:
+    if hashlib.sha256(series_bytes(approval["series_path"], approval["repo_commit"])).hexdigest() != approval["series_sha256"]:
+        raise SystemExit("authorization series hash differs")
+elif approval["series_sha256"] or approval["reason"] == "activate":
+    raise SystemExit("activate authorization lacks series evidence")
+if approval["reason"] != "activate" and any(approval[key] for key in ("readiness_path","readiness_sha256","series_path","series_sha256")):
+    raise SystemExit("non-activate authorization carries activation evidence")
 if os.environ["HAS_JOURNAL"] == "1":
-    journal=json.loads(journal_path.read_text())
+    journal=json.loads(regular_bytes(journal_path,"activation journal"))
     if journal["candidate_commit"] != approval["repo_commit"] or journal["active_manifest"] != approval["active_manifest"]:
         raise SystemExit("pending journal and authorization differ")
-    if approval["reason"] == "activate" and (journal["target_manifest"] != approval["active_manifest"] or journal["readiness_path"] != approval["readiness_path"] or journal["readiness_sha256"] != approval["readiness_sha256"]):
-        raise SystemExit("activate authorization is not readiness-bound to pending journal")
+    if approval["reason"] == "activate" and (journal["target_manifest"] != approval["active_manifest"] or journal["readiness_path"] != approval["readiness_path"] or journal["readiness_sha256"] != approval["readiness_sha256"] or journal["series_path"] != approval["series_path"] or journal["series_sha256"] != approval["series_sha256"]):
+        raise SystemExit("activate authorization is not evidence-bound to pending journal")
 PY
 }
 
@@ -2809,17 +3286,93 @@ validate_stale_autostart_approval() {
     local old_commit="$1" active active_hash
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
-        "$AUTOSTART_APPROVAL" "$old_commit" "$active" "$active_hash" "$SETS_ROOT/$active/manifest.json" <<'PY'
-import hashlib, json, pathlib, sys
+        "$AUTOSTART_APPROVAL" "$old_commit" "$active" "$active_hash" "$SETS_ROOT/$active/manifest.json" \
+        "$(id -u)" "$GENUS_HOME/.genus/a0.3c/series" <<'PY'
+import hashlib, json, os, pathlib, stat, sys
 approval_path, old, active, active_hash, manifest_path = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], pathlib.Path(sys.argv[5])
-approval=json.loads(approval_path.read_text())
-keys={"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","reason"}
-if set(approval)!=keys or approval["schema"]!="genus-a0.3c-runtime-start-authorization-v2" or approval["repo_commit"]!=old or approval["active_manifest"]!=active or approval["active_manifest_sha256"]!=active_hash: raise SystemExit("stale approval binding differs")
+uid, series_root = int(sys.argv[6]), pathlib.Path(sys.argv[7])
+
+def regular_bytes(path, label):
+    path=pathlib.Path(path); before=path.lstat()
+    if not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1:
+        raise SystemExit(f"{label} is not private regular evidence")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd)
+        if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit(f"{label} changed before open")
+        chunks=[]
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(final,key) for key in fields): raise SystemExit(f"{label} changed during read")
+    payload=b"".join(chunks)
+    if len(payload)!=before.st_size: raise SystemExit(f"{label} read was incomplete")
+    return payload
+
+def private_dir(path, label):
+    path=pathlib.Path(path); info=path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid!=uid or stat.S_IMODE(info.st_mode)!=0o700 or path.resolve(strict=True)!=path:
+        raise SystemExit(f"{label} is not canonical private directory")
+    return path
+
+def strict_json(payload):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit("duplicate stale series key")
+            result[key]=value
+        return result
+    value=json.loads(payload,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit("stale series root is not an object")
+    return value
+
+def sealed_digest(data):
+    claimed=data.get("receipt_sha256"); unsigned={key:value for key,value in data.items() if key!="receipt_sha256"}
+    actual=hashlib.sha256(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+    if claimed!=actual: raise SystemExit("stale series chain digest differs")
+    return actual
+
+def series_bytes(value, expected_commit):
+    root=private_dir(series_root,"series root"); path=pathlib.Path(value)
+    if path.name!="final-series.json" or path.parent.parent!=root: raise SystemExit("stale series layout differs")
+    parent=private_dir(path.parent,"series parent"); journal_root=private_dir(parent/"journal-root","series journal root")
+    journal=private_dir(journal_root/"journal","series journal directory")
+    final_payload=regular_bytes(path,"series receipt"); series=strict_json(final_payload); sealed_digest(series)
+    inventory=series.get("journal_entry_sha256")
+    if series.get("schema")!="genus-a0-3c-readiness-series-v1" or series.get("candidate_commit")!=expected_commit or series.get("gate_pass") is not True or series.get("consecutive_green_runs")!=3 or not isinstance(inventory,list) or len(inventory)!=series.get("journal_entry_count") or not inventory: raise SystemExit("stale series aggregate differs")
+    init=strict_json(regular_bytes(journal_root/"series-init.json","series init")); init_sha=sealed_digest(init)
+    if init_sha!=series.get("series_init_sha256"): raise SystemExit("stale series init differs")
+    names=sorted(item.name for item in journal.iterdir()); expected=[f"{index:08d}.json" for index in range(1,len(inventory)+1)]
+    if names!=expected: raise SystemExit("stale series inventory differs")
+    previous="0"*64
+    for index,(name,expected_sha) in enumerate(zip(names,inventory),start=1):
+        entry=strict_json(regular_bytes(journal/name,"series journal entry")); actual=sealed_digest(entry)
+        if actual!=expected_sha or entry.get("index")!=index or entry.get("previous_entry_sha256")!=previous or entry.get("series_init_sha256")!=init_sha: raise SystemExit("stale series journal differs")
+        previous=actual
+    if previous!=series.get("journal_chain_tip_sha256"): raise SystemExit("stale series tip differs")
+    if sorted(item.name for item in journal.iterdir())!=names: raise SystemExit("stale series changed during validation")
+    return final_payload
+
+approval=json.loads(regular_bytes(approval_path,"stale approval"))
+keys_v2={"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","reason"}
+keys_v3=keys_v2|{"series_path","series_sha256"}
+legacy_v2=approval.get("schema")=="genus-a0.3c-runtime-start-authorization-v2"
+if (legacy_v2 and set(approval)!=keys_v2) or (not legacy_v2 and (set(approval)!=keys_v3 or approval.get("schema")!="genus-a0.3c-runtime-start-authorization-v3")): raise SystemExit("stale approval schema differs")
+if approval["repo_commit"]!=old or approval["active_manifest"]!=active or approval["active_manifest_sha256"]!=active_hash: raise SystemExit("stale approval binding differs")
 if approval["reason"] not in {"activate","rollback","recovery"}: raise SystemExit("stale approval reason differs")
 if approval["readiness_path"]:
-    ready=pathlib.Path(approval["readiness_path"])
-    if ready.is_symlink() or not ready.is_file() or ready.stat().st_nlink!=1 or hashlib.sha256(ready.read_bytes()).hexdigest()!=approval["readiness_sha256"]: raise SystemExit("stale approval readiness differs")
+    if hashlib.sha256(regular_bytes(approval["readiness_path"],"stale readiness")).hexdigest()!=approval["readiness_sha256"]: raise SystemExit("stale approval readiness differs")
 elif approval["readiness_sha256"] or approval["reason"]=="activate": raise SystemExit("stale activate approval lacks readiness")
+if approval["reason"]!="activate" and (approval["readiness_path"] or approval["readiness_sha256"]): raise SystemExit("stale non-activate approval carries readiness evidence")
+if not legacy_v2:
+    if approval["series_path"]:
+        if hashlib.sha256(series_bytes(approval["series_path"],old)).hexdigest()!=approval["series_sha256"]: raise SystemExit("stale approval series differs")
+    elif approval["series_sha256"] or approval["reason"]=="activate": raise SystemExit("stale activate approval lacks series")
+    if approval["reason"]!="activate" and any(approval[key] for key in ("readiness_path","readiness_sha256","series_path","series_sha256")): raise SystemExit("stale non-activate approval carries activation evidence")
 manifest=json.loads(manifest_path.read_text())
 if not active.startswith("legacy-") and (manifest.get("schema")!="genus-a0.3c-runtime-set-v1" or manifest.get("manifest_id")!=active or manifest.get("repo_commit")!=old): raise SystemExit("stale active manifest is not old-commit-bound")
 PY
@@ -2827,13 +3380,12 @@ PY
 
 validate_operator_reauthorization() {
     local receipt old new active active_hash guard_hash approval_hash stale_path stale_hash
-    local old_tree new_tree diff_file diff_hash path
+    local old_tree new_tree diff_file diff_hash path legacy_expected legacy_guard_hash current_expected current_guard_hash
     [ -f "$OPERATOR_REAUTH_TOKEN" ] && [ ! -L "$OPERATOR_REAUTH_TOKEN" ] \
         && [ "$(stat -c %u "$OPERATOR_REAUTH_TOKEN")" -eq "$(id -u)" ] \
         && [ "$(stat -c %a "$OPERATOR_REAUTH_TOKEN")" = 600 ] \
         && [ "$(stat -c %h "$OPERATOR_REAUTH_TOKEN")" -eq 1 ] \
         || fail "Operator-Reauthorization-Token ist nicht regulaer/privat" 70
-    systemd_autostart_guard_present
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     receipt="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$OPERATOR_REAUTH_TOKEN" <<'PY'
 import json,pathlib,sys
@@ -2853,11 +3405,30 @@ PY
     case "$(realpath -e -- "$stale_path" 2>/dev/null || true)" in "$RECEIPT_ROOT"/*) ;; *) fail "stale Approval-Evidence entkommt Receipt-Root" 70 ;; esac
     [ -f "$stale_path" ] && [ ! -L "$stale_path" ] && [ "$(stat -c %h "$stale_path")" -eq 1 ] \
         || fail "stale Approval-Evidence ist nicht regulaer" 70
+    old="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import json,pathlib,sys
+value=json.loads(pathlib.Path(sys.argv[1]).read_text()).get("old_commit","")
+if not isinstance(value,str): raise SystemExit("old commit is malformed")
+print(value)
+PY
+    )"
+    [[ "$old" =~ ^[a-f0-9]{40}$ ]] || fail "Reauthorization-OLD ist malformed" 70
+    "$GIT_BIN" -C "$REPO_DIR" merge-base --is-ancestor "$old" "$(repo_commit)" \
+        || fail "Reauthorization-OLD ist kein vertrauenswuerdiger Vorfahr" 70
+    transition_boot_guard_present "$old" \
+        || fail "Boot-Guard ist weder exakt OLD noch exakt aktuell" 70
+    legacy_expected="$(mktemp "$STATE_ROOT/boot-guard-old-verify.XXXXXX")"
+    write_boot_guard_payload_from_commit "$old" "$legacy_expected"
+    legacy_guard_hash="$(sha256_file "$legacy_expected")"; rm -f -- "$legacy_expected"
+    current_expected="$(mktemp "$STATE_ROOT/boot-guard-current-verify.XXXXXX")"
+    write_boot_guard_payload "$current_expected"
+    current_guard_hash="$(sha256_file "$current_expected")"; rm -f -- "$current_expected"
     guard_hash="$(sha256_file "$BOOT_GUARD_PATH")"; approval_hash="$(sha256_file "$AUTOSTART_APPROVAL")"
     stale_hash="$(sha256_file "$stale_path")"
     [ "$approval_hash" = "$stale_hash" ] || fail "live stale Approval driftete von Reauthorization-Evidence" 70
     TOKEN_HASH="$(sha256_file "$receipt")" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
-    GUARD_HASH="$guard_hash" GUARD_PATH="$BOOT_GUARD_PATH" APPROVAL_HASH="$approval_hash" \
+    LIVE_GUARD_HASH="$guard_hash" LEGACY_GUARD_HASH="$legacy_guard_hash" CURRENT_GUARD_HASH="$current_guard_hash" \
+    GUARD_PATH="$BOOT_GUARD_PATH" APPROVAL_HASH="$approval_hash" \
     STALE_PATH="$stale_path" STALE_HASH="$stale_hash" COMMIT="$(repo_commit)" \
         "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
         "$OPERATOR_REAUTH_TOKEN" "$receipt" "$AUTOSTART_APPROVAL" <<'PY'
@@ -2866,19 +3437,15 @@ token=json.loads(pathlib.Path(sys.argv[1]).read_text()); receipt=json.loads(path
 token_keys={"schema","receipt_path","receipt_sha256","old_commit","new_commit","active_manifest","active_manifest_sha256","guard_sha256","intended_command"}
 receipt_keys={"schema","old_commit","new_commit","old_tree","new_tree","active_manifest","active_manifest_sha256","stale_approval_path","stale_approval_sha256","guard_path","guard_sha256","allowed_diff_sha256","intended_command","boot_approval_updated","paths_logged","payloads_logged"}
 if set(token)!=token_keys or token["schema"]!="genus-a0.3c-operator-reauthorization-token-v1" or set(receipt)!=receipt_keys or receipt["schema"]!="genus-a0.3c-operator-reauthorization-v1": raise SystemExit("reauthorization schema differs")
-if token["receipt_path"]!=sys.argv[2] or token["receipt_sha256"]!=os.environ["TOKEN_HASH"] or token["new_commit"]!=os.environ["COMMIT"] or token["active_manifest"]!=os.environ["ACTIVE"] or token["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"] or token["guard_sha256"]!=os.environ["GUARD_HASH"] or token["intended_command"]!="stage-and-activate": raise SystemExit("reauthorization token binding differs")
+if token["receipt_path"]!=sys.argv[2] or token["receipt_sha256"]!=os.environ["TOKEN_HASH"] or token["new_commit"]!=os.environ["COMMIT"] or token["active_manifest"]!=os.environ["ACTIVE"] or token["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"] or token["guard_sha256"]!=os.environ["LEGACY_GUARD_HASH"] or token["intended_command"]!="stage-and-activate": raise SystemExit("reauthorization token binding differs")
 for key in ("old_commit","new_commit","active_manifest","active_manifest_sha256","guard_sha256","intended_command"):
     if receipt[key]!=token[key]: raise SystemExit("reauthorization receipt/token crossbinding differs")
 if receipt["stale_approval_path"]!=os.environ["STALE_PATH"] or receipt["stale_approval_sha256"]!=os.environ["STALE_HASH"] or receipt["stale_approval_sha256"]!=os.environ["APPROVAL_HASH"] or receipt["guard_path"]!=os.environ["GUARD_PATH"]: raise SystemExit("reauthorization stale evidence differs")
+if receipt["guard_sha256"]!=os.environ["LEGACY_GUARD_HASH"] or os.environ["LIVE_GUARD_HASH"] not in {os.environ["LEGACY_GUARD_HASH"],os.environ["CURRENT_GUARD_HASH"]}: raise SystemExit("reauthorization guard migration binding differs")
 if receipt["boot_approval_updated"] is not False or receipt["paths_logged"] is not True or receipt["payloads_logged"] is not False: raise SystemExit("reauthorization safety booleans differ")
 if not re.fullmatch(r"[0-9a-f]{40}",receipt["old_commit"]) or not re.fullmatch(r"[0-9a-f]{40}",receipt["new_commit"]): raise SystemExit("reauthorization commit malformed")
 if any(not re.fullmatch(r"[0-9a-f]{64}",receipt[key]) for key in ("old_tree","new_tree","active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("reauthorization digest malformed")
 PY
-    old="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
-import json,pathlib,sys
-print(json.loads(pathlib.Path(sys.argv[1]).read_text())["old_commit"])
-PY
-)"
     new="$(repo_commit)"
     assert_expected_commit "$new"
     "$GIT_BIN" -C "$REPO_DIR" merge-base --is-ancestor "$old" "$new" \
@@ -2901,6 +3468,7 @@ data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 if data["old_tree"]!=os.environ["OLD_TREE"] or data["new_tree"]!=os.environ["NEW_TREE"] or data["allowed_diff_sha256"]!=os.environ["DIFF_HASH"]: raise SystemExit("reauthorization git-object/diff binding differs")
 PY
     validate_stale_autostart_approval "$old"
+    migrate_boot_guard_to_current "$old"
     OPERATOR_REAUTH_RECEIPT="$receipt"
 }
 
@@ -3347,7 +3915,7 @@ PY
 }
 
 verify_readiness_manifest() {
-    local set_manifest="$1" expected="$2" readiness="$3" set root resolved receipt
+    local set_manifest="$1" expected="$2" readiness="$3" set root resolved receipt attested_hash
     [[ "$set_manifest" =~ ^[a-f0-9]{64}$ ]] || fail "Legacy-Set kann nicht neu aktiviert werden" 65
     [ -f "$readiness" ] && [ ! -L "$readiness" ] || fail "Readiness-Manifest fehlt oder ist ein Link" 65
     [ "$(stat -c %U "$readiness")" = "$GENUS_USER" ] && [ "$(stat -c %a "$readiness")" = 600 ] \
@@ -3369,17 +3937,116 @@ verify_readiness_manifest() {
     [ -f "$receipt" ] && [ "$(stat -c %a "$receipt")" = 600 ] \
         || fail "Readiness-Verifikation lieferte keinen privaten Receipt" 65
     sync -f "$receipt"; fsync_dir "$RECEIPT_ROOT"
-    "$set/core/bin/python" - "$receipt" "$expected" <<'PY'
-import json, pathlib, sys
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    attested_hash="$(
+    (
+    cd "$REPO_DIR"
+    "$set/core/bin/python" - "$receipt" "$expected" "$resolved" "$REPO_DIR" "$set/core/bin/python" <<'PY'
+import json, os, pathlib, sys
+from experiments.a0_3c import harness
+
+receipt_path, expected = pathlib.Path(sys.argv[1]), sys.argv[2]
+manifest_path, code_root, expected_python = pathlib.Path(sys.argv[3]), pathlib.Path(sys.argv[4]), pathlib.Path(sys.argv[5])
+data = harness.read_json_evidence(receipt_path, require_private=True)
 if data.get("schema") != "genus-a0-3c-manifest-verification-v1":
     raise SystemExit("readiness verification schema differs")
-if data.get("outcome") != "verified" or data.get("candidate_commit") != sys.argv[2]:
+if data.get("outcome") != "verified" or data.get("candidate_commit") != expected:
     raise SystemExit("readiness verification did not bind expected commit")
 if data.get("expected_invocation_attested") is not True:
     raise SystemExit("candidate invocation was not attested")
+before, before_stat = harness._stable_file_bytes(manifest_path, harness.MAX_MANIFEST_BYTES)
+if before_stat["links"] != 1 or before_stat["mode"] != "0600" or before_stat["uid"] != os.geteuid():
+    raise SystemExit("readiness manifest is not private user-owned evidence")
+manifest = harness._decode_json_evidence(before)
+verification = harness.verify_runtime_manifest(
+    manifest,
+    code_root=code_root,
+    expected_candidate_commit=expected,
+    identity=harness.runtime_identity(expected_python),
+)
+after, after_stat = harness._stable_file_bytes(manifest_path, harness.MAX_MANIFEST_BYTES)
+if before != after or before_stat != after_stat:
+    raise SystemExit("readiness manifest changed during attestation")
+for key in ("manifest_sha256", "candidate_commit", "runtime_identity_sha256", "candidate_config_sha256"):
+    if data.get(key) != verification.get(key):
+        raise SystemExit("readiness verification receipt crossbinding differs")
+print(before_stat["sha256"])
 PY
-    printf '%s\n' "$receipt"
+    )
+    )" || fail "Readiness-Manifest driftete waehrend der Kandidatenverifikation" 65
+    [[ "$attested_hash" =~ ^[a-f0-9]{64}$ ]] || fail "Readiness-Verifikation lieferte keinen Dateihash" 65
+    VERIFIED_READINESS_RECEIPT="$receipt"
+    VERIFIED_READINESS_MANIFEST="$resolved"
+    VERIFIED_READINESS_SHA256="$attested_hash"
+}
+
+verify_series_receipt() {
+    local set_manifest="$1" expected="$2" readiness="$3" series="$4" set root resolved
+    local replay_output replay_hash readiness_hash
+    [[ "$set_manifest" =~ ^[a-f0-9]{64}$ ]] || fail "Legacy-Set kann keine Readiness-Serie binden" 65
+    [ -f "$series" ] && [ ! -L "$series" ] || fail "finales Serien-Receipt fehlt oder ist ein Link" 65
+    [ "$(stat -c %U "$series")" = "$GENUS_USER" ] && [ "$(stat -c %a "$series")" = 600 ] \
+        && [ "$(stat -c %h "$series")" -eq 1 ] \
+        || fail "finales Serien-Receipt muss user-owned/0600/einfach verlinkt sein" 65
+    root="$GENUS_HOME/.genus/a0.3c/series"
+    [ -d "$root" ] && [ ! -L "$root" ] || fail "privater Serien-Evidence-Root fehlt oder ist ein Link" 65
+    resolved="$(realpath -e -- "$series")"
+    case "$resolved" in "$root"/*) ;; *) fail "finales Serien-Receipt liegt nicht im privaten Serien-Root" 65 ;; esac
+    [ -z "$(find "$root" -type d -perm /077 -print -quit)" ] \
+        || fail "Serien-Evidence-Verzeichnis ist nicht privat" 65
+    set="$(set_path "$set_manifest")"
+    replay_output="$(
+    (
+        cd "$REPO_DIR"
+        "$set/core/bin/python" - "$resolved" "$readiness" "$expected" "$REPO_DIR" \
+            "$set/core/bin/python" "$root" <<'PY'
+import os, sys
+from pathlib import Path
+
+from experiments.a0_3c import harness
+
+series_path, readiness_path = Path(sys.argv[1]), Path(sys.argv[2])
+expected_commit, code_root = sys.argv[3], Path(sys.argv[4])
+expected_python, series_root = Path(sys.argv[5]), Path(sys.argv[6])
+identity = harness.runtime_identity(expected_python)
+readiness_before, readiness_before_stat = harness._stable_file_bytes(
+    readiness_path, harness.MAX_MANIFEST_BYTES
+)
+if (
+    readiness_before_stat["links"] != 1
+    or readiness_before_stat["mode"] != "0600"
+    or readiness_before_stat["uid"] != os.geteuid()
+):
+    raise SystemExit("readiness manifest is not private user-owned evidence")
+manifest = harness._decode_json_evidence(readiness_before)
+verified = harness.verify_final_series_receipt_chain(
+    series_path,
+    series_evidence_root=series_root,
+    manifest=manifest,
+    code_root=code_root,
+    expected_candidate_commit=expected_commit,
+    identity=identity,
+)
+if verified.get("gate_pass") is not True or verified.get("consecutive_green_runs") != 3:
+    raise SystemExit("journal replay is not an exact three-green readiness proof")
+readiness_after, readiness_after_stat = harness._stable_file_bytes(
+    readiness_path, harness.MAX_MANIFEST_BYTES
+)
+if readiness_before != readiness_after or readiness_before_stat != readiness_after_stat:
+    raise SystemExit("readiness manifest changed during journal replay")
+print(f'{verified["file_sha256"]}:{readiness_before_stat["sha256"]}')
+PY
+    )
+    )" || fail "finales Serien-Receipt ist nicht als vollstaendige Journal-Kette an Kandidat und Readiness gebunden" 65
+    replay_hash="${replay_output%%:*}"
+    readiness_hash="${replay_output#*:}"
+    [[ "$replay_hash" =~ ^[a-f0-9]{64}$ ]] && [[ "$readiness_hash" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Journal-Replay lieferte keinen Serien-Dateihash" 65
+    [ "$replay_hash" = "$(sha256_file "$resolved")" ] \
+        || fail "finales Serien-Receipt driftete nach Journal-Replay" 65
+    sync -f "$resolved"; fsync_dir "$(dirname "$resolved")"
+    VERIFIED_SERIES_RECEIPT="$resolved"
+    VERIFIED_SERIES_SHA256="$replay_hash"
+    VERIFIED_SERIES_READINESS_SHA256="$readiness_hash"
 }
 
 attest_active_pointer_unit() {
@@ -3559,8 +4226,9 @@ PY
 }
 
 write_activation_receipt() {
-    local manifest="$1" expected="$2" readiness="$3" verification="$4" previous="$5"
-    local backup="$6" postflight="$7" identity="$8" target service_state evidence
+    local manifest="$1" expected="$2" readiness="$3" series="$4" series_hash="$5"
+    local verification="$6" previous="$7" backup="$8" postflight="$9" identity="${10}"
+    local target service_state evidence
     local target_manifest_path previous_manifest_path reauth reauth_hash
     safe_manifest_id "$manifest"
     safe_manifest_id "$previous"
@@ -3576,7 +4244,9 @@ PY
     previous_manifest_path="$SETS_ROOT/$previous/manifest.json"
     reauth="${OPERATOR_REAUTH_RECEIPT:-}"; reauth_hash=""
     [ -z "$reauth" ] || reauth_hash="$(sha256_file "$reauth")"
-    for evidence in "$backup" "$readiness" "$verification" "$postflight" "$identity" "$target_manifest_path" "$previous_manifest_path"; do
+    [ "$(sha256_file "$series")" = "$series_hash" ] \
+        || fail "Serien-Receipt driftete nach dem fail-closed Preflight" 70
+    for evidence in "$backup" "$readiness" "$series" "$verification" "$postflight" "$identity" "$target_manifest_path" "$previous_manifest_path"; do
         [ -f "$evidence" ] && [ ! -L "$evidence" ] && [ "$(stat -c %h "$evidence")" -eq 1 ] \
             || fail "Activation-Evidence ist nicht regulaer/einfach verlinkt" 70
         sync -f "$evidence"; fsync_dir "$(dirname "$evidence")"
@@ -3588,17 +4258,19 @@ PY
     PREVIOUS_MANIFEST_PATH="$previous_manifest_path" PREVIOUS_MANIFEST_HASH="$(sha256_file "$previous_manifest_path")" \
     BACKUP_RECEIPT="$backup" BACKUP_HASH="$(sha256_file "$backup")" \
     READINESS_MANIFEST="$readiness" READINESS_HASH="$(sha256_file "$readiness")" \
+    SERIES_RECEIPT="$series" SERIES_HASH="$series_hash" \
     VERIFICATION_RECEIPT="$verification" VERIFICATION_HASH="$(sha256_file "$verification")" \
     POSTFLIGHT_RECEIPT="$postflight" POSTFLIGHT_HASH="$(sha256_file "$postflight")" \
     IDENTITY_RECEIPT="$identity" IDENTITY_HASH="$(sha256_file "$identity")" SERVICE_STATE="$service_state" \
     REAUTH_RECEIPT="$reauth" REAUTH_HASH="$reauth_hash" \
         "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
 import json, os, pathlib, sys
-data={"schema":"genus-a0.3c-runtime-activation-v2","outcome":"activated","candidate_commit":os.environ["COMMIT"],
+data={"schema":"genus-a0.3c-runtime-activation-v3","outcome":"activated","candidate_commit":os.environ["COMMIT"],
       "previous_set_manifest":os.environ["PREVIOUS"],"previous_set_manifest_path":os.environ["PREVIOUS_MANIFEST_PATH"],"previous_set_manifest_sha256":os.environ["PREVIOUS_MANIFEST_HASH"],
       "activated_set_manifest":os.environ["MANIFEST"],"activated_set_manifest_path":os.environ["TARGET_MANIFEST_PATH"],"activated_set_manifest_sha256":os.environ["TARGET_MANIFEST_HASH"],
       "backup_receipt_path":os.environ["BACKUP_RECEIPT"],"backup_receipt_sha256":os.environ["BACKUP_HASH"],
       "readiness_manifest_path":os.environ["READINESS_MANIFEST"],"readiness_manifest_sha256":os.environ["READINESS_HASH"],
+      "series_receipt_path":os.environ["SERIES_RECEIPT"],"series_receipt_sha256":os.environ["SERIES_HASH"],
       "verification_receipt_path":os.environ["VERIFICATION_RECEIPT"],"verification_receipt_sha256":os.environ["VERIFICATION_HASH"],
       "active_identity_receipt_path":os.environ["IDENTITY_RECEIPT"],"active_identity_receipt_sha256":os.environ["IDENTITY_HASH"],
       "postflight_receipt_path":os.environ["POSTFLIGHT_RECEIPT"],"postflight_receipt_sha256":os.environ["POSTFLIGHT_HASH"],
@@ -3647,27 +4319,114 @@ PY
     printf '%s\n' "$target"
 }
 
+private_stable_sha256() {
+    local source="$1"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$source" "$(id -u)" <<'PY'
+import hashlib, os, pathlib, stat, sys
+path=pathlib.Path(sys.argv[1]); uid=int(sys.argv[2]); before=path.lstat()
+if not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1: raise SystemExit("private evidence metadata differs")
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try:
+    opened=os.fstat(fd)
+    if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit("private evidence changed before open")
+    chunks=[]
+    while True:
+        chunk=os.read(fd,1024*1024)
+        if not chunk: break
+        chunks.append(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat(); fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) or getattr(before,key)!=getattr(after,key) for key in fields): raise SystemExit("private evidence changed during read")
+payload=b"".join(chunks)
+if len(payload)!=before.st_size: raise SystemExit("private evidence read was incomplete")
+print(hashlib.sha256(payload).hexdigest())
+PY
+}
+
+pin_private_evidence_copy() {
+    local source="$1" target="$2"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$source" "$target" "$(id -u)" <<'PY'
+import hashlib, os, pathlib, stat, sys
+source,target,uid=pathlib.Path(sys.argv[1]),pathlib.Path(sys.argv[2]),int(sys.argv[3]); before=source.lstat()
+if not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1: raise SystemExit("private evidence metadata differs")
+fd=os.open(source,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try:
+    opened=os.fstat(fd); chunks=[]
+    if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit("private evidence changed before open")
+    while True:
+        chunk=os.read(fd,1024*1024)
+        if not chunk: break
+        chunks.append(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=source.lstat(); fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) or getattr(before,key)!=getattr(after,key) for key in fields): raise SystemExit("private evidence changed during snapshot")
+payload=b"".join(chunks)
+if len(payload)!=before.st_size: raise SystemExit("private evidence snapshot was incomplete")
+flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); out=os.open(target,flags,0o600)
+try: os.write(out,payload); os.fsync(out)
+finally: os.close(out)
+directory=os.open(target.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+print(hashlib.sha256(payload).hexdigest())
+PY
+}
+
 validate_completion_receipt() {
-    local receipt="$1" python active previous schema backup
+    local receipt="$1" source_receipt snapshot receipt_pin python active previous schema backup
+    local bindings readiness series series_hash final_hash
     [ -f "$receipt" ] && [ ! -L "$receipt" ] \
         && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
         && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
         || fail "Completion-Receipt ist nicht regulaer/user-owned/0600/einfach verlinkt" 70
+    source_receipt="$receipt"
+    snapshot="$STATE_ROOT/completion-validation.$$.$RANDOM.json"
+    [ ! -e "$snapshot" ] && [ ! -L "$snapshot" ] \
+        || fail "Completion-Validation-Snapshot existiert bereits" 70
+    receipt_pin="$(pin_private_evidence_copy "$source_receipt" "$snapshot")" \
+        || fail "Completion-Receipt konnte nicht stabil gepinnt werden" 70
+    [[ "$receipt_pin" =~ ^[a-f0-9]{64}$ ]] || fail "Completion-Pin ist malformed" 70
+    receipt="$snapshot"
     active="$(selector_manifest)"; python="$(journal_python)"
-    schema="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
-import json, pathlib, sys
-value=json.loads(pathlib.Path(sys.argv[1]).read_text()).get("schema")
+    schema="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" "$receipt_pin" <<'PY'
+import hashlib, json, pathlib, sys
+payload=pathlib.Path(sys.argv[1]).read_bytes()
+if hashlib.sha256(payload).hexdigest()!=sys.argv[2]: raise SystemExit("completion snapshot hash differs")
+value=json.loads(payload).get("schema")
 if not isinstance(value,str): raise SystemExit("completion schema is missing")
 print(value)
 PY
 )"
-    if [ "$schema" = genus-a0.3c-runtime-activation-v2 ]; then
+    if [ "$schema" = genus-a0.3c-runtime-activation-v3 ]; then
         previous="$(selector_manifest "$PREVIOUS_LINK")"
         verify_target "$active" >/dev/null
         verify_target "$previous" >/dev/null
-        backup="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
-import json, pathlib, sys
-data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+        systemd_autostart_guard_present \
+            || fail "Completion-Verifikation verlangt den aktuellen Boot-Guard" 70
+        bindings="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" "$receipt_pin" <<'PY'
+import hashlib, json, pathlib, sys
+payload=pathlib.Path(sys.argv[1]).read_bytes()
+if hashlib.sha256(payload).hexdigest()!=sys.argv[2]: raise SystemExit("completion snapshot hash differs")
+data=json.loads(payload)
+for key in ("readiness_manifest_path","series_receipt_path","series_receipt_sha256"):
+    value=data.get(key)
+    if not isinstance(value,str) or "\t" in value or "\n" in value: raise SystemExit("completion series binding is malformed")
+print("\t".join(data[key] for key in ("readiness_manifest_path","series_receipt_path","series_receipt_sha256")))
+PY
+        )" || fail "Completion-Receipt enthaelt keine lesbare Serienbindung" 70
+        IFS=$'\t' read -r readiness series series_hash <<< "$bindings"
+        verify_series_receipt "$active" "$(repo_commit)" "$readiness" "$series"
+        [ "$series" = "$VERIFIED_SERIES_RECEIPT" ] && [ "$series_hash" = "$VERIFIED_SERIES_SHA256" ] \
+            || fail "Completion-Receipt driftet von erneut abgespielter Serien-Kette" 70
+        backup="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" "$receipt_pin" <<'PY'
+import hashlib, json, pathlib, sys
+payload=pathlib.Path(sys.argv[1]).read_bytes()
+if hashlib.sha256(payload).hexdigest()!=sys.argv[2]: raise SystemExit("completion snapshot hash differs")
+data=json.loads(payload)
 print(data["backup_receipt_path"])
 PY
 )"
@@ -3675,13 +4434,16 @@ PY
         COMMIT="$(repo_commit)" ACTIVE="$active" PREVIOUS="$previous" \
         ACTIVE_HASH="$(manifest_file_hash "$active")" PREVIOUS_HASH="$(manifest_file_hash "$previous")" \
         RECEIPT_ROOT_ENV="$RECEIPT_ROOT" READINESS_ROOT="$GENUS_HOME/.genus/a0.3c/readiness" \
-        SETS_ROOT_ENV="$SETS_ROOT" CORE_STABLE="$CORE_POINTER/bin/python" JOURNAL="$ACTIVATION_JOURNAL" \
-        BOOT_GUARD="$BOOT_GUARD_PATH" \
+        SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" SETS_ROOT_ENV="$SETS_ROOT" \
+        CORE_STABLE="$CORE_POINTER/bin/python" JOURNAL="$ACTIVATION_JOURNAL" \
+        BOOT_GUARD="$BOOT_GUARD_PATH" CURRENT_BOOT_GUARD_HASH="$(sha256_file "$BOOT_GUARD_PATH")" \
+        RECEIPT_PIN="$receipt_pin" \
             "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
 import hashlib, json, os, pathlib, re, stat, sys
 HEX=re.compile(r"[0-9a-f]{64}")
 receipt=pathlib.Path(sys.argv[1]); receipt_root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve()
-readiness_root=pathlib.Path(os.environ["READINESS_ROOT"]).resolve(); sets_root=pathlib.Path(os.environ["SETS_ROOT_ENV"]).resolve()
+readiness_root=pathlib.Path(os.environ["READINESS_ROOT"]).resolve(); series_root=pathlib.Path(os.environ["SERIES_ROOT"]).resolve()
+sets_root=pathlib.Path(os.environ["SETS_ROOT_ENV"]).resolve()
 commit, active, previous=os.environ["COMMIT"],os.environ["ACTIVE"],os.environ["PREVIOUS"]
 def canonical(value): return json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()
 def stable_bytes(path):
@@ -3698,10 +4460,12 @@ def stable_bytes(path):
         if any(getattr(final,k)!=getattr(opened,k) for k in fields): raise SystemExit("activation evidence changed during read")
     finally: os.close(fd)
     return b"".join(chunks)
-def load(path_value,hash_value,root,direct=False):
+def load(path_value,hash_value,root,direct=False,allowed_modes=(0o600,)):
     if not isinstance(path_value,str) or not HEX.fullmatch(str(hash_value)): raise SystemExit("activation evidence path/hash is malformed")
     path=pathlib.Path(path_value); resolved=path.resolve(strict=True); expected=root.resolve(strict=True)
     if expected not in resolved.parents or (direct and resolved.parent!=expected): raise SystemExit("activation evidence escapes its fixed root")
+    info=path.lstat()
+    if path.is_symlink() or info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode) not in allowed_modes or info.st_nlink!=1: raise SystemExit("activation evidence privacy differs")
     payload=stable_bytes(path)
     if hashlib.sha256(payload).hexdigest()!=hash_value: raise SystemExit("activation evidence hash differs")
     return path,json.loads(payload)
@@ -3717,12 +4481,14 @@ def identity(data,label):
     if fingerprint.get("exact_runtime_gate_pass") is not True or fingerprint.get("python_version_info")!=[3,13,15] or fingerprint.get("sqlite_version")!="3.53.4": raise SystemExit(f"{label} runtime gate differs")
     if invocation.get("expected_invocation_path_supplied") is not True or invocation.get("expected_invocation_lexical_match") is not True or invocation.get("expected_invocation_same_file") is not True or invocation.get("expected_invocation_attested") is not True: raise SystemExit(f"{label} invocation is not exact")
     return fingerprint
-top=json.loads(stable_bytes(receipt))
-keys={"schema","outcome","candidate_commit","previous_set_manifest","previous_set_manifest_path","previous_set_manifest_sha256","activated_set_manifest","activated_set_manifest_path","activated_set_manifest_sha256","backup_receipt_path","backup_receipt_sha256","readiness_manifest_path","readiness_manifest_sha256","verification_receipt_path","verification_receipt_sha256","active_identity_receipt_path","active_identity_receipt_sha256","postflight_receipt_path","postflight_receipt_sha256","operator_reauthorization_receipt_path","operator_reauthorization_receipt_sha256","service_state_sha256","core_embed_single_selector","database_rollback_performed","paths_logged","payloads_logged"}
-if set(top)!=keys or top["schema"]!="genus-a0.3c-runtime-activation-v2" or top["outcome"]!="activated" or top["candidate_commit"]!=commit or top["activated_set_manifest"]!=active or top["previous_set_manifest"]!=previous: raise SystemExit("activation receipt schema/selector binding differs")
+top_payload=stable_bytes(receipt)
+if hashlib.sha256(top_payload).hexdigest()!=os.environ["RECEIPT_PIN"]: raise SystemExit("completion snapshot hash differs")
+top=json.loads(top_payload)
+keys={"schema","outcome","candidate_commit","previous_set_manifest","previous_set_manifest_path","previous_set_manifest_sha256","activated_set_manifest","activated_set_manifest_path","activated_set_manifest_sha256","backup_receipt_path","backup_receipt_sha256","readiness_manifest_path","readiness_manifest_sha256","series_receipt_path","series_receipt_sha256","verification_receipt_path","verification_receipt_sha256","active_identity_receipt_path","active_identity_receipt_sha256","postflight_receipt_path","postflight_receipt_sha256","operator_reauthorization_receipt_path","operator_reauthorization_receipt_sha256","service_state_sha256","core_embed_single_selector","database_rollback_performed","paths_logged","payloads_logged"}
+if set(top)!=keys or top["schema"]!="genus-a0.3c-runtime-activation-v3" or top["outcome"]!="activated" or top["candidate_commit"]!=commit or top["activated_set_manifest"]!=active or top["previous_set_manifest"]!=previous: raise SystemExit("activation receipt schema/selector binding differs")
 if top["core_embed_single_selector"] is not True or top["database_rollback_performed"] is not False or top["paths_logged"] is not True or top["payloads_logged"] is not False: raise SystemExit("activation receipt safety booleans differ")
-target_path,target=load(top["activated_set_manifest_path"],top["activated_set_manifest_sha256"],sets_root/active)
-previous_path,previous_data=load(top["previous_set_manifest_path"],top["previous_set_manifest_sha256"],sets_root/previous)
+target_path,target=load(top["activated_set_manifest_path"],top["activated_set_manifest_sha256"],sets_root/active,False,(0o400,0o600))
+previous_path,previous_data=load(top["previous_set_manifest_path"],top["previous_set_manifest_sha256"],sets_root/previous,False,(0o400,0o600))
 if target_path!=(sets_root/active/"manifest.json") or previous_path!=(sets_root/previous/"manifest.json") or target.get("schema")!="genus-a0.3c-runtime-set-v1" or target.get("manifest_id")!=active or target.get("repo_commit")!=commit or previous_data.get("manifest_id")!=previous: raise SystemExit("set manifest evidence differs")
 _,backup=load(top["backup_receipt_path"],top["backup_receipt_sha256"],receipt_root,True)
 if backup.get("schema")!="genus-a0.3c-backup-v2" or backup.get("repo_commit")!=commit: raise SystemExit("backup crossbinding differs")
@@ -3731,6 +4497,15 @@ readiness_keys={"schema","candidate_commit","runtime_identity","runtime_identity
 if set(readiness)!=readiness_keys or readiness["schema"]!="genus-a0-3c-runtime-manifest-v1" or readiness["candidate_commit"]!=commit or readiness["manifest_sha256"]!=hashlib.sha256(canonical({k:v for k,v in readiness.items() if k!="manifest_sha256"})).hexdigest() or readiness["retuning_allowed_within_series"] is not False or readiness["product_activation_authorized"] is not False or readiness["paths_logged"] is not False or readiness["payloads_logged"] is not False: raise SystemExit("readiness manifest contract differs")
 pinned_fingerprint=identity(readiness["runtime_identity"],"readiness")
 if readiness["runtime_identity_sha256"]!=readiness["runtime_identity"]["identity_sha256"] or readiness["runtime_fingerprint"]!=pinned_fingerprint: raise SystemExit("readiness identity binding differs")
+_,series=load(top["series_receipt_path"],top["series_receipt_sha256"],series_root)
+series_keys={"schema","outcome","verified_at_utc","manifest_sha256","candidate_commit","runtime_identity_sha256","candidate_config_sha256","batch_events","batch_bytes","required_consecutive_runs","run_receipt_sha256","acquisition_receipt_sha256","fresh_acquisition_per_run","identical_candidate_runtime_config","retuning_between_runs","red_run_sequences","consecutive_green_runs","series_reset_required","gate_pass","product_activation_authorized","separate_human_live_go_required","paths_logged","payloads_logged","series_init_sha256","journal_entry_count","journal_entry_sha256","journal_chain_tip_sha256","journal_attempt_count","journal_finish_count","journal_reset_count","latest_epoch","all_attempts_bound","latest_epoch_exact_three_green","receipt_sha256"}
+if set(series)!=series_keys or series["schema"]!="genus-a0-3c-readiness-series-v1": raise SystemExit("series receipt schema differs")
+sealed(series,"series")
+if series["outcome"]!="green" or series["candidate_commit"]!=commit or series["manifest_sha256"]!=readiness["manifest_sha256"] or series["runtime_identity_sha256"]!=readiness["runtime_identity_sha256"] or series["candidate_config_sha256"]!=hashlib.sha256(canonical(readiness["candidate_config"])).hexdigest() or series["batch_events"]!=readiness["candidate_config"].get("batch_events") or series["batch_bytes"]!=readiness["candidate_config"].get("batch_bytes") or series["required_consecutive_runs"]!=3 or series["consecutive_green_runs"]!=3 or series["gate_pass"] is not True or series["series_reset_required"] is not False or series["red_run_sequences"]!=[] or series["fresh_acquisition_per_run"] is not True or series["identical_candidate_runtime_config"] is not True or series["retuning_between_runs"] is not False or series["product_activation_authorized"] is not False or series["separate_human_live_go_required"] is not True or series["paths_logged"] is not False or series["payloads_logged"] is not False or series["all_attempts_bound"] is not True or series["latest_epoch_exact_three_green"] is not True: raise SystemExit("series/readiness crossbinding differs")
+runs,acquisitions,entries=series["run_receipt_sha256"],series["acquisition_receipt_sha256"],series["journal_entry_sha256"]
+if not isinstance(runs,list) or len(runs)!=3 or len(set(runs))!=3 or not isinstance(acquisitions,list) or len(acquisitions)!=3 or len(set(acquisitions))!=3 or any(not isinstance(value,str) or not HEX.fullmatch(value) for value in [*runs,*acquisitions]) or not isinstance(entries,list) or not entries or len(entries)!=series["journal_entry_count"] or len(set(entries))!=len(entries) or any(not isinstance(value,str) or not HEX.fullmatch(value) for value in entries) or series["journal_chain_tip_sha256"]!=entries[-1] or not isinstance(series["series_init_sha256"],str) or not HEX.fullmatch(series["series_init_sha256"]): raise SystemExit("series digest inventory differs")
+attempts,finishes,resets=series["journal_attempt_count"],series["journal_finish_count"],series["journal_reset_count"]
+if any(not isinstance(value,int) or isinstance(value,bool) or value<0 for value in (attempts,finishes,resets,series["latest_epoch"],series["journal_entry_count"])) or attempts<3 or finishes<3 or finishes>attempts or attempts-finishes>resets or series["journal_entry_count"]!=attempts+finishes+resets or series["latest_epoch"]!=resets+1: raise SystemExit("series journal summary differs")
 _,verification=load(top["verification_receipt_path"],top["verification_receipt_sha256"],receipt_root,True)
 verify_keys={"schema","outcome","manifest_sha256","candidate_commit","runtime_identity_sha256","current_invocation_identity_sha256","expected_invocation_attested","candidate_config_sha256","a0_3b_code_sha256","a0_3c_code_sha256","gate_evidence","wal_reset_fix_gate_pass","paths_logged","payloads_logged","receipt_sha256"}
 if set(verification)!=verify_keys or verification["schema"]!="genus-a0-3c-manifest-verification-v1": raise SystemExit("verification receipt schema differs")
@@ -3745,7 +4520,9 @@ post_keys={"schema","outcome","consecutive_samples","services","service_state_sh
 if set(postflight)!=post_keys or postflight["schema"]!="genus-a0.3c-runtime-service-postflight-v1" or postflight["outcome"]!="verified" or postflight["consecutive_samples"]!=3 or postflight["paths_logged"] is not False or postflight["payloads_logged"] is not False: raise SystemExit("postflight schema differs")
 services=postflight["services"]
 if postflight["service_state_sha256"]!=hashlib.sha256(canonical(services)).hexdigest() or top["service_state_sha256"]!=postflight["service_state_sha256"]: raise SystemExit("service state digest differs")
-journal=json.loads(stable_bytes(pathlib.Path(os.environ["JOURNAL"])))
+journal_path=pathlib.Path(os.environ["JOURNAL"]); journal_info=journal_path.lstat()
+if journal_path.is_symlink() or journal_info.st_uid!=os.geteuid() or stat.S_IMODE(journal_info.st_mode)!=0o600 or journal_info.st_nlink!=1: raise SystemExit("activation journal privacy differs")
+journal=json.loads(stable_bytes(journal_path))
 allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service","genus-telegram-bot-fallback.service"}
 if [item.get("service") for item in services]!=journal["prior_active_services"] or len({item.get("service") for item in services})!=len(services) or any(set(item)!={"service","unit_type","main_pid","nrestarts","active_state","invocation_id","active_enter_timestamp_monotonic"} or item.get("service") not in allowed or item.get("active_state")!="active" or item.get("unit_type")!=("timer" if item.get("service","").endswith(".timer") else "service") or not isinstance(item.get("main_pid"),int) or isinstance(item.get("main_pid"),bool) or item.get("main_pid",-1)<0 or not isinstance(item.get("nrestarts"),int) or isinstance(item.get("nrestarts"),bool) or item.get("nrestarts",-1)<0 or not isinstance(item.get("active_enter_timestamp_monotonic"),int) or isinstance(item.get("active_enter_timestamp_monotonic"),bool) or item.get("active_enter_timestamp_monotonic",0)<=0 or not isinstance(item.get("invocation_id"),str) or not item.get("invocation_id") for item in services): raise SystemExit("postflight service inventory differs")
 names={item["service"] for item in services}
@@ -3758,17 +4535,50 @@ if reauth_path:
     if set(reauth)!=reauth_keys or reauth["schema"]!="genus-a0.3c-operator-reauthorization-v1" or reauth["new_commit"]!=commit or reauth["active_manifest"]!=previous or reauth["active_manifest_sha256"]!=top["previous_set_manifest_sha256"] or reauth["intended_command"]!="stage-and-activate" or reauth["boot_approval_updated"] is not False or reauth["paths_logged"] is not True or reauth["payloads_logged"] is not False: raise SystemExit("operator reauthorization binding differs")
     if not re.fullmatch(r"[0-9a-f]{40}",reauth["old_commit"]) or any(not HEX.fullmatch(str(reauth[key])) for key in ("old_tree","new_tree","active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("operator reauthorization digest differs")
     stale_path,stale=load(reauth["stale_approval_path"],reauth["stale_approval_sha256"],receipt_root,True)
-    if stale.get("schema")!="genus-a0.3c-runtime-start-authorization-v2" or stale.get("repo_commit")!=reauth["old_commit"] or stale.get("active_manifest")!=previous or stale.get("active_manifest_sha256")!=reauth["active_manifest_sha256"]: raise SystemExit("stale approval evidence differs")
+    stale_v2={"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","reason"}
+    stale_v3=stale_v2|{"series_path","series_sha256"}
+    legacy_stale=stale.get("schema")=="genus-a0.3c-runtime-start-authorization-v2"
+    if (legacy_stale and set(stale)!=stale_v2) or (not legacy_stale and (stale.get("schema")!="genus-a0.3c-runtime-start-authorization-v3" or set(stale)!=stale_v3)): raise SystemExit("stale approval schema differs")
+    if stale.get("repo_commit")!=reauth["old_commit"] or stale.get("active_manifest")!=previous or stale.get("active_manifest_sha256")!=reauth["active_manifest_sha256"] or stale.get("reason") not in {"activate","rollback","recovery"}: raise SystemExit("stale approval evidence differs")
+    def private_evidence(value,digest,root,label):
+        path=pathlib.Path(value); resolved=path.resolve(strict=True)
+        if root.resolve(strict=True) not in resolved.parents: raise SystemExit(f"{label} escapes its private root")
+        info=path.lstat()
+        if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1: raise SystemExit(f"{label} privacy differs")
+        payload=stable_bytes(path)
+        if hashlib.sha256(payload).hexdigest()!=digest: raise SystemExit(f"{label} hash differs")
+        return path
+    if stale["readiness_path"]:
+        private_evidence(stale["readiness_path"],stale["readiness_sha256"],readiness_root,"stale readiness")
+    elif stale["readiness_sha256"] or stale["reason"]=="activate": raise SystemExit("stale activate approval lacks readiness")
+    if not legacy_stale:
+        if stale["series_path"]:
+            stale_series=private_evidence(stale["series_path"],stale["series_sha256"],series_root,"stale series")
+            if stale_series.name!="final-series.json" or stale_series.parent.parent!=series_root: raise SystemExit("stale series layout differs")
+            for directory in (series_root,stale_series.parent,stale_series.parent/"journal-root",stale_series.parent/"journal-root"/"journal"):
+                info=directory.lstat()
+                if directory.is_symlink() or not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or stat.S_IMODE(info.st_mode)!=0o700 or directory.resolve(strict=True)!=directory: raise SystemExit("stale series directory privacy differs")
+            private_evidence(str(stale_series.parent/"journal-root"/"series-init.json"),hashlib.sha256(stable_bytes(stale_series.parent/"journal-root"/"series-init.json")).hexdigest(),stale_series.parent/"journal-root","stale series init")
+        elif stale["series_sha256"] or stale["reason"]=="activate": raise SystemExit("stale activate approval lacks series")
+        if stale["reason"]!="activate" and any(stale[key] for key in ("readiness_path","readiness_sha256","series_path","series_sha256")): raise SystemExit("stale non-activate approval carries activation evidence")
     guard=pathlib.Path(reauth["guard_path"])
-    if guard!=pathlib.Path(os.environ["BOOT_GUARD"]) or hashlib.sha256(stable_bytes(guard)).hexdigest()!=reauth["guard_sha256"]: raise SystemExit("reauthorization guard evidence differs")
+    if guard!=pathlib.Path(os.environ["BOOT_GUARD"]) or hashlib.sha256(stable_bytes(guard)).hexdigest()!=os.environ["CURRENT_BOOT_GUARD_HASH"]: raise SystemExit("reauthorization current guard evidence differs")
 PY
+        final_hash="$(private_stable_sha256 "$source_receipt")" \
+            || fail "Completion-Receipt driftete waehrend der Gesamtverifikation" 70
+        [ "$final_hash" = "$receipt_pin" ] \
+            || fail "Completion-Receipt wurde waehrend der Gesamtverifikation ersetzt" 70
+        VERIFIED_COMPLETION_RECEIPT_SHA256="$receipt_pin"
+        rm -f -- "$snapshot"; fsync_dir "$STATE_ROOT"
         return 0
     fi
     COMMIT="$(repo_commit)" ACTIVE="$active" ACTIVE_HASH="$(manifest_file_hash "$active")" \
-    AUTH_HASH="$(sha256_file "$AUTOSTART_APPROVAL")" \
+    AUTH_HASH="$(sha256_file "$AUTOSTART_APPROVAL")" RECEIPT_PIN="$receipt_pin" \
         "$python" - "$receipt" <<'PY'
-import json, os, pathlib, sys
-data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+import hashlib, json, os, pathlib, sys
+payload=pathlib.Path(sys.argv[1]).read_bytes()
+if hashlib.sha256(payload).hexdigest()!=os.environ["RECEIPT_PIN"]: raise SystemExit("completion snapshot hash differs")
+data=json.loads(payload)
 if data.get("schema") == "genus-a0.3c-runtime-transition-completion-v1":
     if set(data) != {"schema","outcome","repo_commit","active_manifest","active_manifest_sha256","start_authorization_sha256","active_services","database_rollback_performed"}:
         raise SystemExit("transition completion schema differs")
@@ -3776,6 +4586,12 @@ if data.get("schema") == "genus-a0.3c-runtime-transition-completion-v1":
         raise SystemExit("transition completion binding differs")
 else: raise SystemExit("completion receipt schema differs")
 PY
+    final_hash="$(private_stable_sha256 "$source_receipt")" \
+        || fail "Transition-Completion-Receipt driftete waehrend der Verifikation" 70
+    [ "$final_hash" = "$receipt_pin" ] \
+        || fail "Transition-Completion-Receipt wurde waehrend der Verifikation ersetzt" 70
+    VERIFIED_COMPLETION_RECEIPT_SHA256="$receipt_pin"
+    rm -f -- "$snapshot"; fsync_dir "$STATE_ROOT"
 }
 
 journal_field() {
@@ -3820,6 +4636,7 @@ start_recorded_services() {
         active="$($SYSTEMCTL_BIN show "$unit" -p ActiveState --value 2>/dev/null || true)"
         [ "$active" = active ] || return 70
     done
+    validate_autostart_approval
 }
 
 attest_recovered_services() {
@@ -3969,11 +4786,22 @@ finalize_guarded_transition() {
 }
 
 recover_pending_activation() {
-    local phase receipt receipt_hash actual_hash services_output recovery_status fail_closed_status approval_status
+    local phase receipt receipt_hash actual_hash services_output recovery_status fail_closed_status approval_status guard_status
     local -a recovery_services=()
     if [ ! -e "$ACTIVATION_JOURNAL" ]; then
         if [ -e "$ACTIVE_LINK" ] || [ -L "$ACTIVE_LINK" ] || [ -e "$AUTOSTART_APPROVAL" ] || [ -L "$AUTOSTART_APPROVAL" ]; then
-            systemd_autostart_guard_present
+            if [ -e "$OPERATOR_REAUTH_TOKEN" ] || [ -L "$OPERATOR_REAUTH_TOKEN" ]; then
+                set +e
+                ( set -Eeuo pipefail; systemd_autostart_guard_present )
+                guard_status=$?
+                set -e
+                if [ "$guard_status" -ne 0 ]; then
+                    validate_operator_reauthorization
+                fi
+                systemd_autostart_guard_present
+            else
+                systemd_autostart_guard_present
+            fi
             set +e
             ( set -Eeuo pipefail; validate_autostart_approval )
             approval_status=$?
@@ -4010,6 +4838,8 @@ recover_pending_activation() {
             [ "$actual_hash" = "$receipt_hash" ] \
                 || fail "persistierter Activation-Receipt driftet" 70
             validate_completion_receipt "$receipt"
+            [ "$VERIFIED_COMPLETION_RECEIPT_SHA256" = "$receipt_hash" ] \
+                || fail "Completion-Snapshot stimmt nicht mit dem persistierten Receipt-Hash ueberein" 70
             services_output="$(journal_service_lines)"
             [ -n "$services_output" ] \
                 || fail "persistiertes Service-Inventar ist leer/ungueltig" 70
@@ -4040,7 +4870,7 @@ recover_pending_activation() {
         GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" resume
         receipt="$(write_transition_completion_receipt interrupted-restored)"
         validate_completion_receipt "$receipt"
-        update_activation_journal receipt-written "$receipt"
+        update_activation_journal receipt-written "$receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
         finalize_guarded_transition
         log "unterbrochenen Runtimewechsel auf den verifizierten Ausgangszustand restauriert"
     )
@@ -4074,7 +4904,8 @@ activation_fault_point() {
 }
 
 switch_with_quiescence() {
-    local expected="$1" target_manifest="$2" mode="$3" readiness="${4:-}" readiness_receipt=""
+    local expected="$1" target_manifest="$2" mode="$3" readiness="${4:-}" series="${5:-}"
+    local readiness_receipt="" readiness_hash="" series_receipt="" series_hash=""
     local current_target="" previous_selector="" backup_receipt="" postflight_receipt=""
     local active_identity_receipt="" activation_receipt="" restore_status
     local -a recovery_services=()
@@ -4095,7 +4926,15 @@ switch_with_quiescence() {
     recover_incomplete_migration
     verify_target "$target_manifest" >/dev/null
     if [ "$mode" = activate ]; then
-        readiness_receipt="$(verify_readiness_manifest "$target_manifest" "$expected" "$readiness")"
+        verify_readiness_manifest "$target_manifest" "$expected" "$readiness"
+        readiness_receipt="$VERIFIED_READINESS_RECEIPT"
+        readiness="$VERIFIED_READINESS_MANIFEST"
+        readiness_hash="$VERIFIED_READINESS_SHA256"
+        verify_series_receipt "$target_manifest" "$expected" "$readiness" "$series"
+        series_receipt="$VERIFIED_SERIES_RECEIPT"
+        series_hash="$VERIFIED_SERIES_SHA256"
+        [ "$readiness_hash" = "$VERIFIED_SERIES_READINESS_SHA256" ] \
+            || fail "Readiness-Manifest driftete zwischen Einzelverifikation und Serien-Replay" 65
     fi
     remember_services
     [ "${#active_services[@]}" -gt 0 ] \
@@ -4104,7 +4943,8 @@ switch_with_quiescence() {
     capture_activation_crontab
     install_systemd_autostart_guard
     systemd_autostart_guard_present
-    create_activation_journal "$expected" "$target_manifest" "$mode" "$readiness"
+    create_activation_journal "$expected" "$target_manifest" "$mode" "$readiness" "$readiness_hash" \
+        "$series_receipt" "$series_hash"
     cleanup_switch() {
         local status="${1:-$?}"
         trap - EXIT INT TERM
@@ -4148,25 +4988,33 @@ switch_with_quiescence() {
     fi
     GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" paused >/dev/null
     update_activation_journal target-verified
+    if [ "$mode" = activate ]; then
+        verify_series_receipt "$target_manifest" "$expected" "$readiness" "$series_receipt"
+        [ "$VERIFIED_SERIES_SHA256" = "$series_hash" ] \
+            && [ "$VERIFIED_SERIES_READINESS_SHA256" = "$readiness_hash" ] \
+            || fail "Serien-/Readiness-Evidence driftete an der Startgrenze" 70
+    fi
     write_autostart_approval
     validate_autostart_approval
     start_previous_services
+    validate_autostart_approval
     GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" resume
     update_activation_journal resumed
     activation_fault_point after-resume
     if [ "$mode" = activate ]; then
         postflight_receipt="$(attest_restarted_services)"
         update_activation_journal postflight
-        activation_receipt="$(write_activation_receipt "$target_manifest" "$expected" "$readiness" "$readiness_receipt" \
-            "$previous_selector" "$backup_receipt" "$postflight_receipt" "$active_identity_receipt")"
+        activation_receipt="$(write_activation_receipt "$target_manifest" "$expected" "$readiness" \
+            "$series_receipt" "$series_hash" "$readiness_receipt" "$previous_selector" \
+            "$backup_receipt" "$postflight_receipt" "$active_identity_receipt")"
         validate_completion_receipt "$activation_receipt"
-        update_activation_journal receipt-written "$activation_receipt"
+        update_activation_journal receipt-written "$activation_receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
     else
         recovery_services=("${active_services[@]}")
         attest_recovered_services
         activation_receipt="$(write_transition_completion_receipt rollback-restored)"
         validate_completion_receipt "$activation_receipt"
-        update_activation_journal receipt-written "$activation_receipt"
+        update_activation_journal receipt-written "$activation_receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
     fi
     finalize_guarded_transition
     SERVICES_RESTARTED=0
@@ -4185,7 +5033,7 @@ rollback_runtime() {
     [ -n "$target" ] || fail "kein vorheriges Runtime-Set" 65
     [[ "$target" =~ ^legacy-[a-f0-9]{64}$ ]] \
         || fail "rollback akzeptiert nur das gebundene Legacy-Set; Roll-forward braucht activate+Readiness" 65
-    switch_with_quiescence "$expected" "$target" rollback ""
+    switch_with_quiescence "$expected" "$target" rollback "" ""
 }
 
 reauthorize_runtime() {
@@ -4200,9 +5048,10 @@ reauthorize_runtime() {
         || fail "Reauthorization ist mit pending Activation verboten" 70
     [ ! -e "$OPERATOR_REAUTH_TOKEN" ] && [ ! -L "$OPERATOR_REAUTH_TOKEN" ] \
         || fail "Operator-Reauthorization ist bereits pending" 70
-    systemd_autostart_guard_present
     "$GIT_BIN" -C "$REPO_DIR" merge-base --is-ancestor "$old" "$new" \
         || fail "NEW ist kein sauberer Fast-Forward von OLD" 65
+    systemd_autostart_guard_present "$old" \
+        || fail "Boot-Guard entspricht nicht exakt dem reautorisierten OLD-Commit" 70
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     validate_stale_autostart_approval "$old"
     pointer_dir_valid "$CORE_POINTER" core && pointer_dir_valid "$EMBED_POINTER" embed \
@@ -4292,11 +5141,18 @@ main() {
     case "$command" in
         status) shift; [ "$#" -le 1 ] || fail "zu viele Argumente" 64; status_command "${1:-}" ;;
         stage) [ "$#" -le 2 ] || fail "stage akzeptiert hoechstens EXPECTED_SUPPLY_SEAL" 64; stage_set "${2:-}" ;;
-        verify) shift; [ "$#" -le 1 ] || fail "zu viele Argumente" 64; init_user_roots; manifest="$(resolve_manifest "${1:-active}")"; verify_target "$manifest" ;;
+        verify)
+            shift
+            [ "$#" -le 1 ] || fail "zu viele Argumente" 64
+            init_user_roots
+            acquire_operator_lock
+            manifest="$(resolve_manifest "${1:-active}")"
+            verify_target "$manifest"
+            ;;
         activate)
-            [ "$#" -ge 3 ] && [ "$#" -le 4 ] || fail "activate braucht EXPECTED_COMMIT READINESS_MANIFEST [SET_MANIFEST]" 64
-            expected="$2"; manifest="$(resolve_manifest "${4:-staged}")"
-            switch_with_quiescence "$expected" "$manifest" activate "$3"
+            [ "$#" -ge 4 ] && [ "$#" -le 5 ] || fail "activate braucht EXPECTED_COMMIT READINESS_MANIFEST FINAL_SERIES_RECEIPT [SET_MANIFEST]" 64
+            expected="$2"; manifest="$(resolve_manifest "${5:-staged}")"
+            switch_with_quiescence "$expected" "$manifest" activate "$3" "$4"
             ;;
         rollback) [ "$#" -eq 2 ] || fail "rollback braucht EXPECTED_COMMIT" 64; rollback_runtime "$2" ;;
         reauthorize) [ "$#" -eq 3 ] || fail "reauthorize braucht EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT" 64; reauthorize_runtime "$2" "$3" ;;

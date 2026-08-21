@@ -426,7 +426,9 @@ dabei unverändert.
 
 Das abschließende Receipt liegt ebenfalls außerhalb des Journal-Roots. Der CLI
 liest ausschließlich die vollständige Journal-Kette; einzelne `--run`-Dateien
-können nicht ausgewählt oder ausgelassen werden:
+können nicht ausgewählt oder ausgelassen werden. Dieses finale Receipt ist ein
+explizites Pflichtargument der späteren Runtime-Aktivierung; ein Readiness-
+Manifest allein genügt nicht:
 
 ```bash
 "$CANDIDATE_CORE_PY" -m experiments.a0_3c verify-series \
@@ -453,23 +455,47 @@ Live-Go** gesperrt.
 
 ### Stufe 3: Runtime aktivieren und produktiven Prozesspfad beweisen
 
-Erst nach den grünen Kandidaten-Gates darf genau dieses Set als
-**Python-/SQLite-Runtime** aktiviert werden. Commit, externes Readiness-Manifest
-und Set-Manifest-ID sind drei getrennte Pflichtbindungen:
+Erst nach den grünen Kandidaten-Gates und der verifizierten Drei-Lauf-Serie darf
+genau dieses Set als **Python-/SQLite-Runtime** aktiviert werden. Commit,
+externes Readiness-Manifest, finales Serien-Receipt und Set-Manifest-ID sind
+vier getrennte Pflichtbindungen:
 
 ```bash
 ./deploy/pi_a0_3c_runtime.sh activate \
-  "$EXPECTED_COMMIT" "$MANIFEST_JSON" "$MANIFEST_ID"
+  "$EXPECTED_COMMIT" "$MANIFEST_JSON" "$FINAL_SERIES_RECEIPT" "$MANIFEST_ID"
 ./deploy/pi_a0_3c_runtime.sh status
 ./deploy/pi_a0_3c_runtime.sh verify active
 ```
 
-`activate` verifiziert das Readiness-Manifest erneut unter dem Set-Python,
-erzeugt ein frisches geprüftes Ledger-Backup samt Konfigurationsinventar,
+`activate` verifiziert und pinnt zuerst den kanonischen Pfad und Rohdatei-Hash
+des Readiness-Manifests. Unter dem Set-Python prüft es anschließend die
+kanonische Serienablage (`final-series.json` direkt im Serien-Elternverzeichnis,
+daneben `journal-root/series-init.json`) exakt gegen dieses gepinnte Manifest.
+Es spielt die vollständige append-only Journal-Kette erneut ab und vergleicht
+jedes deterministische Feld sowie das Digest-Inventar mit dem finalen Receipt;
+nur Verifikationszeit und daraus folgender Receipt-Hash dürfen neu entstehen.
+Owner, Modus, Link- und Verzeichnisgrenzen werden vor und nach dem Replay
+geprüft. Vor dem durable Pending-Journal muss der während des Replays stabil
+gelesene Readiness-Rohhash weiterhin exakt der ersten Pinnung entsprechen.
+Damit sind drei konsekutive grüne Läufe an Commit, Readiness-Manifest,
+Runtime-Identität und Kandidatenkonfiguration gebunden. Erst danach erzeugt es ein
+frisches geprüftes Ledger-Backup samt Konfigurationsinventar,
 pausiert und stoppt Cron, Watchdog, Learner und Bot kontrolliert und verweigert
 alte Runtime- oder Datenbank-Handles. Erst dann tauscht es den gemeinsamen
 `active`-Selector atomar und startet ausschließlich die zuvor aktiven Prozesse.
 Core und Embedder werden nie einzeln gemischt.
+
+Noch vor Pause, Selector-Tausch oder Start wird diese verifizierte Readiness-
+und Serienbindung mit kanonischem Pfad und Rohdatei-Hash im fsync-ten
+`genus-a0.3c-runtime-activation-pending-v2`-Journal persistiert. Die spätere
+`genus-a0.3c-runtime-start-authorization-v3` und der Boot-Guard verlangen exakt
+dieselben vier Werte. Direkt vor der Startfreigabe läuft außerdem ein zweiter
+vollständiger Replay; Pending-Validator, Approval und Boot-Guard vergleichen
+danach bei jedem Start den internen Init-Digest und jede gepinnte Journal-Entry
+mit dem unveränderten finalen Receipt. Ein Absturz nach Selector-Tausch oder Startfreigabe, aber
+vor dem Abschluss-Receipt, kann das Ziel deshalb nicht ohne dauerhafte
+Serienevidenz booten; Completion und Recovery spielen die Journal-Kette erneut
+ab.
 
 Nach dem Wechsel müssen Runtime-Identität und Manifest erneut über genau den
 stabilen Pfad grün sein, den die produktiven GENUS-Einstiege verwenden:
@@ -490,10 +516,11 @@ Der Script-Postflight verlangt drei aufeinanderfolgende stabile Dienstproben,
 attestiert den privaten Bot-Runtimepfad sowie den gepinnten Learner-Einstieg und
 schreibt private Receipts unter
 `/home/ronny/.genus/runtime-a0.3c/receipts/`. Das abschließende
-`genus-a0.3c-runtime-activation-v2`-Receipt bindet insbesondere:
+`genus-a0.3c-runtime-activation-v3`-Receipt bindet insbesondere:
 
 - das frische Backup-Receipt;
 - Readiness-Manifest und dessen Kandidaten-Verifikation;
+- das finale Drei-Lauf-Serien-Receipt;
 - das Identitäts-Receipt der dann aktiven Runtime;
 - den Dienst-Postflight und seinen Zustands-Hash;
 - Commit sowie vorheriges und aktiviertes Set-Manifest mit Pfad und Hash;
@@ -552,9 +579,13 @@ nur nicht live-importierbare Pfade berührt (`deploy/pi_a0_3c_runtime.sh`,
 `README*`, `CONTRIBUTING.md`). Er schreibt ein Receipt und einen Token, der
 **genau einen** nachfolgenden `stage`-plus-`activate`-Durchgang autorisiert;
 ein `rollback` ist unter Reauthorisierung ausdrücklich gesperrt. Die
-Boot-Freigabe bleibt dabei bewusst auf dem alten Stand: Wer zwischen
-Reauthorisierung und Aktivierung neu startet, findet die Dienste fail-closed
-statt halb umgestellt vor.
+alte Boot-Freigabe bleibt dabei bewusst stale. Beim Schemawechsel wird nur ein
+exakt aus dem attestierten OLD-Git-Objekt reproduzierter v2-Boot-Guard nach
+vollständiger Token-/Receipt-Prüfung auf v3 migriert; die Veröffentlichung
+erfolgt über eine fsync-te root-eigene Tempdatei und atomaren Rename. Der
+v3-Guard lehnt die alte v2-Freigabe ab. Wer zwischen Reauthorisierung und
+Aktivierung neu startet, findet die Dienste daher fail-closed statt halb
+umgestellt vor.
 
 Berührt ein Fast-Forward dagegen `genus/`, `schema.sql` oder andere produktiv
 importierte Pfade, ist er kein A0.3c-Update, sondern eine Produktänderung — er

@@ -513,6 +513,64 @@ def _series_inputs(
     return acquisitions, runs
 
 
+def _final_series_layout(
+    tmp_path: Path,
+    evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> tuple[Path, Path, Path, dict[str, Any], Path, dict[str, Any]]:
+    manifest, identity, acquisition_template, run_template = evidence
+    evidence_root = _private_dir(tmp_path / "series-evidence")
+    series_parent = _private_dir(evidence_root / "readiness-id")
+    journal_root = _private_dir(series_parent / "journal-root")
+    series_init = harness.initialize_series_journal(
+        journal_root,
+        manifest=manifest,
+        code_root=CODE_ROOT,
+        expected_candidate_commit=COMMIT,
+        identity=identity,
+    )
+    for sequence in (1, 2, 3):
+        acquisition = _fresh_acquisition(acquisition_template)
+        start = harness.reserve_series_attempt(
+            journal_root,
+            series_init=series_init,
+            acquisition_receipt=acquisition,
+            requested_sequence=sequence,
+            manifest=manifest,
+            code_root=CODE_ROOT,
+            expected_candidate_commit=COMMIT,
+            identity=identity,
+        )
+        run_time = datetime.now(timezone.utc)
+        run = _green_run(
+            run_template,
+            sequence,
+            acquisition["receipt_sha256"],
+            acquired_at=datetime.fromisoformat(
+                acquisition["acquired_at_utc"].replace("Z", "+00:00")
+            ),
+            started_at=run_time,
+            completed_at=run_time,
+        )
+        harness.finish_series_attempt(
+            journal_root,
+            series_init=series_init,
+            start_entry=start,
+            manifest=manifest,
+            run_receipt=run,
+        )
+    receipt = harness.verify_series_journal(
+        journal_root,
+        series_init=series_init,
+        manifest=manifest,
+        code_root=CODE_ROOT,
+        expected_candidate_commit=COMMIT,
+        identity=identity,
+    )
+    final_receipt = series_parent / "final-series.json"
+    harness.write_json_evidence(final_receipt, receipt)
+    return evidence_root, series_parent, journal_root, series_init, final_receipt, receipt
+
+
 def test_series_accepts_exact_three_fresh_ordered_green_runs(
     green_candidate_evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]
 ) -> None:
@@ -636,6 +694,142 @@ def test_append_only_journal_accepts_only_latest_three_green_epoch(
     assert receipt["journal_attempt_count"] == 3
     assert receipt["journal_reset_count"] == 0
     assert receipt["all_attempts_bound"] is True
+
+
+def test_final_series_chain_replays_canonical_private_journal(
+    tmp_path: Path,
+    green_candidate_evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    manifest, identity, _, _ = green_candidate_evidence
+    evidence_root, _, _, _, final_receipt, receipt = _final_series_layout(
+        tmp_path, green_candidate_evidence
+    )
+    verified = harness.verify_final_series_receipt_chain(
+        final_receipt,
+        series_evidence_root=evidence_root,
+        manifest=manifest,
+        code_root=CODE_ROOT,
+        expected_candidate_commit=COMMIT,
+        identity=identity,
+    )
+    assert verified["file_sha256"] == harness._stable_file_bytes(
+        final_receipt, harness.MAX_RECEIPT_BYTES
+    )[1]["sha256"]
+    assert verified["journal_chain_tip_sha256"] == receipt["journal_chain_tip_sha256"]
+    assert verified["gate_pass"] is True
+
+
+def test_final_series_chain_rejects_self_sealed_stale_aggregate(
+    tmp_path: Path,
+    green_candidate_evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    manifest, identity, _, _ = green_candidate_evidence
+    evidence_root, _, _, _, final_receipt, receipt = _final_series_layout(
+        tmp_path, green_candidate_evidence
+    )
+    stale = dict(receipt)
+    stale.pop("receipt_sha256")
+    stale["journal_chain_tip_sha256"] = "f" * 64
+    final_receipt.unlink()
+    harness.write_json_evidence(final_receipt, harness._seal_receipt(stale))
+    with pytest.raises(harness.SeriesEvidenceError, match="journal replay"):
+        harness.verify_final_series_receipt_chain(
+            final_receipt,
+            series_evidence_root=evidence_root,
+            manifest=manifest,
+            code_root=CODE_ROOT,
+            expected_candidate_commit=COMMIT,
+            identity=identity,
+        )
+
+
+def test_final_series_chain_parses_the_exact_pinned_receipt_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    green_candidate_evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    manifest, identity, _, _ = green_candidate_evidence
+    evidence_root, _, _, _, final_receipt, valid = _final_series_layout(
+        tmp_path, green_candidate_evidence
+    )
+    stale = dict(valid)
+    stale.pop("receipt_sha256")
+    stale["journal_chain_tip_sha256"] = "f" * 64
+    final_receipt.unlink()
+    harness.write_json_evidence(final_receipt, harness._seal_receipt(stale))
+    original_read = harness.read_json_evidence
+
+    def split_read(path: Path | str, **kwargs: Any) -> dict[str, Any]:
+        if Path(path) == final_receipt:
+            return copy.deepcopy(valid)
+        return original_read(path, **kwargs)
+
+    monkeypatch.setattr(harness, "read_json_evidence", split_read)
+    with pytest.raises(harness.SeriesEvidenceError, match="journal replay"):
+        harness.verify_final_series_receipt_chain(
+            final_receipt,
+            series_evidence_root=evidence_root,
+            manifest=manifest,
+            code_root=CODE_ROOT,
+            expected_candidate_commit=COMMIT,
+            identity=identity,
+        )
+
+
+def test_final_series_chain_binds_replay_to_pinned_journal_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    green_candidate_evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    manifest, identity, _, _ = green_candidate_evidence
+    evidence_root, _, journal_root, _, final_receipt, valid = _final_series_layout(
+        tmp_path, green_candidate_evidence
+    )
+    entry_path = journal_root / harness.SERIES_JOURNAL_DIR / "00000001.json"
+    entry = harness.read_json_evidence(entry_path)
+    entry.pop("receipt_sha256")
+    entry["created_at_utc"] = "2026-08-18T00:00:00Z"
+    entry_path.unlink()
+    harness.write_json_evidence(entry_path, harness._seal_receipt(entry))
+    monkeypatch.setattr(
+        harness,
+        "verify_series_journal",
+        lambda *args, **kwargs: copy.deepcopy(valid),
+    )
+    with pytest.raises(harness.SeriesEvidenceError, match="pinned evidence inventory"):
+        harness.verify_final_series_receipt_chain(
+            final_receipt,
+            series_evidence_root=evidence_root,
+            manifest=manifest,
+            code_root=CODE_ROOT,
+            expected_candidate_commit=COMMIT,
+            identity=identity,
+        )
+
+
+def test_final_series_chain_rejects_tampered_journal_entry(
+    tmp_path: Path,
+    green_candidate_evidence: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    manifest, identity, _, _ = green_candidate_evidence
+    evidence_root, _, journal_root, _, final_receipt, _ = _final_series_layout(
+        tmp_path, green_candidate_evidence
+    )
+    entry_path = journal_root / harness.SERIES_JOURNAL_DIR / "00000001.json"
+    entry = harness.read_json_evidence(entry_path)
+    entry.pop("receipt_sha256")
+    entry["candidate_commit"] = "2" * 40
+    entry_path.unlink()
+    harness.write_json_evidence(entry_path, harness._seal_receipt(entry))
+    with pytest.raises(harness.SeriesEvidenceError):
+        harness.verify_final_series_receipt_chain(
+            final_receipt,
+            series_evidence_root=evidence_root,
+            manifest=manifest,
+            code_root=CODE_ROOT,
+            expected_candidate_commit=COMMIT,
+            identity=identity,
+        )
 
 
 def test_open_and_red_attempts_are_bound_by_resets_before_sequence_one(
