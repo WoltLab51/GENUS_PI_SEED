@@ -27,6 +27,7 @@ GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 BACKUP_DIR="${GENUS_SD_BACKUP:-$GENUS_HOME/genus-sd-backup}"
 BACKUP_SCRIPT="${GENUS_A03C_BACKUP_SCRIPT:-$SCRIPT_DIR/backup_ledger_to_sd.sh}"
+BACKUP_LOCK_FILE="$(dirname "$DB_PATH")/backup-ledger.lock"
 RUNTIME_PREFIX="${GENUS_A03C_RUNTIME_PREFIX:-/opt/genus/runtime/cpython-${PYTHON_VERSION}-sqlite-${SQLITE_VERSION}}"
 STATE_ROOT="${GENUS_A03C_STATE_ROOT:-$GENUS_HOME/.genus/runtime-a0.3c}"
 SETS_ROOT="$STATE_ROOT/sets"
@@ -90,6 +91,7 @@ umask 077
 
 PRIVILEGED_BOUNDARY_READY=0
 OPERATOR_LOCK_HELD=0
+BACKUP_LOCK_HELD=0
 OPERATOR_REAUTH_RECEIPT=""
 VERIFIED_READINESS_RECEIPT=""
 VERIFIED_READINESS_MANIFEST=""
@@ -116,6 +118,7 @@ Aufruf:
   ./deploy/pi_a0_3c_runtime.sh verify [active|MANIFEST]
   ./deploy/pi_a0_3c_runtime.sh activate EXPECTED_COMMIT READINESS_MANIFEST FINAL_SERIES_RECEIPT [SET_MANIFEST]
   ./deploy/pi_a0_3c_runtime.sh rollback EXPECTED_COMMIT
+  ./deploy/pi_a0_3c_runtime.sh recover EXPECTED_COMMIT
   ./deploy/pi_a0_3c_runtime.sh reauthorize EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT
 
 stage/verify beruehren weder Dienste noch Produktdatenbank. activate und
@@ -320,6 +323,47 @@ acquire_operator_lock() {
     exec 9>"$LOCK_FILE"
     flock -n 9 || fail "ein anderer A0.3c-Lauf haelt den Operator-Lock" 75
     OPERATOR_LOCK_HELD=1
+}
+
+acquire_backup_lock() {
+    local parent path_identity fd_identity
+    [ "$BACKUP_LOCK_HELD" -eq 0 ] || return 0
+    require_command flock
+    parent="$(realpath -e -- "$(dirname "$DB_PATH")")" \
+        || fail "Backup-Lock-Elternverzeichnis ist nicht kanonisch aufloesbar" 70
+    BACKUP_LOCK_FILE="$parent/backup-ledger.lock"
+    [ -d "$parent" ] && [ ! -L "$parent" ] \
+        && [ "$(stat -c %u "$parent")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$parent")" = 700 ] \
+        || fail "Backup-Lock-Elternverzeichnis ist nicht operator-eigen/privat" 70
+    if [ -e "$BACKUP_LOCK_FILE" ] || [ -L "$BACKUP_LOCK_FILE" ]; then
+        [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
+            && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$(id -u)" ] \
+            && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 600 ] \
+            && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
+            || fail "Backup-Lock ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+    fi
+    exec 8>>"$BACKUP_LOCK_FILE"
+    [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
+        && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 600 ] \
+        && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
+        || fail "Backup-Lock ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+    path_identity="$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")"
+    fd_identity="$(stat -Lc '%d:%i' "/proc/$BASHPID/fd/8")"
+    [ "$path_identity" = "$fd_identity" ] \
+        || fail "Backup-Lock-FD ist nicht an den validierten Pfad gebunden" 70
+    flock -n 8 || fail "ein Ledger-Backup laeuft bereits" 75
+    [ "$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")" = "$fd_identity" ] \
+        || fail "Backup-Lock-Pfad wurde beim Sperren ersetzt" 70
+    BACKUP_LOCK_HELD=1
+}
+
+release_backup_lock() {
+    [ "$BACKUP_LOCK_HELD" -eq 1 ] || return 0
+    flock -u 8 || fail "Backup-Lock konnte nicht freigegeben werden" 70
+    exec 8>&-
+    BACKUP_LOCK_HELD=0
 }
 
 repo_commit() {
@@ -1712,6 +1756,19 @@ PY
     printf '%s\n' "$manifest"
 }
 
+legacy_venv_pair_is_immutable() {
+    local core="$1" embed="$2" offenders
+    # Only nodes owned by the captured Venv pair are part of its immutability
+    # contract.  -L followed the normal bin/python -> /usr/bin/python3 link and
+    # rejected the root-owned system interpreter merely because it is 0755.
+    [ -d "$core" ] && [ ! -L "$core" ] && [ -d "$embed" ] && [ ! -L "$embed" ] \
+        || return 1
+    if ! offenders="$(find -P "$core" "$embed" -xdev ! -type l -perm /222 -print -quit)"; then
+        return 1
+    fi
+    [ -z "$offenders" ]
+}
+
 verify_legacy_set() {
     local manifest="$1" set core_target embed_target tmp core_hash embed_hash tree_hash runtime_hash seed
     [[ "$manifest" =~ ^legacy-[a-f0-9]{64}$ ]] || fail "ungueltige Legacy-ID" 65
@@ -1724,7 +1781,7 @@ verify_legacy_set() {
         || fail "Legacy-Set zeigt nicht auf das gebundene Venv-Paar" 65
     [ -x "$set/core/bin/python" ] && [ -x "$set/core/bin/genus" ] && [ -x "$set/embed/bin/python" ] \
         || fail "Legacy-Venv-Paar ist nicht lauffaehig" 65
-    [ -z "$(find -L "$set/core" "$set/embed" -xdev -perm /222 -print -quit)" ] \
+    legacy_venv_pair_is_immutable "$core_target" "$embed_target" \
         || fail "Legacy-Venv-Paar ist nicht unveraenderlich" 65
     "$set/core/bin/python" -m pip check
     "$set/embed/bin/python" -m pip check
@@ -1899,7 +1956,10 @@ stage_set() (
     init_user_roots
     acquire_operator_lock
     require_command "$FUSER_BIN"
+    acquire_backup_lock
+    prove_no_backup_in_progress
     recover_pending_activation
+    release_backup_lock
     # Reste eines per SIGKILL/Stromausfall abgebrochenen Sandbox-Baus gehoeren dem
     # root-Benutzer; der EXIT-Trap des Sandbox-Baus hat sie dann nie erreicht.
     recover_stale_build_scratch
@@ -3456,7 +3516,7 @@ PY
     "$GIT_BIN" -C "$REPO_DIR" diff --name-only -z "$old" "$new" > "$diff_file"
     while IFS= read -r -d '' path; do
         case "$path" in
-            deploy/pi_a0_3c_runtime.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
+            deploy/pi_a0_3c_runtime.sh|deploy/backup_ledger_to_sd.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
             *) fail "reauthorisierter Diff enthaelt nun einen nicht freigegebenen Pfad" 70 ;;
         esac
     done < "$diff_file"
@@ -3484,6 +3544,31 @@ clear_activation_state() {
     # locked invocation observes the established no-journal state and removes
     # them.  Thus a finalization error can always disable the exact GENUS block.
     rm -f -- "$ACTIVATION_JOURNAL"
+    fsync_dir "$STATE_ROOT"
+}
+
+cleanup_completed_activation_artifacts() {
+    [ ! -e "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
+        || fail "Activation-Artefakte duerfen bei offenem Journal nicht bereinigt werden" 70
+    if [ ! -e "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -L "$ACTIVATION_CRON_SNAPSHOT" ] \
+        && [ ! -e "$ACTIVATION_CRON_DISABLED" ] && [ ! -L "$ACTIVATION_CRON_DISABLED" ]; then
+        return 0
+    fi
+    [ -f "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -L "$ACTIVATION_CRON_SNAPSHOT" ] \
+        && [ "$(stat -c %u "$ACTIVATION_CRON_SNAPSHOT")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$ACTIVATION_CRON_SNAPSHOT")" = 600 ] \
+        && [ "$(stat -c %h "$ACTIVATION_CRON_SNAPSHOT")" -eq 1 ] \
+        || fail "verwaister Activation-Crontab-Snapshot ist nicht privat/regulaer" 70
+    if [ -e "$ACTIVATION_CRON_DISABLED" ] || [ -L "$ACTIVATION_CRON_DISABLED" ]; then
+        [ -f "$ACTIVATION_CRON_DISABLED" ] && [ ! -L "$ACTIVATION_CRON_DISABLED" ] \
+            && [ "$(stat -c %u "$ACTIVATION_CRON_DISABLED")" -eq "$(id -u)" ] \
+            && [ "$(stat -c %a "$ACTIVATION_CRON_DISABLED")" = 600 ] \
+            && [ "$(stat -c %h "$ACTIVATION_CRON_DISABLED")" -eq 1 ] \
+            || fail "verwaister deaktivierter Crontab-Snapshot ist nicht privat/regulaer" 70
+    fi
+    verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT" \
+        || fail "verwaiste Activation-Artefakte koennen nicht sicher bereinigt werden" 70
+    rm -f -- "$ACTIVATION_CRON_SNAPSHOT" "$ACTIVATION_CRON_DISABLED"
     fsync_dir "$STATE_ROOT"
 }
 
@@ -3626,7 +3711,22 @@ prove_no_old_runtime_processes() {
         "$CORE_POINTER" "$EMBED_POINTER" "$active_core" "$active_embed" "$$" <<'PY'
 import os, pathlib, sys
 needles = tuple(os.fsencode(path) for path in sys.argv[1:5])
-own = {int(sys.argv[5]), os.getpid(), os.getppid()}
+shell_pid = int(sys.argv[5])
+own = {os.getpid()}
+cursor = os.getpid()
+while cursor != shell_pid:
+    try:
+        raw = pathlib.Path(f"/proc/{cursor}/stat").read_text()
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError) as exc:
+        raise SystemExit("process ancestry inspection was incomplete") from exc
+    fields = raw[raw.rfind(")") + 2:].split()
+    if len(fields) < 2:
+        raise SystemExit("process ancestry inspection was malformed")
+    parent = int(fields[1])
+    if parent <= 0 or parent in own:
+        raise SystemExit("process ancestry did not reach operator shell")
+    own.add(parent)
+    cursor = parent
 found = 0
 inspection_errors = 0
 for entry in pathlib.Path("/proc").iterdir():
@@ -3779,14 +3879,63 @@ prove_no_backup_in_progress() {
     as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
         "$backup_real" "$$" <<'PY'
 import os, pathlib, sys
-needle, own = os.fsencode(sys.argv[1]), int(sys.argv[2])
+needle = os.fsencode(pathlib.Path(sys.argv[1]).resolve(strict=True))
+needle_stat = os.stat(needle)
+shell_pid = int(sys.argv[2])
+own = {os.getpid()}
+cursor = os.getpid()
+while cursor != shell_pid:
+    try:
+        raw = pathlib.Path(f"/proc/{cursor}/stat").read_text()
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError) as exc:
+        raise SystemExit("backup process ancestry inspection was incomplete") from exc
+    fields = raw[raw.rfind(")") + 2:].split()
+    if len(fields) < 2:
+        raise SystemExit("backup process ancestry inspection was malformed")
+    parent = int(fields[1])
+    if parent <= 0 or parent in own:
+        raise SystemExit("backup process ancestry did not reach operator shell")
+    own.add(parent)
+    cursor = parent
 errors = 0
 for entry in pathlib.Path("/proc").iterdir():
-    if not entry.name.isdigit() or int(entry.name) == own: continue
-    try: argv = (entry / "cmdline").read_bytes().split(b"\0")
+    if not entry.name.isdigit() or int(entry.name) in own: continue
+    try:
+        argv = (entry / "cmdline").read_bytes().split(b"\0")
     except (FileNotFoundError, ProcessLookupError): continue
     except (PermissionError, OSError): errors += 1; continue
-    if needle in argv: raise SystemExit("cron/operator backup process is still running")
+    matched = False
+    cwd = None
+    for token in argv:
+        if token == needle:
+            matched = True
+            break
+        if not token:
+            continue
+        if os.path.isabs(token):
+            candidate = token
+        else:
+            if cwd is None:
+                try:
+                    cwd = os.fsencode(os.readlink(entry / "cwd"))
+                except (FileNotFoundError, ProcessLookupError):
+                    break
+                except (PermissionError, OSError):
+                    errors += 1
+                    break
+            candidate = os.path.join(cwd, token)
+        try:
+            candidate_stat = os.stat(candidate)
+        except (FileNotFoundError, NotADirectoryError, ProcessLookupError, ValueError):
+            continue
+        except (PermissionError, OSError):
+            errors += 1
+            continue
+        same_inode = (candidate_stat.st_dev, candidate_stat.st_ino) == (needle_stat.st_dev, needle_stat.st_ino)
+        if os.path.realpath(candidate) == needle or same_inode:
+            matched = True
+            break
+    if matched: raise SystemExit("cron/operator backup process is still running")
 if errors: raise SystemExit("backup process inspection was incomplete")
 PY
 }
@@ -4817,13 +4966,7 @@ recover_pending_activation() {
                 validate_operator_reauthorization
             fi
         fi
-        if [ -e "$ACTIVATION_CRON_SNAPSHOT" ] || [ -e "$ACTIVATION_CRON_DISABLED" ]; then
-            if [ -f "$ACTIVATION_CRON_SNAPSHOT" ] && verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT"; then
-                rm -f -- "$ACTIVATION_CRON_SNAPSHOT" "$ACTIVATION_CRON_DISABLED"; fsync_dir "$STATE_ROOT"
-            else
-                fail "verwaiste Activation-Artefakte koennen nicht sicher bereinigt werden" 70
-            fi
-        fi
+        cleanup_completed_activation_artifacts
         return 0
     fi
     set +e
@@ -4882,6 +5025,10 @@ recover_pending_activation() {
     recovery_status=$?
     set -e
     if [ "$recovery_status" -eq 0 ]; then
+        # finalize_guarded_transition keeps the exact crontab pair as durable
+        # evidence until a locked no-journal observer confirms the live cron.
+        # This same invocation is such an observer and may continue safely.
+        cleanup_completed_activation_artifacts
         return 0
     fi
     set +e
@@ -4919,6 +5066,11 @@ switch_with_quiescence() {
     acquire_operator_lock
     [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
     require_command "$FUSER_BIN"
+    # Serialize every recovery and selector transition before its first
+    # mutation. The second scan below covers legacy/pre-lock invocations that
+    # appeared while the normal preflight was still running.
+    acquire_backup_lock
+    prove_no_backup_in_progress
     recover_pending_activation
     if [ -e "$OPERATOR_REAUTH_TOKEN" ]; then
         [ "$mode" = activate ] \
@@ -4967,8 +5119,8 @@ switch_with_quiescence() {
     disable_genus_cron_block
     remove_autostart_approval
     update_activation_journal guarded
+    prove_no_backup_in_progress
     if [ "$mode" = activate ]; then
-        prove_no_backup_in_progress
         backup_receipt="$(fresh_backup_receipt)"
     fi
     GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" pause --reason "A0.3c runtime switch"
@@ -5032,13 +5184,30 @@ rollback_runtime() {
     assert_expected_commit "$expected"
     init_user_roots
     acquire_operator_lock
+    [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
     require_command "$FUSER_BIN"
+    acquire_backup_lock
+    prove_no_backup_in_progress
     recover_pending_activation
     target="$(selector_manifest "$PREVIOUS_LINK")"
     [ -n "$target" ] || fail "kein vorheriges Runtime-Set" 65
     [[ "$target" =~ ^legacy-[a-f0-9]{64}$ ]] \
         || fail "rollback akzeptiert nur das gebundene Legacy-Set; Roll-forward braucht activate+Readiness" 65
     switch_with_quiescence "$expected" "$target" rollback "" ""
+}
+
+recover_runtime() {
+    local expected="$1"
+    assert_expected_commit "$expected"
+    init_user_roots
+    acquire_operator_lock
+    [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
+    require_command "$FUSER_BIN"
+    acquire_backup_lock
+    prove_no_backup_in_progress
+    recover_pending_activation
+    release_backup_lock
+    log "Pending-Recovery und verwaiste Transition-Evidenz sind abgeschlossen"
 }
 
 reauthorize_runtime() {
@@ -5061,17 +5230,12 @@ reauthorize_runtime() {
     validate_stale_autostart_approval "$old"
     pointer_dir_valid "$CORE_POINTER" core && pointer_dir_valid "$EMBED_POINTER" embed \
         || fail "aktive Core-/Embed-Pointer sind vor Reauthorization nicht exakt" 70
-    if [ -e "$ACTIVATION_CRON_SNAPSHOT" ] || [ -e "$ACTIVATION_CRON_DISABLED" ]; then
-        [ -f "$ACTIVATION_CRON_SNAPSHOT" ] && verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT" \
-            || fail "verwaiste Cron-Evidenz ist vor Reauthorization nicht sicher" 70
-        rm -f -- "$ACTIVATION_CRON_SNAPSHOT" "$ACTIVATION_CRON_DISABLED"
-        fsync_dir "$STATE_ROOT"
-    fi
+    cleanup_completed_activation_artifacts
     diff_file="$(mktemp "$STATE_ROOT/reauthorize.diff.XXXXXX")"
     "$GIT_BIN" -C "$REPO_DIR" diff --name-only -z "$old" "$new" > "$diff_file"
     while IFS= read -r -d '' path; do
         case "$path" in
-            deploy/pi_a0_3c_runtime.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
+            deploy/pi_a0_3c_runtime.sh|deploy/backup_ledger_to_sd.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
             *) fail "Fast-Forward beruehrt live-importierbaren/nicht freigegebenen Pfad: $path" 65 ;;
         esac
     done < "$diff_file"
@@ -5160,6 +5324,7 @@ main() {
             switch_with_quiescence "$expected" "$manifest" activate "$3" "$4"
             ;;
         rollback) [ "$#" -eq 2 ] || fail "rollback braucht EXPECTED_COMMIT" 64; rollback_runtime "$2" ;;
+        recover) [ "$#" -eq 2 ] || fail "recover braucht EXPECTED_COMMIT" 64; recover_runtime "$2" ;;
         reauthorize) [ "$#" -eq 3 ] || fail "reauthorize braucht EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT" 64; reauthorize_runtime "$2" "$3" ;;
         -h|--help|help) usage ;;
         *) usage >&2; fail "unbekannter Befehl" 64 ;;

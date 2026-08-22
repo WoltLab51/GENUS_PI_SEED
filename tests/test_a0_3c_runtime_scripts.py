@@ -16,6 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy" / "pi_a0_3c_runtime.sh"
+BACKUP_LEDGER_SCRIPT = ROOT / "deploy" / "backup_ledger_to_sd.sh"
 DEPLOY_README = ROOT / "deploy" / "README.md"
 BASH = shutil.which("bash")
 if BASH is None and os.name == "nt":
@@ -42,6 +43,10 @@ def _script() -> str:
 
 def _deploy_readme() -> str:
     return DEPLOY_README.read_text(encoding="utf-8")
+
+
+def _backup_ledger_script() -> str:
+    return BACKUP_LEDGER_SCRIPT.read_text(encoding="utf-8")
 
 
 def _function(name: str) -> str:
@@ -399,6 +404,134 @@ def test_quiescence_covers_cron_fallback_handles_maps_and_restart_identity():
     assert 'as_root env -i PATH=/usr/bin:/bin "$CORE_POINTER/bin/python"' not in script
     assert "inspection_errors" in process_probe
     assert 'raise SystemExit("process inspection was incomplete")' in process_probe
+
+
+def test_process_guards_exclude_the_complete_operator_wrapper_chain():
+    for name in ("prove_no_old_runtime_processes", "prove_no_backup_in_progress"):
+        probe = _function(name)
+        assert "shell_pid = int(sys.argv[" in probe
+        assert "while cursor != shell_pid" in probe
+        assert 'pathlib.Path(f"/proc/{cursor}/stat")' in probe
+        assert "parent <= 0 or parent in own" in probe
+        assert "own.add(parent)" in probe
+        assert "int(entry.name) in own" in probe
+    backup_probe = _function("prove_no_backup_in_progress")
+    assert 'os.readlink(entry / "cwd")' in backup_probe
+    assert "os.path.realpath(candidate) == needle" in backup_probe
+    assert "same_inode" in backup_probe
+    assert "needle_name" not in backup_probe
+
+
+@linux_only
+def test_process_guards_ignore_two_wrappers_but_reject_real_foreign_processes(tmp_path):
+    sudo = shutil.which("sudo")
+    if sudo is None or subprocess.run(
+        [sudo, "-n", "true"], capture_output=True, check=False
+    ).returncode != 0:
+        pytest.skip("needs passwordless sudo for the root /proc probe")
+
+    wrapper_one = tmp_path / "wrapper-one"
+    wrapper_two = tmp_path / "wrapper-two"
+    wrapper_one.write_text(
+        '#!/usr/bin/env bash\nset +e\n"$WRAPPER_TWO" "$@"\nstatus=$?\n:\nexit "$status"\n',
+        encoding="utf-8",
+    )
+    wrapper_two.write_text(
+        '#!/usr/bin/env bash\nset +e\n"$@"\nstatus=$?\n:\nexit "$status"\n',
+        encoding="utf-8",
+    )
+    wrapper_one.chmod(0o700)
+    wrapper_two.chmod(0o700)
+    backup = tmp_path / "backup_ledger_to_sd.sh"
+    backup.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    backup.chmod(0o700)
+    core = tmp_path / "core-venv"
+    embed = tmp_path / "embed-venv"
+    core.mkdir()
+    embed.mkdir()
+    common_env = {
+        "WRAPPER_ONE": _bash_path(wrapper_one),
+        "WRAPPER_TWO": _bash_path(wrapper_two),
+        "SUDO_FOR_TEST": sudo,
+        "GENUS_A03C_BACKUP_SCRIPT": _bash_path(backup),
+    }
+    override = r'''
+as_root() { "$WRAPPER_ONE" "$SUDO_FOR_TEST" -n "$@"; }
+CORE_POINTER="$TEST_CORE"
+EMBED_POINTER="$TEST_EMBED"
+'''
+
+    clean = _source(
+        tmp_path,
+        override
+        + "if prove_no_backup_in_progress && prove_no_old_runtime_processes; "
+        + "then printf 'clean\\n'; else printf 'blocked:%s\\n' \"$?\"; fi",
+        extra_env={
+            **common_env,
+            "TEST_CORE": _bash_path(core),
+            "TEST_EMBED": _bash_path(embed),
+        },
+    )
+    assert clean.returncode == 0, clean.stderr
+    assert clean.stdout.strip().splitlines()[-1] == "clean"
+
+    symlink_alias = tmp_path / "nightly-symlink"
+    hardlink_alias = tmp_path / "nightly-hardlink"
+    symlink_alias.symlink_to(backup)
+    os.link(backup, hardlink_alias)
+    backup_argv = (
+        f"./{backup.name}",
+        str(backup),
+        f"./subdir/../{backup.name}",
+        f"./{symlink_alias.name}",
+        f"./{hardlink_alias.name}",
+    )
+    (tmp_path / "subdir").mkdir()
+    for token in backup_argv:
+        foreign = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)", token],
+            cwd=backup.parent,
+        )
+        try:
+            blocked = _source(
+                tmp_path,
+                override
+                + "if prove_no_backup_in_progress; then printf 'missed\\n'; "
+                + "else printf 'blocked\\n'; fi",
+                extra_env={
+                    **common_env,
+                    "TEST_CORE": _bash_path(core),
+                    "TEST_EMBED": _bash_path(embed),
+                },
+            )
+        finally:
+            foreign.terminate()
+            foreign.wait(timeout=10)
+        assert blocked.returncode == 0, token
+        assert blocked.stdout.strip().splitlines()[-1] == "blocked", token
+        assert "cron/operator backup process is still running" in blocked.stderr, token
+
+    foreign = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)", str(core)]
+    )
+    try:
+        blocked = _source(
+            tmp_path,
+            override
+            + "if prove_no_old_runtime_processes; then printf 'missed\\n'; "
+            + "else printf 'blocked\\n'; fi",
+            extra_env={
+                **common_env,
+                "TEST_CORE": _bash_path(core),
+                "TEST_EMBED": _bash_path(embed),
+            },
+        )
+    finally:
+        foreign.terminate()
+        foreign.wait(timeout=10)
+    assert blocked.returncode == 0
+    assert blocked.stdout.strip().splitlines()[-1] == "blocked"
+    assert "old runtime process handles remain" in blocked.stderr
 
 
 def test_controlled_service_start_accepts_reset_counter_and_rejects_auto_restart(tmp_path):
@@ -930,6 +1063,8 @@ def test_each_unfinished_journal_phase_runs_fail_closed_recovery(tmp_path, phase
     repo = tmp_path / "repo"
     genus = repo / ".venv" / "bin" / "genus"
     journal = tmp_path / "home" / ".genus" / "runtime-a0.3c" / "activation.pending"
+    original = journal.parent / "activation.crontab.original"
+    disabled = journal.parent / "activation.crontab.disabled"
     genus.parent.mkdir(parents=True)
     journal.parent.mkdir(parents=True)
     genus.write_text(
@@ -938,6 +1073,9 @@ def test_each_unfinished_journal_phase_runs_fail_closed_recovery(tmp_path, phase
     )
     genus.chmod(0o700)
     journal.touch()
+    for path in (original, disabled):
+        path.write_text("cron evidence\n", encoding="utf-8")
+        path.chmod(0o600)
     command = r"""
 recover_incomplete_migration() { printf 'migration\n' >> "$EVENT_LOG"; }
 validate_activation_journal() { printf 'validate:%s\n' "${1:-strict}" >> "$EVENT_LOG"; }
@@ -957,8 +1095,11 @@ write_transition_completion_receipt() { printf 'completion-written\n' >> "$EVENT
 validate_completion_receipt() { printf 'completion-validated\n' >> "$EVENT_LOG"; }
 update_activation_journal() { printf 'journal:%s\n' "$1" >> "$EVENT_LOG"; }
 finalize_guarded_transition() { printf 'finalized\n' >> "$EVENT_LOG"; rm -f "$ACTIVATION_JOURNAL"; }
+verify_live_crontab() { return 0; }
 recover_pending_activation
 [ ! -e "$ACTIVATION_JOURNAL" ]
+[ ! -e "$ACTIVATION_CRON_SNAPSHOT" ]
+[ ! -e "$ACTIVATION_CRON_DISABLED" ]
 """
     result = _source(
         tmp_path,
@@ -1197,6 +1338,73 @@ def test_forward_legacy_migration_is_durable_and_fully_verified_before_completio
     assert 'verify_legacy_set "$legacy"' in completed
     assert completed.count("pointer_dir_valid") >= 4
     assert completed.index('verify_legacy_set "$legacy"') < completed.index('rm -f -- "$journal"')
+
+
+def test_legacy_immutability_does_not_follow_system_interpreter_symlinks():
+    immutable = _function("legacy_venv_pair_is_immutable")
+    verifier = _function("verify_legacy_set")
+    assert 'find -P "$core" "$embed" -xdev ! -type l -perm /222' in immutable
+    assert "find -L" not in immutable
+    assert '[ -d "$core" ] && [ ! -L "$core" ]' in immutable
+    assert 'if ! offenders="$(find -P' in immutable
+    assert 'legacy_venv_pair_is_immutable "$core_target" "$embed_target"' in verifier
+
+
+@posix_only
+def test_legacy_immutability_ignores_external_symlink_mode_but_rejects_owned_writes(tmp_path):
+    core = tmp_path / "core"
+    embed = tmp_path / "embed"
+    external = tmp_path / "system-python"
+    (core / "bin").mkdir(parents=True)
+    (embed / "bin").mkdir(parents=True)
+    external.write_text("system interpreter\n", encoding="utf-8")
+    external.chmod(0o755)
+    (core / "bin" / "python").symlink_to(external)
+    (embed / "bin" / "python").symlink_to(external)
+    for directory in (core, core / "bin", embed, embed / "bin"):
+        directory.chmod(0o500)
+
+    clean = _source(
+        tmp_path,
+        f'legacy_venv_pair_is_immutable "{_bash_path(core)}" "{_bash_path(embed)}"',
+    )
+    assert clean.returncode == 0, clean.stderr
+
+    core.chmod(0o700)
+    writable = core / "owned-writable"
+    writable.write_text("mutable\n", encoding="utf-8")
+    writable.chmod(0o600)
+    core.chmod(0o500)
+    blocked = _source(
+        tmp_path,
+        f'legacy_venv_pair_is_immutable "{_bash_path(core)}" "{_bash_path(embed)}"',
+    )
+    assert blocked.returncode != 0
+
+    core.chmod(0o700)
+    writable.unlink()
+    core.chmod(0o500)
+    missing = _source(
+        tmp_path,
+        f'legacy_venv_pair_is_immutable "{_bash_path(tmp_path / "missing")}" '
+        f'"{_bash_path(embed)}"',
+    )
+    assert missing.returncode != 0
+
+    core_alias = tmp_path / "core-alias"
+    core_alias.symlink_to(core, target_is_directory=True)
+    aliased = _source(
+        tmp_path,
+        f'legacy_venv_pair_is_immutable "{_bash_path(core_alias)}" "{_bash_path(embed)}"',
+    )
+    assert aliased.returncode != 0
+
+    find_failed = _source(
+        tmp_path,
+        "find() { return 91; }; "
+        f'legacy_venv_pair_is_immutable "{_bash_path(core)}" "{_bash_path(embed)}"',
+    )
+    assert find_failed.returncode != 0
 
 
 def test_finalize_and_receipt_reattest_failures_converge_fail_closed():
@@ -1662,6 +1870,11 @@ def test_backup_isolated_generation_is_immutable_complete_and_cron_ordered():
     backup = _function("fresh_backup_receipt")
     validator = _function("validate_backup_receipt")
     switch = _function("switch_with_quiescence")
+    stage = _function("stage_set")
+    rollback = _function("rollback_runtime")
+    recovery_command = _function("recover_runtime")
+    lock = _function("acquire_backup_lock")
+    cron_backup = _backup_ledger_script()
     assert "BACKUP_SCRIPT" not in backup
     assert "a03c-activation-snapshots" in backup
     assert "sqlite3.connect" in backup and "source.backup(target)" in backup
@@ -1671,8 +1884,102 @@ def test_backup_isolated_generation_is_immutable_complete_and_cron_ordered():
     assert backup.index('durably_sync_tree "$partial"') < backup.index('mv -T -- "$partial" "$final"')
     assert "actual_config" in validator and "actual_anchors" in validator
     assert "changed during read" in validator
-    assert switch.index("disable_genus_cron_block") < switch.index("prove_no_backup_in_progress")
-    assert switch.index("prove_no_backup_in_progress") < switch.index("fresh_backup_receipt")
+    acquired = switch.index("acquire_backup_lock")
+    first_probe = switch.index("prove_no_backup_in_progress", acquired)
+    recovered = switch.index("recover_pending_activation", first_probe)
+    captured = switch.index("capture_activation_crontab", recovered)
+    disabled = switch.index("disable_genus_cron_block", captured)
+    second_probe = switch.index("prove_no_backup_in_progress", disabled)
+    fresh = switch.index("fresh_backup_receipt", second_probe)
+    assert acquired < first_probe < recovered < captured < disabled < second_probe < fresh
+    assert switch.count("prove_no_backup_in_progress") == 2
+    for body in (stage, rollback, recovery_command):
+        acquired = body.index("acquire_backup_lock")
+        probed = body.index("prove_no_backup_in_progress", acquired)
+        recovered = body.index("recover_pending_activation", probed)
+        assert acquired < probed < recovered
+    assert stage.index("recover_pending_activation") < stage.index("release_backup_lock")
+    assert recovery_command.index("recover_pending_activation") < recovery_command.index(
+        "release_backup_lock"
+    )
+    for contract in (
+        "backup-ledger.lock",
+        "flock -n 8",
+        'exec 8>>"$BACKUP_LOCK_FILE"',
+        'stat -Lc \'%d:%i\' "/proc/$BASHPID/fd/8"',
+    ):
+        assert contract in lock or contract in _script()
+        assert contract in cron_backup
+    assert "GENUS_BACKUP_LOCK_FILE" not in _script()
+    assert "GENUS_BACKUP_LOCK_FILE" not in cron_backup
+    assert _script().count(
+        "deploy/pi_a0_3c_runtime.sh|deploy/backup_ledger_to_sd.sh|deploy/README.md"
+    ) == 2
+    assert "`deploy/backup_ledger_to_sd.sh`" in _deploy_readme()
+
+
+@linux_only
+def test_nightly_backup_refuses_a_lock_held_by_activation(tmp_path):
+    import fcntl
+
+    home = tmp_path / "home"
+    db = home / ".genus" / "genus.sqlite3"
+    lock = home / ".genus" / "backup-ledger.lock"
+    db.parent.mkdir(parents=True)
+    db.parent.chmod(0o700)
+    db.write_bytes(b"not opened because the lock blocks first")
+    lock.touch(mode=0o600)
+    lock.chmod(0o600)
+    with lock.open("a", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = subprocess.run(
+            [BASH, _bash_path(BACKUP_LEDGER_SCRIPT)],
+            env={
+                **os.environ,
+                "GENUS_HOME": str(home),
+                "GENUS_DB_PATH": str(db),
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    assert result.returncode != 0
+    assert "haelt den Backup-Lock" in result.stderr
+
+
+@linux_only
+def test_busy_backup_lock_blocks_transition_before_recovery_or_mutation(tmp_path):
+    import fcntl
+
+    env = _env(tmp_path)
+    state_parent = tmp_path / "home" / ".genus"
+    state_parent.mkdir(parents=True)
+    state_parent.chmod(0o700)
+    db = state_parent / "genus.sqlite3"
+    db.write_bytes(b"lock gate only")
+    lock = state_parent / "backup-ledger.lock"
+    lock.touch(mode=0o600)
+    lock.chmod(0o600)
+    mutation = tmp_path / "MUTATED"
+    command = r'''
+assert_expected_commit() { :; }
+init_user_roots() { :; }
+acquire_operator_lock() { :; }
+require_command() { :; }
+recover_pending_activation() { touch "$MUTATION"; }
+capture_activation_crontab() { touch "$MUTATION"; }
+switch_with_quiescence deadbeef manifest activate readiness series
+'''
+    with lock.open("a", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = _source(
+            tmp_path,
+            command,
+            extra_env={**env, "MUTATION": _bash_path(mutation)},
+        )
+    assert result.returncode == 75
+    assert "Ledger-Backup laeuft bereits" in result.stderr
+    assert not mutation.exists()
 
 
 def test_activation_v3_deeply_crossbinds_all_evidence_and_exact_booleans():
@@ -1723,6 +2030,7 @@ def test_reauthorization_is_clean_ff_one_shot_and_never_boot_authorization():
     assert "boot_approval_updated\":False" in command
     assert "write_autostart_approval" not in command
     assert "os.O_EXCL" in command and "os.fsync(directory)" in command
+    assert "cleanup_completed_activation_artifacts" in command
     assert "old_tree" in validator and "new_tree" in validator
     assert "allowed_diff_sha256" in validator
     assert "validate_stale_autostart_approval" in validator

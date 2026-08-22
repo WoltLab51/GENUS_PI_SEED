@@ -494,6 +494,13 @@ alte Runtime- oder Datenbank-Handles. Erst dann tauscht es den gemeinsamen
 `active`-Selector atomar und startet ausschließlich die zuvor aktiven Prozesse.
 Core und Embedder werden nie einzeln gemischt.
 
+Noch vor Pending-Recovery, Guard, Journal oder Cron-Änderung nimmt der Lauf den
+gleichen exklusiven, inode-gebundenen `backup-ledger.lock` wie das Nachtbackup.
+Ein kanonischer Prozessscan erkennt zusätzlich bereits laufende ältere
+Backup-Aufrufe unabhängig von absolutem, relativem, Symlink- oder Hardlink-Pfad;
+nach dem Deaktivieren des Cron-Blocks wird diese Probe wiederholt. Der Lock
+bleibt über Recovery und den gesamten Activate-/Rollback-Wechsel gehalten.
+
 Noch vor Pause, Selector-Tausch oder Start wird diese verifizierte Readiness-
 und Serienbindung mit kanonischem Pfad und Rohdatei-Hash im fsync-ten
 `genus-a0.3c-runtime-activation-pending-v2`-Journal persistiert. Die spätere
@@ -505,6 +512,14 @@ mit dem unveränderten finalen Receipt. Ein Absturz nach Selector-Tausch oder St
 vor dem Abschluss-Receipt, kann das Ziel deshalb nicht ohne dauerhafte
 Serienevidenz booten; Completion und Recovery spielen die Journal-Kette erneut
 ab.
+
+Ein unterbrochener Wechsel kann ohne anschließenden Stage-/Activate-Versuch
+gezielt restauriert und seine übrig gebliebene Cron-Evidenz geprüft bereinigt
+werden:
+
+```bash
+./deploy/pi_a0_3c_runtime.sh recover "$EXPECTED_COMMIT"
+```
 
 Nach dem Wechsel müssen Runtime-Identität und Manifest erneut über genau den
 stabilen Pfad grün sein, den die produktiven GENUS-Einstiege verwenden:
@@ -584,7 +599,7 @@ Commit und einen exakt sauberen Checkout — ein gewöhnlicher Fast-Forward auf
 
 Der Aufruf akzeptiert ausschließlich einen sauberen Fast-Forward, dessen Diff
 nur nicht live-importierbare Pfade berührt (`deploy/pi_a0_3c_runtime.sh`,
-`deploy/README.md`, `docs/`, `tests/`, `experiments/`, `.github/`,
+`deploy/backup_ledger_to_sd.sh`, `deploy/README.md`, `docs/`, `tests/`, `experiments/`, `.github/`,
 `README*`, `CONTRIBUTING.md`). Er schreibt ein Receipt und einen Token, der
 **genau einen** nachfolgenden `stage`-plus-`activate`-Durchgang autorisiert;
 ein `rollback` ist unter Reauthorisierung ausdrücklich gesperrt. Die
@@ -642,7 +657,9 @@ Der aktuelle Takt:
 
 Das Backup zählt nur, wenn `GENUS_SD_BACKUP` auf einem **anderen Gerät** als das Ledger
 liegt. Der Default ist ein Pfad, kein Beweis für ein zweites Medium; bei gleicher Geräte-ID
-bricht [`backup_ledger_to_sd.sh`](backup_ledger_to_sd.sh) ehrlich ab. Standardmäßig bleiben fünf geprüfte Backups.
+bricht [`backup_ledger_to_sd.sh`](backup_ledger_to_sd.sh) ehrlich ab. Derselbe private,
+aus dem Ledger-Pfad abgeleitete `backup-ledger.lock` verhindert außerdem eine Überlappung
+mit A0.3c-Recovery, Aktivierung oder Rollback. Standardmäßig bleiben fünf geprüfte Backups.
 
 ```bash
 tail -f "$HOME/.genus/logs/cron.log"

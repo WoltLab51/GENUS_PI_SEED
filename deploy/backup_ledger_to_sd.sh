@@ -13,11 +13,14 @@ set -Eeuo pipefail
 #
 # Sicher fuer den Cron: bricht ehrlich ab (Log + Exit != 0), fasst aber nie das Live-Ledger an.
 
+umask 077
+
 GENUS_HOME="${GENUS_HOME:-$HOME}"
 REPO_DIR="${GENUS_REPO_DIR:-$GENUS_HOME/GENUS_PI_SEED}"
 DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
 ANCHOR_DIR="${GENUS_ANCHOR_DIR:-$GENUS_HOME/.genus/anchors}"
 BACKUP_DIR="${GENUS_SD_BACKUP:-$GENUS_HOME/genus-sd-backup}"
+BACKUP_LOCK_FILE="$(dirname "$DB_PATH")/backup-ledger.lock"
 KEEP="${GENUS_BACKUP_KEEP:-5}"
 GENUS="$REPO_DIR/.venv/bin/genus"
 PY="$REPO_DIR/.venv/bin/python"
@@ -26,6 +29,34 @@ log() { printf '[BACKUP] %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 fehler() { printf '[BACKUP] FEHLER: %s\n' "$*" >&2; exit 1; }
 
 [ -f "$DB_PATH" ] || fehler "kein Ledger unter $DB_PATH (SSD nicht gemountet?) -- nichts gesichert"
+command -v flock >/dev/null 2>&1 || fehler "flock fehlt -- Backup-Konkurrenz ist nicht sicher pruefbar"
+LOCK_PARENT="$(realpath -e -- "$(dirname "$DB_PATH")")" \
+    || fehler "Backup-Lock-Elternverzeichnis ist nicht kanonisch aufloesbar"
+BACKUP_LOCK_FILE="$LOCK_PARENT/backup-ledger.lock"
+[ -d "$LOCK_PARENT" ] && [ ! -L "$LOCK_PARENT" ] \
+    && [ "$(stat -c %u "$LOCK_PARENT")" -eq "$(id -u)" ] \
+    && [ "$(stat -c %a "$LOCK_PARENT")" = 700 ] \
+    || fehler "Backup-Lock-Elternverzeichnis ist nicht operator-eigen/privat"
+if [ -e "$BACKUP_LOCK_FILE" ] || [ -L "$BACKUP_LOCK_FILE" ]; then
+    [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
+        && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 600 ] \
+        && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
+        || fehler "Backup-Lock ist nicht regulaer/operator-eigen/0600/einfach verlinkt"
+fi
+exec 8>>"$BACKUP_LOCK_FILE"
+[ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
+    && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$(id -u)" ] \
+    && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 600 ] \
+    && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
+    || fehler "Backup-Lock ist nicht regulaer/operator-eigen/0600/einfach verlinkt"
+LOCK_PATH_IDENTITY="$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")"
+LOCK_FD_IDENTITY="$(stat -Lc '%d:%i' "/proc/$BASHPID/fd/8")"
+[ "$LOCK_PATH_IDENTITY" = "$LOCK_FD_IDENTITY" ] \
+    || fehler "Backup-Lock-FD ist nicht an den validierten Pfad gebunden"
+flock -n 8 || fehler "ein anderer Ledger-Backup-/Runtimewechsel haelt den Backup-Lock"
+[ "$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")" = "$LOCK_FD_IDENTITY" ] \
+    || fehler "Backup-Lock-Pfad wurde beim Sperren ersetzt"
 mkdir -p "$BACKUP_DIR"
 
 # SICHERHEIT: das Ziel muss auf einem ANDEREN Geraet liegen als das Ledger (SD != SSD) --
