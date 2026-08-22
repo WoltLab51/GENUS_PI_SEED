@@ -3486,11 +3486,12 @@ PY
     guard_hash="$(sha256_file "$BOOT_GUARD_PATH")"; approval_hash="$(sha256_file "$AUTOSTART_APPROVAL")"
     stale_hash="$(sha256_file "$stale_path")"
     [ "$approval_hash" = "$stale_hash" ] || fail "live stale Approval driftete von Reauthorization-Evidence" 70
-    TOKEN_HASH="$(sha256_file "$receipt")" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
-    LIVE_GUARD_HASH="$guard_hash" LEGACY_GUARD_HASH="$legacy_guard_hash" CURRENT_GUARD_HASH="$current_guard_hash" \
-    GUARD_PATH="$BOOT_GUARD_PATH" APPROVAL_HASH="$approval_hash" \
-    STALE_PATH="$stale_path" STALE_HASH="$stale_hash" COMMIT="$(repo_commit)" \
-        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        TOKEN_HASH="$(sha256_file "$receipt")" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+        LIVE_GUARD_HASH="$guard_hash" LEGACY_GUARD_HASH="$legacy_guard_hash" CURRENT_GUARD_HASH="$current_guard_hash" \
+        GUARD_PATH="$BOOT_GUARD_PATH" APPROVAL_HASH="$approval_hash" \
+        STALE_PATH="$stale_path" STALE_HASH="$stale_hash" COMMIT="$(repo_commit)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - \
         "$OPERATOR_REAUTH_TOKEN" "$receipt" "$AUTOSTART_APPROVAL" <<'PY'
 import hashlib,json,os,pathlib,re,sys
 token=json.loads(pathlib.Path(sys.argv[1]).read_text()); receipt=json.loads(pathlib.Path(sys.argv[2]).read_text())
@@ -3521,8 +3522,9 @@ PY
         esac
     done < "$diff_file"
     diff_hash="$(sha256_file "$diff_file")"; rm -f -- "$diff_file"
-    OLD_TREE="$old_tree" NEW_TREE="$new_tree" DIFF_HASH="$diff_hash" \
-        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        OLD_TREE="$old_tree" NEW_TREE="$new_tree" DIFF_HASH="$diff_hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
 import json,os,pathlib,sys
 data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 if data["old_tree"]!=os.environ["OLD_TREE"] or data["new_tree"]!=os.environ["NEW_TREE"] or data["allowed_diff_sha256"]!=os.environ["DIFF_HASH"]: raise SystemExit("reauthorization git-object/diff binding differs")
@@ -4045,10 +4047,11 @@ PY
     ledger_hash="$(sha256_file "$ledger")"; inventory_hash="$(sha256_file "$inventory")"
     anchor_inventory_hash="$(sha256_file "$anchor_inventory")"
     receipt="$(receipt_target backup)"
-    COMMIT="$(repo_commit)" SNAPSHOT="$final" DB_SOURCE="$DB_PATH" LEDGER="$ledger" \
-    LEDGER_HASH="$ledger_hash" INVENTORY="$inventory" INVENTORY_HASH="$inventory_hash" \
-    ANCHOR_ROOT="$anchor_copy" ANCHOR_INVENTORY="$anchor_inventory" ANCHOR_INVENTORY_HASH="$anchor_inventory_hash" \
-        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        COMMIT="$(repo_commit)" SNAPSHOT="$final" DB_SOURCE="$DB_PATH" LEDGER="$ledger" \
+        LEDGER_HASH="$ledger_hash" INVENTORY="$inventory" INVENTORY_HASH="$inventory_hash" \
+        ANCHOR_ROOT="$anchor_copy" ANCHOR_INVENTORY="$anchor_inventory" ANCHOR_INVENTORY_HASH="$anchor_inventory_hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
 import json, os, pathlib, sys
 data={"schema":"genus-a0.3c-backup-v2","repo_commit":os.environ["COMMIT"],
       "snapshot_root":os.environ["SNAPSHOT"],"database_source_path":os.environ["DB_SOURCE"],
@@ -4407,17 +4410,18 @@ PY
     done
     if [ -n "$reauth" ]; then sync -f "$reauth"; fsync_dir "$(dirname "$reauth")"; fi
     target="$(receipt_target activation)"
-    MANIFEST="$manifest" PREVIOUS="$previous" COMMIT="$expected" \
-    TARGET_MANIFEST_PATH="$target_manifest_path" TARGET_MANIFEST_HASH="$(sha256_file "$target_manifest_path")" \
-    PREVIOUS_MANIFEST_PATH="$previous_manifest_path" PREVIOUS_MANIFEST_HASH="$(sha256_file "$previous_manifest_path")" \
-    BACKUP_RECEIPT="$backup" BACKUP_HASH="$(sha256_file "$backup")" \
-    READINESS_MANIFEST="$readiness" READINESS_HASH="$(sha256_file "$readiness")" \
-    SERIES_RECEIPT="$series" SERIES_HASH="$series_hash" \
-    VERIFICATION_RECEIPT="$verification" VERIFICATION_HASH="$(sha256_file "$verification")" \
-    POSTFLIGHT_RECEIPT="$postflight" POSTFLIGHT_HASH="$(sha256_file "$postflight")" \
-    IDENTITY_RECEIPT="$identity" IDENTITY_HASH="$(sha256_file "$identity")" SERVICE_STATE="$service_state" \
-    REAUTH_RECEIPT="$reauth" REAUTH_HASH="$reauth_hash" \
-        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        MANIFEST="$manifest" PREVIOUS="$previous" COMMIT="$expected" \
+        TARGET_MANIFEST_PATH="$target_manifest_path" TARGET_MANIFEST_HASH="$(sha256_file "$target_manifest_path")" \
+        PREVIOUS_MANIFEST_PATH="$previous_manifest_path" PREVIOUS_MANIFEST_HASH="$(sha256_file "$previous_manifest_path")" \
+        BACKUP_RECEIPT="$backup" BACKUP_HASH="$(sha256_file "$backup")" \
+        READINESS_MANIFEST="$readiness" READINESS_HASH="$(sha256_file "$readiness")" \
+        SERIES_RECEIPT="$series" SERIES_HASH="$series_hash" \
+        VERIFICATION_RECEIPT="$verification" VERIFICATION_HASH="$(sha256_file "$verification")" \
+        POSTFLIGHT_RECEIPT="$postflight" POSTFLIGHT_HASH="$(sha256_file "$postflight")" \
+        IDENTITY_RECEIPT="$identity" IDENTITY_HASH="$(sha256_file "$identity")" SERVICE_STATE="$service_state" \
+        REAUTH_RECEIPT="$reauth" REAUTH_HASH="$reauth_hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
 import json, os, pathlib, sys
 data={"schema":"genus-a0.3c-runtime-activation-v3","outcome":"activated","candidate_commit":os.environ["COMMIT"],
       "previous_set_manifest":os.environ["PREVIOUS"],"previous_set_manifest_path":os.environ["PREVIOUS_MANIFEST_PATH"],"previous_set_manifest_sha256":os.environ["PREVIOUS_MANIFEST_HASH"],
@@ -4585,14 +4589,15 @@ print(data["backup_receipt_path"])
 PY
 )"
         validate_backup_receipt "$backup"
-        COMMIT="$(repo_commit)" ACTIVE="$active" PREVIOUS="$previous" \
-        ACTIVE_HASH="$(manifest_file_hash "$active")" PREVIOUS_HASH="$(manifest_file_hash "$previous")" \
-        RECEIPT_ROOT_ENV="$RECEIPT_ROOT" READINESS_ROOT="$GENUS_HOME/.genus/a0.3c/readiness" \
-        SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" SETS_ROOT_ENV="$SETS_ROOT" \
-        CORE_STABLE="$CORE_POINTER/bin/python" JOURNAL="$ACTIVATION_JOURNAL" \
-        BOOT_GUARD="$BOOT_GUARD_PATH" CURRENT_BOOT_GUARD_HASH="$(sha256_file "$BOOT_GUARD_PATH")" \
-        RECEIPT_PIN="$receipt_pin" \
-            "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+            COMMIT="$(repo_commit)" ACTIVE="$active" PREVIOUS="$previous" \
+            ACTIVE_HASH="$(manifest_file_hash "$active")" PREVIOUS_HASH="$(manifest_file_hash "$previous")" \
+            RECEIPT_ROOT_ENV="$RECEIPT_ROOT" READINESS_ROOT="$GENUS_HOME/.genus/a0.3c/readiness" \
+            SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" SETS_ROOT_ENV="$SETS_ROOT" \
+            CORE_STABLE="$CORE_POINTER/bin/python" JOURNAL="$ACTIVATION_JOURNAL" \
+            BOOT_GUARD="$BOOT_GUARD_PATH" CURRENT_BOOT_GUARD_HASH="$(sha256_file "$BOOT_GUARD_PATH")" \
+            RECEIPT_PIN="$receipt_pin" \
+            "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
 import hashlib, json, os, pathlib, re, stat, sys
 HEX=re.compile(r"[0-9a-f]{64}")
 receipt=pathlib.Path(sys.argv[1]); receipt_root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve()
@@ -5249,10 +5254,11 @@ reauthorize_runtime() {
     [ "$(sha256_file "$stale_copy")" = "$(sha256_file "$AUTOSTART_APPROVAL")" ] \
         || fail "stale Approval-Copy driftete" 70
     receipt="$(receipt_target operator-reauthorization)"
-    OLD="$old" NEW="$new" OLD_TREE="$old_tree" NEW_TREE="$new_tree" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
-    STALE_PATH="$stale_copy" STALE_HASH="$(sha256_file "$stale_copy")" GUARD_PATH="$BOOT_GUARD_PATH" \
-    GUARD_HASH="$guard_hash" DIFF_HASH="$diff_hash" \
-        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        OLD="$old" NEW="$new" OLD_TREE="$old_tree" NEW_TREE="$new_tree" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+        STALE_PATH="$stale_copy" STALE_HASH="$(sha256_file "$stale_copy")" GUARD_PATH="$BOOT_GUARD_PATH" \
+        GUARD_HASH="$guard_hash" DIFF_HASH="$diff_hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
 import json,os,pathlib,sys
 data={"schema":"genus-a0.3c-operator-reauthorization-v1","old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],
       "old_tree":os.environ["OLD_TREE"],"new_tree":os.environ["NEW_TREE"],"active_manifest":os.environ["ACTIVE"],
@@ -5268,9 +5274,10 @@ try: os.fsync(directory)
 finally: os.close(directory)
 PY
     token="$OPERATOR_REAUTH_TOKEN"
-    RECEIPT="$receipt" RECEIPT_HASH="$(sha256_file "$receipt")" OLD="$old" NEW="$new" \
-    ACTIVE="$active" ACTIVE_HASH="$active_hash" GUARD_HASH="$guard_hash" \
-        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$token" <<'PY'
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        RECEIPT="$receipt" RECEIPT_HASH="$(sha256_file "$receipt")" OLD="$old" NEW="$new" \
+        ACTIVE="$active" ACTIVE_HASH="$active_hash" GUARD_HASH="$guard_hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$token" <<'PY'
 import json,os,pathlib,sys
 data={"schema":"genus-a0.3c-operator-reauthorization-token-v1","receipt_path":os.environ["RECEIPT"],
       "receipt_sha256":os.environ["RECEIPT_HASH"],"old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],

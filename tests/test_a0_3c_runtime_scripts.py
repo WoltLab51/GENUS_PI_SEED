@@ -422,6 +422,37 @@ def test_process_guards_exclude_the_complete_operator_wrapper_chain():
     assert "needle_name" not in backup_probe
 
 
+def test_clean_env_python_calls_pass_contract_values_after_env_reset():
+    script = _script()
+    assignments_before_reset = re.compile(
+        r'(?m)(?:^[ \t]*[A-Z][A-Z0-9_]*=.*\\\n)+'
+        r'[ \t]*"\$ROOT_ENV_BIN" -i'
+    )
+    assert assignments_before_reset.search(script) is None
+    contracts = {
+        "validate_operator_reauthorization": ("TOKEN_HASH", "LIVE_GUARD_HASH", "COMMIT"),
+        "fresh_backup_receipt": ("COMMIT", "SNAPSHOT", "LEDGER_HASH"),
+        "write_activation_receipt": ("MANIFEST", "BACKUP_RECEIPT", "SERVICE_STATE"),
+        "validate_completion_receipt": ("COMMIT", "RECEIPT_ROOT_ENV", "RECEIPT_PIN"),
+        "reauthorize_runtime": ("OLD", "NEW", "RECEIPT_HASH", "GUARD_HASH"),
+    }
+    for name, variables in contracts.items():
+        body = _function(name)
+        resets = [
+            match.start()
+            for match in re.finditer(r'"\$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin', body)
+        ]
+        invocations = [
+            body[reset : body.index('"$SYSTEM_PYTHON_BIN" -I -P', reset)]
+            for reset in resets
+        ]
+        for variable in variables:
+            assert any(f"{variable}=" in invocation for invocation in invocations), (
+                name,
+                variable,
+            )
+
+
 @linux_only
 def test_process_guards_ignore_two_wrappers_but_reject_real_foreign_processes(tmp_path):
     sudo = shutil.which("sudo")
