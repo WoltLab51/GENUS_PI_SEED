@@ -2064,6 +2064,12 @@ def test_reauthorization_is_clean_ff_one_shot_and_never_boot_authorization():
     assert "cleanup_completed_activation_artifacts" in command
     assert "old_tree" in validator and "new_tree" in validator
     assert "allowed_diff_sha256" in validator
+    assert 'r"[0-9a-f]{40}",receipt[key]) for key in ("old_tree","new_tree")' in validator
+    assert (
+        'r"[0-9a-f]{64}",receipt[key]) for key in '
+        '("active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")'
+        in validator
+    )
     assert "validate_stale_autostart_approval" in validator
     assert "validate_operator_reauthorization" in recovery
     assert "unterbrochener reautorisierter Transition" in recovery

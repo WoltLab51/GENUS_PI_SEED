@@ -3505,7 +3505,8 @@ if receipt["stale_approval_path"]!=os.environ["STALE_PATH"] or receipt["stale_ap
 if receipt["guard_sha256"]!=os.environ["LEGACY_GUARD_HASH"] or os.environ["LIVE_GUARD_HASH"] not in {os.environ["LEGACY_GUARD_HASH"],os.environ["CURRENT_GUARD_HASH"]}: raise SystemExit("reauthorization guard migration binding differs")
 if receipt["boot_approval_updated"] is not False or receipt["paths_logged"] is not True or receipt["payloads_logged"] is not False: raise SystemExit("reauthorization safety booleans differ")
 if not re.fullmatch(r"[0-9a-f]{40}",receipt["old_commit"]) or not re.fullmatch(r"[0-9a-f]{40}",receipt["new_commit"]): raise SystemExit("reauthorization commit malformed")
-if any(not re.fullmatch(r"[0-9a-f]{64}",receipt[key]) for key in ("old_tree","new_tree","active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("reauthorization digest malformed")
+if any(not re.fullmatch(r"[0-9a-f]{40}",receipt[key]) for key in ("old_tree","new_tree")): raise SystemExit("reauthorization tree id malformed")
+if any(not re.fullmatch(r"[0-9a-f]{64}",receipt[key]) for key in ("active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("reauthorization digest malformed")
 PY
     new="$(repo_commit)"
     assert_expected_commit "$new"
@@ -4692,7 +4693,8 @@ if reauth_path:
     _,reauth=load(reauth_path,reauth_hash,receipt_root,True)
     reauth_keys={"schema","old_commit","new_commit","old_tree","new_tree","active_manifest","active_manifest_sha256","stale_approval_path","stale_approval_sha256","guard_path","guard_sha256","allowed_diff_sha256","intended_command","boot_approval_updated","paths_logged","payloads_logged"}
     if set(reauth)!=reauth_keys or reauth["schema"]!="genus-a0.3c-operator-reauthorization-v1" or reauth["new_commit"]!=commit or reauth["active_manifest"]!=previous or reauth["active_manifest_sha256"]!=top["previous_set_manifest_sha256"] or reauth["intended_command"]!="stage-and-activate" or reauth["boot_approval_updated"] is not False or reauth["paths_logged"] is not True or reauth["payloads_logged"] is not False: raise SystemExit("operator reauthorization binding differs")
-    if not re.fullmatch(r"[0-9a-f]{40}",reauth["old_commit"]) or any(not HEX.fullmatch(str(reauth[key])) for key in ("old_tree","new_tree","active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("operator reauthorization digest differs")
+    if any(not re.fullmatch(r"[0-9a-f]{40}",reauth[key]) for key in ("old_commit","new_commit","old_tree","new_tree")): raise SystemExit("operator reauthorization git id differs")
+    if any(not HEX.fullmatch(str(reauth[key])) for key in ("active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("operator reauthorization digest differs")
     stale_path,stale=load(reauth["stale_approval_path"],reauth["stale_approval_sha256"],receipt_root,True)
     stale_v2={"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","reason"}
     stale_v3=stale_v2|{"series_path","series_sha256"}
