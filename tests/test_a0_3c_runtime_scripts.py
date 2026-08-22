@@ -1624,10 +1624,16 @@ def test_init_user_roots_rejects_a_symlinked_state_root(tmp_path):
 
 
 @linux_only
-def test_init_user_roots_rejects_a_non_private_state_root(tmp_path):
+def test_init_user_roots_rejects_a_non_private_state_root(tmp_path, request):
     state = tmp_path / "home" / ".genus" / "runtime-a0.3c"
     state.mkdir(parents=True, mode=0o755)
     state.chmod(0o755)
+
+    def restore_private_mode() -> None:
+        if not state.is_symlink() and state.is_dir():
+            state.chmod(0o700)
+
+    request.addfinalizer(restore_private_mode)
 
     result = _source(tmp_path, "init_user_roots")
 
