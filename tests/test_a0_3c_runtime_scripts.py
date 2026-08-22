@@ -2050,6 +2050,16 @@ def test_activation_v3_deeply_crossbinds_all_evidence_and_exact_booleans():
     assert 'top["core_embed_single_selector"] is not True' in validator
     assert 'top["database_rollback_performed"] is not False' in validator
     assert 'top["payloads_logged"] is not False' in validator
+    assert (
+        'readiness["runtime_identity_sha256"]'
+        '!=readiness["runtime_identity"]["runtime_fingerprint_sha256"]'
+        in validator
+    )
+    assert (
+        'readiness["runtime_identity_sha256"]'
+        '!=readiness["runtime_identity"]["identity_sha256"]'
+        not in validator
+    )
     assert "pin_private_evidence_copy" in validator
     assert 'RECEIPT_PIN="$receipt_pin"' in validator
     assert 'VERIFIED_COMPLETION_RECEIPT_SHA256="$receipt_pin"' in validator
