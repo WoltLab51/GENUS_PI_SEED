@@ -88,6 +88,17 @@ Der Reader wird nun erst am `cutover_pre_commit`-Fence gebunden; das Receipt
 weist diesen Scope sowie den ungepinnten Bulk-Replay fail-closed nach. Der rote
 Lauf bleibt erhalten und erzwingt eine vollständig neue Drei-Lauf-Serie.
 
+Der erste Lauf dieses WAL-korrigierten Stands bestätigte mit `156345792 B`,
+dass der WAL nun unter dem `256 MiB`-Budget bleibt, stoppte aber nach einem
+vollständig committeten Replay-Batch am separaten festen `0.5 s`-Writer-
+Handoff-Timeout. Eine frische Diagnosekopie reproduzierte exakt
+`cooperative writer admission slot timed out before a real commit`. Dieses
+Subgate war unbegründet strenger als der unveränderte angenommene
+`2.0 s`-Writer-Vertrag. Der nächste Kandidat verwendet daher eine Quelle der
+Wahrheit für SQLite-Busy-Timeout, kooperatives Handoff und Receipt-Bindung:
+exakt `2.0 s`. Der zweite rote Lauf bleibt ebenfalls erhalten; seine Folgen 2
+und 3 wurden nicht gestartet und die Runtime nicht aktiviert.
+
 Live bleibt gesperrt: Die GENUS-Python-Runtime auf dem Pi meldet SQLite 3.46.1
 und damit keine bestätigte WAL-reset-sichere Version. Außerdem existiert noch
 kein generation-aware Produktpfad. Ein aktualisiertes `sqlite3`-CLI allein
@@ -113,8 +124,9 @@ weiteres ausdrückliches Human-Go über Live-Aktivierung entscheiden.
 und der getrennte
 [menschliche Annahmebeleg](reviews/2026-08-18-a0-3b-prototype-acceptance.md)
 binden den damaligen Prototyp, seine grünen und roten Receipts sowie die
-Live-Sperre. Das Korrektur-Addendum bindet den getrennten A0.3c-Befund; seine
-neue Pi-Serie ist noch zu erbringen. Der bestehende produktive Replay-/
+Live-Sperre. Das Korrektur-Addendum bindet beide getrennten A0.3c-Befunde; die
+neue Pi-Serie des Reader-/Handoff-korrigierten Kandidaten ist noch zu
+erbringen. Der bestehende produktive Replay-/
 Integrity-Pfad und die Produktdatenbank bleiben unverändert. A0.2, A0.1a und
 A0.1b bleiben eingefrorene Prüfinfrastruktur.
 

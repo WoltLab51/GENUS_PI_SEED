@@ -111,7 +111,7 @@ Research darf inspirieren, ist aber kein stiller Implementierungsauftrag.
 - [A0-Entscheidungspaket vom 2026-08-09](reports/2026-08-09-a0-decision-packet.md)
 - [A0.3a Measurement Harness und Pi-Baseline vom 2026-08-14](reports/2026-08-14-a0-3a-measurement-harness-baseline.md)
 - [A0.3b Shadow Generation & Atomic Cutover Prototype vom 2026-08-18](reports/2026-08-15-a0-3b-shadow-cutover-prototype.md)
-- [A0.3c Full-Copy WAL-Pinning · technisches Korrektur-Addendum vom 2026-08-21](reports/2026-08-21-a0-3c-full-copy-wal-pinning-correction.md)
+- [A0.3c Full-Copy WAL-Pinning & Writer-Handoff · technisches Korrektur-Addendum vom 2026-08-21](reports/2026-08-21-a0-3c-full-copy-wal-pinning-correction.md)
 
 Ein Report wird nicht „aktuell gehalten“. Er bekommt einen Nachfolger und verweist darauf.
 

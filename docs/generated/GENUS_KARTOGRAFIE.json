@@ -286,7 +286,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "28f6d320cd606989f24a978cf797893c8ad7c27f78e4cfa47c4239891f49f725",
+  "content_sha256": "50ea15f639200aa77e26a3cb209a7ed5be13114aeab9d82396cc7a565952fb6a",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -1152,7 +1152,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 435
+          "line": 445
         }
       ],
       "to": "flow:voice",
@@ -1177,7 +1177,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 430
+          "line": 440
         }
       ],
       "to": "h1:dialogue_frame",
@@ -11402,7 +11402,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 430
+          "line": 440
         }
       ],
       "statement": "Persönliche Episoden liegen append-only; der löschbare persönliche Vault ist noch ein H1-Vertrag."
@@ -12653,7 +12653,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 435
+          "line": 445
         }
       ],
       "stage": 7,
@@ -12696,7 +12696,7 @@
         {
           "file": "docs/ROADMAP.md",
           "kind": "curated",
-          "line": 430
+          "line": 440
         }
       ],
       "stage": 2,

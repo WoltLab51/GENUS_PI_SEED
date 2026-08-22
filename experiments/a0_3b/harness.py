@@ -52,11 +52,14 @@ DEFAULT_FINAL_TAIL_BYTES = 8 * 1024 * 1024
 MAX_BATCH_EVENTS = 8_192
 MAX_BATCH_BYTES = 16 * 1024 * 1024
 INTER_BATCH_WRITER_YIELD_SECONDS = 0.001
-INTER_BATCH_WRITER_HANDOFF_TIMEOUT_SECONDS = 0.5
+WRITER_BLOCK_BUDGET_SECONDS = 2.0
+# A cooperative slot is evidence for the same writer-block contract. Giving it
+# a stricter, unrelated deadline made healthy sub-two-second commits fail under
+# production-size checkpoint I/O before their actual hard budget was reached.
+INTER_BATCH_WRITER_HANDOFF_TIMEOUT_SECONDS = WRITER_BLOCK_BUDGET_SECONDS
 
 RSS_BUDGET_BYTES = 256 * 1024 * 1024
 WAL_BUDGET_BYTES = 256 * 1024 * 1024
-WRITER_BLOCK_BUDGET_SECONDS = 2.0
 RECOVERY_BUDGET_SECONDS = 10.0
 REBUILD_BUDGET_SECONDS = 180.0
 MAX_WRITER_TELEMETRY_SAMPLES = 100_000
@@ -4778,7 +4781,7 @@ def run_concurrency_probe(
                         "derivation": "experiment:a0_3b:concurrency:v1",
                     },
                     disposable_root=disposable_root,
-                    timeout_seconds=2.0,
+                    timeout_seconds=WRITER_BLOCK_BUDGET_SECONDS,
                 )
             except sqlite3.OperationalError as exc:
                 returned = time.perf_counter()

@@ -538,6 +538,41 @@ def test_inter_batch_handoff_admits_a_continuously_queued_writer(
     assert receipt["concurrency_gate_pass"] is True
 
 
+def test_inter_batch_handoff_allows_a_commit_within_the_hard_writer_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, _ = _synthetic(tmp_path, 9, label="inter-batch-writer-budget")
+    harness.initialize_shadow(path, disposable_root=tmp_path)
+    original_append = harness.append_routed
+    delay_seconds = harness.WRITER_BLOCK_BUDGET_SECONDS * 0.3
+
+    def delayed_append(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        # Model checkpoint/scheduler latency that is longer than the obsolete
+        # 0.5-second slot but still comfortably inside the 2-second hard gate.
+        time.sleep(delay_seconds)
+        return original_append(*args, **kwargs)
+
+    monkeypatch.setattr(harness, "append_routed", delayed_append)
+    receipt = harness.run_concurrency_probe(
+        path,
+        disposable_root=tmp_path,
+        writer_interval_seconds=0.0005,
+        short_reader_interval_seconds=0.001,
+        batch_events=BATCH_EVENTS,
+        batch_bytes=BATCH_BYTES,
+    )
+
+    handoff = receipt["writer_handoff"]
+    assert harness.INTER_BATCH_WRITER_HANDOFF_TIMEOUT_SECONDS == (
+        harness.WRITER_BLOCK_BUDGET_SECONDS
+    )
+    assert handoff["timeout_seconds_per_slot"] == harness.WRITER_BLOCK_BUDGET_SECONDS
+    assert handoff["timeouts"] == 0
+    assert handoff["pass"] is True
+    assert receipt["writer_latency"]["within_max_block_budget"] is True
+    assert receipt["concurrency_gate_pass"] is True
+
+
 def test_writer_latency_percentiles_use_nearest_rank_and_flag_starvation() -> None:
     samples = [
         {"committed": True, "end_to_end_seconds": value}

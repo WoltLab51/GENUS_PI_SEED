@@ -48,6 +48,7 @@ REQUIRED_BATCH_EVENTS = 3_072
 REQUIRED_BATCH_BYTES = a03b.DEFAULT_BATCH_BYTES
 REQUIRED_WRITER_INTERVAL_SECONDS = 0.005
 REQUIRED_READER_INTERVAL_SECONDS = 0.003
+REQUIRED_WRITER_HANDOFF_TIMEOUT_SECONDS = a03b.WRITER_BLOCK_BUDGET_SECONDS
 REQUIRED_LONG_READER_SNAPSHOT_SCOPE = "cutover_pre_commit_through_post_commit"
 REQUIRED_BULK_REPLAY_WAL_PINNED = False
 REQUIRED_CONSECUTIVE_RUNS = 3
@@ -97,8 +98,8 @@ HUMAN_ACCEPTED_A03B_BASELINE_SHA256 = {
 A03C_REQUIRED_A03B_CANDIDATE_SHA256 = {
     "package": "c8fdd59854fa9822867aadf602ce2a9a2e5c2bf64e0d3f30930521a6ffaee871",
     "cli": "612e28134dfd3b9ab029628a824de93b29c4637892a23921ae3f783a9e99890e",
-    "harness": "418a7169f9ee476c74fe4718033fe9af92c97991ea8c6f7e6bb6d91c5b30bb96",
-    "tests": "3f9a333d08957457a610bf5f27638c6de90d47776f0cdc372f08b886e7e67e35",
+    "harness": "13d066b1e7d82c42c39f78a489467ed73762f33989262f64950a325d577c6805",
+    "tests": "6afb316c159bc3c340c5398814be471970adc719d3b41c346c5453b93742c813",
 }
 _WRITER_FREE_BUDGET_KEYS = {
     "peak_rss",
@@ -909,6 +910,7 @@ def required_candidate_config() -> dict[str, Any]:
         "batch_bytes": REQUIRED_BATCH_BYTES,
         "writer_interval_seconds": REQUIRED_WRITER_INTERVAL_SECONDS,
         "short_reader_interval_seconds": REQUIRED_READER_INTERVAL_SECONDS,
+        "writer_handoff_timeout_seconds": REQUIRED_WRITER_HANDOFF_TIMEOUT_SECONDS,
         "long_reader_snapshot_scope": REQUIRED_LONG_READER_SNAPSHOT_SCOPE,
         "bulk_replay_wal_pinned": REQUIRED_BULK_REPLAY_WAL_PINNED,
         "projection_count": 12,
@@ -2394,9 +2396,19 @@ def _concurrency_summary(
     storage = receipt.get("storage_highwater_bytes")
     handoff = receipt.get("writer_handoff")
     handoff = handoff if isinstance(handoff, Mapping) else {}
+    handoff_max_wait = handoff.get("max_wait_seconds")
+    handoff_wait_within_budget = bool(
+        isinstance(handoff_max_wait, (int, float))
+        and not isinstance(handoff_max_wait, bool)
+        and math.isfinite(float(handoff_max_wait))
+        and 0 <= handoff_max_wait <= REQUIRED_WRITER_HANDOFF_TIMEOUT_SECONDS
+    )
     handoff_pass = bool(
         handoff.get("pass") is True
         and handoff.get("timeouts") == 0
+        and handoff.get("timeout_seconds_per_slot")
+        == REQUIRED_WRITER_HANDOFF_TIMEOUT_SECONDS
+        and handoff_wait_within_budget
         and handoff.get("requested") == handoff.get("completed")
         and handoff.get("completed") == handoff.get("expected_from_committed_batches")
         and handoff.get("exactly_one_commit_per_slot") is True
@@ -2533,6 +2545,7 @@ def _concurrency_summary(
         "build_seconds": build.get("duration_seconds"),
         "resource_budgets_pass": resources,
         "writer_handoff_pass": handoff_pass,
+        "writer_handoff_timeout_seconds": handoff.get("timeout_seconds_per_slot"),
         "bounded_phase_write_receipts_pass": bounded_phase_writes,
         "write_receipt_validation": write_receipt_validation,
         "outer_resources": strict_outer_resources,
@@ -2655,6 +2668,11 @@ def _raw_candidate_config_receipt(
         or handoff.get("think_time_seconds") != REQUIRED_WRITER_INTERVAL_SECONDS
     ):
         raise RunEvidenceError("raw writer interval configuration differs")
+    if (
+        handoff.get("timeout_seconds_per_slot")
+        != REQUIRED_WRITER_HANDOFF_TIMEOUT_SECONDS
+    ):
+        raise RunEvidenceError("raw writer handoff timeout configuration differs")
     reader = concurrency.get("reader")
     reader_reconstruction = _concurrency_reader_reconstruction(reader)
     if reader_reconstruction["reader_inventory_exact"] is not True:
@@ -2676,6 +2694,7 @@ def _raw_candidate_config_receipt(
         },
         "writer_interval_seconds": REQUIRED_WRITER_INTERVAL_SECONDS,
         "short_reader_interval_seconds": REQUIRED_READER_INTERVAL_SECONDS,
+        "writer_handoff_timeout_seconds": REQUIRED_WRITER_HANDOFF_TIMEOUT_SECONDS,
         "long_reader_snapshot_scope": reader["long_reader_snapshot_scope"],
         "bulk_replay_wal_pinned": reader["bulk_replay_wal_pinned"],
         "reader_inventory_exact": True,

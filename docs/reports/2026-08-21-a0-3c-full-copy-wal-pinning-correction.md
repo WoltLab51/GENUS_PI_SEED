@@ -1,4 +1,4 @@
-# A0.3c Full-Copy WAL-Pinning · technisches Korrektur-Addendum
+# A0.3c Full-Copy WAL-Pinning & Writer-Handoff · technisches Korrektur-Addendum
 
 > **Status:** `validation pending`
 >
@@ -29,6 +29,16 @@ Der korrigierte Kandidat ist noch nicht angenommen. Seine Quellhashes sind
 unten vorab gebunden; Commit, vollständige Kandidaten-Gates und drei
 konsekutive Pi-Kopienläufe bleiben bis zu ihrer tatsächlichen Verifikation
 offen.
+
+Der erste Lauf des WAL-korrigierten Kandidaten bestätigte den eigentlichen
+Fix: Der Concurrency-WAL blieb mit `156345792 B` unter `256 MiB`. Er legte aber
+ein zweites, unabhängiges Falschrot offen. Der Harness verlangte nach jedem
+committeten Replay-Batch einen echten konkurrierenden Writer-Commit innerhalb
+von `0.5 s`, obwohl der einzige angenommene harte Writer-Vertrag `2.0 s`
+beträgt. Eine getrennte frische Diagnosekopie reproduzierte exakt
+`cooperative writer admission slot timed out before a real commit`. Der neue
+Kandidat bindet diese kooperative Frist deshalb an dasselbe unveränderte
+`2.0 s`-Budget; er erhöht kein Akzeptanzbudget.
 
 ## Unveränderte historische Evidenz
 
@@ -90,7 +100,7 @@ logische WAL-Dateigröße im Messfenster. Das 20-ms-Sampling kann kurze Spitzen
 übersehen, aber aus einer kleineren Datei keine mehrere Gigabyte große Summe
 erzeugen.
 
-## Roter A0.3c-Lauf
+## Erster roter A0.3c-Lauf
 
 Der fehlgeschlagene Lauf bleibt als negative Evidenz erhalten und darf nicht
 als Teil einer grünen Serie wiederverwendet werden.
@@ -111,10 +121,42 @@ Die zugehörigen privaten Datenbankkopien und Receipts bleiben externe
 Operator-Evidenz. Sie werden weder in dieses Repository kopiert noch automatisch
 gelöscht.
 
+## Zweiter roter A0.3c-Lauf und exakte Diagnose
+
+Der erste Lauf des WAL-korrigierten Commits `429b568` blieb nicht mehr am WAL,
+sondern bereits innerhalb des Concurrency-Probes rot. Auch dieser Lauf ist eine
+abgeschlossene negative Serienfolge und wird nicht wiederverwendet.
+
+| Bindung | Wert |
+|---|---|
+| Kandidatencommit | `429b5688472cdce041188e6c93dbffb9fec79fd9` |
+| Runtime-/Set-Manifest-ID | `223e3ee820b7be11f0a4cbcade2764066df1b0fadd75b816a7210e78dc01e3d3` |
+| Readiness-Manifest | intern `c644e4b52d74566bcc18fd41bacf0efcbfc364380d5cd7daeadd50648eb57f5d`; Rohdatei `d579583d8dee9093921daea38108748104d0add530c93829f4d0a5a8b32f11a2` |
+| Acquisition-Receipt-Rohhash | `6ccbdf4f233e34227ae7925918368e2cc05330a3b7291bf84e138ca413bfbea5` |
+| Run-Receipt-Rohhash / Folge | `6696f85382cc72f46ba033fc076e0d5c3e7905ad5c63165fb558eb5bf525187f` / `1` |
+| Journal-Entry-Rohhash | `4e3db7ea25c1add8541019b3fe4f81041530d2d4602e01067d79b38a68ffe86a` |
+| Concurrency-Sampler | WAL `156345792 B`; RSS `63488000 B`; `16188` Samples; Sampler-Gate grün |
+| letzter persistierter G3-Stand | `built_through_event_id=697344 = 227 × 3072`; Batch 227 war vollständig committet |
+| Writer-freier Kontrolllauf | Gate grün; Build `116.708122373 s`; WAL `19994392 B`; RSS `45678592 B`; max. Schreiben `1.045829921 s`; Fence `0.006050324 s`; Recovery `0.392671618 s` |
+| Serienfolge | `reset required`; Folge 2 und 3 nicht gestartet; Runtime nicht aktiviert |
+
+Das versiegelte rote Run-Receipt protokolliert absichtlich nur Klasse und Phase
+(`ShadowHarnessError`, `concurrency`), nicht den sensitiven Exception-Text. Die
+fehlgeschlagene Beweiskopie wurde deshalb nicht erneut geöffnet oder repariert.
+Eine getrennte, frisch erworbene Diagnosekopie reproduzierte denselben Zustand
+mit vollständigem Traceback: `_build_generation` committet zuerst Batch,
+Watermark und Receipt und ruft unmittelbar danach
+`cooperative_writer_handoff` auf; dessen festes `0.5 s`-Timeout warf
+`cooperative writer admission slot timed out before a real commit`. Dass die
+Reproduktion diesmal schon im G2-Build statt im G3-Replay stoppte, bestätigt
+den last- und schedulerabhängigen Subgate-Fehler und widerlegt einen
+projektionstechnischen G3-Datenfehler.
+
 ## Korrigierter Kandidatenvertrag
 
-Die fachlich kleinste Korrektur verschiebt ausschließlich den langlebigen
-Snapshot-Reader:
+Die fachlich kleinsten Korrekturen betreffen ausschließlich das Beweisfenster
+des langlebigen Snapshot-Readers und die bereits vorhandene Writer-Frist.
+Zunächst wird der Reader verschoben:
 
 1. Bulk-G2/G3, Catch-up und die unabhängige Verifikation laufen mit dem bereits
    vorhandenen konkurrierenden Writer und den kurzlebigen Reader-Transaktionen.
@@ -124,6 +166,20 @@ Snapshot-Reader:
    danach weiterhin die vollständige G1 sehen.
 4. Ein frisch geöffneter Reader muss nach dem Commit die vollständige G2 sehen.
 5. Der langlebige Reader wird auch auf jedem Fehlerpfad geschlossen.
+
+Zusätzlich verwendet der kooperative Writer-Slot keine zweite, strengere
+Zeitgrenze mehr:
+
+1. `INTER_BATCH_WRITER_HANDOFF_TIMEOUT_SECONDS` ist dieselbe Quelle der
+   Wahrheit wie `WRITER_BLOCK_BUDGET_SECONDS`, also exakt `2.0 s`.
+2. Auch der SQLite-Busy-Timeout des konkurrierenden `append_routed` verwendet
+   symbolisch dieses Budget statt eines unabhängigen Literals.
+3. Nach jedem committeten Batch bleibt weiterhin genau ein echter Writer-Commit
+   erforderlich. Null Timeouts, genau-ein-Commit-pro-Slot, die gemessene
+   End-to-End-Latenz und die maximale Slot-Wartezeit müssen einzeln grün sein.
+4. Raw Receipt, rekonstruierte Summary und Kandidatenmanifest verlangen exakt
+   `writer_handoff_timeout_seconds=2.0`; ein neu versiegelter abweichender Wert
+   oder eine Wartezeit über `2.0 s` bleibt fail-closed rot.
 
 Damit bleibt der eigentliche Old-or-New-Beweis erhalten, ohne den gesamten
 Bulk-Replay unnötig mit einem alten WAL-Endmark zu pinnen. Die Korrektur ändert
@@ -145,11 +201,13 @@ receiptgebunden sein:
 ```text
 long_reader_snapshot_scope = cutover_pre_commit_through_post_commit
 bulk_replay_wal_pinned = false
+writer_handoff_timeout_seconds = 2.0
 ```
 
-Diese Felder beschreiben eine Korrektur des Beweisfensters, kein Retuning. Ein
-abweichender oder fehlender Wert muss Manifest-, Run- und Serienverifikation
-fail-closed rot machen.
+Diese Felder beschreiben Korrekturen des Reader-Beweisfensters und der internen
+Handoff-Deadline, kein Retuning der angenommenen Budgets. Ein abweichender oder
+fehlender Wert muss Manifest-, Run- und Serienverifikation fail-closed rot
+machen.
 
 ## Neue Hash- und Kandidatenbindungen
 
@@ -163,10 +221,10 @@ angenommenen A0.3b-Stand dargestellt werden.
 | korrigierter Kandidatencommit | `validation pending` |
 | `experiments/a0_3b/__init__.py` | `c8fdd59854fa9822867aadf602ce2a9a2e5c2bf64e0d3f30930521a6ffaee871` (byteidentisch) |
 | `experiments/a0_3b/__main__.py` | `612e28134dfd3b9ab029628a824de93b29c4637892a23921ae3f783a9e99890e` (byteidentisch) |
-| `experiments/a0_3b/harness.py` | `418a7169f9ee476c74fe4718033fe9af92c97991ea8c6f7e6bb6d91c5b30bb96` |
-| `tests/test_a0_3b_shadow_cutover.py` | `3f9a333d08957457a610bf5f27638c6de90d47776f0cdc372f08b886e7e67e35` |
-| A0.3c-Codehashsatz | package `ac681b50c2293167e2c0a7c025bcb452384d0aeb46c66badbe06d72cd6cb5e67`; CLI `2c1a796d3c27b7b32d7a79304cf3ea9d918f362132a745afa6b515b0221d1263`; Harness `4c0cf567fe06b8e1278d619950976db36a6f5b40de21fcd7ede855a32832d628`; Tests `a469101ac47f72509ba82065f04e5b4b5e68efdd28525dbf8effea3f39b74782` |
-| Candidate-Config-SHA-256 | `0225367a6a6fc7c750c8223eaa5e9ccb860d7daa3973d6d7001405b3b3226cfd` |
+| `experiments/a0_3b/harness.py` | `13d066b1e7d82c42c39f78a489467ed73762f33989262f64950a325d577c6805` |
+| `tests/test_a0_3b_shadow_cutover.py` | `6afb316c159bc3c340c5398814be471970adc719d3b41c346c5453b93742c813` |
+| A0.3c-Codehashsatz | package `ac681b50c2293167e2c0a7c025bcb452384d0aeb46c66badbe06d72cd6cb5e67`; CLI `2c1a796d3c27b7b32d7a79304cf3ea9d918f362132a745afa6b515b0221d1263`; Harness `142f35ae0aeebfc6b8476b02eec122ede453b5cc22ea0aeba3c2c15973f94244`; Tests `b0a8e28af8d2156a7825d24234621dea5c3965ca176eefd33b574b2cd61b560f` |
+| Candidate-Config-SHA-256 | `45a479932eccb5411b1ddf5bbbd123d05becf3f3a3803cb4efadd7b0970cd18f` |
 | Runtime-Manifest-SHA-256 | `validation pending` |
 | Runtime-Set-Manifest-ID | `validation pending` |
 
@@ -192,6 +250,9 @@ grün sind:
   zusätzliche oder abweichende Werte werden abgelehnt.
 - Manifest-Verifikation lehnt den historischen A0.3b-Hash als aktuellen
   Korrekturkandidaten sowie jede Config-/Code-Tamperung ab.
+- Ein echter Writer-Commit mit `0.6 s` End-to-End-Latenz passiert den
+  kooperativen Slot, weil er innerhalb des unveränderten `2.0 s`-Hard-Gates
+  liegt; ein abweichendes Timeout oder eine längere Wartezeit bleibt rot.
 - Serienverifikation lehnt eine Mischung aus altem und neuem Commit,
   Codehashsatz, Kandidatenconfig oder Manifest ab.
 - Der vollständige lokale Testlauf, Ruff, Shellsyntax und die A0.2-Gates sind

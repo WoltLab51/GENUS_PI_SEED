@@ -564,6 +564,7 @@ def test_manifest_binds_runtime_code_config_and_real_green_gate_files(
     manifest, identity = _manifest(tmp_path, monkeypatch)
     assert manifest["runtime_identity"] == identity
     assert manifest["candidate_config"]["batch_events"] == 3_072
+    assert manifest["candidate_config"]["writer_handoff_timeout_seconds"] == 2.0
     assert manifest["candidate_config"]["long_reader_snapshot_scope"] == (
         "cutover_pre_commit_through_post_commit"
     )
@@ -641,6 +642,7 @@ def test_a03c_rejects_the_human_accepted_pre_wal_fix_a03b_baseline(
 @pytest.mark.parametrize(
     ("key", "value"),
     [
+        ("writer_handoff_timeout_seconds", 0.5),
         ("long_reader_snapshot_scope", "bulk_replay_through_post_commit"),
         ("bulk_replay_wal_pinned", True),
     ],
@@ -1430,6 +1432,7 @@ def test_raw_evidence_resource_and_write_receipts_fail_closed_on_tamper(
         "cutover_pre_commit_through_post_commit"
     )
     assert config["bulk_replay_wal_pinned"] is False
+    assert config["writer_handoff_timeout_seconds"] == 2.0
     assert config["reader_inventory_exact"] is True
     assert config["reader_evidence_reconstructed"] is True
     extra_raw = copy.deepcopy(template)
@@ -1458,6 +1461,23 @@ def test_raw_evidence_resource_and_write_receipts_fail_closed_on_tamper(
     }
     with pytest.raises(harness.RunEvidenceError, match="writer interval"):
         harness._reconstruct_run_summaries(wrong_interval)
+    wrong_handoff_timeout = copy.deepcopy(template)
+    wrong_handoff_timeout["raw_evidence"]["concurrency"]["writer_handoff"][
+        "timeout_seconds_per_slot"
+    ] = 0.5
+    wrong_handoff_timeout["raw_evidence_sha256"] = {
+        key: harness._sha256_json(value)
+        for key, value in wrong_handoff_timeout["raw_evidence"].items()
+    }
+    with pytest.raises(harness.RunEvidenceError, match="handoff timeout"):
+        harness._reconstruct_run_summaries(wrong_handoff_timeout)
+    excessive_handoff_wait = copy.deepcopy(template)
+    excessive_handoff_wait["raw_evidence"]["concurrency"]["writer_handoff"][
+        "max_wait_seconds"
+    ] = 2.001
+    excessive_summary = _reseal_concurrency_tamper(excessive_handoff_wait)
+    assert excessive_summary["writer_handoff_pass"] is False
+    assert excessive_summary["gate_pass"] is False
     injected_runner = copy.deepcopy(template)
     injected_runner["canonical_runners_used"] = False
     with pytest.raises(harness.RunEvidenceError, match="callsite configuration"):

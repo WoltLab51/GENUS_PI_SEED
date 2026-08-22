@@ -2,7 +2,7 @@
 
 > **Status:** generated · aktueller Quellbaumvertrag
 > **Quelle:** `genus.kartografie` · nicht von Hand editieren
-> **Inhalt:** `28f6d320cd606989` · Regeneration: `genus kartografie build`
+> **Inhalt:** `50ea15f639200aa7` · Regeneration: `genus kartografie build`
 
 Diese Karte beantwortet nicht nur *wer importiert wen?*, sondern die wichtigere
 Frage: **Was kann über welche Kante tatsächlich Wissen, Antwort oder Betrieb
