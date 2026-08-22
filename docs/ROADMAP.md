@@ -279,15 +279,16 @@ Receipt explizit nach, dass der Bulk-Replay nicht durch ihn gepinnt wurde. Die
 historische A0.3b-Annahme bleibt unverändert; die alte A0.3c-Serie ist
 abgebrochen und darf nicht mit der neuen Kandidatenserie gemischt werden.
 
-Der erste Lauf des WAL-korrigierten Stands hielt den WAL mit `156345792 B`
-innerhalb des Budgets und bestätigte damit die Reader-Korrektur. Er machte aber
-ein zweites Falschrot sichtbar: Nach einem vollständig committeten Replay-
-Batch verlangte ein separates kooperatives Handoff schon binnen `0.5 s` einen
-Writer-Commit, obwohl der angenommene Hard-Gate-Vertrag `2.0 s` erlaubt. Eine
-frische Diagnosekopie reproduzierte exakt diesen Timeout. Der neue Kandidat
-bindet Handoff, Writer-Busy-Timeout, Raw Receipt und Manifest an dieselbe
-unveränderte `2.0 s`-Grenze. Auch diese rote Serie ist abgeschlossen; drei neue
-Acquisitions beginnen erst mit dem neu gebundenen Commit und Runtime-Set.
+Der erste Lauf des WAL-korrigierten Stands hielt den WAL bis zu seinem späteren
+Abbruch mit `156345792 B` innerhalb des Budgets und stützt damit die Pinning-
+Root-Cause; der vollständige Budgetnachweis bleibt offen. Er machte aber ein
+zweites Falschrot sichtbar: Nach einem vollständig committeten Replay-Batch
+verlangte ein separates kooperatives Handoff schon binnen `0.5 s` einen Writer-
+Commit, obwohl der angenommene Hard-Gate-Vertrag `2.0 s` erlaubt. Eine frische
+Diagnosekopie reproduzierte exakt diesen Timeout. Der neue Kandidat bindet
+Handoff, Writer-Busy-Timeout, Raw Receipt und Manifest an dieselbe unveränderte
+`2.0 s`-Grenze. Auch diese rote Serie ist abgeschlossen; drei neue Acquisitions
+beginnen erst mit dem neu gebundenen Commit und Runtime-Set.
 
 **Definition of Done**
 

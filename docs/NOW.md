@@ -88,10 +88,11 @@ Der Reader wird nun erst am `cutover_pre_commit`-Fence gebunden; das Receipt
 weist diesen Scope sowie den ungepinnten Bulk-Replay fail-closed nach. Der rote
 Lauf bleibt erhalten und erzwingt eine vollständig neue Drei-Lauf-Serie.
 
-Der erste Lauf dieses WAL-korrigierten Stands bestätigte mit `156345792 B`,
-dass der WAL nun unter dem `256 MiB`-Budget bleibt, stoppte aber nach einem
-vollständig committeten Replay-Batch am separaten festen `0.5 s`-Writer-
-Handoff-Timeout. Eine frische Diagnosekopie reproduzierte exakt
+Der erste Lauf dieses WAL-korrigierten Stands blieb bis zu seinem späteren
+Abbruch mit `156345792 B` unter dem `256 MiB`-Budget und stützt damit die
+Pinning-Root-Cause; der vollständige Budgetnachweis bleibt noch offen. Er
+stoppte nach einem vollständig committeten Replay-Batch am separaten festen
+`0.5 s`-Writer-Handoff-Timeout. Eine frische Diagnosekopie reproduzierte exakt
 `cooperative writer admission slot timed out before a real commit`. Dieses
 Subgate war unbegründet strenger als der unveränderte angenommene
 `2.0 s`-Writer-Vertrag. Der nächste Kandidat verwendet daher eine Quelle der

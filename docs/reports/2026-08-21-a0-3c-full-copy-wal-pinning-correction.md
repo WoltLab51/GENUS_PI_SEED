@@ -30,15 +30,16 @@ unten vorab gebunden; Commit, vollständige Kandidaten-Gates und drei
 konsekutive Pi-Kopienläufe bleiben bis zu ihrer tatsächlichen Verifikation
 offen.
 
-Der erste Lauf des WAL-korrigierten Kandidaten bestätigte den eigentlichen
-Fix: Der Concurrency-WAL blieb mit `156345792 B` unter `256 MiB`. Er legte aber
-ein zweites, unabhängiges Falschrot offen. Der Harness verlangte nach jedem
-committeten Replay-Batch einen echten konkurrierenden Writer-Commit innerhalb
-von `0.5 s`, obwohl der einzige angenommene harte Writer-Vertrag `2.0 s`
-beträgt. Eine getrennte frische Diagnosekopie reproduzierte exakt
-`cooperative writer admission slot timed out before a real commit`. Der neue
-Kandidat bindet diese kooperative Frist deshalb an dasselbe unveränderte
-`2.0 s`-Budget; er erhöht kein Akzeptanzbudget.
+Der erste Lauf des WAL-korrigierten Kandidaten stützt die Pinning-Root-Cause:
+Der Concurrency-WAL blieb bis zu seinem späteren Handoff-Abbruch mit
+`156345792 B` unter `256 MiB`; der vollständige Budgetnachweis bleibt der neuen
+Dreierserie vorbehalten. Der Lauf legte ein zweites, unabhängiges Falschrot
+offen. Der Harness verlangte nach jedem committeten Replay-Batch einen echten
+konkurrierenden Writer-Commit innerhalb von `0.5 s`, obwohl der einzige
+angenommene harte Writer-Vertrag `2.0 s` beträgt. Eine getrennte frische
+Diagnosekopie reproduzierte exakt `cooperative writer admission slot timed out
+before a real commit`. Der neue Kandidat bindet diese kooperative Frist deshalb
+an dasselbe unveränderte `2.0 s`-Budget; er erhöht kein Akzeptanzbudget.
 
 ## Unveränderte historische Evidenz
 
@@ -142,9 +143,10 @@ abgeschlossene negative Serienfolge und wird nicht wiederverwendet.
 
 Das versiegelte rote Run-Receipt protokolliert absichtlich nur Klasse und Phase
 (`ShadowHarnessError`, `concurrency`), nicht den sensitiven Exception-Text. Die
-fehlgeschlagene Beweiskopie wurde deshalb nicht erneut geöffnet oder repariert.
-Eine getrennte, frisch erworbene Diagnosekopie reproduzierte denselben Zustand
-mit vollständigem Traceback: `_build_generation` committet zuerst Batch,
+fehlgeschlagene Beweiskopie wurde nicht fortgesetzt oder repariert; sie wurde
+ausschließlich read-only zur Zustandsdiagnose geöffnet. Eine getrennte, frisch
+erworbene Diagnosekopie reproduzierte denselben Zustand mit vollständigem
+Traceback: `_build_generation` committet zuerst Batch,
 Watermark und Receipt und ruft unmittelbar danach
 `cooperative_writer_handoff` auf; dessen festes `0.5 s`-Timeout warf
 `cooperative writer admission slot timed out before a real commit`. Dass die
