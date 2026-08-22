@@ -408,6 +408,7 @@ def test_cmd_gate_passes_the_exact_built_environment(
 ) -> None:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
+    scratch.chmod(0o700)
     home = scratch / "gate-home"
     temporary = scratch / "gate-tmp"
     expected_environment = {"BOUND_GATE_ENV": "exact"}

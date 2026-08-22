@@ -286,7 +286,7 @@
     "shell_runtime_statement": "Shell, systemd and cron topology is an explicit source-bound runtime contract, not a general shell-language dependency extraction."
   },
   "authority": "repository source + explicit projection and effect contracts",
-  "content_sha256": "afcc6b6ec443de1e1eb131b031b9542185eca9aed4445973c0a5ef2be8c1ea53",
+  "content_sha256": "e4b480bb9da972c6edf1f65a9c3e1ee1925a15dc9d089a06e3d4a7ff26871890",
   "edges": [
     {
       "from": "event:assertion_recorded",
@@ -10961,7 +10961,7 @@
         {
           "file": "deploy/backup_ledger_to_sd.sh",
           "kind": "runtime_contract",
-          "line": 48
+          "line": 79
         }
       ],
       "to": "runtime:backup",
@@ -11463,7 +11463,7 @@
         {
           "file": "deploy/backup_ledger_to_sd.sh",
           "kind": "curated",
-          "line": 20
+          "line": 22
         },
         {
           "file": "docs/SECURITY_MODEL.md",
@@ -15406,7 +15406,7 @@
         {
           "file": "deploy/backup_ledger_to_sd.sh",
           "kind": "runtime_contract",
-          "line": 48
+          "line": 79
         },
         {
           "file": "docs/reports/2026-07-13-cartography-runtime-audit.md",
