@@ -230,8 +230,6 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
                    " verb=" + action.lookup("verb"));
     }
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        subject.system_unit == "genus-cron@doctor.service" &&
-        subject.no_new_privileges == true &&
         action.lookup("unit") == "genus-telegram-bot.service" &&
         action.lookup("verb") == "start") {
         return polkit.Result.YES;
