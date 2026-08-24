@@ -214,7 +214,8 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
                 pytest.fail(
                     f"baseline workload self-probe rejected {unit}: rc={result.returncode}, "
                     f"stdout={result.stdout!r}, stderr={result.stderr!r}, "
-                    f"show={show.stdout!r}, journal={journal.stdout!r}"
+                    f"journal={journal.stdout!r}, show={show.stdout!r}",
+                    pytrace=False,
                 )
 
         # This adversarial rule grants only the concrete cron cgroup a single
