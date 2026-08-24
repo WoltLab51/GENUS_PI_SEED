@@ -40,7 +40,7 @@ jobs:
           set +e
           sudo env \
             GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING="$GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING" \
-            "$python_bin" -m pytest -vv -s --noconftest \
+            "$python_bin" -m pytest -vv -s --tb=short --noconftest \
             --rootdir "$GITHUB_WORKSPACE" \
             "$GITHUB_WORKSPACE/tests/test_a0_3c_workload_self_probe_staging.py" 2>&1 | tee "$log"
           status="${PIPESTATUS[0]}"
