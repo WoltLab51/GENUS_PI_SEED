@@ -6429,8 +6429,8 @@ def workload_account_binding(unit):
     return expected_uid,primary_gid,data_gid
 
 
-def workload_process_snapshot(unit):
-    proc=pathlib.Path("/proc/self")
+def workload_process_snapshot(unit,pid=None):
+    proc=pathlib.Path("/proc/self" if pid is None else f"/proc/{pid}")
     raw=(proc/"stat").read_text(encoding="ascii")
     fields=raw[raw.rfind(")")+2:].split()
     if len(fields)<20: raise RuntimeError("workload authority self-probe stat is truncated")
@@ -6466,48 +6466,74 @@ def workload_authority_root_probe(unit):
 
     if os.geteuid()!=0 or os.getuid()!=0 or len(sys.argv)!=3:
         raise RuntimeError("workload authority root probe requires one root systemd unit")
-    expected_uid,_,_=workload_account_binding(unit)
+    expected_uid,primary_gid,data_gid=workload_account_binding(unit)
     libc=ctypes.CDLL(None,use_errno=True)
-    if libc.prctl(38,1,0,0,0)!=0:
-        raise RuntimeError(f"workload authority root probe could not set NoNewPrivileges (errno={ctypes.get_errno()})")
-    def identity():
-        pid,starttime,rows=workload_process_snapshot(unit)
-        if rows.get("Uid")!=["0"]*4 or rows.get("Gid")!=["0"]*4:
-            raise RuntimeError("workload authority root probe uid/gid identity differs")
-        return pid,starttime,expected_uid
-    before=identity(); subject=",".join(str(value) for value in before)
-    actions=(
-        "org.freedesktop.systemd1.manage-units",
-        "org.freedesktop.systemd1.manage-unit-files",
-        "org.freedesktop.systemd1.reload-daemon",
-        "org.freedesktop.systemd1.set-environment",
-    )
-    verbs=("start","stop","restart","reload","try-restart","reload-or-restart",
-           "try-reload-or-restart","kill","clean","freeze","thaw","reset-failed","set-property")
-    targets=("genus-network-watchdog.timer","genus-network-watchdog.service",
-             "genus-learner.service","genus-telegram-bot.service","genus-backup.service",
-             "genus-cron@.service","genus-telegram-bot-fallback.service")
-    if unit.startswith("genus-cron@"):
-        targets=targets+(unit,)
-    env={"PATH":"/usr/bin:/bin","LC_ALL":"C"}
-    def require_denial(action,*details):
-        command=["/usr/bin/pkcheck","--process",subject,"--action-id",action]
-        for key,value in details:
-            command.extend(("--detail",key,value))
-        result=subprocess.run(command,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
-                              stderr=subprocess.PIPE,text=True,env=env,timeout=10,check=False)
-        if result.returncode not in {1,2}:
-            diagnostic=(result.stderr or "").strip().replace("\n"," ")[-512:]
-            raise RuntimeError(
-                f"workload authority self-probe was not conclusively denied "
-                f"(action={action}, details={details}, rc={result.returncode}, stderr={diagnostic!r})")
-    for action in actions:
-        require_denial(action)
-    for target in targets:
-        for verb in verbs:
-            require_denial("org.freedesktop.systemd1.manage-units",("unit",target),("verb",verb))
-    if identity()!=before:
-        raise RuntimeError("workload authority root probe identity drifted during the Polkit matrix")
+    ready_read,ready_write=os.pipe(); hold_read,hold_write=os.pipe()
+    child=os.fork()
+    if child==0:
+        os.close(ready_read); os.close(hold_write)
+        try:
+            os.setgroups([primary_gid,data_gid]); os.setgid(primary_gid); os.setuid(expected_uid)
+            if libc.prctl(38,1,0,0,0)!=0:
+                raise OSError(ctypes.get_errno(),"PR_SET_NO_NEW_PRIVS failed")
+            os.write(ready_write,b"1"); os.close(ready_write)
+            os.read(hold_read,1); os.close(hold_read); os._exit(0)
+        except BaseException:
+            try: os.write(ready_write,b"0")
+            except OSError: pass
+            os._exit(1)
+    os.close(ready_write); os.close(hold_read)
+    try:
+        ready=os.read(ready_read,1); os.close(ready_read)
+        if ready!=b"1":
+            raise RuntimeError("workload authority root probe child could not assume its bound identity")
+        def identity():
+            pid,starttime,rows=workload_process_snapshot(unit,child)
+            if rows.get("Uid")!=[str(expected_uid)]*4 or rows.get("Gid")!=[str(primary_gid)]*4:
+                raise RuntimeError("workload authority root probe child uid/gid identity differs")
+            observed_groups={int(value) for value in rows.get("Groups",[])}
+            if data_gid not in observed_groups or not observed_groups<={primary_gid,data_gid}:
+                raise RuntimeError("workload authority root probe child supplementary groups differ")
+            return pid,starttime,expected_uid
+        before=identity(); subject=",".join(str(value) for value in before)
+        actions=(
+            "org.freedesktop.systemd1.manage-units",
+            "org.freedesktop.systemd1.manage-unit-files",
+            "org.freedesktop.systemd1.reload-daemon",
+            "org.freedesktop.systemd1.set-environment",
+        )
+        verbs=("start","stop","restart","reload","try-restart","reload-or-restart",
+               "try-reload-or-restart","kill","clean","freeze","thaw","reset-failed","set-property")
+        targets=("genus-network-watchdog.timer","genus-network-watchdog.service",
+                 "genus-learner.service","genus-telegram-bot.service","genus-backup.service",
+                 "genus-cron@.service","genus-telegram-bot-fallback.service")
+        if unit.startswith("genus-cron@"):
+            targets=targets+(unit,)
+        env={"PATH":"/usr/bin:/bin","LC_ALL":"C"}
+        def require_denial(action,*details):
+            command=["/usr/bin/pkcheck","--process",subject,"--action-id",action]
+            for key,value in details:
+                command.extend(("--detail",key,value))
+            result=subprocess.run(command,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.PIPE,text=True,env=env,timeout=10,check=False)
+            if result.returncode not in {1,2}:
+                diagnostic=(result.stderr or "").strip().replace("\n"," ")[-512:]
+                raise RuntimeError(
+                    f"workload authority self-probe was not conclusively denied "
+                    f"(action={action}, details={details}, rc={result.returncode}, stderr={diagnostic!r})")
+        for action in actions:
+            require_denial(action)
+        for target in targets:
+            for verb in verbs:
+                require_denial("org.freedesktop.systemd1.manage-units",("unit",target),("verb",verb))
+        if identity()!=before:
+            raise RuntimeError("workload authority root probe identity drifted during the Polkit matrix")
+    finally:
+        try: os.close(hold_write)
+        except OSError: pass
+        _,status=os.waitpid(child,0)
+        if status!=0 and sys.exc_info()[0] is None:
+            raise RuntimeError("workload authority root probe child did not exit cleanly")
 
 
 def main():
