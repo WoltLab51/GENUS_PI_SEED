@@ -12,7 +12,6 @@ import os
 import platform
 import re
 import subprocess
-import time
 from pathlib import Path
 
 import pytest
@@ -235,17 +234,12 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
             encoding="ascii",
         )
         RULE.chmod(0o644)
-        # polkitd watches its rule directories.  Poll the start edge instead of
-        # assuming one fixed reload latency; success would mean the rule is not
-        # loaded yet, while failure proves the in-unit self-probe saw rc=0.
-        deadline = time.monotonic() + 10
-        result: subprocess.CompletedProcess[str] | None = None
-        while time.monotonic() < deadline:
-            _run("/usr/bin/systemctl", "reset-failed", CONCRETE_CRON, check=False)
-            result = _run("/usr/bin/systemctl", "start", CONCRETE_CRON, check=False)
-            if result.returncode != 0:
-                break
-            time.sleep(0.25)
+        # Reload deterministically instead of treating a filesystem-watcher
+        # delay as security evidence.  The disposable VM has no live consumers.
+        _run("/usr/bin/systemctl", "restart", "polkit.service")
+        _run("/usr/bin/systemctl", "is-active", "--quiet", "polkit.service")
+        _run("/usr/bin/systemctl", "reset-failed", CONCRETE_CRON, check=False)
+        result = _run("/usr/bin/systemctl", "start", CONCRETE_CRON, check=False)
         assert result is not None and result.returncode != 0, (
             "targeted concrete-unit Polkit grant did not block ExecStartPre"
         )
