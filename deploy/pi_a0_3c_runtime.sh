@@ -6463,6 +6463,9 @@ def workload_context_self_probe(unit):
 
 def workload_authority_root_probe(unit):
     import ctypes
+    import select
+    import signal
+    import time
 
     if os.geteuid()!=0 or os.getuid()!=0 or len(sys.argv)!=3:
         raise RuntimeError("workload authority root probe requires one root systemd unit")
@@ -6484,7 +6487,10 @@ def workload_authority_root_probe(unit):
             os._exit(1)
     os.close(ready_write); os.close(hold_read)
     try:
-        ready=os.read(ready_read,1); os.close(ready_read)
+        readable,_,_=select.select([ready_read],[],[],5)
+        if not readable:
+            raise RuntimeError("workload authority root probe child identity handshake timed out")
+        ready=os.read(ready_read,1); os.close(ready_read); ready_read=-1
         if ready!=b"1":
             raise RuntimeError("workload authority root probe child could not assume its bound identity")
         def identity():
@@ -6529,9 +6535,24 @@ def workload_authority_root_probe(unit):
         if identity()!=before:
             raise RuntimeError("workload authority root probe identity drifted during the Polkit matrix")
     finally:
+        if ready_read>=0:
+            try: os.close(ready_read)
+            except OSError: pass
         try: os.close(hold_write)
         except OSError: pass
-        _,status=os.waitpid(child,0)
+        deadline=time.monotonic()+5; status=None
+        while status is None:
+            waited,candidate_status=os.waitpid(child,os.WNOHANG)
+            if waited==child:
+                status=candidate_status
+                break
+            if time.monotonic()>=deadline:
+                os.kill(child,signal.SIGKILL)
+                _,status=os.waitpid(child,0)
+                if sys.exc_info()[0] is None:
+                    raise RuntimeError("workload authority root probe child shutdown timed out")
+                break
+            time.sleep(0.05)
         if status!=0 and sys.exc_info()[0] is None:
             raise RuntimeError("workload authority root probe child did not exit cleanly")
 

@@ -218,20 +218,14 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
                     pytrace=False,
                 )
 
-        # This adversarial rule grants only the concrete cron cgroup a single
-        # systemd verb.  Generic synthetic subjects cannot observe this grant.
+        # This adversarial rule grants only the real workload account in the
+        # concrete cron cgroup a single systemd verb.  The root probe must ask
+        # about its bound child process, not about root or a synthetic subject.
         RULE.write_text(
             """polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.systemd1.manage-units") {
-        polkit.log("GENUS_A03C_STAGING system_unit=" + subject.system_unit +
-                   " no_new_privileges=" + subject.no_new_privileges +
-                   " user=" + subject.user +
-                   " unit=" + action.lookup("unit") +
-                   " verb=" + action.lookup("verb"));
-    }
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         subject.user == "genus-runtime" &&
-        subject.no_new_privileges == true &&
+        subject.system_unit == "genus-cron@doctor.service" &&
         action.lookup("unit") == "genus-telegram-bot.service" &&
         action.lookup("verb") == "start") {
         return polkit.Result.YES;
