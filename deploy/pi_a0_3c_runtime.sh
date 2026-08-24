@@ -6466,9 +6466,12 @@ def workload_authority_self_probe(unit):
         for key,value in details:
             command.extend(("--detail",key,value))
         result=subprocess.run(command,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL,env=env,timeout=10,check=False)
+                              stderr=subprocess.PIPE,text=True,env=env,timeout=10,check=False)
         if result.returncode not in {1,2}:
-            raise RuntimeError(f"workload authority self-probe was not conclusively denied (rc={result.returncode})")
+            diagnostic=(result.stderr or "").strip().replace("\n"," ")[-512:]
+            raise RuntimeError(
+                f"workload authority self-probe was not conclusively denied "
+                f"(action={action}, details={details}, rc={result.returncode}, stderr={diagnostic!r})")
     for action in actions:
         require_denial(action)
     for target in targets:
