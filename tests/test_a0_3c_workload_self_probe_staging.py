@@ -222,6 +222,13 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
         # systemd verb.  Generic synthetic subjects cannot observe this grant.
         RULE.write_text(
             """polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units") {
+        polkit.log("GENUS_A03C_STAGING system_unit=" + subject.system_unit +
+                   " no_new_privileges=" + subject.no_new_privileges +
+                   " user=" + subject.user +
+                   " unit=" + action.lookup("unit") +
+                   " verb=" + action.lookup("verb"));
+    }
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         subject.system_unit == "genus-cron@doctor.service" &&
         subject.no_new_privileges == true &&
@@ -240,8 +247,18 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
         _run("/usr/bin/systemctl", "is-active", "--quiet", "polkit.service")
         _run("/usr/bin/systemctl", "reset-failed", CONCRETE_CRON, check=False)
         result = _run("/usr/bin/systemctl", "start", CONCRETE_CRON, check=False)
+        polkit_journal = _run(
+            "/usr/bin/journalctl",
+            "--unit",
+            "polkit.service",
+            "--no-pager",
+            "--lines=50",
+            "--output=cat",
+            check=False,
+        )
         assert result is not None and result.returncode != 0, (
-            "targeted concrete-unit Polkit grant did not block ExecStartPre"
+            "targeted concrete-unit Polkit grant did not block ExecStartPre: "
+            f"polkit_journal={polkit_journal.stdout!r}"
         )
         show = _run(
             "/usr/bin/systemctl",
