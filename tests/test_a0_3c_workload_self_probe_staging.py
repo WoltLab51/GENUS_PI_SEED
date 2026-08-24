@@ -32,6 +32,12 @@ UNITS = {
 CONCRETE_CRON = "genus-cron@doctor.service"
 GROUPS = ("genus-data", "genus-runtime", "genus-telegram", "genus-backup")
 USERS = ("genus-runtime", "genus-telegram", "genus-backup")
+POLKIT_ACTIONS = (
+    "org.freedesktop.systemd1.manage-units",
+    "org.freedesktop.systemd1.manage-unit-files",
+    "org.freedesktop.systemd1.reload-daemon",
+    "org.freedesktop.systemd1.set-environment",
+)
 
 
 def _run(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -124,6 +130,8 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
         pytest.fail("acknowledged staging requires root in a systemd-booted disposable VM")
     required = (
         Path("/usr/bin/getent"),
+        Path("/usr/bin/journalctl"),
+        Path("/usr/bin/pkaction"),
         Path("/usr/bin/pkcheck"),
         Path("/usr/bin/systemctl"),
         Path("/usr/sbin/groupadd"),
@@ -139,6 +147,14 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
         _account_exists("passwd", name) for name in USERS
     ):
         pytest.fail("a GENUS staging account name already exists")
+    catalog_result = _run("/usr/bin/pkaction", check=False)
+    catalog = set(catalog_result.stdout.splitlines())
+    missing_actions = sorted(set(POLKIT_ACTIONS) - catalog)
+    if catalog_result.returncode != 0 or missing_actions:
+        pytest.fail(
+            f"systemd Polkit action catalog is incomplete: rc={catalog_result.returncode}, "
+            f"missing={missing_actions}, stderr={catalog_result.stderr!r}"
+        )
 
     unit_paths = {name: Path("/run/systemd/system") / name for name in UNITS}
     if any(path.exists() or path.is_symlink() for path in unit_paths.values()):
@@ -175,7 +191,31 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
 
         # Every exact workload context must pass while Polkit conclusively denies it.
         for unit in ("genus-learner.service", "genus-telegram-bot.service", "genus-backup.service", CONCRETE_CRON):
-            _run("/usr/bin/systemctl", "start", unit)
+            result = _run("/usr/bin/systemctl", "start", unit, check=False)
+            if result.returncode != 0:
+                show = _run(
+                    "/usr/bin/systemctl",
+                    "show",
+                    unit,
+                    "--property=Result",
+                    "--property=ExecMainStatus",
+                    "--property=ExecStartPre",
+                    check=False,
+                )
+                journal = _run(
+                    "/usr/bin/journalctl",
+                    "--unit",
+                    unit,
+                    "--no-pager",
+                    "--lines=30",
+                    "--output=cat",
+                    check=False,
+                )
+                pytest.fail(
+                    f"baseline workload self-probe rejected {unit}: rc={result.returncode}, "
+                    f"stdout={result.stdout!r}, stderr={result.stderr!r}, "
+                    f"show={show.stdout!r}, journal={journal.stdout!r}"
+                )
 
         # This adversarial rule grants only the concrete cron cgroup a single
         # systemd verb.  Generic synthetic subjects cannot observe this grant.

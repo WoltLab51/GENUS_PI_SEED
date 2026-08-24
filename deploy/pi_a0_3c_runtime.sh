@@ -6480,7 +6480,11 @@ def workload_authority_self_probe(unit):
 
 def main():
     if sys.argv[1:2]==["--probe-workload-authority"]:
-        workload_authority_self_probe(sys.argv[2] if len(sys.argv)==3 else "")
+        try:
+            workload_authority_self_probe(sys.argv[2] if len(sys.argv)==3 else "")
+        except Exception as error:
+            print(f"GENUS workload authority self-probe failed: {error}",file=sys.stderr)
+            raise
         return
     root_activation_journal_sha256=root_projection_guard()
     if sys.argv[1:2]==["--prepare-code-release-start"]:
