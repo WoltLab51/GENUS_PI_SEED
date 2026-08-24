@@ -6441,7 +6441,7 @@ def workload_process_snapshot(unit,pid=None):
     paths=[row.split(":",2)[-1] for row in (proc/"cgroup").read_text(encoding="ascii").splitlines()]
     if not any(unit in pathlib.PurePosixPath(path).parts for path in paths):
         raise RuntimeError("workload authority self-probe is outside its exact systemd unit cgroup")
-    return os.getpid(),int(fields[19]),rows
+    return (os.getpid() if pid is None else pid),int(fields[19]),rows
 
 
 def workload_context_self_probe(unit):
