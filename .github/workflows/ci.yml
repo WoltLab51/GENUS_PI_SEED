@@ -36,9 +36,20 @@ jobs:
           GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING: I_UNDERSTAND_THIS_IS_A_DISPOSABLE_VM
         run: |
           python_bin="$(command -v python)"
+          log="$RUNNER_TEMP/a03c-polkit-staging.log"
+          set +e
           sudo env \
             GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING="$GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING" \
-            "$python_bin" -m pytest -vv -s tests/test_a0_3c_workload_self_probe_staging.py
+            "$python_bin" -m pytest -vv -s \
+            --rootdir "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE/tests/test_a0_3c_workload_self_probe_staging.py" 2>&1 | tee "$log"
+          status="${PIPESTATUS[0]}"
+          set -e
+          if [ "$status" -ne 0 ]; then
+            message="$(python -c 'import pathlib,sys; text=pathlib.Path(sys.argv[1]).read_text(errors="replace")[-6000:]; print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))' "$log")"
+            printf '::error title=A0.3c disposable Polkit staging failed::%s\n' "$message"
+            exit "$status"
+          fi
 
       - name: Prove staging cleanup
         if: always()
