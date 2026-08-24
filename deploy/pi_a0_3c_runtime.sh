@@ -16,7 +16,10 @@ SQLITE_ARCHIVE="sqlite-autoconf-${SQLITE_NUMBER}.tar.gz"
 SQLITE_URL="https://www.sqlite.org/2026/${SQLITE_ARCHIVE}"
 SQLITE_SHA3_256="454e45f61c6bd75b7420e7190732dea03ce6639c63ada47bbc592f67fc340338"
 SQLITE_SOURCE_ID="2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc"
-PIP_VERSION="26.1.2"
+PIP_VERSION="26.2.1"
+PIP_BOOTSTRAP_WHEEL="pip-${PIP_VERSION}-py3-none-any.whl"
+PIP_BOOTSTRAP_URL="https://files.pythonhosted.org/packages/f3/6e/1736e5b4ae2b778ef2f81c47d797de9f891d4d8acb047a24ca37a60294dd/${PIP_BOOTSTRAP_WHEEL}"
+PIP_BOOTSTRAP_SHA256="71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e"
 SETUPTOOLS_VERSION="84.0.0"
 PYPI_INDEX_URL="https://pypi.org/simple"
 
@@ -24,10 +27,33 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="${GENUS_REPO_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd -P)}"
 GENUS_USER="${GENUS_USER:-${SUDO_USER:-$(id -un)}}"
 GENUS_HOME="${GENUS_HOME:-$(getent passwd "$GENUS_USER" | cut -d: -f6)}"
-DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/genus.sqlite3}"
+RUNTIME_USER="${GENUS_RUNTIME_USER:-genus-runtime}"
+RUNTIME_GROUP="${GENUS_RUNTIME_GROUP:-genus-runtime}"
+TELEGRAM_USER="${GENUS_TELEGRAM_USER:-genus-telegram}"
+TELEGRAM_GROUP="${GENUS_TELEGRAM_GROUP:-genus-telegram}"
+BACKUP_USER="${GENUS_BACKUP_USER:-genus-backup}"
+BACKUP_GROUP="${GENUS_BACKUP_GROUP:-genus-backup}"
+DATA_GROUP="${GENUS_DATA_GROUP:-genus-data}"
+DB_PATH="${GENUS_DB_PATH:-$GENUS_HOME/.genus/data/genus.sqlite3}"
+PAUSE_FILE="${GENUS_PAUSE_FILE:-$GENUS_HOME/.genus/control/paused}"
 BACKUP_DIR="${GENUS_SD_BACKUP:-$GENUS_HOME/genus-sd-backup}"
 BACKUP_SCRIPT="${GENUS_A03C_BACKUP_SCRIPT:-$SCRIPT_DIR/backup_ledger_to_sd.sh}"
-BACKUP_LOCK_FILE="$(dirname "$DB_PATH")/backup-ledger.lock"
+SCHEDULED_BACKUP_DIR="${GENUS_A03C_SCHEDULED_BACKUP_DIR:-$GENUS_HOME/genus-sd-backup/nightly}"
+BACKUP_LOCK_FILE="${GENUS_A03C_BACKUP_LOCK_FILE:-/run/lock/genus/backup-ledger.lock}"
+ROOT_CRON_FILE="${GENUS_A03C_ROOT_CRON_FILE:-/etc/cron.d/genus-pi-seed}"
+ROOT_CRON_DISABLED_FILE="${GENUS_A03C_ROOT_CRON_DISABLED_FILE:-/etc/cron.d/genus-pi-seed.disabled}"
+ROOT_SYSTEM_CRONTAB="${GENUS_A03C_SYSTEM_CRONTAB:-/etc/crontab}"
+PUBLIC_SETS_ROOT="${GENUS_A03C_PUBLIC_SETS_ROOT:-/opt/genus/runtime-sets}"
+RUNTIME_VIEW_ROOT="${GENUS_A03C_RUNTIME_VIEW_ROOT:-/opt/genus/active}"
+TELEGRAM_LAUNCHER_PATH="${GENUS_A03C_TELEGRAM_LAUNCHER_PATH:-/usr/local/libexec/genus/pi_telegram_launcher.py}"
+PROJECTION_HELPER_PATH="${GENUS_A03C_PROJECTION_HELPER_PATH:-/usr/local/libexec/genus/pi_a0_3c_projection.py}"
+PROJECTION_HELPER_REPO_REL="deploy/pi_a0_3c_projection.py"
+PROJECTION_PREPARER_REPO_REL="deploy/pi_a0_3c_prepare_projection.py"
+CONSUMER_PUBLISHER_PATH="${GENUS_A03C_CONSUMER_PUBLISHER_PATH:-/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py}"
+CONSUMER_RENDERER_PATH="${GENUS_A03C_CONSUMER_RENDERER_PATH:-/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py}"
+CONSUMER_PUBLISHER_REPO_REL="deploy/pi_a0_3c_consumer_publish.py"
+CONSUMER_RENDERER_REPO_REL="deploy/pi_a0_3c_consumer_bundle.py"
+ROOT_ARTIFACT_EXECUTOR_REPO_REL="deploy/pi_a0_3c_root_artifact_transaction.py"
 RUNTIME_PREFIX="${GENUS_A03C_RUNTIME_PREFIX:-/opt/genus/runtime/cpython-${PYTHON_VERSION}-sqlite-${SQLITE_VERSION}}"
 STATE_ROOT="${GENUS_A03C_STATE_ROOT:-$GENUS_HOME/.genus/runtime-a0.3c}"
 SETS_ROOT="$STATE_ROOT/sets"
@@ -38,10 +64,27 @@ DOWNLOAD_ROOT="$STATE_ROOT/downloads"
 RECEIPT_ROOT="$STATE_ROOT/receipts"
 LOCK_FILE="$STATE_ROOT/operator.lock"
 ACTIVATION_JOURNAL="$STATE_ROOT/activation.pending"
+ACTIVATION_TERMINAL="$STATE_ROOT/activation.completed"
+ACTIVATION_RESERVATION="$STATE_ROOT/activation.reserved"
+CODE_RELEASE_JOURNAL="$STATE_ROOT/code-release.pending"
 ACTIVATION_CRON_SNAPSHOT="$STATE_ROOT/activation.crontab.original"
 ACTIVATION_CRON_DISABLED="$STATE_ROOT/activation.crontab.disabled"
 AUTOSTART_APPROVAL="$STATE_ROOT/runtime.start-authorized"
 OPERATOR_REAUTH_TOKEN="$STATE_ROOT/operator.reauthorized"
+CODE_RELEASE_TOKEN="$STATE_ROOT/code-release.authorized"
+CODE_RELEASE_START_ROOT="${GENUS_A03C_CODE_RELEASE_START_ROOT:-/run/genus-a0-3c}"
+CODE_RELEASE_START_CAPABILITY="$CODE_RELEASE_START_ROOT/code-release.start-capability"
+CODE_RELEASE_START_MARKER="$CODE_RELEASE_START_ROOT/code-release.start-consumed"
+CODE_RELEASE_TRUST_ROOT="${GENUS_A03C_CODE_RELEASE_TRUST_ROOT:-/var/lib/genus-a0-3c}"
+CODE_RELEASE_TRUST_ANCHOR="$CODE_RELEASE_TRUST_ROOT/code-release.trust-anchor"
+ROOT_ARTIFACT_LOCK="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.lock"
+ROOT_ARTIFACT_JOURNAL="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.pending"
+ROOT_ARTIFACT_SOURCE_ROOT="$CODE_RELEASE_TRUST_ROOT/runtime-artifact-inputs"
+ROOT_ARTIFACT_AUTHORITY_ROOT="$CODE_RELEASE_TRUST_ROOT/runtime-artifact-authorities"
+RUNTIME_PROJECTION_RECEIPT="$CODE_RELEASE_TRUST_ROOT/runtime-projection.receipt"
+RUNTIME_PROJECTION_JOURNAL="$CODE_RELEASE_TRUST_ROOT/runtime-projection.pending"
+RUNTIME_PROJECTION_ROLLBACK_JOURNAL="$CODE_RELEASE_TRUST_ROOT/runtime-projection.rollback.pending"
+RUNTIME_ROLLBACK_JOURNAL="$CODE_RELEASE_TRUST_ROOT/runtime-rollback.pending"
 CORE_POINTER="$REPO_DIR/.venv"
 EMBED_POINTER="$GENUS_HOME/.genus/embed-venv"
 RUNTIME_PARENT="$(dirname "$RUNTIME_PREFIX")"
@@ -69,6 +112,9 @@ ROOT_RM_BIN="/usr/bin/rm"
 ROOT_RMDIR_BIN="/usr/bin/rmdir"
 ROOT_SYSTEMD_RUN_BIN="/usr/bin/systemd-run"
 ROOT_MKTEMP_BIN="/usr/bin/mktemp"
+ROOT_PASSWD_BIN="/usr/bin/passwd"
+ROOT_SHA256_BIN="/usr/bin/sha256sum"
+ROOT_READLINK_BIN="/usr/bin/readlink"
 CURL_BIN="${GENUS_A03C_CURL:-curl}"
 MAKE_BIN="${GENUS_A03C_MAKE:-make}"
 TAR_BIN="${GENUS_A03C_TAR:-tar}"
@@ -78,11 +124,94 @@ APT_GET_BIN="${GENUS_A03C_APT_GET:-/usr/bin/apt-get}"
 APT_CACHE_BIN="${GENUS_A03C_APT_CACHE:-apt-cache}"
 DPKG_QUERY_BIN="${GENUS_A03C_DPKG_QUERY:-dpkg-query}"
 CRONTAB_BIN="${GENUS_A03C_CRONTAB:-/usr/bin/crontab}"
+CRONTAB_SPOOL_ROOT="${GENUS_A03C_CRONTAB_SPOOL_ROOT:-/var/spool/cron/crontabs}"
+ROOT_PKCHECK_BIN="${GENUS_A03C_PKCHECK:-/usr/bin/pkcheck}"
+ROOT_PKACTION_BIN="${GENUS_A03C_PKACTION:-/usr/bin/pkaction}"
 SYSTEMD_GUARD_ROOT="${GENUS_A03C_SYSTEMD_GUARD_ROOT:-/etc/systemd/system}"
 BOOT_GUARD_PATH="${GENUS_A03C_BOOT_GUARD_PATH:-/usr/local/libexec/genus-a0-3c-boot-guard}"
 MODEL="${GENUS_EMBED_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}"
-SERVICES=(genus-network-watchdog.timer genus-learner.service genus-telegram-bot.service genus-telegram-bot-fallback.service)
-AUTOSTART_UNITS=(genus-network-watchdog.timer genus-network-watchdog.service genus-learner.service genus-telegram-bot.service genus-telegram-bot-fallback.service)
+FASTEMBED_REPOSITORY="Qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q"
+FASTEMBED_REVISION="faf4aa4225822f3bc6376869cb1164e8e3feedd0"
+DEUTER_MODEL_RELATIVE="deuter-model/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+DEUTER_MODEL_INPUT="${GENUS_A03C_DEUTER_MODEL_INPUT:-}"
+FASTEMBED_CACHE_INPUT="${GENUS_A03C_FASTEMBED_CACHE_INPUT:-}"
+SERVICES=(genus-network-watchdog.timer genus-learner.service genus-telegram-bot.service)
+AUTOSTART_UNITS=(genus-network-watchdog.timer genus-network-watchdog.service genus-learner.service genus-telegram-bot.service)
+# Scheduled one-shot jobs are never part of the restart inventory.  They are
+# nevertheless stopped during every quiescence/recovery pass so a manually
+# started or just-triggered backup cannot outlive the root schedule disable.
+QUIESCE_ONLY_UNITS=(genus-backup.service)
+GUARDED_UNITS=("${AUTOSTART_UNITS[@]}" "${QUIESCE_ONLY_UNITS[@]}" genus-cron@.service)
+POLKIT_SYSTEMD_ACTIONS=(
+    org.freedesktop.systemd1.manage-units
+    org.freedesktop.systemd1.manage-unit-files
+    org.freedesktop.systemd1.reload-daemon
+    org.freedesktop.systemd1.set-environment
+)
+POLKIT_SYSTEMD_UNIT_VERBS=(
+    start stop restart reload try-restart reload-or-restart try-reload-or-restart
+    kill clean freeze thaw reset-failed set-property
+)
+POLKIT_CANARY_UNIT=genus-telegram-bot-fallback.service
+ROOT_ARTIFACT_TARGETS=(
+    /usr/local/libexec/genus/pi_a0_3c_projection.py
+    /usr/local/libexec/genus-a0-3c-boot-guard
+    /usr/local/libexec/genus/pi_a0_3c_consumer_publish.py
+    /usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py
+    /etc/systemd/system/genus-backup.service.d/90-genus-a0-3c-pending.conf
+    /etc/systemd/system/genus-cron@.service.d/90-genus-a0-3c-pending.conf
+    /etc/systemd/system/genus-learner.service.d/90-genus-a0-3c-pending.conf
+    /etc/systemd/system/genus-network-watchdog.service.d/90-genus-a0-3c-pending.conf
+    /etc/systemd/system/genus-network-watchdog.timer.d/90-genus-a0-3c-pending.conf
+    /etc/systemd/system/genus-telegram-bot.service.d/90-genus-a0-3c-pending.conf
+)
+ROOT_ARTIFACT_SOURCE_NAMES=(
+    projection-helper.payload
+    boot-guard.payload
+    consumer-publisher.payload
+    consumer-renderer.payload
+    systemd-dropin-genus-backup.service.payload
+    systemd-dropin-genus-cron@.service.payload
+    systemd-dropin-genus-learner.service.payload
+    systemd-dropin-genus-network-watchdog.service.payload
+    systemd-dropin-genus-network-watchdog.timer.payload
+    systemd-dropin-genus-telegram-bot.service.payload
+)
+PROJECTION_SOURCE_DEPLOY_FILES=(
+    backup_ledger_to_sd.sh besinnung.sh bridge_senses.py chat_word_learning.py deuter.py
+    model_gateway.py observe_dbnary.sh observe_konzept.sh observe_lexem.sh observe_news.sh
+    observe_weather.sh observe_weather_second.sh pi_a0_3c_consumer_bundle.py pi_a0_3c_consumer_publish.py
+    pi_clock_check.sh pi_cron_dispatch.sh
+    pi_install_cron.sh pi_install_learner.sh pi_install_network_watchdog.sh
+    pi_install_telegram_bot.sh pi_learn.sh pi_network_watchdog.sh pi_telegram_launcher.py
+    remote_deuter.py stimme.py telegram_bot.py verwandtschaft.py waage.py wortschatz_de.txt
+    wortschatz_de_adjektive.txt wortschatz_de_verben.txt
+    a0_3c_consumers/genus-backup.service.template
+    a0_3c_consumers/genus-cron@.service.template
+    a0_3c_consumers/genus-learner.service.template
+    a0_3c_consumers/genus-network-watchdog.service.template
+    a0_3c_consumers/genus-network-watchdog.timer.template
+    a0_3c_consumers/genus-root.cron.template
+    a0_3c_consumers/genus-runtime.tmpfiles.template
+    a0_3c_consumers/genus-telegram-bot.service.template
+)
+# Exact public Python-source closure.  Adding a tracked file below genus/ does
+# not make it public automatically: this list and the commit-bound preparer
+# must both be reviewed and changed deliberately.
+PROJECTION_SOURCE_GENUS_FILES=(
+    __init__.py abnahme.py abstraktion.py alltagsprobe.py anchor.py antwort.py auskunft.py bauplan.py
+    besinnung.py betriebsprofil.py cli.py cli_alltagsprobe.py cli_betriebsprofil.py cli_entwickler.py
+    cli_format.py cli_inquiries.py cli_kartografie.py cli_relations.py cli_schema_detection.py
+    cli_startup.py companion.py confidence.py constants.py control.py db.py deduktion.py dialogplanung.py
+    doctor.py druck.py entwickler.py erinnerung.py event_router.py experience.py formwahl.py gebaerde.py
+    gedanke.py gender_rule.py governance.py hand.py hypothese.py inference.py inquiries.py integrity.py
+    kartografie.py kartografie_render.py konsolidierung.py learning.py ledger.py mathematik.py maturation.py
+    motor.py operation.py orte.py persoenlichkeit.py planer.py projection.py proposal_types.py proposals.py
+    query.py reactors.py rechnen.py recht.py relation_semantics.py response_outcomes.py rules.py
+    schema_detection.py sealing.py selbstbild.py self_calibration.py sensor.py sources.py sprachsignal.py
+    startup.py state.py thermometer.py umsetzung.py verstehen.py verwandt.py weltsinn.py werkplan.py
+    werkstatt.py werkzeug.py werkzeuge_auskunft.py werkzeuge_seed.py wortgraph.py zaehlwerk.py ziele.py
+)
 CRON_BEGIN="# BEGIN GENUS_PI_SEED"
 CRON_END="# END GENUS_PI_SEED"
 BOOTSTRAP_PACKAGES=(build-essential cmake ninja-build pkg-config ca-certificates curl xz-utils psmisc libssl-dev zlib1g-dev libbz2-dev libreadline-dev libffi-dev liblzma-dev libncurses-dev libgdbm-dev libgdbm-compat-dev libexpat1-dev uuid-dev tk-dev)
@@ -93,6 +222,7 @@ PRIVILEGED_BOUNDARY_READY=0
 OPERATOR_LOCK_HELD=0
 BACKUP_LOCK_HELD=0
 OPERATOR_REAUTH_RECEIPT=""
+OPERATOR_REAUTH_OLD_COMMIT=""
 VERIFIED_READINESS_RECEIPT=""
 VERIFIED_READINESS_MANIFEST=""
 VERIFIED_READINESS_SHA256=""
@@ -100,6 +230,42 @@ VERIFIED_SERIES_RECEIPT=""
 VERIFIED_SERIES_SHA256=""
 VERIFIED_SERIES_READINESS_SHA256=""
 VERIFIED_COMPLETION_RECEIPT_SHA256=""
+VERIFIED_CODE_RELEASE_PLAN=""
+VERIFIED_CODE_RELEASE_PLAN_SHA256=""
+VERIFIED_CODE_RELEASE_SEAL=""
+VERIFIED_CODE_RELEASE_NONCE=""
+VERIFIED_CODE_RELEASE_PREFLIGHT_SHA256=""
+VERIFIED_CODE_RELEASE_COMPLETION_SHA256=""
+VERIFIED_CODE_RELEASE_CONSUMPTION_PATH=""
+VERIFIED_CODE_RELEASE_CONSUMPTION_SHA256=""
+VERIFIED_CODE_RELEASE_START_AUTH_PATH=""
+PROJECTION_TRANSACTION_NONCE=""
+PROJECTION_PLAN_PATH=""
+PROJECTION_PLAN_SHA256=""
+PROJECTION_HELPER_SHA256=""
+PROJECTION_PRIOR_MANIFEST=""
+PROJECTION_APPROVAL_PATH=""
+PROJECTION_APPROVAL_SHA256=""
+ROOT_ARTIFACT_TRANSACTION_ID=""
+ROOT_ARTIFACT_INVENTORY_SHA256=""
+ROOT_ARTIFACT_SOURCE_DIRECTORY=""
+ROOT_ARTIFACT_RESERVATION_SHA256=""
+ROOT_ARTIFACT_AUTHORITY_PATH=""
+ROOT_ARTIFACT_AUTHORITY_SHA256=""
+ROOT_ARTIFACT_EXECUTOR_SHA256=""
+ROOT_ARTIFACT_OLD_COMMIT=""
+ROOT_ARTIFACT_NEW_COMMIT=""
+ROOT_ARTIFACT_TERMINAL_PATH=""
+ROOT_ARTIFACT_TERMINAL_SHA256=""
+ROOT_ARTIFACT_COMMIT_POLICY="retain-on-activation-rollback"
+STAGED_CONSUMER_PLAN_PATH=""
+STAGED_CONSUMER_PLAN_SHA256=""
+STAGED_CONSUMER_INVENTORY_PATH=""
+STAGED_CONSUMER_INVENTORY_SHA256=""
+STAGED_CONSUMER_SNAPSHOT_PATH=""
+STAGED_CONSUMER_PUBLISHER_SHA256=""
+STAGED_CONSUMER_RENDERER_SHA256=""
+QUIESCENCE_BACKUP_RECEIPT=""
 
 # Ein errexit-Abbruch ohne eigene Meldung ist nicht diagnostizierbar: Der Lauf
 # endet stumm, und aus dem Log laesst sich die Stelle nicht rekonstruieren (live
@@ -114,15 +280,23 @@ usage() {
     cat <<'EOF'
 Aufruf:
   ./deploy/pi_a0_3c_runtime.sh status [--json]
-  ./deploy/pi_a0_3c_runtime.sh stage [EXPECTED_SUPPLY_SEAL]
+  ./deploy/pi_a0_3c_runtime.sh stage [EXPECTED_SUPPLY_SEAL] [EXPECTED_ASSET_SEAL]
   ./deploy/pi_a0_3c_runtime.sh verify [active|MANIFEST]
   ./deploy/pi_a0_3c_runtime.sh activate EXPECTED_COMMIT READINESS_MANIFEST FINAL_SERIES_RECEIPT [SET_MANIFEST]
   ./deploy/pi_a0_3c_runtime.sh rollback EXPECTED_COMMIT
   ./deploy/pi_a0_3c_runtime.sh recover EXPECTED_COMMIT
   ./deploy/pi_a0_3c_runtime.sh reauthorize EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT
+  ./deploy/pi_a0_3c_runtime.sh release-plan EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT
+  ./deploy/pi_a0_3c_runtime.sh release EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT EXPECTED_RELEASE_SEAL
+  ./deploy/pi_a0_3c_runtime.sh release-recover
 
-stage/verify beruehren weder Dienste noch Produktdatenbank. activate und
+stage verlangt versiegelte Asset-Inputs in GENUS_A03C_DEUTER_MODEL_INPUT und
+GENUS_A03C_FASTEMBED_CACHE_INPUT. stage/verify beruehren weder Dienste noch
+Produktdatenbank. activate und
 rollback schalten core+embed ueber genau einen atomar ersetzten Selector.
+release-plan autorisiert genau einen zeitlich begrenzten, pfadgefilterten
+Fast-Forward. release veraendert keine Produktdaten und kann nur ueber das
+durable Code-Release-Journal vorwaerts finalisieren oder auf OLD zurueckkehren.
 EOF
 }
 
@@ -156,12 +330,41 @@ harden_privileged_boundary() {
         || fail "systemd Guard-Root darf im Produktionsmodus nicht umgebogen werden" 77
     [ "$BOOT_GUARD_PATH" = /usr/local/libexec/genus-a0-3c-boot-guard ] \
         || fail "Boot-Guard-Pfad darf im Produktionsmodus nicht umgebogen werden" 77
+    [ "$PROJECTION_HELPER_PATH" = /usr/local/libexec/genus/pi_a0_3c_projection.py ] \
+        || fail "Projection-Helper-Pfad darf im Produktionsmodus nicht umgebogen werden" 77
+    [ "$CONSUMER_PUBLISHER_PATH" = /usr/local/libexec/genus/pi_a0_3c_consumer_publish.py ] \
+        && [ "$CONSUMER_RENDERER_PATH" = /usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py ] \
+        || fail "Consumer-Publisher/-Renderer duerfen im Produktionsmodus nicht umgebogen werden" 77
+    [ "$CODE_RELEASE_START_ROOT" = /run/genus-a0-3c ] \
+        || fail "Code-Release-Start-Root darf im Produktionsmodus nicht umgebogen werden" 77
+    [ "$CODE_RELEASE_TRUST_ROOT" = /var/lib/genus-a0-3c ] \
+        || fail "Code-Release-Trust-Root darf im Produktionsmodus nicht umgebogen werden" 77
+    [ "$BACKUP_LOCK_FILE" = /run/lock/genus/backup-ledger.lock ] \
+        || fail "Shared-Lock darf im Produktionsmodus nicht umgebogen werden" 77
+    [ "$ROOT_CRON_FILE" = /etc/cron.d/genus-pi-seed ] \
+        && [ "$ROOT_CRON_DISABLED_FILE" = /etc/cron.d/genus-pi-seed.disabled ] \
+        && [ "$ROOT_SYSTEM_CRONTAB" = /etc/crontab ] \
+        && [ "$CRONTAB_SPOOL_ROOT" = /var/spool/cron/crontabs ] \
+        || fail "Root-Cronvertrag darf im Produktionsmodus nicht umgebogen werden" 77
+    [ "$PUBLIC_SETS_ROOT" = /opt/genus/runtime-sets ] && [ "$RUNTIME_VIEW_ROOT" = /opt/genus/active ] \
+        || fail "Runtime-Publikationspfade duerfen im Produktionsmodus nicht umgebogen werden" 77
+    [ "$TELEGRAM_LAUNCHER_PATH" = /usr/local/libexec/genus/pi_telegram_launcher.py ] \
+        && [ "$SCHEDULED_BACKUP_DIR" = "$GENUS_HOME/genus-sd-backup/nightly" ] \
+        && [ "$BACKUP_SCRIPT" = "$REPO_DIR/deploy/backup_ledger_to_sd.sh" ] \
+        || fail "Launcher-/Scheduled-Backup-Pfade duerfen im Produktionsmodus nicht umgebogen werden" 77
+    [ "$RUNTIME_USER" = genus-runtime ] && [ "$RUNTIME_GROUP" = genus-runtime ] \
+        && [ "$TELEGRAM_USER" = genus-telegram ] && [ "$TELEGRAM_GROUP" = genus-telegram ] \
+        && [ "$BACKUP_USER" = genus-backup ] && [ "$BACKUP_GROUP" = genus-backup ] \
+        && [ "$DATA_GROUP" = genus-data ] \
+        || fail "Servicekonto-/Gruppennamen duerfen im Produktionsmodus nicht umgebogen werden" 77
     validate_root_owned_program "$SUDO_BIN" /usr/bin/sudo sudo
     validate_root_owned_program "$SYSTEMCTL_BIN" /usr/bin/systemctl systemctl
     validate_root_owned_program "$FUSER_BIN" /usr/bin/fuser fuser
     validate_root_owned_program "$GIT_BIN" /usr/bin/git git
     validate_root_owned_program "$APT_GET_BIN" /usr/bin/apt-get apt-get
     validate_root_owned_program "$CRONTAB_BIN" /usr/bin/crontab crontab
+    validate_root_owned_program "$ROOT_PKCHECK_BIN" /usr/bin/pkcheck pkcheck
+    validate_root_owned_program "$ROOT_PKACTION_BIN" /usr/bin/pkaction pkaction
     validate_root_owned_program "$SYSTEM_PYTHON_BIN" /usr/bin/python3 system-python
     validate_root_owned_program "$ROOT_ENV_BIN" /usr/bin/env env
     validate_root_owned_program "$ROOT_FIND_BIN" /usr/bin/find find
@@ -178,6 +381,9 @@ harden_privileged_boundary() {
     validate_root_owned_program "$ROOT_RMDIR_BIN" /usr/bin/rmdir rmdir
     validate_root_owned_program "$ROOT_SYSTEMD_RUN_BIN" /usr/bin/systemd-run systemd-run
     validate_root_owned_program "$ROOT_MKTEMP_BIN" /usr/bin/mktemp mktemp
+    validate_root_owned_program "$ROOT_PASSWD_BIN" /usr/bin/passwd passwd
+    validate_root_owned_program "$ROOT_SHA256_BIN" /usr/bin/sha256sum sha256sum
+    validate_root_owned_program "$ROOT_READLINK_BIN" /usr/bin/readlink readlink
     PRIVILEGED_BOUNDARY_READY=1
 }
 
@@ -201,6 +407,465 @@ systemctl_root() {
 }
 
 sha256_file() { sha256sum "$1" | awk '{print $1}'; }
+
+user_stable_sha256() {
+    local path="$1" expected_mode="$2"
+    "$SYSTEM_PYTHON_BIN" -I -P - "$path" "$expected_mode" "$(id -u)" "$(id -g)" <<'PY'
+import hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=int(sys.argv[2],8); uid,gid=map(int,sys.argv[3:5]); before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=expected or before.st_nlink!=1 or before.st_size>16*1024*1024):
+    raise SystemExit("user evidence metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); digest=hashlib.sha256(); size=0
+try:
+    opened=os.fstat(descriptor)
+    while True:
+        chunk=os.read(descriptor,1024*1024)
+        if not chunk: break
+        size+=len(chunk)
+        if size>16*1024*1024: raise SystemExit("user evidence grew beyond bound")
+        digest.update(chunk)
+    final=os.fstat(descriptor)
+finally: os.close(descriptor)
+after=path.lstat()
+if not identity(before)==identity(opened)==identity(final)==identity(after) or size!=before.st_size:
+    raise SystemExit("user evidence changed during descriptor-bound hash")
+print(digest.hexdigest())
+PY
+}
+
+root_stable_sha256() {
+    local path="$1" expected_mode="$2"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$path" "$expected_mode" <<'PY'
+import hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=int(sys.argv[2],8); before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+        or stat.S_IMODE(before.st_mode)!=expected or before.st_nlink!=1 or before.st_size>16*1024*1024):
+    raise SystemExit("root evidence metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); digest=hashlib.sha256(); size=0
+try:
+    opened=os.fstat(fd)
+    while True:
+        chunk=os.read(fd,1024*1024)
+        if not chunk: break
+        size+=len(chunk)
+        if size>16*1024*1024: raise SystemExit("root evidence grew beyond bound")
+        digest.update(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat()
+if not identity(before)==identity(opened)==identity(final)==identity(after) or size!=before.st_size:
+    raise SystemExit("root evidence changed during descriptor-bound hash")
+print(digest.hexdigest())
+PY
+}
+
+ensure_projection_trust_root() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$CODE_RELEASE_TRUST_ROOT" <<'PY'
+import os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1])
+if path!=pathlib.Path("/var/lib/genus-a0-3c"):
+    raise SystemExit("projection trust root differs from the fixed production path")
+parent=path.parent; pinfo=parent.lstat()
+if (parent.resolve(strict=True)!=parent or parent.is_symlink() or not stat.S_ISDIR(pinfo.st_mode)
+        or pinfo.st_uid!=0 or pinfo.st_gid!=0 or stat.S_IMODE(pinfo.st_mode)!=0o755):
+    raise SystemExit("projection trust parent is unsafe")
+try: info=path.lstat()
+except FileNotFoundError:
+    try: path.mkdir(mode=0o700)
+    except FileExistsError: pass
+    else:
+        os.chown(path,0,0); os.chmod(path,0o700)
+        directory=os.open(parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+        try: os.fsync(directory)
+        finally: os.close(directory)
+    info=path.lstat()
+if (path.resolve(strict=True)!=path or path.is_symlink() or not stat.S_ISDIR(info.st_mode)
+        or info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=0o700):
+    raise SystemExit("projection trust root is unsafe")
+PY
+}
+
+ensure_root_artifact_private_roots() {
+    local transaction="$1"
+    [[ "$transaction" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Transaktions-ID ist malformed" 70
+    ensure_projection_trust_root
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$CODE_RELEASE_TRUST_ROOT" "$ROOT_ARTIFACT_SOURCE_ROOT" \
+        "$ROOT_ARTIFACT_AUTHORITY_ROOT" "$transaction" <<'PY'
+import fcntl,os,pathlib,re,stat,sys
+
+trust,source_root,authority_root=map(pathlib.Path,sys.argv[1:4]); transaction=sys.argv[4]
+if (trust!=pathlib.Path("/var/lib/genus-a0-3c")
+        or source_root!=pathlib.Path("/var/lib/genus-a0-3c/runtime-artifact-inputs")
+        or authority_root!=pathlib.Path("/var/lib/genus-a0-3c/runtime-artifact-authorities")
+        or re.fullmatch(r"[a-f0-9]{64}",transaction) is None):
+    raise SystemExit("root artifact private layout differs from the fixed production contract")
+flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)
+def valid_directory(path,mode):
+    info=path.lstat()
+    if (path.resolve(strict=True)!=path or path.is_symlink() or not stat.S_ISDIR(info.st_mode)
+            or info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=mode):
+        raise SystemExit(f"root artifact private directory differs: {path}")
+    return info
+def fsync_directory(path):
+    descriptor=os.open(path,flags)
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+def ensure_directory(path,parent):
+    try: path.mkdir(mode=0o700); created=True
+    except FileExistsError: created=False
+    if created:
+        os.chown(path,0,0); os.chmod(path,0o700)
+        fsync_directory(path); fsync_directory(parent)
+    valid_directory(path,0o700)
+valid_directory(trust,0o700)
+lock_path=trust/"runtime-artifacts.lock"
+lock_flags=os.O_RDWR|os.O_CREAT|getattr(os,"O_NOFOLLOW",0)
+lock_fd=os.open(lock_path,lock_flags,0o600)
+try:
+    lock_info=os.fstat(lock_fd)
+    if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+            or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+        raise SystemExit("root artifact private lock differs")
+    os.fchmod(lock_fd,0o600); os.fsync(lock_fd); fsync_directory(trust)
+    fcntl.flock(lock_fd,fcntl.LOCK_EX)
+    after=os.stat(lock_path,follow_symlinks=False)
+    if (after.st_dev,after.st_ino)!=(lock_info.st_dev,lock_info.st_ino):
+        raise SystemExit("root artifact private lock identity drifted")
+    ensure_directory(source_root,trust)
+    ensure_directory(authority_root,trust)
+    ensure_directory(source_root/transaction,source_root)
+finally:
+    try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+    finally: os.close(lock_fd)
+PY
+}
+
+root_atomic_publish_private_file() {
+    local source="$1" target="$2" expected_sha="$3" transaction="$4" result
+    [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Private-Publish-Hash ist malformed" 70
+    [[ "$transaction" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Private-Publish-Transaktion ist malformed" 70
+    result="$(
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; state=pathlib.Path(sys.argv[3]); uid,gid=map(int,sys.argv[4:6])
+parent=path.parent; pinfo=parent.lstat(); sinfo=state.lstat()
+if (state.resolve(strict=True)!=state or not stat.S_ISDIR(sinfo.st_mode) or sinfo.st_uid!=uid or sinfo.st_gid!=gid
+        or stat.S_IMODE(sinfo.st_mode)!=0o700 or parent.parent!=state or not parent.name.startswith(".root-artifact-inputs.")
+        or parent.resolve(strict=True)!=parent or parent.is_symlink() or not stat.S_ISDIR(pinfo.st_mode)
+        or pinfo.st_uid!=uid or pinfo.st_gid!=gid or stat.S_IMODE(pinfo.st_mode)!=0o700):
+    raise SystemExit("operator-private root artifact source directory differs")
+before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>16*1024*1024):
+    raise SystemExit("operator-private root artifact source metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); digest=hashlib.sha256(); chunks=[]; size=0
+try:
+    opened=os.fstat(fd)
+    while True:
+        chunk=os.read(fd,min(1024*1024,16*1024*1024+1-size))
+        if not chunk: break
+        size+=len(chunk)
+        if size>16*1024*1024: raise SystemExit("operator-private root artifact source grew beyond bound")
+        chunks.append(chunk); digest.update(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat()
+if (not identity(before)==identity(opened)==identity(final)==identity(after)
+        or size!=before.st_size or digest.hexdigest()!=expected):
+    raise SystemExit("operator-private root artifact source changed or differs")
+sys.stdout.buffer.write(b"".join(chunks))' \
+            "$source" "$expected_sha" "$STATE_ROOT" "$(id -u)" "$(id -g)" | \
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import ctypes,errno,fcntl,hashlib,os,pathlib,re,secrets,stat,sys
+target=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; trust=pathlib.Path(sys.argv[3]); source_root=pathlib.Path(sys.argv[4]); authority_root=pathlib.Path(sys.argv[5]); transaction=sys.argv[6]
+payload=sys.stdin.buffer.read(16*1024*1024+1)
+if len(payload)>16*1024*1024 or hashlib.sha256(payload).hexdigest()!=expected:
+    raise SystemExit("root-private artifact stdin payload differs")
+names={"projection-helper.payload","boot-guard.payload","consumer-publisher.payload","consumer-renderer.payload",
+ "systemd-dropin-genus-backup.service.payload","systemd-dropin-genus-cron@.service.payload",
+ "systemd-dropin-genus-learner.service.payload","systemd-dropin-genus-network-watchdog.service.payload",
+ "systemd-dropin-genus-network-watchdog.timer.payload","systemd-dropin-genus-telegram-bot.service.payload"}
+if (trust!=pathlib.Path("/var/lib/genus-a0-3c") or source_root!=trust/"runtime-artifact-inputs"
+        or authority_root!=trust/"runtime-artifact-authorities" or re.fullmatch(r"[a-f0-9]{64}",transaction) is None):
+    raise SystemExit("root-private artifact layout differs")
+source_target=(target.parent==source_root/transaction and target.name in names)
+authority_target=(target==authority_root/f"{transaction}.json")
+if not source_target and not authority_target:
+    raise SystemExit("root-private artifact target is outside the exact allowlist")
+flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)
+def valid_directory(path):
+    info=path.lstat()
+    if (path.resolve(strict=True)!=path or path.is_symlink() or not stat.S_ISDIR(info.st_mode)
+            or info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=0o700):
+        raise SystemExit(f"root-private artifact directory differs: {path}")
+    return info
+def fsync_directory(path):
+    descriptor=os.open(path,flags)
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+def stable_bytes(path):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+            or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>16*1024*1024):
+        raise SystemExit("root-private published artifact metadata differs")
+    fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+    identity=lambda value:tuple(getattr(value,key) for key in fields)
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(fd)
+        while True:
+            chunk=os.read(fd,min(1024*1024,16*1024*1024+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>16*1024*1024: raise SystemExit("root-private published artifact grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("root-private published artifact drifted")
+    return raw
+def rename_noreplace(source,destination):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for root-private artifact publication")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(destination),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(destination))
+valid_directory(trust); valid_directory(source_root); valid_directory(authority_root); valid_directory(target.parent)
+lock_path=trust/"runtime-artifacts.lock"; lock_fd=os.open(lock_path,os.O_RDWR|getattr(os,"O_NOFOLLOW",0))
+try:
+    lock_info=os.fstat(lock_fd)
+    if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+            or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+        raise SystemExit("root-private artifact lock differs")
+    fcntl.flock(lock_fd,fcntl.LOCK_EX)
+    lock_after=os.stat(lock_path,follow_symlinks=False)
+    if (lock_after.st_dev,lock_after.st_ino)!=(lock_info.st_dev,lock_info.st_ino):
+        raise SystemExit("root-private artifact lock identity drifted")
+    try: existing=stable_bytes(target)
+    except FileNotFoundError: existing=None
+    if existing is not None:
+        if existing!=payload: raise SystemExit("existing root-private artifact differs")
+        action="reused"
+    else:
+        temporary=target.with_name(f".{target.name}.publish.{secrets.token_hex(16)}")
+        descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+        try:
+            view=memoryview(payload)
+            while view:
+                count=os.write(descriptor,view)
+                if count<=0: raise SystemExit("short root-private artifact write")
+                view=view[count:]
+            os.fchown(descriptor,0,0); os.fchmod(descriptor,0o400); os.fsync(descriptor)
+        finally: os.close(descriptor)
+        try:
+            if not rename_noreplace(temporary,target):
+                if stable_bytes(target)!=payload: raise SystemExit("raced root-private artifact differs")
+                temporary.unlink()
+                action="reused"
+            else: action="created"
+        except BaseException:
+            try: temporary.unlink()
+            except FileNotFoundError: pass
+            raise
+        fsync_directory(target.parent)
+    final=stable_bytes(target)
+    if final!=payload or hashlib.sha256(final).hexdigest()!=expected:
+        raise SystemExit("published root-private artifact differs after fsync")
+    print(action)
+finally:
+    try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+    finally: os.close(lock_fd)' \
+            "$target" "$expected_sha" "$CODE_RELEASE_TRUST_ROOT" \
+            "$ROOT_ARTIFACT_SOURCE_ROOT" "$ROOT_ARTIFACT_AUTHORITY_ROOT" "$transaction"
+    )"
+    case "$result" in created|reused) ;; *) fail "Root-Artefakt-Private-Publisher lieferte kein gueltiges Ergebnis" 70 ;; esac
+}
+
+ensure_root_publish_parent() {
+    local target="$1"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$target" <<'PY'
+import os,pathlib,stat,sys
+target=pathlib.Path(sys.argv[1]); fixed={
+    pathlib.Path("/usr/local/libexec/genus-a0-3c-boot-guard"),
+    pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_projection.py"),
+    pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py"),
+    pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py"),
+}
+units={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service",
+       "genus-telegram-bot.service","genus-backup.service","genus-cron@.service"}
+dropin=(target.parent.parent==pathlib.Path("/etc/systemd/system") and target.parent.name.endswith(".d")
+        and target.parent.name.removesuffix(".d") in units and target.name=="90-genus-a0-3c-pending.conf")
+if target not in fixed and not dropin: raise SystemExit("root publish parent target is outside the fixed allowlist")
+flags=os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0)
+def valid(info):
+    return (stat.S_ISDIR(info.st_mode) and info.st_uid==0 and info.st_gid==0
+            and stat.S_IMODE(info.st_mode)==0o755)
+base=pathlib.Path("/usr/local/libexec") if target.parent==pathlib.Path("/usr/local/libexec/genus") else target.parent
+if dropin: base=pathlib.Path("/etc/systemd/system")
+parts=base.parts; fd=os.open("/",flags)
+try:
+    for part in parts[1:]:
+        child=os.open(part,flags,dir_fd=fd); info=os.fstat(child)
+        if not valid(info): os.close(child); raise SystemExit("root publish parent chain differs")
+        os.close(fd); fd=child
+    if base!=target.parent:
+        name=target.parent.name
+        try: os.mkdir(name,0o755,dir_fd=fd); created=True
+        except FileExistsError: created=False
+        child=os.open(name,flags,dir_fd=fd); info=os.fstat(child)
+        try:
+            if created:
+                os.fchown(child,0,0); os.fchmod(child,0o755); os.fsync(child); os.fsync(fd); info=os.fstat(child)
+            if not valid(info): raise SystemExit("root publish final parent differs")
+        finally: os.close(child)
+finally: os.close(fd)
+PY
+}
+
+root_atomic_publish_verified_file() {
+    local source="$1" target="$2" target_mode="$3" expected_sha="$4" expected_old="${5:-absent}"
+    local result expected_result action old_result
+    [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "privilegierter Publish-Hash ist malformed" 70
+    [ "$expected_old" = absent ] || [[ "$expected_old" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "privilegierter Publish-CAS-Hash ist malformed" 70
+    result="$(
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; state=pathlib.Path(sys.argv[3]); uid,gid=map(int,sys.argv[4:6])
+sinfo=state.lstat()
+if (state.resolve(strict=True)!=state or not stat.S_ISDIR(sinfo.st_mode) or sinfo.st_uid!=uid or sinfo.st_gid!=gid or stat.S_IMODE(sinfo.st_mode)!=0o700 or path.parent!=state): raise SystemExit("private publish source root differs")
+before=path.lstat()
+if path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>16*1024*1024: raise SystemExit("private publish source metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns"); identity=lambda value:tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; digest=hashlib.sha256(); size=0
+try:
+ opened=os.fstat(fd)
+ while True:
+  chunk=os.read(fd,1024*1024)
+  if not chunk: break
+  size+=len(chunk)
+  if size>16*1024*1024: raise SystemExit("private publish source grew beyond bound")
+  chunks.append(chunk); digest.update(chunk)
+ final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat()
+if not identity(before)==identity(opened)==identity(final)==identity(after) or size!=before.st_size or digest.hexdigest()!=expected: raise SystemExit("private publish source changed or differs")
+sys.stdout.buffer.write(b"".join(chunks))' \
+            "$source" "$expected_sha" "$STATE_ROOT" "$(id -u)" "$(id -g)" | \
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import fcntl,hashlib,json,os,pathlib,secrets,stat,sys
+target_raw=sys.argv[1]; target=pathlib.Path(target_raw); mode=int(sys.argv[2],8); new_sha=sys.argv[3]; old_sha=sys.argv[4]; lock_path=pathlib.Path(sys.argv[5])
+stable_id=lambda value:(value.st_dev,value.st_ino,value.st_uid,value.st_gid,value.st_mode,value.st_nlink)
+payload=sys.stdin.buffer.read(16*1024*1024+1)
+if len(payload)>16*1024*1024 or hashlib.sha256(payload).hexdigest()!=new_sha: raise SystemExit("privileged stdin payload differs")
+fixed={"/usr/local/libexec/genus/pi_a0_3c_projection.py":0o555,"/usr/local/libexec/genus-a0-3c-boot-guard":0o755,
+       "/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py":0o755,
+       "/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py":0o755}
+units={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service","genus-backup.service","genus-cron@.service"}
+dropin=(target.parent.parent==pathlib.Path("/etc/systemd/system") and target.parent.name.endswith(".d")
+        and target.parent.name.removesuffix(".d") in units and target.name=="90-genus-a0-3c-pending.conf" and mode==0o644)
+if (not target.is_absolute() or target_raw!=os.path.normpath(target_raw) or (fixed.get(target_raw)!=mode and not dropin)):
+ raise SystemExit("privileged publisher target is outside the fixed allowlist")
+if lock_path!=pathlib.Path("/var/lib/genus-a0-3c/runtime-projection.lock"):
+ raise SystemExit("privileged publisher lock path differs")
+lock_parent=lock_path.parent; lock_parent_info=lock_parent.lstat()
+if (lock_parent.resolve(strict=True)!=lock_parent or lock_parent.is_symlink() or not stat.S_ISDIR(lock_parent_info.st_mode)
+    or lock_parent_info.st_uid!=0 or lock_parent_info.st_gid!=0 or stat.S_IMODE(lock_parent_info.st_mode)!=0o700):
+ raise SystemExit("privileged publisher lock parent differs")
+lock_fd=os.open(lock_path,os.O_RDWR|os.O_CREAT|getattr(os,"O_NOFOLLOW",0),0o600)
+try:
+ lock_info=os.fstat(lock_fd)
+ if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0 or stat.S_IMODE(lock_info.st_mode)!=0o600
+     or lock_info.st_nlink!=1 or lock_info.st_size!=0): raise SystemExit("privileged publisher lock differs")
+ fcntl.flock(lock_fd,fcntl.LOCK_EX)
+ if stable_id(os.stat(lock_path,follow_symlinks=False))!=stable_id(os.fstat(lock_fd)): raise SystemExit("privileged publisher lock identity drifted")
+ parent=target.parent; pinfo=parent.lstat()
+ if (parent.resolve(strict=True)!=parent or parent.is_symlink() or not stat.S_ISDIR(pinfo.st_mode) or pinfo.st_uid!=0 or pinfo.st_gid!=0 or stat.S_IMODE(pinfo.st_mode)!=0o755): raise SystemExit("privileged publisher target parent differs")
+ parent_fd=os.open(parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+ try:
+  if stable_id(os.fstat(parent_fd))!=stable_id(pinfo): raise SystemExit("privileged publisher parent identity drifted")
+  fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns"); identity=lambda value:tuple(getattr(value,key) for key in fields)
+  def current_hash():
+   try: before=os.stat(target.name,dir_fd=parent_fd,follow_symlinks=False)
+   except FileNotFoundError: return None
+   if (not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0 or stat.S_IMODE(before.st_mode)!=mode
+       or before.st_nlink!=1 or before.st_size>16*1024*1024): raise SystemExit("privileged publisher existing target differs")
+   fd=os.open(target.name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0),dir_fd=parent_fd); digest=hashlib.sha256(); size=0
+   try:
+    opened=os.fstat(fd)
+    while True:
+     chunk=os.read(fd,1024*1024)
+     if not chunk: break
+     size+=len(chunk)
+     if size>16*1024*1024: raise SystemExit("privileged publisher target grew beyond bound")
+     digest.update(chunk)
+    final=os.fstat(fd)
+   finally: os.close(fd)
+   after=os.stat(target.name,dir_fd=parent_fd,follow_symlinks=False)
+   if not identity(before)==identity(opened)==identity(final)==identity(after) or size!=before.st_size: raise SystemExit("privileged publisher target changed during CAS read")
+   return digest.hexdigest()
+  actual_old=current_hash()
+  if (old_sha=="absent" and actual_old is not None) or (old_sha!="absent" and actual_old!=old_sha): raise SystemExit("privileged publisher target CAS differs")
+  temporary=None; out=None
+  for _ in range(128):
+   candidate=f".{target.name}.publish-{secrets.token_hex(16)}"
+   try: out=os.open(candidate,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600,dir_fd=parent_fd)
+   except FileExistsError: continue
+   temporary=candidate; break
+  if temporary is None or out is None: raise SystemExit("cannot allocate privileged publisher temp")
+  try:
+   try:
+    view=memoryview(payload)
+    while view:
+     written=os.write(out,view)
+     if written<=0: raise SystemExit("short privileged publisher write")
+     view=view[written:]
+    os.fchown(out,0,0); os.fchmod(out,mode); os.fsync(out); temp=os.fstat(out)
+   finally: os.close(out)
+   if (not stat.S_ISREG(temp.st_mode) or temp.st_uid!=0 or temp.st_gid!=0 or stat.S_IMODE(temp.st_mode)!=mode
+       or temp.st_nlink!=1 or temp.st_size!=len(payload)): raise SystemExit("privileged publisher temp differs")
+   if current_hash()!=actual_old: raise SystemExit("privileged publisher target drifted before replace")
+   os.replace(temporary,target.name,src_dir_fd=parent_fd,dst_dir_fd=parent_fd); temporary=None; os.fsync(parent_fd)
+  finally:
+   if temporary is not None:
+    try: os.unlink(temporary,dir_fd=parent_fd)
+    except FileNotFoundError: pass
+  if current_hash()!=new_sha: raise SystemExit("privileged published target differs")
+ finally: os.close(parent_fd)
+ print(json.dumps({"action":"created" if actual_old is None else "replaced","new_sha256":new_sha,"old_sha256":actual_old or ""},sort_keys=True,separators=(",",":")))
+finally:
+ try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+ finally: os.close(lock_fd)' \
+            "$target" "$target_mode" "$expected_sha" "$expected_old" \
+            "$CODE_RELEASE_TRUST_ROOT/runtime-projection.lock"
+    )"
+    action=created; old_result=""
+    if [ "$expected_old" != absent ]; then action=replaced; old_result="$expected_old"; fi
+    expected_result="{\"action\":\"$action\",\"new_sha256\":\"$expected_sha\",\"old_sha256\":\"$old_result\"}"
+    [ "$result" = "$expected_result" ] \
+        || fail "privilegierter Publisher lieferte kein kanonisch gebundenes Ergebnis" 70
+    [ "$(root_stable_sha256 "$target" "$target_mode")" = "$expected_sha" ] \
+        || fail "privilegierter Publish driftete nach atomarem Rename" 70
+}
 
 sha3_file() {
     "$OPENSSL_BIN" dgst -sha3-256 "$1" | awk '{print $NF}'
@@ -243,6 +908,92 @@ safe_manifest_id() {
 set_path() {
     safe_manifest_id "$1"
     printf '%s/%s\n' "$SETS_ROOT" "$1"
+}
+
+public_set_path() {
+    [[ "$1" =~ ^[a-f0-9]{64}$ ]] || fail "ungueltige Public-Manifest-ID" 64
+    printf '%s/%s\n' "$PUBLIC_SETS_ROOT" "$1"
+}
+
+validate_product_path_contract() {
+    local expected_db="$GENUS_HOME/.genus/data/genus.sqlite3"
+    local expected_pause="$GENUS_HOME/.genus/control/paused"
+    [ "$DB_PATH" != "$GENUS_HOME/.genus/genus.sqlite3" ] \
+        || fail "Legacy-Produkt-DB braucht eine getrennte menschlich abgenommene Migration" 77
+    [ "$DB_PATH" = "$expected_db" ] \
+        || fail "Produkt-DB muss exakt im dedizierten data-Namespace liegen" 77
+    [ "$PAUSE_FILE" = "$expected_pause" ] \
+        || fail "Pause-Control muss exakt im dedizierten control-Namespace liegen" 77
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$GENUS_HOME" "$DB_PATH" "$PAUSE_FILE" <<'PY'
+import pathlib
+import posixpath
+import sys
+
+home, db, pause = sys.argv[1:]
+for label, raw in (("home", home), ("database", db), ("pause", pause)):
+    if not raw.startswith("/") or raw.startswith("//") or posixpath.normpath(raw) != raw:
+        raise SystemExit(f"{label} path is not a canonical absolute lexical path")
+root = pathlib.PurePosixPath(home)
+if pathlib.PurePosixPath(db) != root / ".genus" / "data" / "genus.sqlite3":
+    raise SystemExit("database path escaped the dedicated product namespace")
+if pathlib.PurePosixPath(pause) != root / ".genus" / "control" / "paused":
+    raise SystemExit("pause path escaped the dedicated control namespace")
+PY
+}
+
+validate_product_data_contract() {
+    local data_dir control_dir data_gid operator_uid runtime_uid telegram_uid member owner group mode links
+    validate_product_path_contract
+    data_dir="$(dirname "$DB_PATH")"
+    control_dir="$(dirname "$PAUSE_FILE")"
+    data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+    runtime_uid="$(id -u -- "$RUNTIME_USER" 2>/dev/null || true)"
+    telegram_uid="$(id -u -- "$TELEGRAM_USER" 2>/dev/null || true)"
+    operator_uid="$(id -u)"
+    [[ "$data_gid" =~ ^[0-9]+$ ]] && [[ "$runtime_uid" =~ ^[0-9]+$ ]] \
+        && [[ "$telegram_uid" =~ ^[0-9]+$ ]] \
+        || fail "genus-data/Runtime-/Telegram-Identitaet fehlt" 77
+    case " $(id -G -- "$GENUS_USER") " in *" $data_gid "*) ;; *)
+        fail "Operator ist nicht tatsaechlich Mitglied von genus-data" 77 ;;
+    esac
+    [ "$(realpath -e -- "$data_dir")" = "$data_dir" ] && [ -d "$data_dir" ] && [ ! -L "$data_dir" ] \
+        && [ "$(stat -c %u "$data_dir")" -eq "$operator_uid" ] \
+        && [ "$(stat -c %g "$data_dir")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$data_dir")" = 2770 ] \
+        || fail "Produktdaten-Verzeichnis ist nicht operator:genus-data 2770" 77
+    [ "$(realpath -e -- "$control_dir")" = "$control_dir" ] && [ -d "$control_dir" ] && [ ! -L "$control_dir" ] \
+        && [ "$(stat -c %u "$control_dir")" -eq "$operator_uid" ] \
+        && [ "$(stat -c %g "$control_dir")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$control_dir")" = 750 ] \
+        || fail "Control-Verzeichnis ist nicht operator:genus-data 0750" 77
+    [ -e "$DB_PATH" ] && [ ! -L "$DB_PATH" ] \
+        || fail "Produkt-DB fehlt; A0 darf sie nicht automatisch anlegen" 77
+    for member in "$DB_PATH" "$DB_PATH-wal" "$DB_PATH-shm"; do
+        if [ "$member" != "$DB_PATH" ] && [ ! -e "$member" ] && [ ! -L "$member" ]; then continue; fi
+        [ -f "$member" ] && [ ! -L "$member" ] || fail "Produkt-DB-Mitglied ist nicht regulaer" 77
+        owner="$(stat -c %u "$member")"; group="$(stat -c %g "$member")"
+        mode="$(stat -c %a "$member")"; links="$(stat -c %h "$member")"
+        if [ "$member" = "$DB_PATH" ]; then
+            [ "$owner" -eq "$operator_uid" ] \
+                || fail "Produkt-DB selbst ist nicht operator-eigen" 77
+        else
+            case "$owner" in "$operator_uid"|"$runtime_uid"|"$telegram_uid") ;; *)
+                fail "Produkt-DB-Sidecar gehoert keiner erlaubten genus-data-Writer-UID" 77 ;;
+            esac
+        fi
+        [ "$group" -eq "$data_gid" ] && [ "$mode" = 660 ] && [ "$links" -eq 1 ] \
+            || fail "Produkt-DB-Mitglied ist nicht genus-data 0660/einfach verlinkt" 77
+    done
+    if [ -e "$PAUSE_FILE" ] || [ -L "$PAUSE_FILE" ]; then
+        [ -f "$PAUSE_FILE" ] && [ ! -L "$PAUSE_FILE" ] \
+            && [ "$(stat -c %u "$PAUSE_FILE")" -eq "$operator_uid" ] \
+            && [ "$(stat -c %h "$PAUSE_FILE")" -eq 1 ] \
+            || fail "Pause-Control ist nicht regulaer/operator-eigen/einfach verlinkt" 77
+        case "$(stat -c %a "$PAUSE_FILE")" in 600|640) ;; *)
+            fail "Pause-Control hat keinen privaten Modus" 77 ;;
+        esac
+    fi
 }
 
 ensure_private_state_hierarchy() {
@@ -313,6 +1064,7 @@ init_user_roots() {
     [ "$GENUS_USER" != root ] || [ "${GENUS_ALLOW_ROOT:-0}" = 1 ] \
         || fail "GENUS_USER=root ist ohne GENUS_ALLOW_ROOT=1 verboten" 77
     harden_privileged_boundary
+    validate_product_path_contract
     ensure_private_state_hierarchy \
         || fail "State-Hierarchie ist nicht kanonisch/operator-eigen/privat" 70
 }
@@ -325,36 +1077,80 @@ acquire_operator_lock() {
     OPERATOR_LOCK_HELD=1
 }
 
+validate_shared_backup_lock_contract() {
+    local parent data_gid lock_owner_uid=0
+    parent="$(realpath -e -- "$(dirname "$BACKUP_LOCK_FILE")")" \
+        || fail "Backup-Lock-Elternverzeichnis ist nicht kanonisch aufloesbar" 70
+    [ "$BACKUP_LOCK_FILE" = "$parent/backup-ledger.lock" ] \
+        || fail "Backup-Lock-Pfad ist nicht der kanonische feste Shared-Lock" 70
+    if [ "${GENUS_A03C_TEST_MODE:-0}" = 1 ] \
+        && [ "$BACKUP_LOCK_FILE" != /run/lock/genus/backup-ledger.lock ]; then
+        lock_owner_uid="$(id -u)"; data_gid="$(id -g)"
+    else
+        data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+        [[ "$data_gid" =~ ^[0-9]+$ ]] || fail "genus-data Gruppe fehlt" 77
+        case " $(id -G -- "$GENUS_USER") " in *" $data_gid "*) ;; *)
+            fail "Operator ist nicht tatsaechlich Mitglied von genus-data" 77 ;;
+        esac
+    fi
+    [ -d "$parent" ] && [ ! -L "$parent" ] \
+        && [ "$(stat -c %u "$parent")" -eq "$lock_owner_uid" ] \
+        && [ "$(stat -c %g "$parent")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$parent")" = 750 ] \
+        || fail "Backup-Lock-Elternverzeichnis ist nicht root:genus-data 0750" 70
+    [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
+        && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$lock_owner_uid" ] \
+        && [ "$(stat -c %g "$BACKUP_LOCK_FILE")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 660 ] \
+        && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
+        || fail "Backup-Lock ist nicht regulaer/root:genus-data 0660/einfach verlinkt" 70
+}
+
 acquire_backup_lock() {
-    local parent path_identity fd_identity
+    local parent path_identity fd_identity data_gid lock_owner_uid=0
     [ "$BACKUP_LOCK_HELD" -eq 0 ] || return 0
     require_command flock
-    parent="$(realpath -e -- "$(dirname "$DB_PATH")")" \
+    validate_shared_backup_lock_contract
+    parent="$(realpath -e -- "$(dirname "$BACKUP_LOCK_FILE")")" \
         || fail "Backup-Lock-Elternverzeichnis ist nicht kanonisch aufloesbar" 70
-    BACKUP_LOCK_FILE="$parent/backup-ledger.lock"
-    [ -d "$parent" ] && [ ! -L "$parent" ] \
-        && [ "$(stat -c %u "$parent")" -eq "$(id -u)" ] \
-        && [ "$(stat -c %a "$parent")" = 700 ] \
-        || fail "Backup-Lock-Elternverzeichnis ist nicht operator-eigen/privat" 70
-    if [ -e "$BACKUP_LOCK_FILE" ] || [ -L "$BACKUP_LOCK_FILE" ]; then
-        [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
-            && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$(id -u)" ] \
-            && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 600 ] \
-            && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
-            || fail "Backup-Lock ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+    [ "$BACKUP_LOCK_FILE" = "$parent/backup-ledger.lock" ] \
+        || fail "Backup-Lock-Pfad ist nicht der kanonische feste Shared-Lock" 70
+    if [ "${GENUS_A03C_TEST_MODE:-0}" = 1 ] \
+        && [ "$BACKUP_LOCK_FILE" != /run/lock/genus/backup-ledger.lock ]; then
+        lock_owner_uid="$(id -u)"; data_gid="$(id -g)"
+    else
+        data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+        [[ "$data_gid" =~ ^[0-9]+$ ]] || fail "genus-data Gruppe fehlt" 77
+        case " $(id -G -- "$GENUS_USER") " in *" $data_gid "*) ;; *)
+            fail "Operator ist nicht tatsaechlich Mitglied von genus-data" 77 ;;
+        esac
     fi
-    exec 8>>"$BACKUP_LOCK_FILE"
+    [ -d "$parent" ] && [ ! -L "$parent" ] \
+        && [ "$(stat -c %u "$parent")" -eq "$lock_owner_uid" ] \
+        && [ "$(stat -c %g "$parent")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$parent")" = 750 ] \
+        || fail "Backup-Lock-Elternverzeichnis ist nicht root:genus-data 0750" 70
     [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
-        && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$(id -u)" ] \
-        && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 600 ] \
+        && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$lock_owner_uid" ] \
+        && [ "$(stat -c %g "$BACKUP_LOCK_FILE")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 660 ] \
         && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
-        || fail "Backup-Lock ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+        || fail "Backup-Lock ist nicht regulaer/root:genus-data 0660/einfach verlinkt" 70
+    # Der root-eigene 0750-Parent ist fuer genus-data nicht ersetzbar. Deshalb
+    # darf Bash den bereits provisionierten Lock read/write oeffnen; es wird hier
+    # bewusst weder O_CREAT noch ein append-Schreibvorgang ausgeloest.
+    exec 8<>"$BACKUP_LOCK_FILE"
     path_identity="$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")"
     fd_identity="$(stat -Lc '%d:%i' "/proc/$BASHPID/fd/8")"
     [ "$path_identity" = "$fd_identity" ] \
         || fail "Backup-Lock-FD ist nicht an den validierten Pfad gebunden" 70
     flock -n 8 || fail "ein Ledger-Backup laeuft bereits" 75
-    [ "$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")" = "$fd_identity" ] \
+    [ -f "$BACKUP_LOCK_FILE" ] && [ ! -L "$BACKUP_LOCK_FILE" ] \
+        && [ "$(stat -c %u "$BACKUP_LOCK_FILE")" -eq "$lock_owner_uid" ] \
+        && [ "$(stat -c %g "$BACKUP_LOCK_FILE")" -eq "$data_gid" ] \
+        && [ "$(stat -c %a "$BACKUP_LOCK_FILE")" = 660 ] \
+        && [ "$(stat -c %h "$BACKUP_LOCK_FILE")" -eq 1 ] \
+        && [ "$(stat -c '%d:%i' "$BACKUP_LOCK_FILE")" = "$fd_identity" ] \
         || fail "Backup-Lock-Pfad wurde beim Sperren ersetzt" 70
     BACKUP_LOCK_HELD=1
 }
@@ -366,8 +1162,34 @@ release_backup_lock() {
     BACKUP_LOCK_HELD=0
 }
 
+safe_git() {
+    /usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C \
+        GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_OPTIONAL_LOCKS=0 \
+        GIT_NO_REPLACE_OBJECTS=1 \
+        "$GIT_BIN" --no-replace-objects \
+        -c "safe.directory=$REPO_DIR" -c core.fsmonitor=false \
+        -c core.untrackedCache=false -c core.hooksPath=/dev/null \
+        -c core.attributesFile=/dev/null -c diff.external= \
+        -C "$REPO_DIR" "$@"
+}
+
+reject_ambient_git_object_overrides() {
+    local common_dir replacement
+    common_dir="$(safe_git rev-parse --path-format=absolute --git-common-dir)" \
+        || fail "Git-Common-Dir ist nicht bestimmbar" 65
+    [ -d "$common_dir" ] && [ ! -L "$common_dir" ] \
+        && [ "$(realpath -e -- "$common_dir")" = "$common_dir" ] \
+        || fail "Git-Common-Dir ist nicht kanonisch" 65
+    for replacement in "$common_dir/info/grafts" "$common_dir/info/attributes"; do
+        [ ! -s "$replacement" ] \
+            || fail "nicht versionierter Git-Objekt-/Archiv-Override ist gesetzt: $replacement" 65
+    done
+    [ -z "$(safe_git for-each-ref --format='%(refname)' refs/replace/)" ] \
+        || fail "Git-Replacement-Refs sind fuer A0.3c verboten" 65
+}
+
 repo_commit() {
-    "$GIT_BIN" -C "$REPO_DIR" rev-parse --verify HEAD
+    safe_git rev-parse --verify HEAD
 }
 
 assert_expected_commit() {
@@ -375,11 +1197,12 @@ assert_expected_commit() {
     [[ "$expected" =~ ^[a-f0-9]{40}$ ]] || fail "EXPECTED_COMMIT muss eine volle SHA-1 sein" 64
     actual="$(repo_commit)"
     [ "$actual" = "$expected" ] || fail "Repo-Commit weicht vom gebundenen Expected-Commit ab" 65
-    [ -z "$("$GIT_BIN" -C "$REPO_DIR" status --porcelain=v1 --untracked-files=all)" ] \
+    reject_ambient_git_object_overrides
+    [ -z "$(safe_git status --porcelain=v1 --untracked-files=all)" ] \
         || fail "Repo ist nicht exakt clean" 65
 }
 
-normalize_freeze() {
+normalize_capture_freeze() {
     local source="$1" target="$2" editable_policy="$3"
     local line editable=0
     : > "$target"
@@ -402,6 +1225,39 @@ normalize_freeze() {
         [ "$editable" -eq 0 ] || fail "Embed-Inventar darf kein Editable enthalten" 65
         printf 'pip==%s\nsetuptools==%s\n' "$PIP_VERSION" "$SETUPTOOLS_VERSION" >> "$target"
     fi
+    LC_ALL=C sort -fu -o "$target" "$target"
+}
+
+normalize_verify_freeze() {
+    local source="$1" target="$2" editable_policy="$3"
+    local line editable=0 pip_rows=0 setuptools_rows=0 name
+    : > "$target"
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ''|'# '*) continue ;;
+            -e\ *) editable=$((editable + 1)); continue ;;
+        esac
+        [[ "$line" =~ ^[A-Za-z0-9_.-]+==[^[:space:]]+$ ]] \
+            || fail "nicht reproduzierbarer Eintrag im installierten Paketinventar" 65
+        name="${line%%==*}"
+        case "$name" in
+            pip) pip_rows=$((pip_rows + 1)) ;;
+            setuptools) setuptools_rows=$((setuptools_rows + 1)) ;;
+            genus-pi-seed) continue ;;
+        esac
+        printf '%s\n' "$line" >> "$target"
+    done < "$source"
+    if [ "$editable_policy" = one ]; then
+        [ "$editable" -eq 1 ] \
+            || fail "Core-Inventar muss genau ein kontrolliertes Editable enthalten" 65
+    else
+        [ "$editable" -eq 0 ] \
+            || fail "Embed-Inventar darf kein Editable enthalten" 65
+    fi
+    [ "$pip_rows" -eq 1 ] \
+        || fail "installiertes Paketinventar muss genau eine reale pip-Version enthalten" 65
+    [ "$setuptools_rows" -eq 1 ] \
+        || fail "installiertes Paketinventar muss genau eine reale setuptools-Version enthalten" 65
     LC_ALL=C sort -fu -o "$target" "$target"
 }
 
@@ -440,8 +1296,8 @@ if repo not in module.parents:
 PY
     "$core_python" -m pip freeze --all > "$work/core.raw"
     "$embed_python" -m pip freeze --all > "$work/embed.raw"
-    normalize_freeze "$work/core.raw" "$work/core.lock" one
-    normalize_freeze "$work/embed.raw" "$work/embed.lock" none
+    normalize_capture_freeze "$work/core.raw" "$work/core.lock" one
+    normalize_capture_freeze "$work/embed.raw" "$work/embed.lock" none
     rm -f -- "$work/core.raw" "$work/embed.raw"
 }
 
@@ -516,6 +1372,7 @@ runtime_tree_inventory() {
         "$root" "$RUNTIME_INVENTORY_REL" <<'PY'
 import hashlib
 import json
+import fcntl
 import os
 import pathlib
 import stat
@@ -528,6 +1385,8 @@ if not stat.S_ISDIR(before_root.st_mode) or stat.S_ISLNK(before_root.st_mode):
     raise SystemExit("runtime inventory root is not a real directory")
 resolved_root = root.resolve(strict=True)
 entries = []
+MAX_ENTRIES = 100_000
+MAX_PATH_BYTES = 4096
 
 def stable_digest(path, before):
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
@@ -553,9 +1412,15 @@ def stable_digest(path, before):
         os.close(fd)
 
 def walk(directory):
+    before_directory = directory.lstat()
     try:
         with os.scandir(directory) as scan:
-            children = sorted(list(scan), key=lambda item: os.fsencode(item.name))
+            children = []
+            for child in scan:
+                if len(children) >= MAX_ENTRIES:
+                    raise SystemExit("runtime directory entry limit exceeded")
+                children.append(child)
+            children.sort(key=lambda item: os.fsencode(item.name))
     except OSError as exc:
         raise SystemExit(f"runtime directory scan failed: {exc}") from exc
     for child in children:
@@ -563,8 +1428,10 @@ def walk(directory):
         relative = path.relative_to(root).as_posix()
         if relative == excluded:
             continue
-        if "\n" in relative or "\r" in relative:
-            raise SystemExit("runtime path contains a line break")
+        if "\n" in relative or "\r" in relative or len(relative.encode("utf-8")) > MAX_PATH_BYTES:
+            raise SystemExit("runtime path is unsafe or too long")
+        if len(entries) >= MAX_ENTRIES:
+            raise SystemExit("runtime tree entry limit exceeded")
         info = path.lstat()
         common = {"path": relative, "mode": stat.S_IMODE(info.st_mode), "nlink": info.st_nlink}
         if stat.S_ISLNK(info.st_mode):
@@ -580,6 +1447,10 @@ def walk(directory):
             entries.append({**common, "type": "file", "sha256": stable_digest(path, info)})
         else:
             raise SystemExit("runtime tree contains a special filesystem object")
+    after_directory = directory.lstat()
+    fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_gid", "st_nlink", "st_size", "st_mtime_ns")
+    if any(getattr(after_directory, key) != getattr(before_directory, key) for key in fields):
+        raise SystemExit("runtime directory changed during enumeration")
 
 walk(root)
 python_rows = [item for item in entries if item["path"] == "bin/python3.13" and item["type"] == "file"]
@@ -748,7 +1619,8 @@ recover_runtime_publication() {
 
 runtime_probe() {
     local python="$1" expected_executable="${2:-$1}"
-    "$python" - "$RUNTIME_PREFIX" "$expected_executable" "$SQLITE_VERSION" "$SQLITE_SOURCE_ID" <<'PY'
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C.UTF-8 PYTHONNOUSERSITE=1 \
+        "$python" -I -P - "$RUNTIME_PREFIX" "$expected_executable" "$SQLITE_VERSION" "$SQLITE_SOURCE_ID" <<'PY'
 import _sqlite3, hashlib, json, os, pathlib, sqlite3, sys
 prefix = pathlib.Path(sys.argv[1]).resolve()
 expected_executable = pathlib.Path(sys.argv[2]).resolve()
@@ -936,8 +1808,11 @@ build_runtime() {
 inventory_for_compare() {
     local python="$1" policy="$2" target="$3" raw
     raw="${target}.raw"
-    "$python" -m pip freeze --all > "$raw"
-    normalize_freeze "$raw" "$target" "$policy"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C.UTF-8 \
+        PYTHONNOUSERSITE=1 PIP_CONFIG_FILE=/dev/null PIP_DISABLE_PIP_VERSION_CHECK=1 \
+        PIP_NO_INPUT=1 PIP_NO_CACHE_DIR=1 \
+        "$python" -I -P -m pip freeze --all > "$raw"
+    normalize_verify_freeze "$raw" "$target" "$policy"
     rm -f -- "$raw"
 }
 
@@ -960,6 +1835,142 @@ clean_pip() {
         "$python" -I -P -m pip "$@"
 }
 
+assert_installed_pip_version() {
+    local python="$1" expected_root="$2"
+    "$python" -I -P - "$PIP_VERSION" "$expected_root" <<'PY'
+import importlib.metadata
+import pathlib
+import sys
+
+expected_version = sys.argv[1]
+expected_root = pathlib.Path(sys.argv[2]).resolve(strict=True)
+actual_root = pathlib.Path(sys.prefix).resolve(strict=True)
+if actual_root != expected_root:
+    raise SystemExit("pip interpreter escaped its exact acquisition environment")
+if importlib.metadata.version("pip") != expected_version:
+    raise SystemExit("pip version differs from the fixed acquisition pin")
+import pip
+pip_path = pathlib.Path(pip.__file__).resolve(strict=True)
+if expected_root not in pip_path.parents:
+    raise SystemExit("pip module did not load from the exact acquisition environment")
+PY
+}
+
+verify_pip_bootstrap_wheel() {
+    local directory="$1" wheel="$directory/$PIP_BOOTSTRAP_WHEEL"
+    [ -f "$wheel" ] && [ ! -L "$wheel" ] && [ "$(stat -c %h "$wheel")" -eq 1 ] \
+        || fail "pip-Bootstrap-Wheel ist nicht regulaer/einfach verlinkt" 65
+    verify_archive "$wheel" sha256 "$PIP_BOOTSTRAP_SHA256"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$wheel" "$PIP_VERSION" "$PIP_BOOTSTRAP_WHEEL" <<'PY'
+import email.parser
+import pathlib
+import stat
+import sys
+import zipfile
+
+wheel = pathlib.Path(sys.argv[1])
+version, filename = sys.argv[2:4]
+info = wheel.lstat()
+if wheel.name != filename or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+    raise SystemExit("pip bootstrap wheel identity differs")
+metadata_name = f"pip-{version}.dist-info/METADATA"
+with zipfile.ZipFile(wheel) as archive:
+    matches = [item for item in archive.infolist() if item.filename == metadata_name]
+    if len(matches) != 1 or matches[0].file_size > 1024 * 1024:
+        raise SystemExit("pip bootstrap wheel metadata is missing or ambiguous")
+    metadata = email.parser.Parser().parsestr(archive.read(matches[0]).decode("utf-8"))
+if metadata.get("Name") != "pip" or metadata.get("Version") != version:
+    raise SystemExit("pip bootstrap wheel metadata differs from the fixed pin")
+PY
+}
+
+prepare_pip_acquirer() {
+    local acquirer="$1" wheel="$DOWNLOAD_ROOT/$PIP_BOOTSTRAP_WHEEL"
+    [ ! -e "$acquirer" ] && [ ! -L "$acquirer" ] \
+        || fail "pip-Acquisition-Umgebung existiert bereits" 65
+    download_source "$PIP_BOOTSTRAP_URL" "$wheel" sha256 "$PIP_BOOTSTRAP_SHA256"
+    verify_pip_bootstrap_wheel "$DOWNLOAD_ROOT"
+    install -d -m 0700 "$acquirer"
+    install -m 0400 "$wheel" "$acquirer/$PIP_BOOTSTRAP_WHEEL"
+    chmod 0500 "$acquirer"
+    verify_pip_bootstrap_wheel "$acquirer"
+}
+
+trusted_network_pip_download() {
+    local acquirer="$1" home="$2" wheel="$1/$PIP_BOOTSTRAP_WHEEL"
+    shift 2
+    # STATE_ROOT und Acquirer gehoeren dem menschlichen Operator. Prozesse mit
+    # derselben UID liegen deshalb innerhalb dieser Vertrauensgrenze (sie koennten
+    # auch chmod/ptrace nutzen); NEW-Dienste muessen eine getrennte Runtime-UID
+    # besitzen. Gegen Pfadaustausch zwischen Verify und Execute bindet der folgende
+    # Python-Prozess Hash, METADATA, Import und runpy trotzdem an denselben offenen
+    # O_NOFOLLOW-Dateideskriptor statt erneut den benutzerschreibbaren Namen zu oeffnen.
+    [ -d "$acquirer" ] && [ ! -L "$acquirer" ] && [ "$(stat -c %a "$acquirer")" = 500 ] \
+        || fail "pip-Acquisition-Store ist nicht real und versiegelt" 65
+    verify_pip_bootstrap_wheel "$acquirer"
+    install -d -m 0700 "$home"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin HOME="$home" LC_ALL=C.UTF-8 \
+        PYTHONNOUSERSITE=1 PIP_CONFIG_FILE=/dev/null PIP_DISABLE_PIP_VERSION_CHECK=1 \
+        PIP_NO_INPUT=1 PIP_NO_CACHE_DIR=1 \
+        "$RUNTIME_PREFIX/bin/python3.13" -I -P - \
+        "$wheel" "$PIP_VERSION" "$PIP_BOOTSTRAP_WHEEL" "$PIP_BOOTSTRAP_SHA256" \
+        "$PYPI_INDEX_URL" "$@" <<'PY'
+import email.parser
+import hashlib
+import os
+import pathlib
+import runpy
+import stat
+import sys
+import zipfile
+
+wheel = pathlib.Path(sys.argv[1])
+expected, filename, expected_sha256, index, *arguments = sys.argv[2:]
+if index != "https://pypi.org/simple":
+    raise SystemExit("pip acquisition index differs from the fixed origin")
+before = wheel.lstat()
+fd = os.open(wheel, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+try:
+    opened = os.fstat(fd)
+    fields = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns")
+    if wheel.name != filename or not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+        raise SystemExit("pip bootstrap wheel descriptor identity differs")
+    if any(getattr(opened, key) != getattr(before, key) for key in fields):
+        raise SystemExit("pip bootstrap wheel changed while opening")
+    digest = hashlib.sha256()
+    while chunk := os.read(fd, 1024 * 1024):
+        digest.update(chunk)
+    final = os.fstat(fd)
+    if any(getattr(final, key) != getattr(opened, key) for key in fields):
+        raise SystemExit("pip bootstrap wheel changed while hashing")
+    if digest.hexdigest() != expected_sha256:
+        raise SystemExit("pip bootstrap wheel descriptor hash differs")
+    os.lseek(fd, 0, os.SEEK_SET)
+    with zipfile.ZipFile(os.fdopen(os.dup(fd), "rb")) as archive:
+        metadata_name = f"pip-{expected}.dist-info/METADATA"
+        matches = [item for item in archive.infolist() if item.filename == metadata_name]
+        if len(matches) != 1 or matches[0].file_size > 1024 * 1024:
+            raise SystemExit("pip bootstrap descriptor metadata is missing or ambiguous")
+        metadata = email.parser.Parser().parsestr(archive.read(matches[0]).decode("utf-8"))
+    if metadata.get("Name") != "pip" or metadata.get("Version") != expected:
+        raise SystemExit("pip bootstrap descriptor metadata differs")
+    os.lseek(fd, 0, os.SEEK_SET)
+    descriptor = pathlib.Path(f"/proc/self/fd/{fd}")
+    if not descriptor.exists():
+        raise SystemExit("descriptor-bound wheel execution needs procfs")
+    sys.path.insert(0, str(descriptor))
+    import pip
+    module = str(pip.__file__)
+    if pip.__version__ != expected or not module.startswith(str(descriptor) + "/"):
+        raise SystemExit("network pip did not load from the descriptor-bound bootstrap wheel")
+    sys.argv = ["pip", "download", "--index-url", index, *arguments]
+    runpy.run_module("pip", run_name="__main__", alter_sys=True)
+finally:
+    os.close(fd)
+PY
+}
+
 artifact_inventory() {
     local directory="$1" target="$2"
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
@@ -967,7 +1978,12 @@ artifact_inventory() {
 import hashlib, os, pathlib, re, stat, sys
 root, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 rows = []
-for path in sorted(root.iterdir(), key=lambda item: os.fsencode(item.name)):
+children=[]
+with os.scandir(root) as scan:
+    for child in scan:
+        if len(children)>=10_000: raise SystemExit("artifact store entry limit exceeded")
+        children.append(pathlib.Path(child.path))
+for path in sorted(children, key=lambda item: os.fsencode(item.name)):
     info = path.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
         raise SystemExit("artifact store contains a non-regular/single-link object")
@@ -987,7 +2003,7 @@ PY
 }
 
 acquire_locked_sources() {
-    local lock="$1" destination="$2" binary_lock="$3"
+    local lock="$1" destination="$2" binary_lock="$3" acquirer="$4"
     install -d -m 0700 "$destination"
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin HOME="$STATE_ROOT" LC_ALL=C.UTF-8 \
         "$RUNTIME_PREFIX/bin/python3.13" -I -P - \
@@ -1115,8 +2131,8 @@ finally: os.close(parent)
 binary_lock.write_text("\n".join(missing) + ("\n" if missing else ""))
 PY
     if [ -s "$binary_lock" ]; then
-        clean_pip "$RUNTIME_PREFIX/bin/python3.13" "${destination}.pip-home" download \
-            --index-url "$PYPI_INDEX_URL" --only-binary=:all: --no-deps \
+        trusted_network_pip_download "$acquirer" "${destination}.pip-home" \
+            --only-binary=:all: --no-deps \
             --dest "$destination" -r "$binary_lock"
     fi
 }
@@ -1194,7 +2210,12 @@ root_artifact_inventory() {
         "$directory" "$target" <<'PY'
 import hashlib, os, pathlib, re, stat, sys
 root, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]); rows=[]
-for path in sorted(root.iterdir(), key=lambda item: os.fsencode(item.name)):
+children=[]
+with os.scandir(root) as scan:
+    for child in scan:
+        if len(children)>=10_000: raise SystemExit("sandbox artifact entry limit exceeded")
+        children.append(pathlib.Path(child.path))
+for path in sorted(children,key=lambda item: os.fsencode(item.name)):
     info=path.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.+!-]*",path.name):
         raise SystemExit("sandbox artifact is unsafe")
@@ -1443,13 +2464,16 @@ pathlib.Path(sys.argv[6]).write_text("isolated\n")' \
 prepare_wheelhouse_inputs() {
     local lock="$1" wheelhouse="$2" builder="$3" sources="$4" backends="$5" prefix="$6"
     local binary_lock="${sources}.binary.lock" backend_requirements="${backends}.requirements"
-    acquire_locked_sources "$lock" "$sources" "$binary_lock"
+    prepare_pip_acquirer "$builder"
+    acquire_locked_sources "$lock" "$sources" "$binary_lock" "$builder"
+    verify_pip_bootstrap_wheel "$sources"
     artifact_inventory "$sources" "${prefix}-sources.sha256"
     build_backend_requirements "$sources" "$backend_requirements"
     install -d -m 0700 "$backends"
-    clean_pip "$RUNTIME_PREFIX/bin/python3.13" "${backends}.pip-home" download \
-        --index-url "$PYPI_INDEX_URL" --only-binary=:all: --dest "$backends" \
+    trusted_network_pip_download "$builder" "${backends}.pip-home" \
+        --only-binary=:all: --dest "$backends" \
         -r "$backend_requirements"
+    verify_pip_bootstrap_wheel "$backends"
     artifact_inventory "$backends" "${prefix}-backends.sha256"
     seal_artifact_store "$sources" "${prefix}-sources.sha256"
     seal_artifact_store "$backends" "${prefix}-backends.sha256"
@@ -1499,6 +2523,13 @@ build_wheelhouse() (
     sandbox_run "$scratch" "$scratch/work/builder/bin/python" -I -P -m pip install \
         --disable-pip-version-check --no-input --no-cache-dir --no-index \
         --find-links "$scratch/input/backends" "pip==$PIP_VERSION" "setuptools==$SETUPTOOLS_VERSION" wheel
+    sandbox_run "$scratch" "$scratch/work/builder/bin/python" -I -P -c \
+        'import importlib.metadata, pathlib, sys
+expected, root = sys.argv[1], pathlib.Path(sys.prefix).resolve(strict=True)
+if importlib.metadata.version("pip") != expected: raise SystemExit("sandbox pip version differs")
+import pip
+if root not in pathlib.Path(pip.__file__).resolve(strict=True).parents: raise SystemExit("sandbox pip escaped builder")' \
+        "$PIP_VERSION"
     sandbox_run "$scratch" "$scratch/work/builder/bin/python" -I -P -m pip wheel \
         --disable-pip-version-check --no-input --no-cache-dir --no-index \
         --find-links "$scratch/input/sources" --find-links "$scratch/input/backends" \
@@ -1523,32 +2554,575 @@ build_wheelhouse() (
 )
 
 install_offline_lock() {
-    local python="$1" lock="$2" wheelhouse="$3"
+    local python="$1" lock="$2" wheelhouse="$3" environment="${1%/bin/python}"
     clean_pip "$python" "${python}.pip-home" install --no-index --no-deps \
         --find-links "$wheelhouse" -r "$lock"
+    assert_installed_pip_version "$python" "$environment"
+}
+
+sealed_projection_model_digest() {
+    local model="$1"
+    [ -n "$model" ] && [[ "$model" = /* ]] \
+        || fail "GENUS_A03C_DEUTER_MODEL_INPUT muss ein absoluter versiegelter Pfad sein" 64
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$model" <<'PY'
+import hashlib, os, pathlib, stat, sys
+path=pathlib.Path(sys.argv[1]); uid=os.geteuid(); gid=os.getegid()
+if path.resolve(strict=True)!=path: raise SystemExit("Deuter input path is not canonical")
+parent=path.parent; pinfo=parent.lstat(); before=path.lstat()
+if (parent.is_symlink() or not stat.S_ISDIR(pinfo.st_mode) or os.path.ismount(parent)
+        or pinfo.st_uid!=uid or pinfo.st_gid!=gid or stat.S_IMODE(pinfo.st_mode)!=0o500):
+    raise SystemExit("Deuter input parent is not operator-owned and sealed")
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or before.st_dev!=pinfo.st_dev or before.st_nlink!=1 or stat.S_IMODE(before.st_mode)!=0o400):
+    raise SystemExit("Deuter input is not a sealed single-link operator file")
+fields=("st_dev","st_ino","st_mode","st_uid","st_gid","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value: tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); digest=hashlib.sha256(); size=0
+try:
+    opened=os.fstat(fd)
+    while True:
+        chunk=os.read(fd,1024*1024)
+        if not chunk: break
+        digest.update(chunk); size+=len(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat()
+if not identity(before)==identity(opened)==identity(final)==identity(after) or size!=before.st_size:
+    raise SystemExit("Deuter input changed while hashed")
+print(digest.hexdigest())
+PY
+}
+
+sealed_projection_tree_inventory() {
+    local root="$1" target="$2" prefix="$3"
+    [ -n "$root" ] && [[ "$root" = /* ]] \
+        || fail "GENUS_A03C_FASTEMBED_CACHE_INPUT muss ein absoluter versiegelter Pfad sein" 64
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$root" "$target" "$prefix" <<'PY'
+import hashlib, os, pathlib, stat, sys
+root,target,prefix=pathlib.Path(sys.argv[1]),pathlib.Path(sys.argv[2]),sys.argv[3]; uid=os.geteuid(); gid=os.getegid()
+MAX_ENTRIES=100_000; MAX_PATH_BYTES=4096; MAX_INVENTORY_BYTES=64*1024*1024
+if root.resolve(strict=True)!=root: raise SystemExit("sealed tree path is not canonical")
+rinfo=root.lstat()
+if (root.is_symlink() or not stat.S_ISDIR(rinfo.st_mode) or os.path.ismount(root)
+        or rinfo.st_uid!=uid or rinfo.st_gid!=gid or stat.S_IMODE(rinfo.st_mode)!=0o500):
+    raise SystemExit("sealed tree root is not an operator-owned read-only directory")
+if target.exists() or target.is_symlink(): raise SystemExit("sealed inventory target already exists")
+fields=("st_dev","st_ino","st_mode","st_uid","st_gid","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value: tuple(getattr(value,key) for key in fields)
+rows=[]; inventory_bytes=1
+def safe(name):
+    return (name not in {"",".",".."} and not name.startswith(".") and "/" not in name and "\\" not in name
+            and not any(ch.isspace() or ord(ch)<32 or ord(ch)==127 for ch in name))
+def walk(directory,relative_root):
+    global inventory_bytes
+    dbefore=directory.lstat()
+    children=[]
+    with os.scandir(directory) as opened:
+        for child in opened:
+            if len(children)>=MAX_ENTRIES:
+                raise SystemExit("sealed tree directory entry limit exceeded")
+            children.append(child)
+    children.sort(key=lambda item:os.fsencode(item.name))
+    for child in children:
+        if not safe(child.name): raise SystemExit("unsafe member in sealed tree")
+        path=directory/child.name; relative=(relative_root/pathlib.Path(child.name)).as_posix(); before=path.lstat()
+        if (len(relative.encode("utf-8"))>MAX_PATH_BYTES or before.st_dev!=rinfo.st_dev
+                or before.st_uid!=uid or before.st_gid!=gid):
+            raise SystemExit("sealed tree member owner/device/mode differs")
+        qualified=f"{prefix}/{relative}"
+        if stat.S_ISLNK(before.st_mode): raise SystemExit("symlink in sealed tree")
+        if stat.S_ISDIR(before.st_mode):
+            if stat.S_IMODE(before.st_mode)!=0o500: raise SystemExit("sealed tree directory mode differs")
+            if os.path.ismount(path): raise SystemExit("mount in sealed tree")
+            row=f"D {qualified}"
+            if len(rows)>=MAX_ENTRIES or inventory_bytes+len(row.encode())+1>MAX_INVENTORY_BYTES:
+                raise SystemExit("sealed tree inventory limit exceeded")
+            rows.append(row); inventory_bytes+=len(row.encode())+1; walk(path,relative_root/pathlib.Path(child.name))
+            if identity(path.lstat())!=identity(before): raise SystemExit("sealed directory raced")
+        elif stat.S_ISREG(before.st_mode):
+            if before.st_nlink!=1 or stat.S_IMODE(before.st_mode)!=0o400:
+                raise SystemExit("multiply linked or incorrectly mode-sealed input")
+            fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); digest=hashlib.sha256(); size=0
+            try:
+                opened_info=os.fstat(fd)
+                while True:
+                    chunk=os.read(fd,1024*1024)
+                    if not chunk: break
+                    digest.update(chunk); size+=len(chunk)
+                final=os.fstat(fd)
+            finally: os.close(fd)
+            if not identity(before)==identity(opened_info)==identity(final)==identity(path.lstat()) or size!=before.st_size:
+                raise SystemExit("sealed file raced")
+            row=f"F {qualified} {digest.hexdigest()}"
+            if len(rows)>=MAX_ENTRIES or inventory_bytes+len(row.encode())+1>MAX_INVENTORY_BYTES:
+                raise SystemExit("sealed tree inventory limit exceeded")
+            rows.append(row); inventory_bytes+=len(row.encode())+1
+        else: raise SystemExit("special file in sealed tree")
+    if identity(directory.lstat())!=identity(dbefore): raise SystemExit("sealed tree directory raced")
+walk(root,pathlib.Path())
+if not any(row.startswith("F ") for row in rows): raise SystemExit("sealed tree contains no files")
+payload=("\n".join(sorted(rows))+"\n").encode()
+if len(payload)>MAX_INVENTORY_BYTES: raise SystemExit("sealed tree inventory byte limit exceeded")
+fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o400)
+try:
+    view=memoryview(payload)
+    while view:
+        written=os.write(fd,view)
+        if written<=0: raise OSError("sealed inventory write made no progress")
+        view=view[written:]
+    os.fchmod(fd,0o400); os.fsync(fd)
+finally: os.close(fd)
+parent=os.open(target.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(parent)
+finally: os.close(parent)
+PY
+}
+
+prepare_git_projection_source() {
+    local work="$1" commit="$2" require_current_head="${3:-1}"
+    local source="$work/projection-source" inventory="$work/projection-source.inventory" file
+    local -a paths=(schema.sql)
+    for file in "${PROJECTION_SOURCE_GENUS_FILES[@]}"; do paths+=("genus/$file"); done
+    for file in "${PROJECTION_SOURCE_DEPLOY_FILES[@]}"; do paths+=("deploy/$file"); done
+    [ ! -e "$source" ] && [ ! -L "$source" ] \
+        && [ ! -e "$inventory" ] && [ ! -L "$inventory" ] \
+        || fail "Projection-Source-Arbeitsnamen sind nicht frisch" 70
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - \
+        "$REPO_DIR" "$GIT_BIN" "$commit" "$source" "${paths[@]}" <<'PY'
+import hashlib, os, pathlib, re, selectors, subprocess, sys, time
+
+repo, git, commit, root = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], pathlib.Path(sys.argv[4])
+allowed = tuple(sys.argv[5:])
+if not re.fullmatch(r"[0-9a-f]{40}", commit):
+    raise SystemExit("malformed bound Git commit")
+if len(allowed) != len(set(allowed)) or not allowed:
+    raise SystemExit("duplicate or empty public source allow-list")
+if root.exists() or root.is_symlink() or root.parent.resolve(strict=True) != root.parent:
+    raise SystemExit("public source output is not a fresh canonical child")
+
+env = {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/nonexistent",
+    "LC_ALL": "C",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+}
+base = [
+    git, "--no-replace-objects", "-c", f"safe.directory={repo}",
+    "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+    "-c", "core.hooksPath=/dev/null", "-c", "core.attributesFile=/dev/null",
+    "-c", "diff.external=", "-C", str(repo),
+]
+
+def run_git(arguments: list[str], *, limit: int) -> bytes:
+    process = subprocess.Popen(
+        [*base, *arguments], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        env=env,
+    )
+    assert process.stdout is not None
+    fd=process.stdout.fileno(); os.set_blocking(fd,False)
+    selected=selectors.DefaultSelector(); selected.register(fd,selectors.EVENT_READ)
+    chunks=[]; total=0; deadline=time.monotonic()+60
+    try:
+        while True:
+            remaining=deadline-time.monotonic()
+            if remaining<=0:
+                process.kill(); process.wait(); raise SystemExit("Git source operation timed out")
+            events=selected.select(min(remaining,1.0))
+            if not events:
+                if process.poll() is not None:
+                    chunk=os.read(fd,64*1024)
+                    if chunk: chunks.append(chunk); total+=len(chunk)
+                    break
+                continue
+            chunk=os.read(fd,min(64*1024,limit+1-total))
+            if not chunk: break
+            chunks.append(chunk); total+=len(chunk)
+            if total>limit:
+                process.kill(); process.wait()
+                raise SystemExit("Git source operation exceeded its fixed byte limit")
+        status=process.wait(timeout=max(0.1,deadline-time.monotonic()))
+    finally:
+        selected.close(); process.stdout.close()
+        if process.poll() is None:
+            process.kill(); process.wait()
+    if status!=0: raise SystemExit("bound Git source operation failed")
+    return b"".join(chunks)
+
+def parse_tree(raw: bytes) -> dict[str, tuple[str, str]]:
+    result: dict[str, tuple[str, str]] = {}
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        try:
+            header, encoded_path = record.split(b"\t", 1)
+            mode, kind, oid = header.split(b" ")
+            path = encoded_path.decode("utf-8", "strict")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise SystemExit("malformed Git tree record") from exc
+        if (
+            kind != b"blob"
+            or mode not in {b"100644", b"100755"}
+            or not re.fullmatch(rb"[0-9a-f]{40}", oid)
+            or path in result
+        ):
+            raise SystemExit("public source tree contains a non-regular or duplicate member")
+        result[path] = (mode.decode(), oid.decode())
+    return result
+
+selected = parse_tree(run_git(
+    ["ls-tree", "-rz", "--full-tree", commit, "--", *allowed], limit=4 * 1024 * 1024
+))
+if set(selected) != set(allowed):
+    missing = sorted(set(allowed).difference(selected))
+    extra = sorted(set(selected).difference(allowed))
+    raise SystemExit(f"public source allow-list/tree differs: missing={missing[:1]} extra={extra[:1]}")
+genus_expected = {path for path in allowed if path.startswith("genus/")}
+genus_actual = set(parse_tree(run_git(
+    ["ls-tree", "-rz", "--full-tree", commit, "--", "genus"], limit=4 * 1024 * 1024
+)))
+if genus_actual != genus_expected:
+    raise SystemExit("tracked genus tree differs from its exact public allow-list")
+
+os.mkdir(root, 0o700)
+root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
+directory_fds: dict[str, int] = {"": root_fd}
+total = 0
+try:
+    for directory in ("deploy", "genus"):
+        os.mkdir(directory, 0o700, dir_fd=root_fd)
+        directory_fds[directory] = os.open(
+            directory, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0), dir_fd=root_fd
+        )
+    os.mkdir("a0_3c_consumers", 0o700, dir_fd=directory_fds["deploy"])
+    directory_fds["deploy/a0_3c_consumers"] = os.open(
+        "a0_3c_consumers", os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+        dir_fd=directory_fds["deploy"],
+    )
+    for relative in sorted(allowed, key=os.fsencode):
+        parts = pathlib.PurePosixPath(relative).parts
+        if (
+            not parts
+            or len(parts) > 3
+            or any(part in {"", ".", ".."} or part.startswith(".") for part in parts)
+            or len(relative.encode()) > 4096
+        ):
+            raise SystemExit("unsafe public source member")
+        parent = "" if len(parts) == 1 else "/".join(parts[:-1])
+        if parent not in directory_fds:
+            raise SystemExit("public source member escaped exact topology")
+        oid = selected[relative][1]
+        raw_size=run_git(["cat-file", "-s", oid], limit=64)
+        if not re.fullmatch(rb"[0-9]+\n?",raw_size):
+            raise SystemExit("Git blob size is malformed")
+        blob_size=int(raw_size)
+        if blob_size>32*1024*1024:
+            raise SystemExit("Git source blob exceeds its fixed byte limit")
+        payload = run_git(["cat-file", "blob", oid], limit=blob_size)
+        if len(payload)!=blob_size:
+            raise SystemExit("Git source blob size changed during extraction")
+        total += len(payload)
+        if total > 128 * 1024 * 1024:
+            raise SystemExit("public source snapshot exceeded its fixed byte limit")
+        git_digest = hashlib.sha1(b"blob " + str(len(payload)).encode() + b"\0" + payload).hexdigest()
+        if git_digest != oid:
+            raise SystemExit("Git blob bytes differ from their bound object id")
+        fd = os.open(
+            parts[-1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o400, dir_fd=directory_fds[parent],
+        )
+        try:
+            view = memoryview(payload)
+            while view:
+                written=os.write(fd,view)
+                if written<=0: raise OSError("Git source write made no progress")
+                view=view[written:]
+            os.fchmod(fd, 0o400)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    for name in ("deploy/a0_3c_consumers", "deploy", "genus"):
+        os.fchmod(directory_fds[name], 0o500)
+        os.fsync(directory_fds[name])
+    os.fchmod(root_fd, 0o500)
+    os.fsync(root_fd)
+finally:
+    for _name, fd in reversed(tuple(directory_fds.items())):
+        os.close(fd)
+PY
+    if [ "$require_current_head" = 1 ]; then
+        assert_expected_commit "$commit"
+    elif [ "$require_current_head" != 0 ]; then
+        fail "ungueltiger Git-Projection-HEAD-Pruefmodus" 70
+    fi
+    sealed_projection_tree_inventory "$source" "$inventory" source
+    printf '%s\n' "$source|$inventory|$(sha256_file "$inventory")"
+}
+
+commit_bound_projection_preparer_blob() {
+    local commit="$1" expected
+    expected="$(safe_git rev-parse "$commit:$PROJECTION_PREPARER_REPO_REL")" \
+        || fail "Projection-Preparer fehlt im gebundenen Commit" 70
+    [[ "$expected" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "Projection-Preparer-Blob-ID ist malformed" 70
+    safe_git cat-file -e "$expected^{blob}" \
+        || fail "Projection-Preparer-Blob ist nicht lesbar" 70
+    printf '%s\n' "$expected"
+}
+
+prepare_projection_payload() {
+    local payload="$1" work="$2" commit="$3" repo_tree="$4" deuter_hash="$5"
+    local fastembed_inventory="$6" fastembed_hash="$7" expected_core_wheels="$8" expected_embed_wheels="$9"
+    local source_root source_inventory source_hash preparer_blob preparer_source result scratch=""
+    local copied_hash projection_hash asset_hash nobody_uid nobody_gid verify_inventory
+    IFS='|' read -r source_root source_inventory source_hash \
+        < <(prepare_git_projection_source "$work" "$commit")
+    [ -n "$source_root" ] && [ -n "$source_inventory" ] && [[ "$source_hash" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "versiegelte Projection-Source-Evidence ist unvollstaendig" 70
+    preparer_blob="$(commit_bound_projection_preparer_blob "$commit")"
+    preparer_source="$work/projection-preparer.$preparer_blob.py"
+    [ ! -e "$preparer_source" ] && [ ! -L "$preparer_source" ] \
+        || fail "Projection-Preparer-Zwischenpfad kollidiert" 70
+    safe_git cat-file blob "$preparer_blob" > "$preparer_source"
+    chmod 0400 "$preparer_source"
+    [ "$(safe_git hash-object "$preparer_source")" = "$preparer_blob" ] \
+        || fail "Projection-Preparer-Bytes driften vom gebundenen Git-Blob" 70
+
+    nobody_uid="$(getent passwd nobody | cut -d: -f3)"
+    nobody_gid="$(getent group nogroup | cut -d: -f3)"
+    [[ "$nobody_uid" =~ ^[0-9]+$ ]] && [[ "$nobody_gid" =~ ^[0-9]+$ ]] \
+        || fail "dedizierte Projection-Build-Identitaet nobody:nogroup fehlt" 69
+    [ "$nobody_uid" -ne "$(id -u)" ] \
+        || fail "Projection-Build-Identitaet ist nicht vom Operator getrennt" 70
+    scratch="$(create_build_scratch)"
+    [[ "$scratch" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]] \
+        || fail "Projection-Build-Scratch liegt nicht unter dem fixen /var/lib-Root" 70
+    cleanup_projection_scratch() {
+        local status=$?
+        trap - EXIT
+        set +e
+        if [[ "$scratch" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]]; then
+            as_root "$ROOT_RM_BIN" -rf -- "$scratch"
+            as_root "$ROOT_SYNC_BIN" -f /var/lib
+        fi
+        exit "$status"
+    }
+    trap cleanup_projection_scratch EXIT
+    as_root "$ROOT_CHMOD_BIN" 0711 "$scratch"
+    as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0555 \
+        "$scratch/input" "$scratch/input/deuter-model"
+    as_root "$ROOT_CP_BIN" -a -- "$work/wheelhouse-core" "$scratch/input/wheelhouse-core"
+    as_root "$ROOT_CP_BIN" -a -- "$work/wheelhouse-embed" "$scratch/input/wheelhouse-embed"
+    as_root "$ROOT_CP_BIN" -a -- "$source_root" "$scratch/input/source"
+    as_root "$ROOT_CP_BIN" -a -- "$FASTEMBED_CACHE_INPUT" "$scratch/input/fastembed-cache"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$work/core.lock" "$scratch/input/core.lock"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$work/embed.lock" "$scratch/input/embed.lock"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$work/wheels-core.sha256" "$scratch/input/wheels-core.sha256"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$work/wheels-embed.sha256" "$scratch/input/wheels-embed.sha256"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$source_inventory" "$scratch/input/source.inventory"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$fastembed_inventory" "$scratch/input/fastembed-cache.inventory"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$DEUTER_MODEL_INPUT" \
+        "$scratch/input/deuter-model/model.gguf"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0444 "$preparer_source" "$scratch/input/preparer.py"
+    as_root "$ROOT_CHOWN_BIN" -R root:root "$scratch/input"
+    as_root "$ROOT_FIND_BIN" "$scratch/input" -type d -exec "$ROOT_CHMOD_BIN" 0555 {} +
+    as_root "$ROOT_FIND_BIN" "$scratch/input" -type f -exec "$ROOT_CHMOD_BIN" 0444 {} +
+
+    copied_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/input/wheels-core.sha256")"; copied_hash="${copied_hash%% *}"
+    [ "$copied_hash" = "$expected_core_wheels" ] \
+        || fail "root-eigenes Core-Wheel-Inventar driftete von der versiegelten Akquise" 70
+    copied_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/input/wheels-embed.sha256")"; copied_hash="${copied_hash%% *}"
+    [ "$copied_hash" = "$expected_embed_wheels" ] \
+        || fail "root-eigenes Embed-Wheel-Inventar driftete von der versiegelten Akquise" 70
+    copied_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/input/source.inventory")"; copied_hash="${copied_hash%% *}"
+    [ "$copied_hash" = "$source_hash" ] \
+        || fail "root-eigenes Source-Inventar driftete vom commitgebundenen Snapshot" 70
+    copied_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/input/fastembed-cache.inventory")"; copied_hash="${copied_hash%% *}"
+    [ "$copied_hash" = "$fastembed_hash" ] \
+        || fail "root-eigenes FastEmbed-Inventar driftete von der versiegelten Akquise" 70
+    copied_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/input/deuter-model/model.gguf")"; copied_hash="${copied_hash%% *}"
+    [ "$copied_hash" = "$deuter_hash" ] \
+        || fail "root-eigenes Deuter-Modell driftete von der versiegelten Akquise" 70
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$scratch/input/preparer.py" "$preparer_blob" <<'PY'
+import hashlib,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; info=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_gid!=0
+        or stat.S_IMODE(info.st_mode)!=0o444 or info.st_nlink!=1 or info.st_size>8*1024*1024):
+    raise SystemExit("root projection preparer metadata differs")
+payload=path.read_bytes(); actual=hashlib.sha1(b"blob "+str(len(payload)).encode()+b"\0"+payload).hexdigest()
+if actual!=expected: raise SystemExit("root projection preparer differs from commit-bound Git blob")
+PY
+    verify_inventory="$scratch/core-wheels.verify"
+    root_artifact_inventory "$scratch/input/wheelhouse-core" "$verify_inventory"
+    as_root "$ROOT_CMP_BIN" -s -- "$verify_inventory" "$scratch/input/wheels-core.sha256" \
+        || fail "root-eigene Core-Wheels driften von ihrem Inventar" 70
+    verify_inventory="$scratch/embed-wheels.verify"
+    root_artifact_inventory "$scratch/input/wheelhouse-embed" "$verify_inventory"
+    as_root "$ROOT_CMP_BIN" -s -- "$verify_inventory" "$scratch/input/wheels-embed.sha256" \
+        || fail "root-eigene Embed-Wheels driften von ihrem Inventar" 70
+
+    as_root "$ROOT_INSTALL_BIN" -d -o nobody -g nogroup -m 0700 \
+        "$scratch/work" "$scratch/work/home" "$scratch/work/projection-payload" "$scratch/output"
+    sandbox_canary "$scratch"
+    sandbox_run "$scratch" "$RUNTIME_PREFIX/bin/python3.13" -I -P -m venv \
+        "$scratch/work/projection-payload/core"
+    sandbox_run "$scratch" "$RUNTIME_PREFIX/bin/python3.13" -I -P -m venv \
+        "$scratch/work/projection-payload/embed"
+    sandbox_run "$scratch" "$scratch/work/projection-payload/core/bin/python" -I -P -m pip install \
+        --disable-pip-version-check --no-input --no-cache-dir --no-index --no-deps \
+        --only-binary=:all: --find-links "$scratch/input/wheelhouse-core" -r "$scratch/input/core.lock"
+    sandbox_run "$scratch" "$scratch/work/projection-payload/embed/bin/python" -I -P -m pip install \
+        --disable-pip-version-check --no-input --no-cache-dir --no-index --no-deps \
+        --only-binary=:all: --find-links "$scratch/input/wheelhouse-embed" -r "$scratch/input/embed.lock"
+    # No environment interpreter is executed after installation.  In particular,
+    # an injected sitecustomize/.pth hook cannot run before the stdlib-only
+    # preparer has rejected/discarded it and emitted a descriptor-bound projection.
+    result="$(sandbox_run "$scratch" "$RUNTIME_PREFIX/bin/python3.13" -I -P \
+        "$scratch/input/preparer.py" --root-owned-inputs \
+        --work-root "$scratch/work/projection-payload" --runtime-prefix "$RUNTIME_PREFIX" \
+        --source-root "$scratch/input/source" --source-inventory "$scratch/input/source.inventory" \
+        --source-inventory-sha256 "$source_hash" --repo-commit "$commit" --repo-tree "$repo_tree" \
+        --deuter-model "$scratch/input/deuter-model/model.gguf" --deuter-model-sha256 "$deuter_hash" \
+        --deuter-model-relative-path "$DEUTER_MODEL_RELATIVE" \
+        --fastembed-cache "$scratch/input/fastembed-cache" \
+        --fastembed-cache-inventory "$scratch/input/fastembed-cache.inventory" \
+        --fastembed-cache-inventory-sha256 "$fastembed_hash" --fastembed-model-id "$MODEL" \
+        --fastembed-repository "$FASTEMBED_REPOSITORY" --fastembed-revision "$FASTEMBED_REVISION")"
+    projection_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/work/projection-payload/projection.inventory")"; projection_hash="${projection_hash%% *}"
+    asset_hash="$(as_root "$ROOT_SHA256_BIN" "$scratch/work/projection-payload/assets.inventory")"; asset_hash="${asset_hash%% *}"
+    PROJECTION_RESULT="$result" PROJECTION_SHA="$projection_hash" ASSET_SHA="$asset_hash" SOURCE_SHA="$source_hash" \
+        "$RUNTIME_PREFIX/bin/python3.13" -I -P - <<'PY'
+import json,os,re
+data=json.loads(os.environ["PROJECTION_RESULT"])
+expected={"projection_inventory_sha256":os.environ["PROJECTION_SHA"],
+          "asset_inventory_sha256":os.environ["ASSET_SHA"],
+          "source_inventory_sha256":os.environ["SOURCE_SHA"]}
+if set(data)!={*expected,"asset_receipt_sha256"} or any(data.get(k)!=v for k,v in expected.items()):
+    raise SystemExit("projection preparer result binding differs")
+if not re.fullmatch(r"[a-f0-9]{64}",data["asset_receipt_sha256"]):
+    raise SystemExit("projection asset receipt digest is malformed")
+PY
+    durably_sync_tree "$scratch/work/projection-payload"
+    as_root "$ROOT_CP_BIN" -a -- "$scratch/work/projection-payload/projection" "$payload/projection"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0400 \
+        "$scratch/work/projection-payload/projection.inventory" "$payload/projection.inventory"
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0400 \
+        "$scratch/work/projection-payload/assets.inventory" "$payload/assets.inventory"
+    as_root "$ROOT_CHOWN_BIN" -R "$(id -u):$(id -g)" "$payload"
+    [ "$(sha256_file "$payload/projection.inventory")" = "$projection_hash" ] \
+        && [ "$(sha256_file "$payload/assets.inventory")" = "$asset_hash" ] \
+        || fail "Projection-Output driftete beim Rueckkopieren aus der isolierten Build-Identitaet" 70
+    as_root "$ROOT_RM_BIN" -rf -- "$scratch"
+    as_root "$ROOT_SYNC_BIN" -f /var/lib
+    scratch=""
+    rm -f -- "$preparer_source"
+    trap - EXIT
+    assert_expected_commit "$commit"
 }
 
 tree_inventory() {
     local set="$1" target="$2"
-    "$set/core/bin/python" - "$set" "$target" <<'PY'
-import hashlib, os, pathlib, sys
-root, output = pathlib.Path(sys.argv[1]).resolve(), pathlib.Path(sys.argv[2])
-excluded = {"manifest.json", "tree.inventory"}
-rows = []
-for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
-    relative = path.relative_to(root).as_posix()
-    if relative in excluded:
-        continue
-    info = path.lstat()
-    if path.is_symlink():
-        rows.append(f"L {relative} {os.readlink(path)}")
-    elif path.is_file():
-        rows.append(f"F {relative} {hashlib.sha256(path.read_bytes()).hexdigest()}")
-    elif path.is_dir():
-        rows.append(f"D {relative}")
-    else:
-        raise SystemExit("unexpected filesystem object in runtime set")
-output.write_text("\n".join(rows) + "\n")
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$set" "$target" <<'PY'
+import hashlib,os,pathlib,stat,sys
+root=pathlib.Path(sys.argv[1]); output=pathlib.Path(sys.argv[2]); uid=os.geteuid(); gid=os.getegid()
+MAX_ENTRIES=100_000; MAX_PATH_BYTES=4096; MAX_INVENTORY_BYTES=64*1024*1024
+if (root.resolve(strict=True)!=root or output.parent.resolve(strict=True)!=output.parent
+        or output.name!="tree.inventory" or output.exists() or output.is_symlink()):
+    raise SystemExit("private tree inventory paths are not canonical")
+root_info=root.lstat(); output_parent_info=output.parent.lstat()
+if (not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=uid or root_info.st_gid!=gid
+        or stat.S_IMODE(root_info.st_mode) not in {0o500,0o700}
+        or not stat.S_ISDIR(output_parent_info.st_mode) or output_parent_info.st_uid!=uid
+        or output_parent_info.st_gid!=gid or output_parent_info.st_dev!=root_info.st_dev):
+    raise SystemExit("private tree root/output parent ownership, mode, or device differs")
+root_dev=root_info.st_dev; rows=[]; inventory_bytes=1; excluded={"manifest.json","tree.inventory"}
+identity=lambda value:(value.st_dev,value.st_ino,value.st_uid,value.st_gid,value.st_mode,
+                       value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+def append(row):
+    global inventory_bytes
+    if len(rows)>=MAX_ENTRIES: raise SystemExit("private tree entry limit exceeded")
+    encoded=len(row.encode("utf-8"))+1; inventory_bytes+=encoded
+    if inventory_bytes>MAX_INVENTORY_BYTES: raise SystemExit("private tree inventory byte limit exceeded")
+    rows.append(row)
+def walk(fd,prefix=""):
+    names=[]
+    with os.scandir(fd) as entries:
+        for entry in entries:
+            if len(names)>=MAX_ENTRIES: raise SystemExit("private directory entry limit exceeded")
+            names.append(entry.name)
+    for name in sorted(names,key=os.fsencode):
+        if not prefix and name in excluded: continue
+        if not name or name in {".",".."} or "/" in name or "\x00" in name:
+            raise SystemExit("unsafe private tree member name")
+        relative=f"{prefix}/{name}" if prefix else name
+        if len(relative.encode("utf-8"))>MAX_PATH_BYTES: raise SystemExit("private tree path limit exceeded")
+        before=os.stat(name,dir_fd=fd,follow_symlinks=False)
+        if before.st_uid!=uid or before.st_gid!=gid or before.st_dev!=root_dev:
+            raise SystemExit(f"private tree ownership/device differs: {relative}")
+        if stat.S_ISDIR(before.st_mode):
+            if stat.S_IMODE(before.st_mode)!=0o500: raise SystemExit(f"private directory mode differs: {relative}")
+            child=os.open(name,os.O_RDONLY|os.O_DIRECTORY|getattr(os,"O_NOFOLLOW",0),dir_fd=fd)
+            try:
+                if identity(os.fstat(child))!=identity(before): raise SystemExit(f"private directory raced: {relative}")
+                append(f"D {relative}"); walk(child,relative)
+                if (identity(os.fstat(child))!=identity(before)
+                        or identity(os.stat(name,dir_fd=fd,follow_symlinks=False))!=identity(before)):
+                    raise SystemExit(f"private directory changed: {relative}")
+            finally: os.close(child)
+        elif stat.S_ISREG(before.st_mode):
+            if before.st_nlink!=1 or stat.S_IMODE(before.st_mode) not in {0o400,0o500}:
+                raise SystemExit(f"private file link/mode differs: {relative}")
+            file_fd=os.open(name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0),dir_fd=fd)
+            try:
+                opened=os.fstat(file_fd)
+                if identity(opened)!=identity(before): raise SystemExit(f"private file raced: {relative}")
+                digest=hashlib.sha256(); size=0
+                while True:
+                    chunk=os.read(file_fd,1024*1024)
+                    if not chunk: break
+                    digest.update(chunk); size+=len(chunk)
+                final=os.fstat(file_fd)
+            finally: os.close(file_fd)
+            after=os.stat(name,dir_fd=fd,follow_symlinks=False)
+            if identity(final)!=identity(before) or identity(after)!=identity(before) or size!=before.st_size:
+                raise SystemExit(f"private file changed: {relative}")
+            append(f"F {relative} {digest.hexdigest()}")
+        elif stat.S_ISLNK(before.st_mode):
+            if before.st_nlink!=1: raise SystemExit(f"private symlink hardlink rejected: {relative}")
+            target=os.readlink(name,dir_fd=fd); after=os.stat(name,dir_fd=fd,follow_symlinks=False)
+            if identity(after)!=identity(before) or not target or "\n" in target or "\r" in target:
+                raise SystemExit(f"private symlink changed or malformed: {relative}")
+            append(f"L {relative} {target}")
+        else: raise SystemExit(f"unexpected filesystem object in runtime set: {relative}")
+root_fd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|getattr(os,"O_NOFOLLOW",0))
+try:
+    if identity(os.fstat(root_fd))!=identity(root_info): raise SystemExit("private tree root raced")
+    walk(root_fd)
+    if identity(os.fstat(root_fd))!=identity(root_info) or identity(root.lstat())!=identity(root_info):
+        raise SystemExit("private tree root changed")
+finally: os.close(root_fd)
+payload=("\n".join(sorted(rows))+"\n").encode()
+if len(payload)>MAX_INVENTORY_BYTES: raise SystemExit("private tree inventory byte limit exceeded")
+parent_fd=os.open(output.parent,os.O_RDONLY|os.O_DIRECTORY|getattr(os,"O_NOFOLLOW",0))
+try:
+    anchor=lambda value:(value.st_dev,value.st_ino,value.st_uid,value.st_gid,value.st_mode)
+    if anchor(os.fstat(parent_fd))!=anchor(output_parent_info): raise SystemExit("inventory output parent raced")
+    flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0)
+    out=os.open(output.name,flags,0o400,dir_fd=parent_fd)
+    try:
+        view=memoryview(payload)
+        while view:
+            written=os.write(out,view)
+            if written<=0: raise OSError("private inventory write made no progress")
+            view=view[written:]
+        os.fchmod(out,0o400); os.fsync(out)
+    finally: os.close(out)
+    if anchor(os.fstat(parent_fd))!=anchor(output_parent_info): raise SystemExit("inventory output parent changed")
+    os.fsync(parent_fd)
+finally: os.close(parent_fd)
 PY
 }
 
@@ -1564,6 +3138,7 @@ write_manifest() {
     local set="$1" manifest="$2" commit="$3" core_hash="$4" embed_hash="$5" probe="$6"
     local core_wheels="$7" embed_wheels="$8" core_sources="$9" embed_sources="${10}"
     local core_backends="${11}" embed_backends="${12}" tree_hash="${13}" repo_tree="${14}"
+    local projection_hash="${15}" asset_hash="${16}"
     local bootstrap_hash runtime_inventory_hash runtime_python_hash runtime_stdlib_hash runtime_tree_hash
     bootstrap_hash="$(sha256_file "$RUNTIME_PREFIX/share/genus/BUILD-BOOTSTRAP.lock")"
     runtime_inventory_hash="$(sha256_file "$RUNTIME_INVENTORY")"
@@ -1574,14 +3149,17 @@ write_manifest() {
     CORE_WHEELS="$core_wheels" EMBED_WHEELS="$embed_wheels" TREE_HASH="$tree_hash" \
     CORE_SOURCES="$core_sources" EMBED_SOURCES="$embed_sources" \
     CORE_BACKENDS="$core_backends" EMBED_BACKENDS="$embed_backends" \
+    PROJECTION_HASH="$projection_hash" ASSET_HASH="$asset_hash" \
     REPO_TREE="$repo_tree" BOOTSTRAP_HASH="$bootstrap_hash" \
     RUNTIME_INVENTORY_HASH="$runtime_inventory_hash" RUNTIME_PYTHON_HASH="$runtime_python_hash" \
     RUNTIME_STDLIB_HASH="$runtime_stdlib_hash" RUNTIME_TREE_HASH="$runtime_tree_hash" \
-    "$set/core/bin/python" - "$set/manifest.json.tmp" "$manifest" "$commit" <<'PY'
+    PIP_BOOTSTRAP_VERSION="$PIP_VERSION" PIP_BOOTSTRAP_WHEEL="$PIP_BOOTSTRAP_WHEEL" \
+    PIP_BOOTSTRAP_URL="$PIP_BOOTSTRAP_URL" PIP_BOOTSTRAP_HASH="$PIP_BOOTSTRAP_SHA256" \
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$set/manifest.json.tmp" "$manifest" "$commit" <<'PY'
 import json, os, pathlib, sys
 probe = json.loads(os.environ["PROBE"])
 data = {
-    "schema": "genus-a0.3c-runtime-set-v1",
+    "schema": "genus-a0.3c-runtime-set-v2",
     "manifest_id": sys.argv[2],
     "repo_commit": sys.argv[3],
     "python": {
@@ -1602,6 +3180,14 @@ data = {
     "wheel_inventories": {"core_sha256": os.environ["CORE_WHEELS"], "embed_sha256": os.environ["EMBED_WHEELS"]},
     "source_inventories": {"core_sha256": os.environ["CORE_SOURCES"], "embed_sha256": os.environ["EMBED_SOURCES"]},
     "build_backend_inventories": {"core_sha256": os.environ["CORE_BACKENDS"], "embed_sha256": os.environ["EMBED_BACKENDS"]},
+    "projection_inventory_sha256": os.environ["PROJECTION_HASH"],
+    "asset_inventory_sha256": os.environ["ASSET_HASH"],
+    "pip_bootstrap": {
+        "version": os.environ["PIP_BOOTSTRAP_VERSION"],
+        "filename": os.environ["PIP_BOOTSTRAP_WHEEL"],
+        "url": os.environ["PIP_BOOTSTRAP_URL"],
+        "sha256": os.environ["PIP_BOOTSTRAP_HASH"],
+    },
     "tree_inventory_sha256": os.environ["TREE_HASH"],
     "repo_tree": os.environ["REPO_TREE"],
     "bootstrap_inventory_sha256": os.environ["BOOTSTRAP_HASH"],
@@ -1613,54 +3199,365 @@ PY
     chmod 0600 "$set/manifest.json"
 }
 
+smoke_sandbox_run() {
+    local set="$1" primary_group
+    shift
+    primary_group="$(id -gn -- "$GENUS_USER")"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$ROOT_SYSTEMD_RUN_BIN" \
+        --quiet --wait --pipe --collect --property=Type=exec \
+        --property="User=$GENUS_USER" --property="Group=$primary_group" --property=UMask=0077 \
+        --property=ProtectHome=read-only --property=ProtectSystem=strict \
+        --property=PrivateNetwork=yes --property=PrivateDevices=yes --property=PrivateTmp=yes \
+        --property=NoNewPrivileges=yes --property=CapabilityBoundingSet= \
+        --property=RestrictAddressFamilies=AF_UNIX --property=ProtectProc=invisible \
+        --property=ProtectKernelTunables=yes --property=ProtectKernelModules=yes \
+        --property=ProtectControlGroups=yes --property=LockPersonality=yes \
+        --property=TasksMax=512 --property=RuntimeMaxSec=20m --property=MemoryMax=7G \
+        --property="ReadOnlyPaths=$set $RUNTIME_PREFIX" \
+        --property="InaccessiblePaths=$REPO_DIR -$DB_PATH -$PAUSE_FILE" \
+        --property="WorkingDirectory=$set/projection" \
+        --setenv=PATH=/usr/bin:/bin --setenv=HOME=/nonexistent --setenv=LC_ALL=C.UTF-8 \
+        --setenv=PYTHONNOUSERSITE=1 --setenv=PIP_CONFIG_FILE=/dev/null \
+        --setenv=PIP_DISABLE_PIP_VERSION_CHECK=1 --setenv=PIP_NO_INPUT=1 \
+        --setenv=PIP_NO_CACHE_DIR=1 --setenv=GENUS_PRODUCT_MODE=1 \
+        --setenv=GENUS_MODEL_OFFLINE=1 --setenv=HF_HUB_OFFLINE=1 \
+        --setenv=TRANSFORMERS_OFFLINE=1 --setenv=NO_PROXY='*' -- "$@"
+}
+
 smoke_set() {
-    local set="$1"
-    "$set/core/bin/python" -m pip check
-    "$set/embed/bin/python" -m pip check
-    "$set/core/bin/python" -c 'import genus, llama_cpp, sqlite3; assert sqlite3.sqlite_version == "3.53.4"'
-    GENUS_EMBED_MODEL="$MODEL" "$set/embed/bin/python" - <<'PY'
-import os
+    local set="$1" core="$1/projection/core/bin/python" embed="$1/projection/embed/bin/python"
+    local source="$1/projection/source" assets="$1/projection/assets"
+    smoke_sandbox_run "$set" "$core" -I -P -m pip check
+    smoke_sandbox_run "$set" "$embed" -I -P -m pip check
+    smoke_sandbox_run "$set" "$core" -I -P -c \
+        'import pathlib,sys
+sys.addaudithook(lambda event,args: (_ for _ in ()).throw(PermissionError("network denied")) if event.startswith("socket.") else None)
+source=pathlib.Path(sys.argv[1]).resolve(strict=True); sys.path.insert(0,str(source))
+import genus, llama_cpp, sqlite3
+assert source in pathlib.Path(genus.__file__).resolve(strict=True).parents
+assert sqlite3.sqlite_version=="3.53.4"
+model=pathlib.Path(sys.argv[2]).resolve(strict=True)
+engine=llama_cpp.Llama(model_path=str(model),n_ctx=128,n_batch=32,n_threads=1,verbose=False)
+assert engine is not None' \
+        "$source" "$assets/$DEUTER_MODEL_RELATIVE"
+    smoke_sandbox_run "$set" "$embed" -I -P - \
+        "$MODEL" "$assets/fastembed-cache" <<'PY'
+import pathlib,sys
+sys.addaudithook(lambda event,args: (_ for _ in ()).throw(PermissionError("network denied")) if event.startswith("socket.") else None)
 from fastembed import TextEmbedding
-model = TextEmbedding(model_name=os.environ["GENUS_EMBED_MODEL"])
-vectors = list(model.embed(["bereit"]))
-assert len(vectors) == 1 and len(vectors[0]) > 0
+cache=pathlib.Path(sys.argv[2]).resolve(strict=True)
+model=TextEmbedding(model_name=sys.argv[1],cache_dir=str(cache),local_files_only=True)
+vectors=list(model.embed(["bereit"]))
+assert len(vectors)==1 and len(vectors[0])>0
+PY
+}
+
+read_static_set_manifest_bindings() {
+    local manifest_file="$1" expected_manifest="$2"
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$manifest_file" "$expected_manifest" <<'PY'
+import json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; uid=os.geteuid(); gid=os.getegid()
+if path.parent.resolve(strict=True)!=path.parent or not re.fullmatch(r"[0-9a-f]{64}",expected):
+    raise SystemExit("private manifest path or expected id is malformed")
+parent=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY|getattr(os,"O_NOFOLLOW",0))
+try:
+    before=os.stat(path.name,dir_fd=parent,follow_symlinks=False)
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or before.st_nlink!=1 or stat.S_IMODE(before.st_mode)!=0o400
+            or before.st_size>128*1024):
+        raise SystemExit("private manifest metadata differs")
+    fd=os.open(path.name,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0),dir_fd=parent)
+    try:
+        opened=os.fstat(fd); raw=b""
+        while True:
+            chunk=os.read(fd,64*1024)
+            if not chunk: break
+            raw+=chunk
+            if len(raw)>128*1024: raise SystemExit("private manifest exceeds byte limit")
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=os.stat(path.name,dir_fd=parent,follow_symlinks=False)
+finally: os.close(parent)
+identity=lambda value:(value.st_dev,value.st_ino,value.st_mode,value.st_uid,value.st_gid,
+                       value.st_nlink,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+    raise SystemExit("private manifest changed during descriptor-bound read")
+try: data=json.loads(raw.decode("utf-8","strict"))
+except (UnicodeDecodeError,json.JSONDecodeError) as exc: raise SystemExit("private manifest JSON is invalid") from exc
+canonical=(json.dumps(data,sort_keys=True,separators=(",",":"),ensure_ascii=True,allow_nan=False)+"\n").encode()
+top={"asset_inventory_sha256","bootstrap_inventory_sha256","build_backend_inventories","manifest_id",
+     "pip_bootstrap","projection_inventory_sha256","python","repo_commit","repo_tree","requirements",
+     "schema","source_inventories","sqlite","tree_inventory_sha256","wheel_inventories"}
+if raw!=canonical or not isinstance(data,dict) or set(data)!=top:
+    raise SystemExit("private manifest is not canonical or has an inexact key set")
+exact_nested={
+ "python":{"archive_sha256","executable_sha256","runtime_inventory_sha256","stdlib_sha256","version","whole_tree_sha256"},
+ "sqlite":{"archive_sha3_256","compile_options_sha256","source_id","sqlite_extension_sha256","sqlite_library_sha256","version"},
+ "requirements":{"core_sha256","embed_sha256"},
+ "wheel_inventories":{"core_sha256","embed_sha256"},
+ "source_inventories":{"core_sha256","embed_sha256"},
+ "build_backend_inventories":{"core_sha256","embed_sha256"},
+ "pip_bootstrap":{"filename","sha256","url","version"},
+}
+if any(not isinstance(data.get(key),dict) or set(data[key])!=keys for key,keys in exact_nested.items()):
+    raise SystemExit("private manifest nested key set differs")
+if (data.get("schema")!="genus-a0.3c-runtime-set-v2" or data.get("manifest_id")!=expected
+        or not re.fullmatch(r"[0-9a-f]{40}",str(data.get("repo_commit","")))
+        or not re.fullmatch(r"[0-9a-f]{40}",str(data.get("repo_tree","")))):
+    raise SystemExit("private manifest identity/source binding differs")
+probe={key:data["sqlite"][key] for key in ("compile_options_sha256","sqlite_extension_sha256","sqlite_library_sha256")}
+print(data["repo_commit"]); print(data["repo_tree"])
+print(json.dumps(probe,sort_keys=True,separators=(",",":")))
+PY
+}
+
+validate_private_projection_evidence() {
+    local set="$1" live_tree="$2" commit="$3" repo_tree="$4"
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - \
+        "$set" "$live_tree" "$commit" "$repo_tree" "$MODEL" "$FASTEMBED_REPOSITORY" \
+        "$FASTEMBED_REVISION" "$DEUTER_MODEL_RELATIVE" \
+        --genus "${PROJECTION_SOURCE_GENUS_FILES[@]}" \
+        --deploy "${PROJECTION_SOURCE_DEPLOY_FILES[@]}" <<'PY'
+import hashlib,json,pathlib,re,sys
+root,tree_path=map(pathlib.Path,sys.argv[1:3])
+commit,repo_tree,model_id,repository,revision,deuter_relative=sys.argv[3:9]
+try:
+    genus_marker=sys.argv.index("--genus",9); deploy_marker=sys.argv.index("--deploy",genus_marker+1)
+except ValueError as exc: raise SystemExit("private projection source allow-list markers are absent") from exc
+genus_files=set(sys.argv[genus_marker+1:deploy_marker]); deploy_files=set(sys.argv[deploy_marker+1:])
+MAX=64*1024*1024
+def read_limited(path,limit=MAX):
+    with path.open("rb") as handle: raw=handle.read(limit+1)
+    if len(raw)>limit: raise SystemExit(f"projection evidence exceeds limit: {path.name}")
+    return raw
+def inventory(raw,label):
+    try: text=raw.decode("utf-8","strict")
+    except UnicodeDecodeError as exc: raise SystemExit(f"{label} inventory is not UTF-8") from exc
+    if not text.endswith("\n") or not text: raise SystemExit(f"{label} inventory is not newline terminated")
+    rows=text.splitlines()
+    if len(rows)>100_000 or rows!=sorted(set(rows)):
+        raise SystemExit(f"{label} inventory is not bounded, sorted, and unique")
+    for row in rows:
+        if re.fullmatch(r"D [^\s/][^\s]*",row): continue
+        if re.fullmatch(r"F [^\s/][^\s]* [0-9a-f]{64}",row): continue
+        if re.fullmatch(r"L [^\s/][^\s]* \S+",row): continue
+        raise SystemExit(f"{label} inventory row is malformed")
+    canonical=("\n".join(rows)+"\n").encode()
+    if canonical!=raw: raise SystemExit(f"{label} inventory is not canonical")
+    return rows
+def row_path(row): return row.split(" ",2)[1]
+def canonical_json(path,keys,schema):
+    raw=read_limited(path,128*1024)
+    try: data=json.loads(raw.decode("utf-8","strict"))
+    except (UnicodeDecodeError,json.JSONDecodeError) as exc: raise SystemExit(f"invalid JSON evidence: {path.name}") from exc
+    encoded=(json.dumps(data,sort_keys=True,separators=(",",":"),ensure_ascii=True,allow_nan=False)+"\n").encode()
+    if raw!=encoded or not isinstance(data,dict) or set(data)!=keys or data.get("schema")!=schema:
+        raise SystemExit(f"noncanonical or inexact JSON evidence: {path.name}")
+    return data
+
+live=inventory(read_limited(tree_path),"live private tree")
+projection_rows=[]
+for row in live:
+    path=row_path(row)
+    if path.startswith("projection/"):
+        projection_rows.append(row.replace(f" {path}",f" {path.removeprefix('projection/')}",1))
+projection=inventory(read_limited(root/"projection.inventory"),"projection")
+if projection_rows!=projection: raise SystemExit("projection inventory differs from the complete private tree")
+assets=[row for row in projection if row_path(row).startswith("assets/")]
+if inventory(read_limited(root/"assets.inventory"),"assets")!=assets:
+    raise SystemExit("asset inventory is not the exact projection asset subset")
+
+snapshot=canonical_json(
+    root/"projection/source/source.snapshot.json",
+    {"repo_commit","repo_tree","schema","source_inventory_sha256"},
+    "genus-a0.3c-public-source-snapshot-v1",
+)
+source_rows=[row for row in projection if row_path(row).startswith("source/") and row_path(row)!="source/source.snapshot.json"]
+source_raw=("\n".join(source_rows)+"\n").encode()
+if (snapshot["repo_commit"]!=commit or snapshot["repo_tree"]!=repo_tree
+        or snapshot["source_inventory_sha256"]!=hashlib.sha256(source_raw).hexdigest()):
+    raise SystemExit("source snapshot does not bind commit, tree, and exact source inventory")
+source_kinds={row_path(row):row[0] for row in source_rows}
+expected_source={"source/genus":"D","source/deploy":"D","source/deploy/a0_3c_consumers":"D","source/schema.sql":"F"}
+expected_source.update({f"source/genus/{name}":"F" for name in genus_files})
+expected_source.update({f"source/deploy/{name}":"F" for name in deploy_files})
+if source_kinds!=expected_source: raise SystemExit("public source topology differs from its exact allow-list")
+
+receipt=canonical_json(
+    root/"projection/assets/receipt.sha256",
+    {"deuter_model_relative_path","deuter_model_sha256","fastembed_cache_inventory_sha256",
+     "fastembed_model_id","fastembed_repository","fastembed_revision","offline_only","schema"},
+    "genus-a0.3c-offline-assets-v1",
+)
+if (receipt["deuter_model_relative_path"]!=deuter_relative or receipt["fastembed_model_id"]!=model_id
+        or receipt["fastembed_repository"]!=repository or receipt["fastembed_revision"]!=revision
+        or receipt["offline_only"] is not True or not re.fullmatch(r"[0-9a-f]{64}",str(receipt["deuter_model_sha256"]))):
+    raise SystemExit("offline asset receipt pins differ")
+deuter_row=f"F assets/{deuter_relative} {receipt['deuter_model_sha256']}"
+if deuter_row not in assets: raise SystemExit("Deuter model digest is absent from asset inventory")
+fastembed=[row for row in assets if row_path(row).startswith("assets/fastembed-cache/")]
+fastembed_raw=("\n".join(fastembed)+"\n").encode()
+if receipt["fastembed_cache_inventory_sha256"]!=hashlib.sha256(fastembed_raw).hexdigest():
+    raise SystemExit("FastEmbed cache receipt differs from exact asset subtree")
+cache_root=f"models--{repository.replace('/','--')}"
+snapshot_files={"config.json","model_optimized.onnx","ort_config.json","special_tokens_map.json",
+                "tokenizer.json","tokenizer_config.json","unigram.json"}
+cache_paths={tuple(row_path(row).split("/")[2:]) for row in fastembed}
+required_cache_paths={
+    (cache_root,),(cache_root,"blobs"),(cache_root,"files_metadata.json"),(cache_root,"refs"),
+    (cache_root,"refs","main"),(cache_root,"snapshots"),(cache_root,"snapshots",revision),
+    *((cache_root,"snapshots",revision,name) for name in {
+        "config.json","model_optimized.onnx","special_tokens_map.json","tokenizer.json","tokenizer_config.json"}),
+}
+if not required_cache_paths.issubset(cache_paths):
+    raise SystemExit("FastEmbed cache lacks the pinned repository/revision runtime closure")
+for row in fastembed:
+    kind=row[0]; parts=tuple(row_path(row).split("/")[2:])
+    allowed=(
+        (kind=="D" and parts in {(cache_root,),(cache_root,"blobs"),(cache_root,"refs"),
+                                 (cache_root,"snapshots"),(cache_root,"snapshots",revision)})
+        or (kind=="F" and (
+            parts in {(cache_root,"files_metadata.json"),(cache_root,"refs","main")}
+            or (len(parts)==3 and parts[:2]==(cache_root,"blobs") and re.fullmatch(r"[0-9a-f]{40,64}",parts[2]))
+            or (len(parts)==4 and parts[:3]==(cache_root,"snapshots",revision) and parts[3] in snapshot_files)
+        ))
+    )
+    if not allowed: raise SystemExit(f"unexpected FastEmbed cache member: {row_path(row)}")
+if not any(len(path)==3 and path[:2]==(cache_root,"blobs") for path in cache_paths):
+    raise SystemExit("FastEmbed cache lacks its immutable blob closure")
+allowed_asset_roots={"assets/deuter-model","assets/fastembed-cache","assets/receipt.sha256"}
+for row in assets:
+    path=row_path(row)
+    if path in allowed_asset_roots or path.startswith("assets/fastembed-cache/") or path==f"assets/{deuter_relative}":
+        continue
+    raise SystemExit(f"unexpected public asset topology: {path}")
 PY
 }
 
 verify_set() {
-    local manifest="$1" set manifest_file tmp probe canonical_sets canonical_set
+    local manifest="$1" source_commit="${2:-}" set manifest_file tmp probe actual_probe embed_probe
+    local canonical_sets canonical_set source_tree actual_source_tree git_source git_inventory git_inventory_hash
+    local -a manifest_bindings
     safe_manifest_id "$manifest"
     set="$(set_path "$manifest")"
-    [ ! -L "$SETS_ROOT" ] && [ ! -L "$set" ] && [ ! -L "$set/core" ] && [ ! -L "$set/embed" ] \
+    [ ! -L "$SETS_ROOT" ] && [ ! -L "$set" ] && [ ! -L "$set/projection" ] \
+        && [ ! -L "$set/projection/core" ] && [ ! -L "$set/projection/embed" ] \
         || fail "Set-/Rollenpfad darf kein Symlink sein" 65
+    [ -L "$set/core" ] && [ "$(readlink -- "$set/core")" = projection/core ] \
+        && [ -L "$set/embed" ] && [ "$(readlink -- "$set/embed")" = projection/embed ] \
+        || fail "private Rollen-Aliase weichen von der versiegelten Projection ab" 65
     canonical_sets="$(realpath -e -- "$SETS_ROOT")"; canonical_set="$(realpath -e -- "$set")"
     [ "$canonical_sets" = "$SETS_ROOT" ] && [ "$canonical_set" = "$SETS_ROOT/$manifest" ] \
         || fail "Set ist nicht kanonisch strikt unter SETS_ROOT" 65
-    [ "$(dirname "$(realpath -e -- "$set/core")")" = "$canonical_set" ] \
-        && [ "$(dirname "$(realpath -e -- "$set/embed")")" = "$canonical_set" ] \
-        || fail "Core-/Embed-Rolle entkommt dem kanonischen Set" 65
+    [ "$(dirname "$(realpath -e -- "$set/projection")")" = "$canonical_set" ] \
+        && [ "$(dirname "$(realpath -e -- "$set/projection/core")")" = "$canonical_set/projection" ] \
+        && [ "$(dirname "$(realpath -e -- "$set/projection/embed")")" = "$canonical_set/projection" ] \
+        || fail "Projection-/Core-/Embed-Rolle entkommt dem kanonischen Set" 65
     manifest_file="$set/manifest.json"
-    [ -f "$manifest_file" ] && [ -x "$set/core/bin/python" ] && [ -x "$set/embed/bin/python" ] \
+    [ -f "$manifest_file" ] && [ ! -L "$manifest_file" ] \
+        && [ -f "$set/tree.inventory" ] && [ ! -L "$set/tree.inventory" ] \
+        && [ -f "$set/projection.inventory" ] && [ ! -L "$set/projection.inventory" ] \
+        && [ -f "$set/assets.inventory" ] && [ ! -L "$set/assets.inventory" ] \
+        && [ -x "$set/projection/core/bin/python" ] && [ -x "$set/projection/embed/bin/python" ] \
         || fail "Set ist unvollstaendig" 65
     [ "$(stat -c %U "$set")" = "$GENUS_USER" ] || fail "Set hat falschen Owner" 65
     [ -z "$(find "$set" -xdev ! -user "$GENUS_USER" -print -quit)" ] || fail "Set enthaelt fremden Owner" 65
     [ -z "$(find "$set" -xdev -type f -perm /222 -print -quit)" ] || fail "Set-Datei ist nach Stage schreibbar" 65
     [ -z "$(find "$set" -xdev -type d -perm /222 -print -quit)" ] || fail "Set-Verzeichnis ist nach Stage schreibbar" 65
     verify_runtime_prefix
-    probe="$(runtime_probe "$set/core/bin/python" "$set/core/bin/python")"
-    runtime_probe "$set/embed/bin/python" "$set/embed/bin/python" >/dev/null
-    "$set/core/bin/python" - "$manifest_file" "$manifest" "$(repo_commit)" "$probe" \
-        "$("$GIT_BIN" -C "$REPO_DIR" rev-parse 'HEAD^{tree}')" \
+    mapfile -t manifest_bindings < <(read_static_set_manifest_bindings "$manifest_file" "$manifest")
+    [ "${#manifest_bindings[@]}" -eq 3 ] \
+        || fail "statische Manifest-Bindungen sind unvollstaendig" 65
+    if [ -n "$source_commit" ] && [ "$source_commit" != "${manifest_bindings[0]}" ]; then
+        fail "expliziter Set-Quellcommit weicht vom versiegelten Manifest ab" 65
+    fi
+    source_commit="${manifest_bindings[0]}"
+    source_tree="${manifest_bindings[1]}"
+    probe="${manifest_bindings[2]}"
+    [[ "$source_commit" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "Set-Quellcommit ist malformed" 65
+    [[ "$source_tree" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "Set-Quellbaum ist malformed" 65
+    local evidence
+    for evidence in "$manifest_file" "$set/tree.inventory"; do
+        [ "$(stat -c %u "$evidence")" -eq "$(id -u)" ] \
+            && [ "$(stat -c %g "$evidence")" -eq "$(id -g)" ] \
+            && [ "$(stat -c %a "$evidence")" = 400 ] \
+            && [ "$(stat -c %h "$evidence")" -eq 1 ] \
+            || fail "private Set-Metadaten haben nicht UID/GID/0400/Single-Link" 65
+    done
+    tmp="$(mktemp -d "$STATE_ROOT/verify.XXXXXX")"
+    tree_inventory "$set" "$tmp/tree.inventory"
+    cmp -s "$tmp/tree.inventory" "$set/tree.inventory" || fail "Set-Dateibaum driftet" 65
+    actual_source_tree="$(safe_git rev-parse "$source_commit^{tree}")" \
+        || fail "manifestgebundener Git-Commit ist fuer die Recovery nicht mehr verifizierbar" 65
+    [ "$actual_source_tree" = "$source_tree" ] \
+        || fail "manifestgebundener Git-Commit und Repo-Tree divergieren" 65
+    install -d -m 0700 "$tmp/git-provenance"
+    IFS='|' read -r git_source git_inventory git_inventory_hash \
+        < <(prepare_git_projection_source "$tmp/git-provenance" "$source_commit" 0)
+    [ -d "$git_source" ] && [ -f "$git_inventory" ] && [[ "$git_inventory_hash" =~ ^[a-f0-9]{64}$ ]] \
+        && [ "$(sha256_file "$git_inventory")" = "$git_inventory_hash" ] \
+        || fail "Git-Source-Provenienz konnte nicht frisch rekonstruiert werden" 65
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$set/projection.inventory" "$git_inventory" <<'PY'
+import pathlib,sys
+projection,expected=map(pathlib.Path,sys.argv[1:3])
+MAX=64*1024*1024
+def bounded(path):
+    with path.open("rb") as handle: raw=handle.read(MAX+1)
+    if len(raw)>MAX: raise SystemExit("source provenance inventory exceeds byte limit")
+    return raw
+rows=bounded(projection).decode("utf-8","strict").splitlines()
+actual=("\n".join(row for row in rows if row.split(" ",2)[1].startswith("source/"))+"\n").encode()
+if actual!=bounded(expected): raise SystemExit("public source bytes differ from manifest-bound Git blobs")
+PY
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$tmp/tree.inventory" "$RUNTIME_PREFIX" <<'PY'
+import pathlib,sys
+inventory=pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+runtime=sys.argv[2]
+allowed={"core":"projection/core","embed":"projection/embed"}
+for role in ("core","embed"):
+    for name in ("python","python3","python3.13"):
+        allowed[f"projection/{role}/bin/{name}"]=f"{runtime}/bin/python3.13"
+    allowed[f"projection/{role}/lib64"]="lib"
+seen={}
+for row in inventory.splitlines():
+    if not row.startswith("L "): continue
+    try: _kind,path,target=row.split(" ",2)
+    except ValueError as exc: raise SystemExit("malformed private symlink inventory row") from exc
+    if path in seen or allowed.get(path)!=target:
+        raise SystemExit(f"unapproved private projection symlink: {path}")
+    seen[path]=target
+required={"core","embed",*{
+    f"projection/{role}/bin/{name}"
+    for role in ("core","embed") for name in ("python","python3","python3.13")
+}}
+if not required.issubset(seen): raise SystemExit("required private projection symlink is absent")
+PY
+    validate_private_projection_evidence "$set" "$tmp/tree.inventory" "$source_commit" "$source_tree"
+    "$RUNTIME_PREFIX/bin/python3.13" -I -P - "$manifest_file" "$manifest" "$source_commit" "$probe" \
+        "$source_tree" \
         "$(sha256_file "$RUNTIME_PREFIX/share/genus/BUILD-BOOTSTRAP.lock")" \
         "$(sha256_file "$RUNTIME_INVENTORY")" \
         "$(runtime_inventory_field python_executable_sha256)" \
         "$(runtime_inventory_field stdlib_sha256)" \
-        "$(runtime_inventory_field whole_tree_sha256)" <<'PY'
+        "$(runtime_inventory_field whole_tree_sha256)" \
+        "$PIP_VERSION" "$PIP_BOOTSTRAP_WHEEL" "$PIP_BOOTSTRAP_URL" \
+        "$PIP_BOOTSTRAP_SHA256" <<'PY'
 import hashlib, json, pathlib, sys
 path, expected_id, commit, probe = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], json.loads(sys.argv[4])
 repo_tree, bootstrap_hash, runtime_inventory_hash, runtime_python_hash, runtime_stdlib_hash, runtime_tree_hash = sys.argv[5:11]
-data = json.loads(path.read_text())
-if data["schema"] != "genus-a0.3c-runtime-set-v1" or data["manifest_id"] != expected_id:
+pip_version, pip_filename, pip_url, pip_sha256 = sys.argv[11:15]
+def read_limited(candidate,limit):
+    with candidate.open("rb") as handle:
+        payload=handle.read(limit+1)
+    if len(payload)>limit: raise SystemExit(f"bounded set evidence exceeds limit: {candidate.name}")
+    return payload
+raw=read_limited(path,128*1024)
+data = json.loads(raw.decode("utf-8","strict"))
+canonical=(json.dumps(data,sort_keys=True,separators=(",",":"),ensure_ascii=True,allow_nan=False)+"\n").encode()
+if canonical!=raw: raise SystemExit("manifest JSON is not canonical")
+if data["schema"] != "genus-a0.3c-runtime-set-v2" or data["manifest_id"] != expected_id:
     raise SystemExit("manifest identity mismatch")
 if data.get("python") != {
     "version":"3.13.15",
@@ -1681,29 +3578,50 @@ if data["repo_commit"] != commit or any(data["sqlite"].get(k) != v for k, v in p
     raise SystemExit("manifest runtime/commit mismatch")
 if data.get("repo_tree") != repo_tree or data.get("bootstrap_inventory_sha256") != bootstrap_hash:
     raise SystemExit("manifest source/bootstrap binding differs")
+projection=read_limited(path.parent/"projection.inventory",64*1024*1024)
+assets=read_limited(path.parent/"assets.inventory",64*1024*1024)
+if (data.get("projection_inventory_sha256")!=hashlib.sha256(projection).hexdigest()
+        or data.get("asset_inventory_sha256")!=hashlib.sha256(assets).hexdigest()):
+    raise SystemExit("manifest projection/asset inventory binding differs")
+pip_binding = data.get("pip_bootstrap")
+if pip_binding is not None and pip_binding != {"version":pip_version,"filename":pip_filename,"url":pip_url,"sha256":pip_sha256}:
+    raise SystemExit("manifest pip-bootstrap binding differs")
+current_pip_locks = 0
 for name in ("core", "embed"):
-    payload = (path.parent / f"requirements-{name}.lock").read_bytes()
+    payload = read_limited(path.parent / f"requirements-{name}.lock",8*1024*1024)
+    if f"pip=={pip_version}" in payload.decode("utf-8").splitlines():
+        current_pip_locks += 1
     if hashlib.sha256(payload).hexdigest() != data["requirements"][f"{name}_sha256"]:
         raise SystemExit("requirements hash mismatch")
-    wheels = (path.parent / f"wheels-{name}.sha256").read_bytes()
+    wheels = read_limited(path.parent / f"wheels-{name}.sha256",64*1024*1024)
     if hashlib.sha256(wheels).hexdigest() != data["wheel_inventories"][f"{name}_sha256"]:
         raise SystemExit("wheel inventory hash mismatch")
-    sources = (path.parent / f"sources-{name}.sha256").read_bytes()
+    sources = read_limited(path.parent / f"sources-{name}.sha256",64*1024*1024)
     if hashlib.sha256(sources).hexdigest() != data["source_inventories"][f"{name}_sha256"]:
         raise SystemExit("source inventory hash mismatch")
-    backends = (path.parent / f"backends-{name}.sha256").read_bytes()
+    backends = read_limited(path.parent / f"backends-{name}.sha256",64*1024*1024)
     if hashlib.sha256(backends).hexdigest() != data["build_backend_inventories"][f"{name}_sha256"]:
         raise SystemExit("build-backend inventory hash mismatch")
-tree = (path.parent / "tree.inventory").read_bytes()
+if pip_binding is None and current_pip_locks:
+    raise SystemExit("current pip lock lacks its explicit bootstrap binding")
+tree = read_limited(path.parent / "tree.inventory",64*1024*1024)
 if hashlib.sha256(tree).hexdigest() != data["tree_inventory_sha256"]:
     raise SystemExit("tree inventory hash mismatch")
 probe_fields = {key: data["sqlite"][key] for key in ("compile_options_sha256", "sqlite_extension_sha256", "sqlite_library_sha256")}
 probe_hash = hashlib.sha256(json.dumps(probe_fields, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+pip_seed = "" if pip_binding is None else (
+    f"pip_bootstrap_version={pip_binding['version']}\n"
+    f"pip_bootstrap_filename={pip_binding['filename']}\n"
+    f"pip_bootstrap_url={pip_binding['url']}\n"
+    f"pip_bootstrap_sha256={pip_binding['sha256']}\n"
+)
 seed = (
     f"commit={commit}\n"
     f"tree={repo_tree}\n"
     f"python={data['python']['archive_sha256']}\n"
     f"sqlite={data['sqlite']['archive_sha3_256']}\n"
+    + pip_seed
+    +
     f"core={data['requirements']['core_sha256']}\n"
     f"embed={data['requirements']['embed_sha256']}\n"
     f"core_wheels={data['wheel_inventories']['core_sha256']}\n"
@@ -1718,15 +3636,21 @@ seed = (
     f"runtime_tree={runtime_tree_hash}\n"
     f"bootstrap={bootstrap_hash}\n"
     f"probe={probe_hash}\n"
+    f"projection_inventory={data['projection_inventory_sha256']}\n"
+    f"asset_inventory={data['asset_inventory_sha256']}\n"
+    f"tree_inventory={data['tree_inventory_sha256']}\n"
 )
 if hashlib.sha256(seed.encode()).hexdigest() != expected_id:
     raise SystemExit("manifest id is not reproducible from bound inputs")
 PY
-    tmp="$(mktemp -d "$STATE_ROOT/verify.XXXXXX")"
-    inventory_for_compare "$set/core/bin/python" one "$tmp/core.lock"
-    inventory_for_compare "$set/embed/bin/python" none "$tmp/embed.lock"
-    cmp -s "$tmp/core.lock" "$set/requirements-core.lock" || fail "Core-Inventar driftet" 65
-    cmp -s "$tmp/embed.lock" "$set/requirements-embed.lock" || fail "Embed-Inventar driftet" 65
+    actual_probe="$(runtime_probe "$RUNTIME_PREFIX/bin/python3.13" "$RUNTIME_PREFIX/bin/python3.13")"
+    EXPECTED_PROBE="$probe" ACTUAL_PROBE="$actual_probe" \
+        "$RUNTIME_PREFIX/bin/python3.13" -I -P - <<'PY'
+import json,os
+expected=json.loads(os.environ["EXPECTED_PROBE"])
+if json.loads(os.environ["ACTUAL_PROBE"])!=expected:
+    raise SystemExit("root-owned base-runtime probe differs after static set verification")
+PY
     (cd "$set/wheelhouse-core" && sha256sum -c ../wheels-core.sha256 >/dev/null) \
         || fail "Core-Wheelhouse driftet" 65
     (cd "$set/wheelhouse-embed" && sha256sum -c ../wheels-embed.sha256 >/dev/null) \
@@ -1739,20 +3663,7 @@ PY
         || fail "Core-Build-Backends driften" 65
     (cd "$set/backends-embed" && sha256sum -c ../backends-embed.sha256 >/dev/null) \
         || fail "Embed-Build-Backends driften" 65
-    tree_inventory "$set" "$tmp/tree.inventory"
-    cmp -s "$tmp/tree.inventory" "$set/tree.inventory" || fail "Set-Dateibaum driftet" 65
-    "$set/core/bin/python" - "$set" "$RUNTIME_PREFIX" <<'PY'
-import pathlib, sys
-root, runtime = pathlib.Path(sys.argv[1]).resolve(), pathlib.Path(sys.argv[2]).resolve()
-for link in root.rglob("*"):
-    if not link.is_symlink():
-        continue
-    resolved = link.resolve(strict=True)
-    if resolved != runtime and root not in resolved.parents and runtime not in resolved.parents:
-        raise SystemExit("set symlink escapes both set and pinned runtime")
-PY
     remove_state_work "$tmp"
-    smoke_set "$set"
     printf '%s\n' "$manifest"
 }
 
@@ -1818,6 +3729,34 @@ verify_target() {
     esac
 }
 
+manifest_source_commit() {
+    local manifest="$1" path
+    local -a bindings=()
+    safe_manifest_id "$manifest"
+    [[ "$manifest" != legacy-* ]] || { printf '\n'; return; }
+    path="$(set_path "$manifest")/manifest.json"
+    mapfile -t bindings < <(read_static_set_manifest_bindings "$path" "$manifest")
+    [ "${#bindings[@]}" -eq 3 ] && [[ "${bindings[0]}" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "runtime set source commit differs" 65
+    printf '%s\n' "${bindings[0]}"
+}
+
+verify_active_runtime_for_release() {
+    local manifest source_commit
+    manifest="$(selector_manifest)"
+    [ -n "$manifest" ] || fail "Code-Release verlangt einen aktiven Runtime-Selector" 70
+    if [[ "$manifest" = legacy-* ]]; then
+        verify_legacy_set "$manifest" >/dev/null
+    else
+        source_commit="$(manifest_source_commit "$manifest")"
+        safe_git merge-base --is-ancestor "$source_commit" "$(repo_commit)" \
+            || fail "aktives Runtime-Set stammt nicht aus einem Vorfahren des Release-Commits" 70
+        verify_set "$manifest" "$source_commit" >/dev/null
+    fi
+    pointer_dir_valid "$CORE_POINTER" core && pointer_dir_valid "$EMBED_POINTER" embed \
+        || fail "aktive Core-/Embed-Pointer sind vor Code-Release nicht exakt" 70
+}
+
 write_set_publication_marker() {
     local manifest="$1" marker="$SETS_ROOT/.building-$1"
     safe_manifest_id "$manifest"
@@ -1828,7 +3767,11 @@ path = pathlib.Path(sys.argv[1])
 payload = {"schema":"genus-a0.3c-set-publication-v1","manifest_id":sys.argv[2],"set_path":sys.argv[3]}
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
 try:
-    os.write(fd, (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode())
+    view=memoryview((json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode())
+    while view:
+        written=os.write(fd,view)
+        if written<=0: raise OSError("set publication marker write made no progress")
+        view=view[written:]
     os.fsync(fd)
 finally:
     os.close(fd)
@@ -1836,6 +3779,7 @@ parent = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
 try: os.fsync(parent)
 finally: os.close(parent)
 PY
+    validate_set_publication_marker "$manifest"
 }
 
 validate_set_publication_marker() {
@@ -1947,9 +3891,10 @@ recover_stale_set_publications() {
 }
 
 stage_set() (
-    local expected_supply="${1:-}" supply_seed supply_seal
-    local work commit repo_tree core_hash embed_hash seed manifest set building probe probe_hash
+    local expected_supply="${1:-}" expected_asset="${2:-}" supply_seed supply_seal asset_seed asset_seal
+    local work commit repo_tree core_hash embed_hash seed manifest set building probe probe_hash payload projection_work
     local core_wheels embed_wheels core_sources embed_sources core_backends embed_backends
+    local deuter_hash fastembed_inventory fastembed_hash projection_hash asset_hash
     local runtime_inventory_hash runtime_python_hash runtime_stdlib_hash runtime_tree_hash
     local tree_hash bootstrap_hash quarantine recovery_status
     exec 3>&1 1>&2
@@ -1998,23 +3943,37 @@ stage_set() (
     trap cleanup_stage_work EXIT
     capture_locks "$work"
     commit="$(repo_commit)"
-    repo_tree="$("$GIT_BIN" -C "$REPO_DIR" rev-parse 'HEAD^{tree}')"
+    repo_tree="$(safe_git rev-parse "$commit^{tree}")"
     core_hash="$(sha256_file "$work/core.lock")"
     embed_hash="$(sha256_file "$work/embed.lock")"
     prepare_wheelhouse_inputs "$work/core.lock" "$work/wheelhouse-core" "$work/builder-core" \
         "$work/sources-core" "$work/backends-core" "$work/core"
     prepare_wheelhouse_inputs "$work/embed.lock" "$work/wheelhouse-embed" "$work/builder-embed" \
         "$work/sources-embed" "$work/backends-embed" "$work/embed"
-    supply_seed="index=$PYPI_INDEX_URL\ncore_lock=$(sha256_file "$work/core.lock")\nembed_lock=$(sha256_file "$work/embed.lock")\ncore_sources=$(sha256_file "$work/core-sources.sha256")\nembed_sources=$(sha256_file "$work/embed-sources.sha256")\ncore_backends=$(sha256_file "$work/core-backends.sha256")\nembed_backends=$(sha256_file "$work/embed-backends.sha256")\n"
+    deuter_hash="$(sealed_projection_model_digest "$DEUTER_MODEL_INPUT")"
+    fastembed_inventory="$work/fastembed-cache.inventory"
+    sealed_projection_tree_inventory "$FASTEMBED_CACHE_INPUT" "$fastembed_inventory" assets/fastembed-cache
+    fastembed_hash="$(sha256_file "$fastembed_inventory")"
+    asset_seed="deuter_model_sha256=$deuter_hash\nfastembed_cache_inventory_sha256=$fastembed_hash\nfastembed_model_id=$MODEL\nfastembed_repository=$FASTEMBED_REPOSITORY\nfastembed_revision=$FASTEMBED_REVISION\n"
+    asset_seal="$(printf '%b' "$asset_seed" | sha256sum | awk '{print $1}')"
+    supply_seed="index=$PYPI_INDEX_URL\npip_bootstrap_version=$PIP_VERSION\npip_bootstrap_filename=$PIP_BOOTSTRAP_WHEEL\npip_bootstrap_url=$PIP_BOOTSTRAP_URL\npip_bootstrap_sha256=$PIP_BOOTSTRAP_SHA256\ncore_lock=$(sha256_file "$work/core.lock")\nembed_lock=$(sha256_file "$work/embed.lock")\ncore_sources=$(sha256_file "$work/core-sources.sha256")\nembed_sources=$(sha256_file "$work/embed-sources.sha256")\ncore_backends=$(sha256_file "$work/core-backends.sha256")\nembed_backends=$(sha256_file "$work/embed-backends.sha256")\n"
     supply_seal="$(printf '%b' "$supply_seed" | sha256sum | awk '{print $1}')"
     printf '[A0.3c] SUPPLY_SEAL=%s\n' "$supply_seal" >&2
+    printf '[A0.3c] ASSET_SEAL=%s\n' "$asset_seal" >&2
     if [ -z "$expected_supply" ]; then
-        fail "Supply wurde ohne Fremdcode-Ausfuehrung versiegelt; stage mit exakt diesem EXPECTED_SUPPLY_SEAL erneut autorisieren" 78
+        fail "Supply wurde ohne ungebundene Fremdcode-Ausfuehrung versiegelt; stage mit exakt diesem EXPECTED_SUPPLY_SEAL erneut autorisieren" 78
     fi
     [[ "$expected_supply" =~ ^[a-f0-9]{64}$ ]] \
         || fail "EXPECTED_SUPPLY_SEAL muss SHA-256 sein" 64
     [ "$expected_supply" = "$supply_seal" ] \
         || fail "Operator-Supply-Freigabe stimmt nicht mit der frischen versiegelten Akquise ueberein" 65
+    if [ -z "$expected_asset" ]; then
+        fail "Assets wurden descriptor-gebunden inventarisiert; stage mit exakt diesem EXPECTED_ASSET_SEAL erneut autorisieren" 78
+    fi
+    [[ "$expected_asset" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "EXPECTED_ASSET_SEAL muss SHA-256 sein" 64
+    [ "$expected_asset" = "$asset_seal" ] \
+        || fail "Operator-Asset-Freigabe stimmt nicht mit den versiegelten Offline-Inputs ueberein" 65
     verify_artifact_store "$work/sources-core" "$work/core-sources.sha256"
     verify_artifact_store "$work/sources-embed" "$work/embed-sources.sha256"
     verify_artifact_store "$work/backends-core" "$work/core-backends.sha256"
@@ -2038,10 +3997,51 @@ stage_set() (
     runtime_python_hash="$(runtime_inventory_field python_executable_sha256)"
     runtime_stdlib_hash="$(runtime_inventory_field stdlib_sha256)"
     runtime_tree_hash="$(runtime_inventory_field whole_tree_sha256)"
+    payload="$work/set-payload"
+    projection_work="$work/projection-payload"
+    install -d -m 0700 "$payload"
+    install -d -m 0700 "$projection_work"
+    cp -a -- "$work/wheelhouse-core" "$payload/wheelhouse-core"
+    cp -a -- "$work/wheelhouse-embed" "$payload/wheelhouse-embed"
+    cp -a -- "$work/sources-core" "$payload/sources-core"
+    cp -a -- "$work/sources-embed" "$payload/sources-embed"
+    cp -a -- "$work/backends-core" "$payload/backends-core"
+    cp -a -- "$work/backends-embed" "$payload/backends-embed"
+    install -m 0600 "$work/wheels-core.sha256" "$payload/wheels-core.sha256"
+    install -m 0600 "$work/wheels-embed.sha256" "$payload/wheels-embed.sha256"
+    install -m 0600 "$work/core-sources.sha256" "$payload/sources-core.sha256"
+    install -m 0600 "$work/embed-sources.sha256" "$payload/sources-embed.sha256"
+    install -m 0600 "$work/core-backends.sha256" "$payload/backends-core.sha256"
+    install -m 0600 "$work/embed-backends.sha256" "$payload/backends-embed.sha256"
+    install -m 0600 "$work/core.lock" "$payload/requirements-core.lock"
+    install -m 0600 "$work/embed.lock" "$payload/requirements-embed.lock"
+    prepare_projection_payload "$projection_work" "$work" "$commit" "$repo_tree" "$deuter_hash" \
+        "$fastembed_inventory" "$fastembed_hash" "$core_wheels" "$embed_wheels"
+    mv -T -- "$projection_work/projection" "$payload/projection"
+    mv -T -- "$projection_work/projection.inventory" "$payload/projection.inventory"
+    mv -T -- "$projection_work/assets.inventory" "$payload/assets.inventory"
+    fsync_dir "$payload"
+    ln -s -- projection/core "$payload/core"
+    ln -s -- projection/embed "$payload/embed"
+    projection_hash="$(sha256_file "$payload/projection.inventory")"
+    asset_hash="$(sha256_file "$payload/assets.inventory")"
+    # The private set remains operator-owned until the root publisher performs
+    # its descriptor-bound copy.  Never execute it here: derive the SQLite pin
+    # from the already root-owned immutable base runtime instead.
     probe="$(runtime_probe "$RUNTIME_PREFIX/bin/python3.13" "$RUNTIME_PREFIX/bin/python3.13")"
     probe_hash="$(printf '%s' "$probe" | sha256sum | awk '{print $1}')"
-    seed="commit=$commit\ntree=$repo_tree\npython=$PYTHON_SHA256\nsqlite=$SQLITE_SHA3_256\ncore=$core_hash\nembed=$embed_hash\ncore_wheels=$core_wheels\nembed_wheels=$embed_wheels\ncore_sources=$core_sources\nembed_sources=$embed_sources\ncore_backends=$core_backends\nembed_backends=$embed_backends\nruntime_inventory=$runtime_inventory_hash\nruntime_python=$runtime_python_hash\nruntime_stdlib=$runtime_stdlib_hash\nruntime_tree=$runtime_tree_hash\nbootstrap=$bootstrap_hash\nprobe=$probe_hash\n"
+    seal_set_modes "$payload"
+    chmod 0700 "$payload"
+    tree_inventory "$payload" "$work/tree.inventory"
+    tree_hash="$(sha256_file "$work/tree.inventory")"
+    mv -T -- "$work/tree.inventory" "$payload/tree.inventory"
+    seed="commit=$commit\ntree=$repo_tree\npython=$PYTHON_SHA256\nsqlite=$SQLITE_SHA3_256\npip_bootstrap_version=$PIP_VERSION\npip_bootstrap_filename=$PIP_BOOTSTRAP_WHEEL\npip_bootstrap_url=$PIP_BOOTSTRAP_URL\npip_bootstrap_sha256=$PIP_BOOTSTRAP_SHA256\ncore=$core_hash\nembed=$embed_hash\ncore_wheels=$core_wheels\nembed_wheels=$embed_wheels\ncore_sources=$core_sources\nembed_sources=$embed_sources\ncore_backends=$core_backends\nembed_backends=$embed_backends\nruntime_inventory=$runtime_inventory_hash\nruntime_python=$runtime_python_hash\nruntime_stdlib=$runtime_stdlib_hash\nruntime_tree=$runtime_tree_hash\nbootstrap=$bootstrap_hash\nprobe=$probe_hash\nprojection_inventory=$projection_hash\nasset_inventory=$asset_hash\ntree_inventory=$tree_hash\n"
     manifest="$(printf '%b' "$seed" | sha256sum | awk '{print $1}')"
+    write_manifest "$payload" "$manifest" "$commit" "$core_hash" "$embed_hash" "$probe" \
+        "$core_wheels" "$embed_wheels" "$core_sources" "$embed_sources" \
+        "$core_backends" "$embed_backends" "$tree_hash" "$repo_tree" "$projection_hash" "$asset_hash"
+    seal_set_modes "$payload"
+    durably_sync_tree "$payload"
     set="$(set_path "$manifest")"
     building="$SETS_ROOT/.building-$manifest"
     set +e
@@ -2051,47 +4051,20 @@ stage_set() (
     case "$recovery_status" in
     0) ;;
     10)
+        [ ! -e "$set" ] && [ ! -L "$set" ] \
+            || fail "Set-Ziel erschien vor atomarer Publikation" 70
         if [ ! -e "$building" ]; then
             write_set_publication_marker "$manifest"
         else
             validate_set_publication_marker "$manifest"
         fi
         publication_fault_point after-set-marker
-        install -d -m 0700 "$set"
-        cp -a -- "$work/wheelhouse-core" "$set/wheelhouse-core"
-        cp -a -- "$work/wheelhouse-embed" "$set/wheelhouse-embed"
-        cp -a -- "$work/sources-core" "$set/sources-core"
-        cp -a -- "$work/sources-embed" "$set/sources-embed"
-        cp -a -- "$work/backends-core" "$set/backends-core"
-        cp -a -- "$work/backends-embed" "$set/backends-embed"
-        install -m 0600 "$work/wheels-core.sha256" "$set/wheels-core.sha256"
-        install -m 0600 "$work/wheels-embed.sha256" "$set/wheels-embed.sha256"
-        install -m 0600 "$work/core-sources.sha256" "$set/sources-core.sha256"
-        install -m 0600 "$work/embed-sources.sha256" "$set/sources-embed.sha256"
-        install -m 0600 "$work/core-backends.sha256" "$set/backends-core.sha256"
-        install -m 0600 "$work/embed-backends.sha256" "$set/backends-embed.sha256"
-        "$RUNTIME_PREFIX/bin/python3.13" -m venv "$set/core"
-        "$RUNTIME_PREFIX/bin/python3.13" -m venv "$set/embed"
-        install_offline_lock "$set/core/bin/python" "$work/core.lock" "$set/wheelhouse-core"
-        install_offline_lock "$set/embed/bin/python" "$work/embed.lock" "$set/wheelhouse-embed"
-        assert_expected_commit "$commit"
-        clean_pip "$set/core/bin/python" "$work/editable-pip-home" install \
-            --no-index --no-build-isolation --no-deps -e "$REPO_DIR"
-        assert_expected_commit "$commit"
-        publication_fault_point after-set-populate
-        install -m 0600 "$work/core.lock" "$set/requirements-core.lock"
-        install -m 0600 "$work/embed.lock" "$set/requirements-embed.lock"
-        probe="$(runtime_probe "$set/core/bin/python" "$set/core/bin/python")"
-        tree_inventory "$set" "$set/tree.inventory"
-        tree_hash="$(sha256_file "$set/tree.inventory")"
-        write_manifest "$set" "$manifest" "$commit" "$core_hash" "$embed_hash" "$probe" \
-            "$core_wheels" "$embed_wheels" "$core_sources" "$embed_sources" \
-            "$core_backends" "$embed_backends" "$tree_hash" "$repo_tree"
-        seal_set_modes "$set"
-        durably_sync_tree "$set"
+        mv -T -- "$payload" "$set"
+        payload=""
         fsync_dir "$SETS_ROOT"
+        publication_fault_point after-set-populate
         publication_fault_point after-set-seal
-        verify_set "$manifest" >/dev/null
+        verify_set "$manifest" "$commit" >/dev/null
         publication_fault_point after-set-verify
         rm -f -- "$building"
         fsync_dir "$SETS_ROOT"
@@ -2099,7 +4072,7 @@ stage_set() (
         ;;
     *) fail "Set-Publikationsrecovery scheiterte" "$recovery_status" ;;
     esac
-    verify_set "$manifest" >/dev/null
+    verify_set "$manifest" "$commit" >/dev/null
     atomic_link "sets/$manifest" "$STAGED_LINK"
     remove_state_work "$work"
     work=""
@@ -2423,7 +4396,7 @@ manifest_file_hash() {
 assert_not_previously_paused() {
     local status
     set +e
-    GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" paused >/dev/null 2>&1
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" paused >/dev/null 2>&1
     status=$?
     set -e
     case "$status" in
@@ -2433,94 +4406,517 @@ assert_not_previously_paused() {
     esac
 }
 
-capture_activation_crontab() {
-    local original disabled status
-    require_command "$CRONTAB_BIN"
-    [ ! -e "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -e "$ACTIVATION_CRON_DISABLED" ] \
-        || fail "verwaiste Activation-Crontab-Artefakte vorhanden" 70
-    original="$(mktemp "$STATE_ROOT/crontab.original.XXXXXX")"
-    disabled="$(mktemp "$STATE_ROOT/crontab.disabled.XXXXXX")"
-    set +e
-    "$CRONTAB_BIN" -l > "$original" 2>/dev/null; status=$?
-    set -e
-    [ "$status" -eq 0 ] || { rm -f -- "$original" "$disabled"; fail "User-Crontab nicht exakt lesbar" 70; }
-    "$CORE_POINTER/bin/python" - "$original" "$disabled" "$CRON_BEGIN" "$CRON_END" <<'PY'
-import pathlib, sys
-source, target = map(pathlib.Path, sys.argv[1:3])
-begin, end = sys.argv[3:5]
-lines = source.read_bytes().splitlines(keepends=True)
-begin_rows = [i for i, row in enumerate(lines) if row.rstrip(b"\r\n") == begin.encode()]
-end_rows = [i for i, row in enumerate(lines) if row.rstrip(b"\r\n") == end.encode()]
-if len(begin_rows) != 1 or len(end_rows) != 1 or begin_rows[0] >= end_rows[0]:
-    raise SystemExit("GENUS cron block is not unique and well formed")
-target.write_bytes(b"".join(lines[:begin_rows[0]] + lines[end_rows[0] + 1:]))
-PY
-    chmod 0600 "$original" "$disabled"
-    [ -s "$original" ] || { rm -f -- "$original" "$disabled"; fail "Crontab-Snapshot ist leer" 70; }
-    mv -- "$original" "$ACTIVATION_CRON_SNAPSHOT"
-    mv -- "$disabled" "$ACTIVATION_CRON_DISABLED"
-    sync -f "$ACTIVATION_CRON_SNAPSHOT"; sync -f "$ACTIVATION_CRON_DISABLED"; fsync_dir "$STATE_ROOT"
-}
-
-verify_live_crontab() {
-    local expected="$1" actual status
-    actual="$(mktemp "$STATE_ROOT/crontab.verify.XXXXXX")" || return 70
-    set +e
-    "$CRONTAB_BIN" -l > "$actual" 2>/dev/null; status=$?
-    set -e
-    if [ "$status" -ne 0 ] || ! cmp -s -- "$actual" "$expected"; then
-        rm -f -- "$actual"
-        return 70
+cron_schedule_owner_uid() {
+    if [ "${GENUS_A03C_TEST_MODE:-0}" = 1 ] && [ "$ROOT_CRON_FILE" != /etc/cron.d/genus-pi-seed ]; then
+        id -u
+    else
+        printf '0\n'
     fi
-    rm -f -- "$actual"
 }
 
-disable_genus_cron_block() {
-    if verify_live_crontab "$ACTIVATION_CRON_DISABLED"; then return 0; fi
-    verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT" \
-        || fail "Crontab driftet vor GENUS-Block-Deaktivierung" 70
-    "$CRONTAB_BIN" "$ACTIVATION_CRON_DISABLED"
-    verify_live_crontab "$ACTIVATION_CRON_DISABLED" \
-        || fail "GENUS-Cronblock blieb nach Deaktivierung aktiv" 70
+cron_schedule_owner_gid() {
+    if [ "${GENUS_A03C_TEST_MODE:-0}" = 1 ] && [ "$ROOT_CRON_FILE" != /etc/cron.d/genus-pi-seed ]; then
+        id -g
+    else
+        printf '0\n'
+    fi
 }
 
-restore_genus_cron_block() {
-    if verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT"; then return 0; fi
-    verify_live_crontab "$ACTIVATION_CRON_DISABLED" \
-        || { printf '[A0.3c] FEHLER: Crontab driftet; exakte Restaurierung verweigert\n' >&2; return 70; }
-    "$CRONTAB_BIN" "$ACTIVATION_CRON_SNAPSHOT" || return 70
-    verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT"
-}
-
-write_boot_guard_payload() {
-    local output="$1" generator_status
-    harden_privileged_boundary
-    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
-        "$output" "$ACTIVATION_JOURNAL" "$AUTOSTART_APPROVAL" "$ACTIVE_LINK" \
-        "$SETS_ROOT" "$REPO_DIR" "$GIT_BIN" "$(id -u)" "$(id -g)" "$STATE_ROOT" \
-        "$CORE_POINTER" "$EMBED_POINTER" "$GENUS_HOME/.genus/a0.3c/series" <<'PY'
-import pathlib, sys
-config = {
-    "journal": sys.argv[2], "approval": sys.argv[3], "active": sys.argv[4],
-    "sets": sys.argv[5], "repo": sys.argv[6], "git": sys.argv[7], "uid": int(sys.argv[8]),
-    "gid": int(sys.argv[9]), "state": sys.argv[10], "core_pointer": sys.argv[11],
-    "embed_pointer": sys.argv[12], "series_root": sys.argv[13],
-}
-program = r'''#!/usr/bin/python3 -I
-import hashlib
-import json
+assert_no_genus_user_crontab() {
+    local account="$1" must_be_empty="$2" test_spool=0
+    [[ "$account" =~ ^[A-Za-z_][A-Za-z0-9_.-]{0,31}$ ]] \
+        || fail "Crontab-Konto ist nicht kanonisch" 77
+    case "$must_be_empty" in 0|1) ;; *) fail "Crontab-Leerheitsvertrag ist ungueltig" 70 ;; esac
+    if [ "${GENUS_A03C_TEST_MODE:-0}" = 1 ] \
+        && [ "$CRONTAB_SPOOL_ROOT" != /var/spool/cron/crontabs ]; then
+        test_spool=1
+    fi
+    if ! as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin LC_ALL=C \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CRONTAB_BIN" "$CRONTAB_SPOOL_ROOT" \
+        "$account" "$must_be_empty" "$test_spool" "$REPO_DIR" "$DB_PATH" "$PAUSE_FILE" <<'PY'
+import grp
 import os
-import pathlib
-import re
 import stat
 import subprocess
 import sys
 
+crontab, spool_root, account, must_be_empty, test_spool, *bound = sys.argv[1:]
+must_be_empty = must_be_empty == "1"
+test_spool = test_spool == "1"
+allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-"
+first = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+if not account or account in {".", ".."} or account[0] not in first:
+    raise SystemExit("non-canonical crontab account")
+if any(char not in allowed for char in account):
+    raise SystemExit("non-canonical crontab account")
+
+spool_fd = None
+spool_identity = None
+if must_be_empty:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    spool_fd = os.open(spool_root, flags)
+    before = os.fstat(spool_fd)
+    named = os.stat(spool_root, follow_symlinks=False)
+    spool_identity = (before.st_dev, before.st_ino, before.st_uid, before.st_gid, stat.S_IMODE(before.st_mode))
+    if (named.st_dev, named.st_ino) != spool_identity[:2] or not stat.S_ISDIR(before.st_mode):
+        raise SystemExit("crontab spool root is not one stable directory")
+    if test_spool:
+        expected = (os.getuid(), os.getgid(), 0o700)
+    else:
+        expected = (0, grp.getgrnam("crontab").gr_gid, 0o1730)
+    if spool_identity[2:] != expected:
+        raise SystemExit("crontab spool root ownership/mode differs")
+
+    def require_absent():
+        try:
+            os.stat(account, dir_fd=spool_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        raise SystemExit("service account has a crontab spool entry")
+
+    require_absent()
+
+try:
+    result = subprocess.run(
+        [crontab, "-u", account, "-l"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
+        close_fds=True,
+        check=False,
+    )
+except OSError as exc:
+    raise SystemExit(f"crontab inventory execution failed: {exc}") from exc
+
+if must_be_empty:
+    after = os.fstat(spool_fd)
+    named = os.stat(spool_root, follow_symlinks=False)
+    after_identity = (after.st_dev, after.st_ino, after.st_uid, after.st_gid, stat.S_IMODE(after.st_mode))
+    if after_identity != spool_identity or (named.st_dev, named.st_ino) != spool_identity[:2]:
+        raise SystemExit("crontab spool root changed during inventory")
+    require_absent()
+    os.close(spool_fd)
+
+if result.returncode == 0:
+    if result.stderr:
+        raise SystemExit("successful crontab inventory emitted a diagnostic")
+    if must_be_empty:
+        raise SystemExit("service account owns a user crontab, including an empty one")
+    raw = result.stdout.lower()
+elif result.returncode == 1:
+    expected = f"no crontab for {account}\n".encode()
+    if result.stdout or result.stderr != expected:
+        raise SystemExit("rc=1 did not carry the exact C-locale absence diagnostic")
+    raw = b""
+else:
+    raise SystemExit(f"crontab inventory returned ambiguous rc={result.returncode}")
+
+needles = (b"genus", *(os.fsencode(value).lower() for value in bound))
+if any(needle and needle in raw for needle in needles):
+    raise SystemExit("competing GENUS user schedule")
+PY
+    then
+        fail "Crontab fuer $account ist nicht eindeutig autoritaetsfrei" 77
+    fi
+}
+
+assert_no_competing_genus_schedules() {
+    local owner_uid owner_gid cron_dir
+    owner_uid="$(cron_schedule_owner_uid)"; owner_gid="$(cron_schedule_owner_gid)"
+    cron_dir="$(dirname "$ROOT_CRON_FILE")"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        EXPECTED_UID="$owner_uid" EXPECTED_GID="$owner_gid" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$cron_dir" "$ROOT_CRON_FILE" \
+        "$ROOT_CRON_DISABLED_FILE" "$ROOT_SYSTEM_CRONTAB" "$REPO_DIR" "$DB_PATH" "$PAUSE_FILE" <<'PY'
+import os,pathlib,re,stat,sys
+directory,active,disabled,system,*bound=map(pathlib.Path,sys.argv[1:])
+uid=int(os.environ["EXPECTED_UID"]); gid=int(os.environ["EXPECTED_GID"])
+needles=(b"genus",*(os.fsencode(str(item)).lower() for item in bound))
+def inspect(path, required):
+    try: info=path.lstat()
+    except FileNotFoundError:
+        if required: raise SystemExit(f"required cron namespace member is missing: {path}")
+        return
+    if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=uid or info.st_gid!=gid or info.st_nlink!=1:
+        raise SystemExit(f"competing cron namespace member is unsafe: {path}")
+    raw=path.read_bytes().lower()
+    if any(needle and needle in raw for needle in needles):
+        raise SystemExit(f"competing GENUS schedule found: {path}")
+inspect(system, True)
+for entry in directory.iterdir():
+    if entry in {active,disabled}: continue
+    inspect(entry, False)
+PY
+}
+
+validate_root_schedule_contract() {
+    local owner_uid owner_gid
+    owner_uid="$(cron_schedule_owner_uid)"; owner_gid="$(cron_schedule_owner_gid)"
+    [ ! -e "$ROOT_CRON_DISABLED_FILE" ] && [ ! -L "$ROOT_CRON_DISABLED_FILE" ] \
+        || fail "Root-Cron liegt unerwartet im deaktivierten Crash-Zustand" 77
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin EXPECTED_UID="$owner_uid" EXPECTED_GID="$owner_gid" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$ROOT_CRON_FILE" "$CRON_BEGIN" "$CRON_END" \
+        "7 3 * * * root /usr/bin/systemctl start genus-backup.service" <<'PY'
+import os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); begin,end,backup=sys.argv[2:]; info=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=int(os.environ["EXPECTED_UID"])
+        or info.st_gid!=int(os.environ["EXPECTED_GID"]) or stat.S_IMODE(info.st_mode)!=0o644 or info.st_nlink!=1):
+    raise SystemExit("root schedule metadata differs")
+rows=path.read_bytes().splitlines()
+if rows.count(begin.encode())!=1 or rows.count(end.encode())!=1 or rows.index(begin.encode())>=rows.index(end.encode()):
+    raise SystemExit("root GENUS schedule block differs")
+first=rows.index(begin.encode()); last=rows.index(end.encode())
+if rows.count(backup.encode())!=1 or not first<rows.index(backup.encode())<last:
+    raise SystemExit("dedicated root backup schedule differs")
+outside=rows[:first]+rows[last+1:]
+if any(b"genus" in row.lower() for row in outside):
+    raise SystemExit("GENUS root schedule escaped its unique block")
+for row in rows[first+1:last]:
+    lowered=row.lower()
+    if b"backup_ledger_to_sd" in lowered or b"genus-cron@ledger-backup" in lowered:
+        raise SystemExit("backup still uses a direct/shared-uid schedule")
+commands=[row for row in rows[first+1:last] if row.strip() and not row.lstrip().startswith(b"#")]
+units=[]
+for row in commands:
+    fields=row.decode("utf-8").split()
+    if (len(fields)!=9 or fields[5]!="root" or fields[6:8]!=["/usr/bin/systemctl","start"]):
+        raise SystemExit("root GENUS schedule contains a non-systemd command")
+    unit=fields[8]
+    if unit!="genus-backup.service" and not re.fullmatch(r"genus-cron@[a-z0-9][a-z0-9-]*\.service",unit):
+        raise SystemExit("root GENUS schedule contains an unknown unit namespace")
+    units.append(unit)
+if len(units)!=len(set(units)): raise SystemExit("root GENUS schedule repeats a unit")
+PY
+    assert_no_genus_user_crontab root 0
+    assert_no_genus_user_crontab "$GENUS_USER" 0
+    assert_no_genus_user_crontab "$RUNTIME_USER" 1
+    assert_no_genus_user_crontab "$TELEGRAM_USER" 1
+    assert_no_genus_user_crontab "$BACKUP_USER" 1
+    assert_no_competing_genus_schedules
+}
+
+capture_root_schedule() {
+    local original identity owner_uid owner_gid baseline
+    require_command "$CRONTAB_BIN"
+    [ ! -e "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -L "$ACTIVATION_CRON_SNAPSHOT" ] \
+        && [ ! -e "$ACTIVATION_CRON_DISABLED" ] && [ ! -L "$ACTIVATION_CRON_DISABLED" ] \
+        || fail "verwaiste Root-Cron-Evidenz vorhanden" 70
+    [ ! -e "$ROOT_CRON_DISABLED_FILE" ] && [ ! -L "$ROOT_CRON_DISABLED_FILE" ] \
+        || fail "deaktivierter Root-Cron-Sibling ist vor Capture bereits vorhanden" 70
+    baseline="${CONSUMER_BASELINE_HINT:-present}"
+    case "$baseline" in
+        present) validate_root_schedule_contract ;;
+        absent) ;;
+        *) fail "Consumer-Baseline-Hinweis fuer Cron-Capture ist unbekannt" 70 ;;
+    esac
+    original="$(mktemp "$STATE_ROOT/root-cron.original.XXXXXX")"
+    identity="$(mktemp "$STATE_ROOT/root-cron.identity.XXXXXX")"
+    owner_uid="$(cron_schedule_owner_uid)"; owner_gid="$(cron_schedule_owner_gid)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin EXPECTED_UID="$owner_uid" EXPECTED_GID="$owner_gid" \
+        BASELINE_HINT="$baseline" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$ROOT_CRON_FILE" "$ROOT_CRON_DISABLED_FILE" \
+        "$original" "$identity" "$CRON_BEGIN" "$CRON_END" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+active,disabled,snapshot,evidence=map(pathlib.Path,sys.argv[1:5]); begin,end=sys.argv[5:]
+uid=int(os.environ["EXPECTED_UID"]); gid=int(os.environ["EXPECTED_GID"])
+parent=active.parent; pinfo=parent.lstat()
+if (parent.resolve(strict=True)!=parent or not stat.S_ISDIR(pinfo.st_mode) or pinfo.st_uid!=uid
+        or pinfo.st_gid!=gid or stat.S_IMODE(pinfo.st_mode)!=0o755):
+    raise SystemExit("cron.d parent is not canonical owner:group 0755")
+if disabled != active.with_name(active.name+".disabled"):
+    raise SystemExit("disabled cron sibling is not the fixed dotted name")
+if disabled.exists() or disabled.is_symlink(): raise SystemExit("disabled cron sibling already exists")
+if os.environ["BASELINE_HINT"]=="absent":
+    if active.exists() or active.is_symlink(): raise SystemExit("absent root schedule unexpectedly exists")
+    snapshot.write_bytes(b"")
+    data={"schema":"genus-a0.3c-root-cron-identity-v2","baseline":"absent","active_path":str(active),
+          "disabled_path":str(disabled),"device":0,"inode":0,"size":0,"mtime_ns":0,
+          "sha256":hashlib.sha256(b"").hexdigest()}
+    evidence.write_text(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n",encoding="utf-8")
+    raise SystemExit(0)
+before=active.lstat()
+if (active.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o644 or before.st_nlink!=1):
+    raise SystemExit("active root schedule is not owner:group 0644 regular/nlink1")
+fd=os.open(active,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try:
+    opened=os.fstat(fd); raw=b""
+    while True:
+        chunk=os.read(fd,65536)
+        if not chunk: break
+        raw+=chunk
+        if len(raw)>1024*1024: raise SystemExit("root schedule is oversized")
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=active.lstat(); fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+if any(getattr(before,k)!=getattr(opened,k) or getattr(before,k)!=getattr(final,k) or getattr(before,k)!=getattr(after,k) for k in fields):
+    raise SystemExit("root schedule changed during stable read")
+rows=raw.splitlines()
+if rows.count(begin.encode())!=1 or rows.count(end.encode())!=1 or rows.index(begin.encode())>=rows.index(end.encode()):
+    raise SystemExit("root GENUS cron block is not unique and well formed")
+snapshot.write_bytes(raw)
+data={"schema":"genus-a0.3c-root-cron-identity-v2","baseline":"present","active_path":str(active),"disabled_path":str(disabled),
+      "device":before.st_dev,"inode":before.st_ino,"size":before.st_size,"mtime_ns":before.st_mtime_ns,
+      "sha256":hashlib.sha256(raw).hexdigest()}
+evidence.write_text(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n",encoding="utf-8")
+PY
+    chmod 0600 "$original" "$identity"
+    mv -- "$original" "$ACTIVATION_CRON_SNAPSHOT"
+    mv -- "$identity" "$ACTIVATION_CRON_DISABLED"
+    sync -f "$ACTIVATION_CRON_SNAPSHOT"; sync -f "$ACTIVATION_CRON_DISABLED"; fsync_dir "$STATE_ROOT"
+    verify_root_schedule_state active
+}
+
+capture_activation_crontab() { capture_root_schedule; }
+capture_code_release_crontab() { capture_root_schedule; }
+
+verify_root_schedule_state() {
+    local state="$1" owner_uid owner_gid
+    case "$state" in active|disabled) ;; *) return 64 ;; esac
+    owner_uid="$(cron_schedule_owner_uid)"; owner_gid="$(cron_schedule_owner_gid)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin EXPECTED_UID="$owner_uid" EXPECTED_GID="$owner_gid" \
+        EXPECTED_STATE="$state" "$SYSTEM_PYTHON_BIN" -I -P - "$ROOT_CRON_FILE" \
+        "$ROOT_CRON_DISABLED_FILE" "$ACTIVATION_CRON_SNAPSHOT" "$ACTIVATION_CRON_DISABLED" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+active,disabled,snapshot,evidence=map(pathlib.Path,sys.argv[1:]); uid=int(os.environ["EXPECTED_UID"]); gid=int(os.environ["EXPECTED_GID"])
+for path in (snapshot,evidence):
+    info=path.lstat()
+    if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1:
+        raise SystemExit("private cron evidence is unsafe")
+data=json.loads(evidence.read_text())
+keys={"schema","baseline","active_path","disabled_path","device","inode","size","mtime_ns","sha256"}
+if (set(data)!=keys or data["schema"]!="genus-a0.3c-root-cron-identity-v2" or data["baseline"] not in {"present","absent"} or data["active_path"]!=str(active)
+        or data["disabled_path"]!=str(disabled) or not re.fullmatch(r"[a-f0-9]{64}",data["sha256"])):
+    raise SystemExit("root cron identity evidence differs")
+if data["baseline"]=="absent":
+    if (active.exists() or active.is_symlink() or disabled.exists() or disabled.is_symlink()
+            or snapshot.read_bytes()!=b"" or any(data[key]!=0 for key in ("device","inode","size","mtime_ns"))
+            or data["sha256"]!=hashlib.sha256(b"").hexdigest()):
+        raise SystemExit("absent root schedule baseline differs")
+    raise SystemExit(0)
+selected=active if os.environ["EXPECTED_STATE"]=="active" else disabled
+absent=disabled if selected==active else active
+if absent.exists() or absent.is_symlink(): raise SystemExit("both root cron states are present")
+before=selected.lstat()
+if (selected.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o644 or before.st_nlink!=1):
+    raise SystemExit("selected root schedule state is unsafe")
+fd=os.open(selected,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try:
+    opened=os.fstat(fd); raw=b""
+    while True:
+        chunk=os.read(fd,65536)
+        if not chunk: break
+        raw+=chunk
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=selected.lstat(); fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+if any(getattr(before,k)!=getattr(opened,k) or getattr(before,k)!=getattr(final,k) or getattr(before,k)!=getattr(after,k) for k in fields):
+    raise SystemExit("root schedule changed during verification")
+if ((before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns)!=(data["device"],data["inode"],data["size"],data["mtime_ns"])
+        or hashlib.sha256(raw).hexdigest()!=data["sha256"] or raw!=snapshot.read_bytes()):
+    raise SystemExit("root schedule bytes/inode drifted")
+PY
+}
+
+verify_live_crontab() {
+    [ "$1" = "$ACTIVATION_CRON_SNAPSHOT" ] || return 70
+    verify_root_schedule_state active
+}
+
+disable_genus_cron_block() {
+    if [ ! -e "$ROOT_CRON_FILE" ] && [ ! -L "$ROOT_CRON_FILE" ] \
+        && verify_root_schedule_state disabled; then return 0; fi
+    verify_root_schedule_state active || fail "Root-Cron driftet vor Deaktivierung" 70
+    as_root "$ROOT_MV_BIN" -T -n -- "$ROOT_CRON_FILE" "$ROOT_CRON_DISABLED_FILE"
+    as_root "$ROOT_SYNC_BIN" -f "$(dirname "$ROOT_CRON_FILE")"
+    verify_root_schedule_state disabled || fail "Root-Cron blieb nach atomarer Deaktivierung aktiv/unsicher" 70
+}
+
+restore_genus_cron_block() {
+    if [ ! -e "$ROOT_CRON_DISABLED_FILE" ] && [ ! -L "$ROOT_CRON_DISABLED_FILE" ] \
+        && verify_root_schedule_state active; then return 0; fi
+    verify_root_schedule_state disabled \
+        || { printf '[A0.3c] FEHLER: Root-Cron driftet; exakte Restaurierung verweigert\n' >&2; return 70; }
+    as_root "$ROOT_MV_BIN" -T -n -- "$ROOT_CRON_DISABLED_FILE" "$ROOT_CRON_FILE" || return 70
+    as_root "$ROOT_SYNC_BIN" -f "$(dirname "$ROOT_CRON_FILE")" || return 70
+    verify_root_schedule_state active
+}
+
+write_boot_guard_payload() {
+    local output="$1" generator_status generator_hash
+    harden_privileged_boundary
+    generator_hash="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$output" "$ACTIVATION_JOURNAL" "$CODE_RELEASE_JOURNAL" "$AUTOSTART_APPROVAL" "$ACTIVE_LINK" \
+        "$SETS_ROOT" "$REPO_DIR" "$GIT_BIN" "$(id -u)" "$(id -g)" "$STATE_ROOT" \
+        "$CORE_POINTER" "$EMBED_POINTER" "$GENUS_HOME/.genus/a0.3c/series" "$RECEIPT_ROOT" "$DB_PATH" \
+        "$CODE_RELEASE_START_CAPABILITY" "$CODE_RELEASE_START_MARKER" \
+        "$CODE_RELEASE_TRUST_ANCHOR" "$BACKUP_DIR/a03c-code-release-byte-snapshots" \
+        "$PUBLIC_SETS_ROOT" "$RUNTIME_VIEW_ROOT" "$CODE_RELEASE_TRUST_ROOT" "$RUNTIME_PREFIX" \
+        "$PROJECTION_HELPER_PATH" "$CONSUMER_PUBLISHER_PATH" "$CONSUMER_RENDERER_PATH" <<'PY'
+import hashlib, pathlib, sys
+config = {
+    "journal": sys.argv[2], "code_journal": sys.argv[3], "approval": sys.argv[4], "active": sys.argv[5],
+    "sets": sys.argv[6], "repo": sys.argv[7], "git": sys.argv[8], "uid": int(sys.argv[9]),
+    "gid": int(sys.argv[10]), "state": sys.argv[11], "core_pointer": sys.argv[12],
+    "embed_pointer": sys.argv[13], "series_root": sys.argv[14], "receipt_root": sys.argv[15],
+    "database": sys.argv[16], "start_capability": sys.argv[17], "start_marker": sys.argv[18],
+    "trust_anchor": sys.argv[19], "code_backup_root": sys.argv[20],
+    "public_sets": sys.argv[21], "public_active": sys.argv[22], "projection_trust": sys.argv[23],
+    "runtime_prefix": sys.argv[24], "projection_helper": sys.argv[25],
+    "consumer_publisher": sys.argv[26], "consumer_renderer": sys.argv[27],
+}
+program = r'''#!/usr/bin/python3 -I
+import atexit
+import hashlib
+import json
+import fcntl
+import os
+import pathlib
+import pwd
+import re
+import stat
+import subprocess
+import sys
+import time
+
 CONFIG = __CONFIG__
+GIT_ENV = {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/nonexistent",
+    "LC_ALL": "C",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+}
+
+
+def safe_git(*arguments, **kwargs):
+    return subprocess.run(
+        [
+            CONFIG["git"],
+            "--no-replace-objects",
+            "-c", f"safe.directory={CONFIG['repo']}",
+            "-c", "core.fsmonitor=false",
+            "-c", "core.untrackedCache=false",
+            "-c", "core.hooksPath=/dev/null",
+            "-c", "core.attributesFile=/dev/null",
+            "-c", "diff.external=",
+            "-C", CONFIG["repo"],
+            *arguments,
+        ],
+        env=GIT_ENV,
+        **kwargs,
+    )
+
+
 PENDING_KEYS = {"schema","phase","candidate_commit","mode","target_manifest","target_manifest_sha256",
  "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
- "prior_active_manifest","prior_previous_manifest","prior_active_services","cron_original_sha256",
- "cron_disabled_sha256","activation_receipt_path","activation_receipt_sha256"}
+ "prior_active_manifest","prior_previous_manifest","prior_active_services","target_active_services","cron_original_sha256",
+ "cron_disabled_sha256","operator_uid","projection_transaction_nonce","projection_plan_path",
+ "projection_plan_sha256","projection_helper_sha256","projection_approval_path","projection_approval_sha256",
+ "projection_prior_manifest",
+ "projection_prior_receipt_sha256","projection_target_receipt_sha256",
+ "consumer_state","consumer_plan_path","consumer_plan_sha256","consumer_inventory_path",
+ "consumer_inventory_sha256","consumer_snapshot_path","consumer_snapshot_sha256",
+ "consumer_publisher_sha256","consumer_renderer_sha256","consumer_baseline_hint","consumer_baseline",
+ "consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256",
+ "activation_receipt_path","activation_receipt_sha256","activation_reservation_sha256",
+ "root_artifact_transaction_id","root_artifact_inventory_sha256","root_artifact_authority_path",
+ "root_artifact_authority_sha256","root_artifact_executor_sha256","root_artifact_old_commit",
+ "root_artifact_new_commit","root_artifact_commit_policy","root_artifact_state",
+ "root_artifact_terminal_path","root_artifact_terminal_sha256","projection_state"}
+ROOT_STATES={"staged","pending","applied-reloaded","committed","rolled-back"}
+PROJECTION_STATES={"unbound","authorized","prepared","activated","committed","restored"}
+CONSUMER_STATES={"unbound","baseline-snapshotted","snapshotted-authorized","published","target-verified",
+                 "prior-restored","prior-unchanged"}
+TARGET_PROJECTION_STATES={"activated","committed"}
+TARGET_CONSUMER_STATES={"target-verified"}
+PRIOR_PROJECTION_STATES={"restored"}
+PRIOR_CONSUMER_STATES={"prior-restored","prior-unchanged"}
+ROOT_EXECUTOR_REL="deploy/pi_a0_3c_root_artifact_transaction.py"
+ROOT_EXECUTION_MARKER="descriptor-bound-authorized-commit-blob-v1"
+RESERVATION_KEYS={"schema","candidate_commit","old_commit","mode","operator_uid","private_active","public_prior",
+ "projection_helper_sha256","consumer_publisher_sha256","consumer_renderer_sha256","root_artifact_executor_sha256",
+ "root_artifact_authority_path","root_artifact_authority_sha256","root_artifact_commit_policy","root_artifact_paths",
+ "root_artifact_payloads","readiness_sha256","series_sha256","state_root","target_manifest","target_manifest_sha256",
+ "target_tree_inventory_sha256","prior_manifest_sha256","prior_tree_inventory_sha256","transaction_nonce",
+ "root_artifact_transaction_id"}
+CONSUMER_APPROVAL_KEYS={"authorization_sha256","baseline","candidate_commit","inventory_sha256","operator_uid",
+ "plan_sha256","projection_approval_sha256","publisher_sha256","renderer_sha256","schema","snapshot_path",
+ "snapshot_sha256","state_root","target_manifest","transaction_nonce"}
+ROLLBACK_PROTOCOL="committed-runtime-rollback-v1"
+ROLLBACK_SOURCE_SCHEMA="genus-a0.3c-runtime-projection-rollback-source-v1"
+RUNTIME_ROLLBACK_JOURNAL_SCHEMA="genus-a0.3c-runtime-rollback-pending-v1"
+RUNTIME_ROLLBACK_TERMINAL_SCHEMA="genus-a0.3c-runtime-rollback-terminal-v1"
+RUNTIME_ROLLBACK_CURRENT_SCHEMA="genus-a0.3c-runtime-rollback-current-v1"
+RUNTIME_ROLLBACK_PHASES=("intent-staged","quiescence-guarded","quiescence-paused","quiescence-stopped",
+ "projection-pending","projection-restored","private-restored","consumer-prior-restored",
+ "consumer-prior-unchanged","start-authorized","services-verified","receipt-written")
+RUNTIME_ROLLBACK_START_PHASES={"start-authorized","services-verified","receipt-written"}
+RUNTIME_ROLLBACK_EARLY_PHASES=set(RUNTIME_ROLLBACK_PHASES)-RUNTIME_ROLLBACK_START_PHASES
+RUNTIME_SERVICE_ORDER=("genus-network-watchdog.timer","genus-network-watchdog.service",
+ "genus-learner.service","genus-telegram-bot.service")
+ROLLBACK_SOURCE_KEYS={"activation_reservation_sha256","activation_receipt_path","activation_receipt_sha256",
+ "activation_terminal_path","activation_terminal_sha256","candidate_commit","consumer_approval_path",
+ "consumer_approval_sha256","consumer_baseline","consumer_baseline_authorization_sha256",
+ "consumer_inventory_path","consumer_inventory_sha256","consumer_plan_path","consumer_plan_sha256",
+ "consumer_publisher_sha256","consumer_renderer_sha256","consumer_snapshot_path","consumer_snapshot_sha256",
+ "operator_uid","prior_active_manifest","prior_active_manifest_sha256","prior_active_services","prior_manifest",
+ "prior_manifest_sha256","prior_receipt_sha256","prior_tree_inventory_sha256","projection_approval_path",
+ "projection_approval_sha256","projection_helper_sha256","projection_plan_path","projection_plan_sha256",
+ "projection_terminal_path","projection_terminal_sha256","protocol","publisher_sha256",
+ "root_artifact_commit_policy","root_artifact_authority_path","root_artifact_authority_sha256",
+ "root_artifact_executor_sha256","root_artifact_inventory_path","root_artifact_inventory_sha256",
+ "root_artifact_state","root_artifact_terminal_path","root_artifact_terminal_sha256",
+ "root_artifact_transaction_id","schema","source_transaction_nonce","state_root","target_active_services",
+ "target_manifest","target_manifest_sha256","target_receipt_sha256","target_tree_inventory_sha256"}
+RUNTIME_ROLLBACK_JOURNAL_KEYS={"active_manifest","active_manifest_sha256","authorization_sha256",
+ "candidate_commit","completion_path","completion_sha256","consumer_approval_path","consumer_approval_sha256",
+ "consumer_baseline","consumer_publisher_sha256","consumer_renderer_sha256","consumer_state",
+ "cron_identity_path","cron_identity_sha256","cron_original_path","cron_original_sha256",
+ "consumer_inventory_path","consumer_inventory_sha256","consumer_plan_path","consumer_plan_sha256",
+ "consumer_snapshot_path","consumer_snapshot_sha256","intent_path","intent_sha256","database_backup_performed",
+ "database_migration_performed","database_replay_performed","database_reseal_performed","database_restore_performed",
+ "database_rollback_performed","operator_uid","phase","prior_active_manifest","prior_active_manifest_sha256",
+ "prior_active_services","prior_manifest","prior_current_sha256","product_db_device","product_db_inode","product_db_path",
+ "projection_helper_sha256","projection_pending_path","projection_pending_sha256","projection_state",
+ "projection_terminal_path","projection_terminal_sha256","protocol","rollback_transaction_nonce",
+ "root_artifact_commit_policy","root_artifact_executor_sha256","root_artifact_state",
+ "root_artifact_terminal_path","root_artifact_terminal_sha256","root_artifact_transaction_id","schema",
+ "source_authority_path","source_authority_sha256","source_transaction_nonce","start_authorization_path",
+ "start_authorization_sha256","state_root","target_active_services","target_manifest","target_manifest_sha256"}
+RUNTIME_ROLLBACK_TERMINAL_KEYS={"active_manifest","active_manifest_sha256","active_services","candidate_commit",
+ "completion_path","completion_sha256","consumer_approval_path","consumer_approval_sha256","consumer_baseline",
+ "consumer_publisher_sha256","consumer_renderer_sha256","consumer_state","cron_identity_path",
+ "cron_identity_sha256","cron_original_path","cron_original_sha256","database_backup_performed",
+ "database_migration_performed","database_replay_performed","database_reseal_performed","database_restore_performed",
+ "database_rollback_performed","intent_path","intent_sha256","phase","product_db_device","product_db_inode",
+ "product_db_path","prior_current_sha256","projection_helper_sha256","projection_state","projection_terminal_path",
+ "projection_terminal_sha256","protocol","public_manifest","rollback_transaction_nonce",
+ "root_artifact_executor_sha256","root_artifact_state","root_artifact_terminal_path",
+ "root_artifact_terminal_sha256","root_artifact_transaction_id","runtime_journal_sha256","schema",
+ "source_authority_path","source_authority_sha256","source_terminal_path","source_terminal_sha256",
+ "source_transaction_nonce","start_authorization_path","start_authorization_sha256"}
+RUNTIME_ROLLBACK_CURRENT_KEYS={"active_manifest","active_manifest_sha256","candidate_commit",
+ "prior_current_sha256","protocol","rollback_transaction_nonce","schema","source_authority_sha256",
+ "source_transaction_nonce","start_authorization_sha256","terminal_path","terminal_sha256"}
+ROOT_ARTIFACT_LOCK_FD=None
+ROOT_PROJECTION_LOCK_FD=None
+ROOT_ROLLBACK_AUTHORITY=None
+
+def release_root_guard_locks():
+    global ROOT_ARTIFACT_LOCK_FD,ROOT_PROJECTION_LOCK_FD
+    for name in ("ROOT_PROJECTION_LOCK_FD","ROOT_ARTIFACT_LOCK_FD"):
+        fd=globals()[name]
+        if fd is None: continue
+        try: fcntl.flock(fd,fcntl.LOCK_UN)
+        finally:
+            os.close(fd); globals()[name]=None
+
+atexit.register(release_root_guard_locks)
 
 def regular_bytes(name, mode):
     path = pathlib.Path(name)
@@ -2547,6 +4943,30 @@ def regular_bytes(name, mode):
     finally:
         os.close(fd)
 
+def root_regular_bytes(name, mode, limit=16*1024*1024):
+    path=pathlib.Path(name); before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit):
+        raise RuntimeError("unsafe root evidence file")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd); chunks=[]; size=0
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            size+=len(chunk)
+            if size>limit: raise RuntimeError("root evidence grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) for key in fields):
+        raise RuntimeError("root evidence changed during read")
+    payload=b"".join(chunks)
+    if len(payload)!=before.st_size or len(payload)>limit:
+        raise RuntimeError("root evidence read was incomplete or oversized")
+    return payload
+
 def safe_dir(path, mode):
     path = pathlib.Path(path)
     info = path.lstat()
@@ -2569,9 +4989,14 @@ def set_roles(manifest):
             resolved = pathlib.Path(expected)
             safe_dir(resolved, 0o500)
         else:
-            resolved = safe_dir(path, 0o500)
-            if resolved.parent != root:
-                raise RuntimeError("runtime role escapes set")
+            link_info=path.lstat(); expected=f"projection/{role}"
+            if (not stat.S_ISLNK(link_info.st_mode) or link_info.st_uid!=CONFIG["uid"]
+                    or os.readlink(path)!=expected):
+                raise RuntimeError("private projection role alias differs")
+            projection=safe_dir(root/"projection",0o500)
+            resolved=safe_dir(projection/role,0o500)
+            if path.resolve(strict=True)!=resolved:
+                raise RuntimeError("runtime role alias escapes projection")
         roles[role] = resolved.resolve(strict=True)
     return root, roles
 
@@ -2613,8 +5038,63 @@ def strict_json(payload):
             result[key]=value
         return result
     value=json.loads(payload,object_pairs_hook=pairs)
-    if not isinstance(value,dict): raise RuntimeError("evidence root is not an object")
+    try: canonical=(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+    except (TypeError,ValueError) as exc: raise RuntimeError("evidence is not canonical JSON") from exc
+    if not isinstance(value,dict) or canonical!=payload: raise RuntimeError("evidence root is not canonical")
     return value
+
+def root_trust_anchor():
+    path=pathlib.Path(CONFIG["trust_anchor"]); parent=path.parent
+    try: info=path.lstat()
+    except FileNotFoundError:
+        try: parent_info=parent.lstat()
+        except FileNotFoundError: return None
+        if (parent.resolve(strict=True)!=parent or not stat.S_ISDIR(parent_info.st_mode)
+                or parent_info.st_uid!=0 or parent_info.st_gid!=0 or stat.S_IMODE(parent_info.st_mode)!=0o700):
+            raise RuntimeError("code release trust root is unsafe")
+        return None
+    parent_info=parent.lstat()
+    if (parent.resolve(strict=True)!=parent or not stat.S_ISDIR(parent_info.st_mode)
+            or parent_info.st_uid!=0 or parent_info.st_gid!=0 or stat.S_IMODE(parent_info.st_mode)!=0o700
+            or not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_gid!=0
+            or stat.S_IMODE(info.st_mode)!=0o444 or info.st_nlink!=1):
+        raise RuntimeError("code release root trust anchor is unsafe")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd); payload=b""
+        while True:
+            chunk=os.read(fd,65536)
+            if not chunk: break
+            payload+=chunk
+            if len(payload)>65536: raise RuntimeError("code release root trust anchor is oversized")
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(info,key)!=getattr(opened,key) or getattr(info,key)!=getattr(final,key) for key in fields) or len(payload)!=info.st_size:
+        raise RuntimeError("code release root trust anchor changed during read")
+    data=strict_json(payload)
+    keys={"schema","state","repo_commit","active_manifest","active_manifest_sha256","release_seal","nonce",
+          "approval_schema","approval_sha256","journal_phase","journal_sha256","published_at"}
+    if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-root-trust-v1":
+        raise RuntimeError("code release root trust anchor schema differs")
+    if (data.get("state") not in {"pending","terminal-ready","steady"}
+            or not re.fullmatch(r"[a-f0-9]{40}",data.get("repo_commit",""))
+            or not re.fullmatch(r"(?:legacy-)?[a-f0-9]{64}",data.get("active_manifest",""))
+            or not re.fullmatch(r"[a-f0-9]{64}",data.get("active_manifest_sha256",""))
+            or not re.fullmatch(r"[a-f0-9]{64}",data.get("release_seal",""))
+            or not re.fullmatch(r"[a-f0-9]{64}",data.get("nonce",""))
+            or data.get("approval_schema") not in {"genus-a0.3c-runtime-start-authorization-v3","genus-a0.3c-runtime-start-authorization-v4"}
+            or not re.fullmatch(r"[a-f0-9]{64}",data.get("approval_sha256",""))
+            or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ",data.get("published_at",""))):
+        raise RuntimeError("code release root trust anchor identity differs")
+    if data["state"] in {"pending","terminal-ready"}:
+        allowed_phases={"authorized","receipt-written","rollback-authorized"} if data["state"]=="pending" else {"terminalized","resumed","rollback-authorized"}
+        if (data.get("journal_phase") not in allowed_phases
+                or not re.fullmatch(r"[a-f0-9]{64}",data.get("journal_sha256",""))):
+            raise RuntimeError("nonsteady code release root trust anchor differs")
+    elif data.get("journal_phase") or data.get("journal_sha256"):
+        raise RuntimeError("steady code release root trust anchor carries a pending journal")
+    return data
 
 def sealed_digest(data):
     claimed=data.get("receipt_sha256")
@@ -2667,21 +5147,1428 @@ def drop_to_runtime_user():
     if os.geteuid() != CONFIG["uid"] or os.getegid() != CONFIG["gid"]:
         raise RuntimeError("boot guard could not enter the bound runtime identity")
 
+def root_prepare_code_release_start(unit):
+    if os.geteuid()!=0 or len(sys.argv)!=3:
+        raise RuntimeError("code release capability preparation requires the root ExecCondition mode")
+    allowed={"genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+    if unit not in allowed: raise RuntimeError("controlled code release start unit is not allowed")
+    capability=pathlib.Path(CONFIG["start_capability"]); marker_base=pathlib.Path(CONFIG["start_marker"])
+    marker=marker_base.with_name(f"{marker_base.name}.{unit}")
+    root=capability.parent; root_info=root.lstat()
+    if (root.resolve(strict=True)!=root or not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=0
+            or stat.S_IMODE(root_info.st_mode)!=0o711 or marker_base.parent!=root or marker.parent!=root):
+        raise RuntimeError("code release capability root is unsafe")
+    def root_bytes(path,mode):
+        before=path.lstat()
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1):
+            raise RuntimeError("root capability evidence is unsafe")
+        fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+        try:
+            opened=os.fstat(fd); payload=b""
+            while True:
+                chunk=os.read(fd,65536)
+                if not chunk: break
+                payload+=chunk
+            final=os.fstat(fd)
+        finally: os.close(fd)
+        fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+        if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) for key in fields):
+            raise RuntimeError("root capability evidence changed during read")
+        return payload
+    try: marker_info=marker.lstat()
+    except FileNotFoundError: pass
+    else:
+        if not stat.S_ISREG(marker_info.st_mode) or marker_info.st_uid!=0 or marker_info.st_nlink!=1:
+            raise RuntimeError("code release start marker is unsafe")
+        marker.unlink()
+    try: capability.lstat()
+    except FileNotFoundError:
+        anchor_data=root_trust_anchor()
+        if anchor_data is not None and anchor_data["state"]=="pending":
+            raise RuntimeError("pending root trust lacks a root-controlled start capability")
+        directory=os.open(root,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+        try: os.fsync(directory)
+        finally: os.close(directory)
+        return
+    lock_path=pathlib.Path(str(capability)+".lock"); root_bytes(lock_path,0o600)
+    lock_fd=os.open(lock_path,os.O_RDWR|getattr(os,"O_NOFOLLOW",0))
+    try:
+        fcntl.flock(lock_fd,fcntl.LOCK_EX)
+        data=strict_json(root_bytes(capability,0o600))
+        keys={"schema","boot_id","issued_monotonic_ns","expires_monotonic_ns","repo_commit","release_seal",
+              "nonce","journal_phase","approval_sha256","journal_sha256","remaining_units"}
+        if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-start-capability-v1":
+            raise RuntimeError("code release start capability schema differs")
+        boot_id=pathlib.Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+        issued=data["issued_monotonic_ns"]; expires=data["expires_monotonic_ns"]; now=time.monotonic_ns()
+        if (data["boot_id"]!=boot_id or not re.fullmatch(r"[0-9a-f-]{36}",boot_id)
+                or not isinstance(issued,int) or isinstance(issued,bool) or not isinstance(expires,int) or isinstance(expires,bool)
+                or issued<=0 or expires<=issued or expires-issued>120_000_000_000 or now<issued or now>expires):
+            raise RuntimeError("code release start capability boot/time binding differs")
+        for key,size in (("repo_commit",40),("release_seal",64),("nonce",64),("approval_sha256",64),("journal_sha256",64)):
+            if not re.fullmatch(rf"[a-f0-9]{{{size}}}",data.get(key,"")): raise RuntimeError("capability digest malformed")
+        if data.get("journal_phase") not in {"authorized","receipt-written","rollback-authorized"}:
+            raise RuntimeError("capability phase differs")
+        anchor=root_trust_anchor()
+        if (anchor is None or anchor["state"]!="pending" or anchor["repo_commit"]!=data["repo_commit"]
+                or anchor["release_seal"]!=data["release_seal"] or anchor["nonce"]!=data["nonce"]
+                or anchor["journal_phase"]!=data["journal_phase"]
+                or anchor["approval_sha256"]!=data["approval_sha256"]
+                or anchor["journal_sha256"]!=data["journal_sha256"]):
+            raise RuntimeError("controlled start capability differs from persistent root trust")
+        remaining=data["remaining_units"]
+        if (not isinstance(remaining,list) or not remaining or len(remaining)!=len(set(remaining))
+                or any(item not in allowed for item in remaining) or unit not in remaining):
+            raise RuntimeError("code release start capability is absent/reused for this unit")
+        remaining=[item for item in remaining if item!=unit]
+        if remaining:
+            data["remaining_units"]=remaining; tmp=capability.with_name(f"{capability.name}.tmp.{os.getpid()}")
+            fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+            try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+            finally: os.close(fd)
+            os.replace(tmp,capability)
+        else: capability.unlink()
+        marker_data={"schema":"genus-a0.3c-code-release-start-consumed-v1","boot_id":boot_id,
+                     "consumed_monotonic_ns":time.monotonic_ns(),"repo_commit":data["repo_commit"],
+                     "release_seal":data["release_seal"],"nonce":data["nonce"],
+                     "journal_phase":data["journal_phase"],"approval_sha256":data["approval_sha256"],
+                     "journal_sha256":data["journal_sha256"],"unit":unit}
+        tmp=marker.with_name(f"{marker.name}.tmp.{os.getpid()}")
+        fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+        try: os.write(fd,(json.dumps(marker_data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+        finally: os.close(fd)
+        os.chmod(tmp,0o444); os.replace(tmp,marker)
+        directory=os.open(root,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+        try: os.fsync(directory)
+        finally: os.close(directory)
+    finally: os.close(lock_fd)
+
+def validate_code_release_start_marker(expected_commit,expected_seal,expected_nonce,expected_phase,
+                                       expected_approval_sha256,expected_journal_sha256):
+    if len(sys.argv)!=2: raise RuntimeError("controlled code release start lacks an exact systemd unit")
+    unit=sys.argv[1]; marker_base=pathlib.Path(CONFIG["start_marker"])
+    marker=marker_base.with_name(f"{marker_base.name}.{unit}"); before=marker.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or stat.S_IMODE(before.st_mode)!=0o444 or before.st_nlink!=1):
+        raise RuntimeError("controlled code release start marker is unsafe")
+    fd=os.open(marker,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        payload=b""
+        while True:
+            chunk=os.read(fd,65536)
+            if not chunk: break
+            payload+=chunk
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    if (final.st_dev,final.st_ino,final.st_uid,final.st_mode,final.st_nlink,final.st_size,final.st_mtime_ns)!=(before.st_dev,before.st_ino,before.st_uid,before.st_mode,before.st_nlink,before.st_size,before.st_mtime_ns):
+        raise RuntimeError("controlled code release start marker changed during read")
+    data=strict_json(payload); keys={"schema","boot_id","consumed_monotonic_ns","repo_commit","release_seal","nonce",
+                                    "journal_phase","approval_sha256","journal_sha256","unit"}
+    now=time.monotonic_ns(); consumed=data.get("consumed_monotonic_ns")
+    if (set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-start-consumed-v1"
+            or data.get("boot_id")!=pathlib.Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+            or not isinstance(consumed,int) or isinstance(consumed,bool) or consumed>now or now-consumed>120_000_000_000
+            or data.get("repo_commit")!=expected_commit or data.get("release_seal")!=expected_seal
+            or data.get("nonce")!=expected_nonce or data.get("journal_phase")!=expected_phase
+            or data.get("approval_sha256")!=expected_approval_sha256
+            or data.get("journal_sha256")!=expected_journal_sha256 or data.get("unit")!=unit):
+        raise RuntimeError("controlled code release start marker binding differs")
+
+def code_release_v4(approval,approval_sha256,anchor):
+    keys={"schema","repo_commit","active_manifest","active_manifest_sha256",
+          "prior_start_authorization_path","prior_start_authorization_sha256",
+          "code_release_preflight_path","code_release_preflight_sha256",
+          "release_seal","completion_receipt_path","completion_receipt_sha256",
+          "consumption_receipt_path","consumption_receipt_sha256","reason"}
+    if set(approval)!=keys or approval.get("schema")!="genus-a0.3c-runtime-start-authorization-v4":
+        raise RuntimeError("code release authorization schema differs")
+    if approval.get("reason")!="code-release" or not re.fullmatch(r"[a-f0-9]{40}",approval.get("repo_commit","")):
+        raise RuntimeError("code release authorization identity differs")
+    if not re.fullmatch(r"[a-f0-9]{64}",approval.get("release_seal","")):
+        raise RuntimeError("code release seal malformed")
+    commit=safe_git("rev-parse","--verify","HEAD",check=True,text=True,capture_output=True).stdout.strip()
+    if commit!=approval["repo_commit"]: raise RuntimeError("repo commit differs")
+    dirty=safe_git("status","--porcelain=v1","--untracked-files=all",check=True,text=True,capture_output=True).stdout
+    if dirty: raise RuntimeError("repo worktree is not exactly clean")
+    active_path=pathlib.Path(CONFIG["active"])
+    if not stat.S_ISLNK(active_path.lstat().st_mode) or os.readlink(active_path)!=f"sets/{approval['active_manifest']}":
+        raise RuntimeError("ACTIVE selector differs")
+    active_payload=manifest_bytes(approval["active_manifest"])
+    if digest(active_payload)!=approval["active_manifest_sha256"]: raise RuntimeError("ACTIVE manifest hash differs")
+    _,roles=set_roles(approval["active_manifest"])
+    pointer_unit(CONFIG["core_pointer"],"core",roles["core"])
+    pointer_unit(CONFIG["embed_pointer"],"embed",roles["embed"])
+    receipt_root=safe_dir(CONFIG["receipt_root"],0o700)
+    def evidence(value,expected,label):
+        path=pathlib.Path(value)
+        if path.parent.resolve(strict=True)!=receipt_root or path.name in {".",".."}:
+            raise RuntimeError(f"{label} escapes receipt root")
+        payload=regular_bytes(path,0o600)
+        if digest(payload)!=expected: raise RuntimeError(f"{label} hash differs")
+        return strict_json(payload)
+    prior=evidence(approval["prior_start_authorization_path"],approval["prior_start_authorization_sha256"],"prior authorization")
+    if prior.get("schema") not in {"genus-a0.3c-runtime-start-authorization-v3","genus-a0.3c-runtime-start-authorization-v4"}:
+        raise RuntimeError("prior authorization version differs")
+    preflight=evidence(approval["code_release_preflight_path"],approval["code_release_preflight_sha256"],"code release preflight")
+    preflight_keys={"schema","outcome","old_commit","new_commit","new_tree","active_manifest","active_manifest_sha256",
+        "release_plan_path","release_plan_sha256","release_seal","nonce","backup_receipt_path","backup_receipt_sha256",
+        "product_db_canary_path","product_db_canary_sha256",
+        "compileall_pass","ruff_pass","pytest_pass","test_scope","product_database_modified","product_database_replayed",
+        "product_database_resealed","product_database_restored","paths_logged","payloads_logged"}
+    if set(preflight)!=preflight_keys or preflight.get("schema")!="genus-a0.3c-code-release-preflight-v1" or preflight.get("outcome")!="verified":
+        raise RuntimeError("code release preflight schema differs")
+    if (preflight["new_commit"]!=commit or preflight["active_manifest"]!=approval["active_manifest"]
+            or preflight["active_manifest_sha256"]!=approval["active_manifest_sha256"]
+            or preflight["release_seal"]!=approval["release_seal"]):
+        raise RuntimeError("code release preflight binding differs")
+    if any(preflight[key] is not True for key in ("compileall_pass","ruff_pass","pytest_pass")):
+        raise RuntimeError("code release checks are not green")
+    if any(preflight[key] is not False for key in ("product_database_modified","product_database_replayed","product_database_resealed","product_database_restored","payloads_logged")) or preflight["paths_logged"] is not True:
+        raise RuntimeError("code release data safety booleans differ")
+    if preflight["test_scope"]!="a0-exit-full-suite-synthetic-v1":
+        raise RuntimeError("code release test scope is not the full synthetic suite")
+    plan=evidence(preflight["release_plan_path"],preflight["release_plan_sha256"],"code release plan")
+    plan_keys={"schema","contract_version","transition_kind","created_at","expires_at","nonce","old_commit","new_commit",
+        "old_tree","new_tree","active_manifest","active_manifest_sha256","start_authorization_path",
+        "start_authorization_sha256","boot_guard_path","boot_guard_sha256","allowed_diff_sha256","changed_paths",
+        "release_seal","intended_command","repo_path","product_db_path","product_db_device","product_db_inode",
+        "operator_uid","operator_name","machine_id_sha256","branch_name","origin_remote_sha256",
+        "paths_logged","payloads_logged"}
+    if set(plan)!=plan_keys or plan.get("schema")!="genus-a0.3c-code-release-plan-v1" or plan.get("contract_version")!="genus-a0.3c-code-release-contract-v1":
+        raise RuntimeError("code release plan schema differs")
+    unsigned={key:value for key,value in plan.items() if key!="release_seal"}
+    calculated=digest(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode())
+    if calculated!=plan["release_seal"] or calculated!=approval["release_seal"] or plan["new_commit"]!=commit or plan["nonce"]!=preflight["nonce"]:
+        raise RuntimeError("code release plan seal differs")
+    db_path=pathlib.Path(CONFIG["database"]); db_info=db_path.lstat()
+    branch=safe_git("symbolic-ref","--quiet","--short","HEAD",check=True,text=True,capture_output=True).stdout.strip()
+    origin=safe_git("config","--get","remote.origin.url",check=True,text=True,capture_output=True).stdout.rstrip("\n")
+    target={"repo_path":str(pathlib.Path(CONFIG["repo"]).resolve(strict=True)),
+            "product_db_path":str(db_path.resolve(strict=True)),"product_db_device":db_info.st_dev,
+            "product_db_inode":db_info.st_ino,"operator_uid":CONFIG["uid"],
+            "operator_name":pwd.getpwuid(CONFIG["uid"]).pw_name,
+            "machine_id_sha256":digest(pathlib.Path("/etc/machine-id").read_bytes()),
+            "branch_name":branch,"origin_remote_sha256":digest(origin.encode())}
+    if any(plan.get(key)!=value for key,value in target.items()):
+        raise RuntimeError("code release target binding differs")
+    backup=evidence(preflight["backup_receipt_path"],preflight["backup_receipt_sha256"],"code release byte backup")
+    canary=evidence(preflight["product_db_canary_path"],preflight["product_db_canary_sha256"],"product database canary")
+    canary_keys={"schema","database_path","database","wal","shm"}
+    member_keys={"present","device","inode","owner_uid","group_gid","mode","nlink","size","mtime_ns","sha256"}
+    if set(canary)!=canary_keys or canary.get("schema")!="genus-a0.3c-code-release-product-db-canary-v2" or canary.get("database_path")!=plan["product_db_path"]:
+        raise RuntimeError("product database canary schema differs")
+    if any(set(canary[name])!=member_keys for name in ("database","wal","shm")) or canary["database"].get("present") is not True:
+        raise RuntimeError("product database canary member differs")
+    backup_keys={"schema","repo_commit","snapshot_root","database_source_path","product_db_canary_path",
+        "product_db_canary_sha256","database","wal","shm","sqlite_live_opened","copy_integrity_check_pass",
+        "candidate_access","config_secrets_copied","paths_logged","payloads_logged"}
+    backup_member_keys={"present","copy_path","copy_sha256"}
+    if set(backup)!=backup_keys or backup.get("schema")!="genus-a0.3c-code-release-byte-backup-v1":
+        raise RuntimeError("code release byte backup schema differs")
+    if (backup["repo_commit"]!=commit or backup["database_source_path"]!=plan["product_db_path"]
+            or backup["product_db_canary_path"]!=preflight["product_db_canary_path"]
+            or backup["product_db_canary_sha256"]!=preflight["product_db_canary_sha256"]):
+        raise RuntimeError("code release byte backup binding differs")
+    if (backup["sqlite_live_opened"] is not False or backup["copy_integrity_check_pass"] is not True
+            or backup["candidate_access"] is not False or backup["config_secrets_copied"] is not False
+            or backup["paths_logged"] is not True or backup["payloads_logged"] is not False):
+        raise RuntimeError("code release byte backup safety fields differ")
+    backup_root=safe_dir(CONFIG["code_backup_root"],0o700)
+    snapshot=safe_dir(backup["snapshot_root"],0o500)
+    if snapshot.parent!=backup_root or not snapshot.name.startswith("snapshot-"):
+        raise RuntimeError("code release byte backup layout differs")
+    expected_names=set()
+    for name,filename in (("database","database.sqlite3"),("wal","database.sqlite3-wal"),("shm","database.sqlite3-shm")):
+        member=backup[name]
+        if set(member)!=backup_member_keys or member["present"] is not canary[name]["present"]:
+            raise RuntimeError("code release byte backup member schema differs")
+        if member["present"]:
+            path=snapshot/filename; expected_names.add(filename)
+            payload=regular_bytes(path,0o400)
+            if member["copy_path"]!=str(path) or digest(payload)!=member["copy_sha256"] or member["copy_sha256"]!=canary[name]["sha256"] or len(payload)!=canary[name]["size"]:
+                raise RuntimeError("code release byte backup member differs")
+        elif member!={"present":False,"copy_path":"","copy_sha256":""}:
+            raise RuntimeError("absent code release byte backup member differs")
+    if {path.name for path in snapshot.iterdir()}!=expected_names:
+        raise RuntimeError("code release byte backup inventory differs")
+    terminal=(approval["completion_receipt_path"],approval["completion_receipt_sha256"],
+              approval["consumption_receipt_path"],approval["consumption_receipt_sha256"])
+    if any(terminal) and not all(terminal): raise RuntimeError("terminal v4 evidence is partially bound")
+    terminal_bound=all(terminal)
+    if terminal_bound:
+        completion=evidence(approval["completion_receipt_path"],approval["completion_receipt_sha256"],"completion")
+        completion_keys={"schema","outcome","old_commit","new_commit","release_seal","nonce","plan_path","plan_sha256",
+          "active_manifest","active_manifest_sha256","backup_receipt_path","backup_receipt_sha256","preflight_receipt_path",
+          "preflight_receipt_sha256","postflight_receipt_path","postflight_receipt_sha256","start_authorization_path",
+          "start_authorization_sha256","prior_start_authorization_path","prior_start_authorization_sha256",
+          "prior_boot_guard_path","prior_boot_guard_sha256","product_db_canary_path","product_db_canary_sha256",
+          "repo_path","product_db_path","product_db_device","product_db_inode","operator_uid","operator_name",
+          "machine_id_sha256","branch_name","origin_remote_sha256","active_services","database_replay_performed",
+          "database_reseal_performed","database_restore_performed","paths_logged","payloads_logged"}
+        if set(completion)!=completion_keys or completion.get("schema")!="genus-a0.3c-code-release-completion-v1" or completion.get("outcome")!="activated":
+            raise RuntimeError("terminal completion schema differs")
+        if (completion["new_commit"]!=commit or completion["release_seal"]!=approval["release_seal"]
+                or completion["old_commit"]!=plan["old_commit"] or completion["nonce"]!=plan["nonce"]
+                or completion["plan_path"]!=preflight["release_plan_path"]
+                or completion["plan_sha256"]!=preflight["release_plan_sha256"]
+                or completion["active_manifest"]!=approval["active_manifest"]
+                or completion["active_manifest_sha256"]!=approval["active_manifest_sha256"]
+                or completion["backup_receipt_path"]!=preflight["backup_receipt_path"]
+                or completion["backup_receipt_sha256"]!=preflight["backup_receipt_sha256"]
+                or completion["preflight_receipt_path"]!=approval["code_release_preflight_path"]
+                or completion["preflight_receipt_sha256"]!=approval["code_release_preflight_sha256"]
+                or completion["prior_start_authorization_sha256"]!=plan["start_authorization_sha256"]
+                or completion["prior_boot_guard_sha256"]!=plan["boot_guard_sha256"]
+                or completion["product_db_canary_path"]!=preflight["product_db_canary_path"]
+                or completion["product_db_canary_sha256"]!=preflight["product_db_canary_sha256"]
+                or any(completion.get(key)!=value for key,value in target.items())):
+            raise RuntimeError("terminal completion binding differs")
+        if (any(completion[key] is not False for key in ("database_replay_performed","database_reseal_performed","database_restore_performed","payloads_logged"))
+                or completion["paths_logged"] is not True):
+            raise RuntimeError("terminal completion data safety fields differ")
+        allowed_services={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+        services=completion["active_services"]
+        if not isinstance(services,list) or not services or len(services)!=len(set(services)) or any(unit not in allowed_services for unit in services):
+            raise RuntimeError("terminal completion service inventory differs")
+        postflight=evidence(completion["postflight_receipt_path"],completion["postflight_receipt_sha256"],"postflight")
+        postflight_keys={"schema","outcome","consecutive_samples","services","service_state_sha256","bot_private_runtime_attested",
+                         "learner_pinned_script_attested","paths_logged","payloads_logged"}
+        if (set(postflight)!=postflight_keys or postflight.get("schema")!="genus-a0.3c-runtime-service-postflight-v1"
+                or postflight.get("outcome")!="verified" or postflight.get("consecutive_samples")!=3
+                or postflight["paths_logged"] is not False or postflight["payloads_logged"] is not False):
+            raise RuntimeError("terminal postflight schema differs")
+        service_keys={"service","unit_type","main_pid","nrestarts","active_state","invocation_id","active_enter_timestamp_monotonic"}
+        names=[]
+        for item in postflight["services"]:
+            if (not isinstance(item,dict) or set(item)!=service_keys or item["service"] not in allowed_services
+                    or item["unit_type"] not in {"timer","service"} or item["active_state"]!="active"
+                    or not isinstance(item["main_pid"],int) or isinstance(item["main_pid"],bool) or item["main_pid"]<0
+                    or item["nrestarts"]!=0 or not re.fullmatch(r"[a-f0-9]{32}",item["invocation_id"])
+                    or not isinstance(item["active_enter_timestamp_monotonic"],int) or isinstance(item["active_enter_timestamp_monotonic"],bool)
+                    or item["active_enter_timestamp_monotonic"]<=0):
+                raise RuntimeError("terminal postflight service state differs")
+            if (item["unit_type"]=="timer")!=(item["service"].endswith(".timer")) or (item["unit_type"]=="timer" and item["main_pid"]!=0):
+                raise RuntimeError("terminal postflight unit type differs")
+            names.append(item["service"])
+        if names!=services or digest(json.dumps(postflight["services"],sort_keys=True,separators=(",", ":")).encode())!=postflight["service_state_sha256"]:
+            raise RuntimeError("terminal postflight inventory/hash differs")
+        if (("genus-telegram-bot.service" in names) is not postflight["bot_private_runtime_attested"]
+                or ("genus-learner.service" in names) is not postflight["learner_pinned_script_attested"]):
+            raise RuntimeError("terminal postflight process attestation differs")
+        start_auth=evidence(completion["start_authorization_path"],completion["start_authorization_sha256"],"release start authorization")
+        start_keys={"schema","repo_commit","active_manifest","active_manifest_sha256","prior_start_authorization_path",
+                    "prior_start_authorization_sha256","code_release_preflight_path","code_release_preflight_sha256","release_seal",
+                    "completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256","reason"}
+        if set(start_auth)!=start_keys or start_auth.get("schema")!="genus-a0.3c-runtime-start-authorization-v4" or start_auth.get("reason")!="code-release":
+            raise RuntimeError("release start authorization copy schema differs")
+        for key in ("repo_commit","active_manifest","active_manifest_sha256","prior_start_authorization_path",
+                    "prior_start_authorization_sha256","code_release_preflight_path","code_release_preflight_sha256","release_seal"):
+            if start_auth[key]!=approval[key]: raise RuntimeError("release start authorization copy binding differs")
+        if any(start_auth[key] for key in ("completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256")):
+            raise RuntimeError("release start authorization copy is not preterminal")
+        prior=evidence(completion["prior_start_authorization_path"],completion["prior_start_authorization_sha256"],"prior start authorization")
+        if prior.get("schema")=="genus-a0.3c-runtime-start-authorization-v3":
+            prior_v3_keys={"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256",
+                           "series_path","series_sha256","reason"}
+            if (set(prior)!=prior_v3_keys or not re.fullmatch(r"[a-f0-9]{40}",prior.get("repo_commit",""))
+                    or prior.get("reason") not in {"activate","rollback","recovery"}
+                    or not re.fullmatch(r"(?:legacy-)?[a-f0-9]{64}",prior.get("active_manifest",""))
+                    or not re.fullmatch(r"[a-f0-9]{64}",prior.get("active_manifest_sha256",""))):
+                raise RuntimeError("prior v3 start authorization schema differs")
+        elif prior.get("schema")=="genus-a0.3c-runtime-start-authorization-v4":
+            if set(prior)!=start_keys or prior.get("reason")!="code-release":
+                raise RuntimeError("prior v4 start authorization schema differs")
+            prior_terminal=(prior["completion_receipt_path"],prior["completion_receipt_sha256"],
+                            prior["consumption_receipt_path"],prior["consumption_receipt_sha256"])
+            if not all(prior_terminal): raise RuntimeError("prior v4 authorization is not terminal")
+            historical_completion=evidence(prior["completion_receipt_path"],prior["completion_receipt_sha256"],"prior completion")
+            historical_consumption=evidence(prior["consumption_receipt_path"],prior["consumption_receipt_sha256"],"prior consumption")
+            if (historical_completion.get("schema")!="genus-a0.3c-code-release-completion-v1"
+                    or historical_completion.get("outcome")!="activated"
+                    or historical_completion.get("new_commit")!=prior["repo_commit"]
+                    or historical_completion.get("release_seal")!=prior["release_seal"]
+                    or historical_consumption.get("schema")!="genus-a0.3c-code-release-authorization-consumed-v1"
+                    or historical_consumption.get("completion_path")!=prior["completion_receipt_path"]
+                    or historical_consumption.get("completion_sha256")!=prior["completion_receipt_sha256"]
+                    or historical_consumption.get("nonce")!=historical_completion.get("nonce")
+                    or historical_consumption.get("release_seal")!=prior["release_seal"]
+                    or historical_consumption.get("outcome")!="activated"):
+                raise RuntimeError("prior v4 terminal evidence differs")
+        else:
+            raise RuntimeError("prior start authorization schema differs")
+        prior_guard_path=pathlib.Path(completion["prior_boot_guard_path"])
+        if prior_guard_path.parent.resolve(strict=True)!=receipt_root or digest(regular_bytes(prior_guard_path,0o600))!=completion["prior_boot_guard_sha256"]:
+            raise RuntimeError("prior boot guard evidence differs")
+        consumption=evidence(approval["consumption_receipt_path"],approval["consumption_receipt_sha256"],"consumption")
+        consumption_keys={"schema","nonce","release_seal","plan_path","plan_sha256","completion_path","completion_sha256","outcome","consumed_at"}
+        if set(consumption)!=consumption_keys or consumption.get("schema")!="genus-a0.3c-code-release-authorization-consumed-v1":
+            raise RuntimeError("terminal consumption schema differs")
+        if (consumption["nonce"]!=completion["nonce"] or consumption["release_seal"]!=completion["release_seal"]
+                or consumption["plan_path"]!=completion["plan_path"] or consumption["plan_sha256"]!=completion["plan_sha256"]
+                or consumption["completion_path"]!=approval["completion_receipt_path"]
+                or consumption["completion_sha256"]!=approval["completion_receipt_sha256"]
+                or consumption["outcome"]!="activated"):
+            raise RuntimeError("terminal consumption binding differs")
+    if pathlib.Path(CONFIG["journal"]).exists():
+        raise RuntimeError("activation and code release journals coexist")
+    code_path=pathlib.Path(CONFIG["code_journal"])
+    if code_path.exists():
+        journal_payload=regular_bytes(code_path,0o600); journal=strict_json(journal_payload)
+        journal_keys={"schema","phase","transition_kind","old_commit","new_commit","old_tree","new_tree","release_seal","nonce",
+          "plan_path","plan_sha256","active_manifest","active_manifest_sha256","prior_active_services","cron_original_sha256",
+          "cron_disabled_sha256","prior_start_authorization_path","prior_start_authorization_sha256","prior_boot_guard_path",
+          "prior_boot_guard_sha256","repo_path","product_db_path","product_db_device","product_db_inode","operator_uid",
+          "operator_name","machine_id_sha256","branch_name","origin_remote_sha256","product_db_canary_path",
+          "product_db_canary_sha256","release_start_authorization_path","release_start_authorization_sha256",
+          "backup_receipt_path","backup_receipt_sha256","preflight_receipt_path","preflight_receipt_sha256",
+          "postflight_receipt_path","postflight_receipt_sha256","completion_receipt_path","completion_receipt_sha256",
+          "consumption_receipt_path","consumption_receipt_sha256","database_replay_performed",
+          "database_reseal_performed","database_restore_performed"}
+        if set(journal)!=journal_keys or journal.get("schema")!="genus-a0.3c-code-release-pending-v1":
+            raise RuntimeError("code release journal schema differs")
+        if any(journal.get(key)!=value for key,value in target.items()):
+            raise RuntimeError("pending code release target differs")
+        if journal["phase"]=="rollback-authorized":
+            prior_path=pathlib.Path(journal["prior_start_authorization_path"])
+            if (not terminal_bound or journal["old_commit"]!=commit
+                    or journal["active_manifest"]!=approval["active_manifest"]
+                    or journal["active_manifest_sha256"]!=approval["active_manifest_sha256"]
+                    or prior_path.parent.resolve(strict=True)!=receipt_root
+                    or digest(regular_bytes(prior_path,0o600))!=journal["prior_start_authorization_sha256"]
+                    or journal["prior_start_authorization_sha256"]!=approval_sha256
+                    or any(journal[key] is not False for key in ("database_replay_performed","database_reseal_performed","database_restore_performed"))):
+                raise RuntimeError("pending code release rollback does not bind restored terminal v4 approval")
+            if anchor["state"]=="pending":
+                validate_code_release_start_marker(
+                    commit,journal["release_seal"],journal["nonce"],journal["phase"],
+                    approval_sha256,digest(journal_payload)
+                )
+            return
+        if (journal["phase"] not in {"authorized","receipt-written","terminalized","resumed"}
+                or journal["new_commit"]!=commit or journal["release_seal"]!=approval["release_seal"]
+                or journal["active_manifest"]!=approval["active_manifest"]
+                or journal["preflight_receipt_path"]!=approval["code_release_preflight_path"]
+                or journal["preflight_receipt_sha256"]!=approval["code_release_preflight_sha256"]):
+            raise RuntimeError("pending code release does not authorize start")
+        if journal["phase"] in {"terminalized","resumed"}:
+            if (not terminal_bound or journal["completion_receipt_path"]!=approval["completion_receipt_path"]
+                    or journal["consumption_receipt_path"]!=approval["consumption_receipt_path"]):
+                raise RuntimeError("terminal pending code release evidence differs")
+        else:
+            if terminal_bound:
+                raise RuntimeError("preterminal code release carries terminal approval")
+            validate_code_release_start_marker(
+                commit,journal["release_seal"],journal["nonce"],journal["phase"],
+                approval_sha256,digest(journal_payload)
+            )
+    elif not terminal_bound:
+        raise RuntimeError("v4 approval without journal lacks completion/consumption")
+
+
+PROJECTION_APPROVAL_KEYS={
+    "authorization_sha256","candidate_commit","operator_uid","plan_sha256","prior_manifest",
+    "prior_manifest_sha256","prior_tree_inventory_sha256","protocol","publisher_sha256",
+    "readiness_sha256","schema","series_sha256","state_root","target_manifest",
+    "target_manifest_sha256","target_tree_inventory_sha256","transaction_nonce",
+}
+PROJECTION_TERMINAL_KEYS={
+    "active_manifest","active_receipt_sha256","journal_sha256","outcome","plan_sha256",
+    "protocol","schema","transaction_nonce",
+}
+
+
+def canonical_root_json(data):
+    try:
+        return (json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+    except (TypeError,ValueError) as exc:
+        raise RuntimeError("root projection evidence is not canonical JSON") from exc
+
+
+def root_projection_approval(trust_root, nonce):
+    if not re.fullmatch(r"[a-f0-9]{64}",nonce):
+        raise RuntimeError("root projection approval nonce is malformed")
+    path=trust_root/f"runtime-projection.approval.{nonce}.json"
+    raw=root_regular_bytes(path,0o400,1024*1024); approval=strict_json(raw)
+    digest_fields=("authorization_sha256","plan_sha256","publisher_sha256","readiness_sha256",
+                   "series_sha256","target_manifest","target_manifest_sha256",
+                   "target_tree_inventory_sha256","transaction_nonce")
+    if (set(approval)!=PROJECTION_APPROVAL_KEYS or canonical_root_json(approval)!=raw
+            or approval.get("schema")!="genus-a0.3c-runtime-projection-approval-v1"
+            or approval.get("protocol")!="dual-selector-journal-v2"
+            or approval.get("transaction_nonce")!=nonce
+            or approval.get("operator_uid")!=CONFIG["uid"]
+            or approval.get("state_root")!=CONFIG["state"]
+            or not re.fullmatch(r"[a-f0-9]{40}",approval.get("candidate_commit",""))
+            or any(not re.fullmatch(r"[a-f0-9]{64}",approval.get(key,"")) for key in digest_fields)):
+        raise RuntimeError("root projection approval schema/evidence differs")
+    prior=approval.get("prior_manifest")
+    if prior:
+        if (not re.fullmatch(r"[a-f0-9]{64}",prior)
+                or any(not re.fullmatch(r"[a-f0-9]{64}",approval.get(key,""))
+                       for key in ("prior_manifest_sha256","prior_tree_inventory_sha256"))):
+            raise RuntimeError("root projection approval prior binding differs")
+    elif (prior!="" or approval.get("prior_manifest_sha256")!=""
+            or approval.get("prior_tree_inventory_sha256")!=""):
+        raise RuntimeError("root projection approval carries orphan prior evidence")
+    return approval
+
+
+def root_projection_public_state(manifest):
+    public_active=pathlib.Path(CONFIG["public_active"]); sets_root=pathlib.Path(CONFIG["public_sets"])
+    active_info=public_active.lstat()
+    if (not stat.S_ISLNK(active_info.st_mode) or active_info.st_uid!=0 or active_info.st_gid!=0
+            or active_info.st_nlink!=1 or os.readlink(public_active)!=f"runtime-sets/{manifest}"):
+        raise RuntimeError("public projection selector is not the root-owned private match")
+    generation=sets_root/manifest; generation_info=generation.lstat()
+    if (generation.is_symlink() or not stat.S_ISDIR(generation_info.st_mode)
+            or generation_info.st_uid!=0 or generation_info.st_gid!=0
+            or stat.S_IMODE(generation_info.st_mode)!=0o555
+            or generation.resolve(strict=True)!=generation or public_active.resolve(strict=True)!=generation):
+        raise RuntimeError("public projection generation is not canonical root-owned evidence")
+    receipt=root_regular_bytes(generation/"projection.receipt",0o444,128*1024)
+    current=root_regular_bytes(pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.receipt",0o400,128*1024)
+    if current!=receipt:
+        raise RuntimeError("current projection receipt differs from the active generation")
+    return digest(receipt)
+
+
+def steady_projection_helper_authorized(trust_root, manifest, helper_sha):
+    receipt_sha=root_projection_public_state(manifest); terminal_count=0; matched=False
+    terminal_pattern=re.compile(r"runtime-projection\.terminal\.([a-f0-9]{64})\.receipt")
+    with os.scandir(trust_root) as entries:
+        for entry in entries:
+            terminal_count+=1
+            if terminal_count>4096:
+                raise RuntimeError("projection trust directory entry limit exceeded")
+            if len(os.fsencode(entry.name))>255:
+                raise RuntimeError("projection trust entry name is oversized")
+            found=terminal_pattern.fullmatch(entry.name)
+            if not found: continue
+            nonce=found.group(1); raw=root_regular_bytes(trust_root/entry.name,0o400,128*1024)
+            terminal=strict_json(raw)
+            if (set(terminal)!=PROJECTION_TERMINAL_KEYS or canonical_root_json(terminal)!=raw
+                    or terminal.get("schema")!="genus-a0.3c-runtime-projection-terminal-v1"
+                    or terminal.get("protocol")!="dual-selector-journal-v2"
+                    or terminal.get("transaction_nonce")!=nonce
+                    or terminal.get("outcome") not in {"target","prior-or-none"}
+                    or any(not re.fullmatch(r"[a-f0-9]{64}",terminal.get(key,""))
+                           for key in ("journal_sha256","plan_sha256"))):
+                raise RuntimeError("root projection terminal schema/evidence differs")
+            approval=root_projection_approval(trust_root,nonce)
+            approved=(approval["target_manifest"] if terminal["outcome"]=="target"
+                      else approval["prior_manifest"])
+            if (terminal["active_manifest"]==manifest and terminal["active_receipt_sha256"]==receipt_sha
+                    and terminal["plan_sha256"]==approval["plan_sha256"] and approved==manifest
+                    and approval["publisher_sha256"]==helper_sha):
+                matched=True
+    if not matched:
+        raise RuntimeError("no retained root terminal/approval pair authorizes the installed projection helper")
+
+
+def load_v7_journal(journal_path):
+    raw=regular_bytes(journal_path,0o600)
+    if len(raw)>8*1024*1024:
+        raise RuntimeError("activation-v7 journal is oversized")
+    journal=strict_json(raw)
+    if (set(journal)!=PENDING_KEYS
+            or journal.get("schema")!="genus-a0.3c-runtime-activation-pending-v7"):
+        raise RuntimeError("activation-v7 journal schema differs")
+    if (journal.get("root_artifact_state") not in ROOT_STATES
+            or journal.get("projection_state") not in PROJECTION_STATES
+            or journal.get("consumer_state") not in CONSUMER_STATES):
+        raise RuntimeError("activation-v7 journal state domain differs")
+    hex_digest=re.compile(r"[a-f0-9]{64}"); commit=re.compile(r"[a-f0-9]{40}")
+    digest_fields=("target_manifest_sha256","readiness_sha256","series_sha256","active_manifest_sha256",
+        "cron_original_sha256","cron_disabled_sha256","activation_reservation_sha256",
+        "root_artifact_transaction_id","root_artifact_inventory_sha256","root_artifact_authority_sha256",
+        "root_artifact_executor_sha256","projection_transaction_nonce","projection_helper_sha256",
+        "consumer_publisher_sha256","consumer_renderer_sha256")
+    if any(hex_digest.fullmatch(str(journal.get(key,""))) is None for key in digest_fields):
+        raise RuntimeError("activation-v7 digest binding is malformed")
+    if any(commit.fullmatch(str(journal.get(key,""))) is None for key in
+           ("candidate_commit","root_artifact_old_commit","root_artifact_new_commit")):
+        raise RuntimeError("activation-v7 commit binding is malformed")
+    if (journal.get("operator_uid")!=CONFIG["uid"] or journal.get("mode")!="activate"
+            or journal.get("root_artifact_state")!="committed"
+            or journal.get("root_artifact_new_commit")!=journal.get("candidate_commit")
+            or journal.get("root_artifact_commit_policy")!="retain-on-activation-rollback"
+            or journal.get("projection_transaction_nonce")==journal.get("root_artifact_transaction_id")):
+        raise RuntimeError("activation-v7 root authority is not start-safe")
+    for path_key,sha_key in (("projection_plan_path","projection_plan_sha256"),
+            ("projection_approval_path","projection_approval_sha256"),
+            ("consumer_plan_path","consumer_plan_sha256"),
+            ("consumer_inventory_path","consumer_inventory_sha256"),
+            ("consumer_snapshot_path","consumer_snapshot_sha256"),
+            ("consumer_approval_path","consumer_approval_sha256"),
+            ("activation_receipt_path","activation_receipt_sha256"),
+            ("root_artifact_terminal_path","root_artifact_terminal_sha256")):
+        if bool(journal.get(path_key))!=bool(journal.get(sha_key)):
+            raise RuntimeError(f"activation-v7 path/hash pair differs: {path_key}")
+    return journal,raw
+
+
+def v7_start_route(journal, manifest):
+    state=(journal["phase"],journal["root_artifact_state"],journal["projection_state"],
+           journal["consumer_state"])
+    routes={
+        ("projection-activated","committed","activated","target-verified"):
+            ("target","validate-pending-active","validate-target"),
+        ("projection-committed","committed","committed","target-verified"):
+            ("target","validate-terminal","validate-target"),
+        ("consumer-prior-restored","committed","restored","prior-restored"):
+            ("prior","validate-terminal","validate-prior"),
+        ("consumer-prior-unchanged","committed","restored","prior-unchanged"):
+            ("prior","validate-terminal","validate-prior"),
+        ("restore-receipt-written","committed","restored","prior-restored"):
+            ("prior","validate-terminal","validate-prior"),
+        ("restore-receipt-written","committed","restored","prior-unchanged"):
+            ("prior","validate-terminal","validate-prior"),
+    }
+    try: route=routes[state]
+    except KeyError as exc:
+        if journal.get("root_artifact_state")=="rolled-back":
+            raise RuntimeError("rolled-back root artifact transaction cannot authorize NEW start") from exc
+        raise RuntimeError("activation-v7 phase/state tuple does not permit a service start") from exc
+    if route[0]=="target":
+        if (manifest!=journal.get("target_manifest") or manifest.startswith("legacy-")
+                or journal.get("projection_state") not in TARGET_PROJECTION_STATES
+                or journal.get("consumer_state") not in TARGET_CONSUMER_STATES):
+            raise RuntimeError("activation-v7 target start tuple differs")
+    else:
+        prior=journal.get("prior_active_manifest","")
+        expected_public="" if prior.startswith("legacy-") else prior
+        if (manifest!=prior or journal.get("projection_prior_manifest")!=expected_public
+                or journal.get("projection_state") not in PRIOR_PROJECTION_STATES
+                or journal.get("consumer_state") not in PRIOR_CONSUMER_STATES):
+            raise RuntimeError("activation-v7 prior start tuple differs")
+    return route
+
+
+def load_activation_reservation(journal, trust_root):
+    path=pathlib.Path(CONFIG["state"])/"activation.reserved"
+    raw=regular_bytes(path,0o600)
+    if len(raw)>2*1024*1024 or digest(raw)!=journal["activation_reservation_sha256"]:
+        raise RuntimeError("activation-v7 reservation digest differs")
+    reservation=strict_json(raw)
+    if (set(reservation)!=RESERVATION_KEYS
+            or reservation.get("schema")!="genus-a0.3c-activation-reservation-v2"):
+        raise RuntimeError("activation-v7 reservation schema differs")
+    transaction=journal["root_artifact_transaction_id"]
+    authority=trust_root/"runtime-artifact-authorities"/f"{transaction}.json"
+    expected={
+        "candidate_commit":journal["candidate_commit"],
+        "old_commit":journal["root_artifact_old_commit"],
+        "mode":"activate",
+        "operator_uid":CONFIG["uid"],
+        "private_active":journal["prior_active_manifest"],
+        "public_prior":journal["projection_prior_manifest"],
+        "projection_helper_sha256":journal["projection_helper_sha256"],
+        "consumer_publisher_sha256":journal["consumer_publisher_sha256"],
+        "consumer_renderer_sha256":journal["consumer_renderer_sha256"],
+        "root_artifact_executor_sha256":journal["root_artifact_executor_sha256"],
+        "root_artifact_authority_path":str(authority),
+        "root_artifact_authority_sha256":journal["root_artifact_authority_sha256"],
+        "root_artifact_commit_policy":"retain-on-activation-rollback",
+        "readiness_sha256":journal["readiness_sha256"],
+        "series_sha256":journal["series_sha256"],
+        "state_root":CONFIG["state"],
+        "target_manifest":journal["target_manifest"],
+        "target_manifest_sha256":journal["target_manifest_sha256"],
+        "transaction_nonce":journal["projection_transaction_nonce"],
+        "root_artifact_transaction_id":transaction,
+    }
+    if any(reservation.get(key)!=value for key,value in expected.items()):
+        raise RuntimeError("activation-v7 reservation crossbinding differs")
+    if (pathlib.Path(journal["root_artifact_authority_path"])!=authority
+            or not isinstance(reservation.get("root_artifact_paths"),list)
+            or len(reservation["root_artifact_paths"])!=10
+            or not isinstance(reservation.get("root_artifact_payloads"),list)
+            or len(reservation["root_artifact_payloads"])!=10):
+        raise RuntimeError("activation-v7 root artifact reservation topology differs")
+    return reservation
+
+
+def committed_root_executor_payload(journal):
+    git_kwargs={"check":True,"capture_output":True,"user":CONFIG["uid"],"group":CONFIG["gid"],
+                "extra_groups":()}
+    object_name=f"{journal['root_artifact_new_commit']}:{ROOT_EXECUTOR_REL}"
+    object_id=safe_git("rev-parse","--verify",object_name,text=True,**git_kwargs).stdout.strip()
+    if re.fullmatch(r"[a-f0-9]{40,64}",object_id) is None:
+        raise RuntimeError("root artifact executor Git object id is malformed")
+    payload=safe_git("cat-file","blob",object_id,**git_kwargs).stdout
+    if (len(payload)>8*1024*1024
+            or digest(payload)!=journal["root_artifact_executor_sha256"]):
+        raise RuntimeError("root artifact executor commit blob differs")
+    return payload
+
+
+def validate_root_artifact_terminal(journal, trust_root):
+    reservation=load_activation_reservation(journal,trust_root)
+    transaction=journal["root_artifact_transaction_id"]
+    authority=trust_root/"runtime-artifact-authorities"/f"{transaction}.json"
+    inventory=trust_root/f"runtime-artifacts.{transaction}"/"inventory.json"
+    terminal=trust_root/f"runtime-artifacts.terminal.{transaction}.json"
+    if (pathlib.Path(journal["root_artifact_authority_path"])!=authority
+            or pathlib.Path(journal["root_artifact_terminal_path"])!=terminal):
+        raise RuntimeError("activation-v7 root evidence path differs")
+    if (digest(root_regular_bytes(authority,0o400,1024*1024))!=journal["root_artifact_authority_sha256"]
+            or digest(root_regular_bytes(inventory,0o400,8*1024*1024))!=journal["root_artifact_inventory_sha256"]):
+        raise RuntimeError("activation-v7 immutable root evidence differs")
+    executor=committed_root_executor_payload(journal)
+    launcher=r"""import hashlib,pathlib,sys
+fixed=pathlib.Path(sys.argv[1]); expected=sys.argv[2]
+payload=sys.stdin.buffer.read(8*1024*1024+1)
+if len(payload)>8*1024*1024 or hashlib.sha256(payload).hexdigest()!=expected:
+    raise SystemExit("root artifact executor pipe bytes differ")
+sys.argv=[str(fixed),*sys.argv[3:]]; sys.dont_write_bytecode=True
+namespace={"__name__":"__main__","__file__":str(fixed),"__package__":None,"__cached__":None}
+exec(compile(payload,str(fixed),"exec"),namespace,namespace)"""
+    argv=["/usr/bin/env","-i","PATH=/usr/bin:/bin",
+          f"GENUS_A03C_ROOT_ARTIFACT_EXECUTION={ROOT_EXECUTION_MARKER}",
+          f"GENUS_A03C_ROOT_ARTIFACT_EXECUTOR_SHA256={journal['root_artifact_executor_sha256']}",
+          "/usr/bin/python3","-I","-P","-c",launcher,
+          str(pathlib.Path(CONFIG["repo"])/ROOT_EXECUTOR_REL),journal["root_artifact_executor_sha256"],
+          "validate-terminal","--transaction",transaction,"--authority-path",str(authority),
+          "--authority-sha256",journal["root_artifact_authority_sha256"],
+          "--activation-reservation-sha256",journal["activation_reservation_sha256"],
+          "--operator-uid",str(CONFIG["uid"]),"--old-commit",journal["root_artifact_old_commit"],
+          "--new-commit",journal["root_artifact_new_commit"],
+          "--inventory-sha256",journal["root_artifact_inventory_sha256"],"--outcome","committed"]
+    result=subprocess.run(argv,input=executor,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                          check=False,timeout=300)
+    terminal_raw=root_regular_bytes(terminal,0o400,1024*1024)
+    if (result.returncode!=0 or result.stdout!=terminal_raw
+            or digest(terminal_raw)!=journal["root_artifact_terminal_sha256"]):
+        raise RuntimeError("root artifact helper rejected committed terminal/live side")
+    terminal_data=strict_json(terminal_raw)
+    expected={"activation_reservation_sha256":journal["activation_reservation_sha256"],
+        "artifact_count":10,"authority_sha256":journal["root_artifact_authority_sha256"],
+        "executor_sha256":journal["root_artifact_executor_sha256"],
+        "inventory_sha256":journal["root_artifact_inventory_sha256"],
+        "new_commit":journal["root_artifact_new_commit"],"old_commit":journal["root_artifact_old_commit"],
+        "operator_uid":CONFIG["uid"],"outcome":"committed","parent_count":6,
+        "schema":"genus-a0.3c-root-artifact-terminal-v1","transaction_id":transaction}
+    if terminal_data!=expected:
+        raise RuntimeError("root artifact committed terminal binding differs")
+    return reservation
+
+
+def validate_v7_projection_approval(journal, reservation, trust_root, helper_sha):
+    nonce=journal["projection_transaction_nonce"]
+    plan_path=pathlib.Path(CONFIG["state"])/f"projection-plan.{nonce}.json"
+    approval_path=trust_root/f"runtime-projection.approval.{nonce}.json"
+    if (pathlib.Path(journal["projection_plan_path"])!=plan_path
+            or pathlib.Path(journal["projection_approval_path"])!=approval_path):
+        raise RuntimeError("activation-v7 projection authority path differs")
+    plan_raw=regular_bytes(plan_path,0o400)
+    approval_raw=root_regular_bytes(approval_path,0o400,1024*1024)
+    approval=root_projection_approval(trust_root,nonce)
+    if (digest(plan_raw)!=journal["projection_plan_sha256"]
+            or digest(approval_raw)!=journal["projection_approval_sha256"]):
+        raise RuntimeError("activation-v7 projection authority digest differs")
+    expected={"candidate_commit":journal["candidate_commit"],"operator_uid":CONFIG["uid"],
+        "plan_sha256":journal["projection_plan_sha256"],"prior_manifest":journal["projection_prior_manifest"],
+        "prior_manifest_sha256":reservation["prior_manifest_sha256"],
+        "prior_tree_inventory_sha256":reservation["prior_tree_inventory_sha256"],
+        "publisher_sha256":helper_sha,"readiness_sha256":journal["readiness_sha256"],
+        "series_sha256":journal["series_sha256"],"state_root":CONFIG["state"],
+        "target_manifest":journal["target_manifest"],"target_manifest_sha256":journal["target_manifest_sha256"],
+        "target_tree_inventory_sha256":reservation["target_tree_inventory_sha256"],
+        "transaction_nonce":nonce}
+    if any(approval.get(key)!=value for key,value in expected.items()):
+        raise RuntimeError("activation-v7 projection approval crossbinding differs")
+    return approval_raw
+
+
+def validate_v7_consumer_authority(journal, route, trust_root, projection_approval_raw):
+    publisher=pathlib.Path(CONFIG["consumer_publisher"]); renderer=pathlib.Path(CONFIG["consumer_renderer"])
+    if (publisher!=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py")
+            or renderer!=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py")
+            or digest(root_regular_bytes(publisher,0o755,4*1024*1024))!=journal["consumer_publisher_sha256"]
+            or digest(root_regular_bytes(renderer,0o755,4*1024*1024))!=journal["consumer_renderer_sha256"]):
+        raise RuntimeError("activation-v7 installed consumer tools differ")
+    nonce=journal["projection_transaction_nonce"]
+    plan=pathlib.Path(CONFIG["state"])/f"consumer-plan.{nonce}.json"
+    inventory=pathlib.Path(CONFIG["state"])/f"consumer-inventory.{nonce}.json"
+    snapshot_name=digest(f"genus-a0.3c-consumer-snapshot-v1\n{nonce}\n".encode())
+    snapshot=trust_root/"consumer-snapshots"/snapshot_name
+    if (pathlib.Path(journal["consumer_plan_path"])!=plan
+            or pathlib.Path(journal["consumer_inventory_path"])!=inventory
+            or pathlib.Path(journal["consumer_snapshot_path"])!=snapshot
+            or digest(regular_bytes(plan,0o400))!=journal["consumer_plan_sha256"]
+            or digest(regular_bytes(inventory,0o400))!=journal["consumer_inventory_sha256"]
+            or journal.get("consumer_baseline") not in {"present","absent"}
+            or journal.get("consumer_baseline")!=journal.get("consumer_baseline_hint")):
+        raise RuntimeError("activation-v7 consumer contract/snapshot binding differs")
+    approval_fields=(journal.get("consumer_baseline_authorization_sha256"),
+                     journal.get("consumer_approval_path"),journal.get("consumer_approval_sha256"))
+    approval_required=journal["consumer_state"] in {"target-verified","prior-restored","prior-unchanged"}
+    if any(approval_fields)!=all(approval_fields) or approval_required and not all(approval_fields):
+        raise RuntimeError("activation-v7 consumer approval presence differs")
+    if all(approval_fields):
+        approval_path=trust_root/f"runtime-consumer.approval.{nonce}.json"
+        approval_raw=root_regular_bytes(approval_path,0o400,1024*1024)
+        approval=strict_json(approval_raw)
+        expected={"authorization_sha256":journal["consumer_baseline_authorization_sha256"],
+            "baseline":journal["consumer_baseline"],"candidate_commit":journal["candidate_commit"],
+            "inventory_sha256":journal["consumer_inventory_sha256"],"operator_uid":CONFIG["uid"],
+            "plan_sha256":journal["consumer_plan_sha256"],
+            "projection_approval_sha256":digest(projection_approval_raw),
+            "publisher_sha256":journal["consumer_publisher_sha256"],
+            "renderer_sha256":journal["consumer_renderer_sha256"],
+            "schema":"genus-a0.3c-runtime-consumer-approval-v1","snapshot_path":str(snapshot),
+            "snapshot_sha256":journal["consumer_snapshot_sha256"],"state_root":CONFIG["state"],
+            "target_manifest":journal["target_manifest"],"transaction_nonce":nonce}
+        if (pathlib.Path(journal["consumer_approval_path"])!=approval_path
+                or digest(approval_raw)!=journal["consumer_approval_sha256"]
+                or set(approval)!=CONSUMER_APPROVAL_KEYS or approval!=expected):
+            raise RuntimeError("activation-v7 root consumer approval differs")
+    command=route[2]
+    argv=["/usr/bin/env","-i","PATH=/usr/bin:/bin","/usr/bin/python3","-I","-P",str(publisher),command,
+          "--plan",str(plan),"--plan-sha256",journal["consumer_plan_sha256"],
+          "--inventory",str(inventory),"--inventory-sha256",journal["consumer_inventory_sha256"],
+          "--snapshot",str(snapshot),"--snapshot-sha256",journal["consumer_snapshot_sha256"],
+          "--cron-location","disabled"]
+    result=subprocess.run(argv,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,check=False,timeout=300)
+    if result.returncode!=0 or len(result.stdout)>65536:
+        raise RuntimeError("installed consumer publisher rejected live start topology")
+    report=strict_json(result.stdout)
+    expected_report={"command":command,"schema":"genus-a0.3c-consumer-publish-result-v1",
+                     "snapshot_sha256":journal["consumer_snapshot_sha256"],"status":"ok"}
+    if report!=expected_report:
+        raise RuntimeError("consumer live validation result differs")
+
+
+def canonical_root_payload(value):
+    return (json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+
+
+def canonical_runtime_services(value, label, allow_empty=True):
+    if (not isinstance(value,list) or any(not isinstance(item,str) for item in value)
+            or len(value)!=len(set(value))
+            or any(item not in RUNTIME_SERVICE_ORDER for item in value)
+            or value!=[item for item in RUNTIME_SERVICE_ORDER if item in value]
+            or not allow_empty and not value):
+        raise RuntimeError(f"{label} service membership differs")
+    return value
+
+
+def require_sha(value, label, allow_empty=False):
+    if allow_empty and value=="": return value
+    if not isinstance(value,str) or re.fullmatch(r"[a-f0-9]{64}",value) is None:
+        raise RuntimeError(f"{label} digest differs")
+    return value
+
+
+def require_absolute_path(value, label):
+    if (not isinstance(value,str) or not value.startswith("/")
+            or os.path.normpath(value)!=value):
+        raise RuntimeError(f"{label} path differs")
+    return pathlib.Path(value)
+
+
+def rollback_source_shape(source, source_raw, source_path, trust_root):
+    match=re.fullmatch(r"runtime-projection\.rollback-source\.([a-f0-9]{64})\.json",source_path.name)
+    if (match is None or source_path.parent!=trust_root or set(source)!=ROLLBACK_SOURCE_KEYS
+            or source.get("schema")!=ROLLBACK_SOURCE_SCHEMA or source.get("protocol")!=ROLLBACK_PROTOCOL
+            or source.get("source_transaction_nonce")!=match.group(1)
+            or source.get("state_root")!=CONFIG["state"] or source.get("operator_uid")!=CONFIG["uid"]
+            or source.get("root_artifact_state")!="committed"
+            or source.get("root_artifact_commit_policy")!="retain-on-activation-rollback"
+            or source.get("prior_manifest")!=""):
+        raise RuntimeError("rollback source authority schema/identity differs")
+    if (re.fullmatch(r"[a-f0-9]{40}",source.get("candidate_commit","")) is None
+            or re.fullmatch(r"[a-f0-9]{64}",source.get("target_manifest","")) is None
+            or re.fullmatch(r"legacy-[a-f0-9]{64}",source.get("prior_active_manifest","")) is None):
+        raise RuntimeError("rollback source manifest/commit identity differs")
+    canonical_runtime_services(source.get("prior_active_services"),"rollback source prior")
+    canonical_runtime_services(source.get("target_active_services"),"rollback source target",allow_empty=False)
+    for field in ("prior_manifest_sha256","prior_receipt_sha256","prior_tree_inventory_sha256"):
+        if source.get(field)!="": raise RuntimeError("rollback source Legacy prior carries public evidence")
+    for field in ("activation_reservation_sha256","activation_receipt_sha256","activation_terminal_sha256",
+                  "consumer_approval_sha256","consumer_baseline_authorization_sha256","consumer_inventory_sha256",
+                  "consumer_plan_sha256","consumer_publisher_sha256","consumer_renderer_sha256",
+                  "consumer_snapshot_sha256","prior_active_manifest_sha256","projection_approval_sha256",
+                  "projection_helper_sha256","projection_plan_sha256","projection_terminal_sha256",
+                  "publisher_sha256","root_artifact_authority_sha256","root_artifact_executor_sha256",
+                  "root_artifact_inventory_sha256","root_artifact_terminal_sha256",
+                  "root_artifact_transaction_id","target_manifest_sha256","target_receipt_sha256",
+                  "target_tree_inventory_sha256"):
+        require_sha(source.get(field),f"rollback source {field}")
+    if (source.get("publisher_sha256")!=source.get("projection_helper_sha256")
+            or source.get("consumer_baseline") not in {"present","absent"}
+            or source.get("projection_terminal_path")!=str(trust_root/f"runtime-projection.terminal.{match.group(1)}.receipt")
+            or source.get("root_artifact_terminal_path")!=str(trust_root/f"runtime-artifacts.terminal.{source['root_artifact_transaction_id']}.json")):
+        raise RuntimeError("rollback source helper/root binding differs")
+    if canonical_root_payload(source)!=source_raw:
+        raise RuntimeError("rollback source is not canonical JSON")
+    return source
+
+
+def rollback_record_source(record, trust_root):
+    nonce=require_sha(record.get("source_transaction_nonce"),"rollback source nonce")
+    expected=trust_root/f"runtime-projection.rollback-source.{nonce}.json"
+    if pathlib.Path(record.get("source_authority_path",""))!=expected:
+        raise RuntimeError("rollback source authority path differs")
+    source_raw=root_regular_bytes(expected,0o400,4*1024*1024)
+    if digest(source_raw)!=record.get("source_authority_sha256"):
+        raise RuntimeError("rollback source authority digest differs")
+    source=rollback_source_shape(strict_json(source_raw),source_raw,expected,trust_root)
+    shared={"candidate_commit":"candidate_commit","prior_active_manifest":"prior_active_manifest",
+            "prior_active_manifest_sha256":"prior_active_manifest_sha256","prior_active_services":"prior_active_services",
+            "prior_manifest":"prior_manifest","target_active_services":"target_active_services",
+            "target_manifest":"target_manifest","root_artifact_state":"root_artifact_state",
+            "root_artifact_terminal_path":"root_artifact_terminal_path",
+            "root_artifact_terminal_sha256":"root_artifact_terminal_sha256",
+            "root_artifact_transaction_id":"root_artifact_transaction_id",
+            "root_artifact_executor_sha256":"root_artifact_executor_sha256",
+            "projection_helper_sha256":"projection_helper_sha256",
+            "consumer_publisher_sha256":"consumer_publisher_sha256",
+            "consumer_renderer_sha256":"consumer_renderer_sha256"}
+    if any(record.get(left)!=source.get(right) for left,right in shared.items()):
+        raise RuntimeError("rollback record differs from retained source authority")
+    return source,source_raw
+
+
+def rollback_database_shape(record):
+    database=pathlib.Path(CONFIG["database"])
+    if (record.get("product_db_path")!=str(database)
+            or not isinstance(record.get("product_db_device"),int) or record["product_db_device"]<0
+            or not isinstance(record.get("product_db_inode"),int) or record["product_db_inode"]<=0):
+        raise RuntimeError("rollback database binding differs")
+    info=database.lstat()
+    if (database.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=CONFIG["uid"]
+            or info.st_nlink!=1 or info.st_dev!=record["product_db_device"]
+            or info.st_ino!=record["product_db_inode"]):
+        raise RuntimeError("rollback database live identity differs")
+
+
+def runtime_rollback_start_authority(record, manifest, unit=None, terminal=False):
+    keys=RUNTIME_ROLLBACK_TERMINAL_KEYS if terminal else RUNTIME_ROLLBACK_JOURNAL_KEYS
+    schema=RUNTIME_ROLLBACK_TERMINAL_SCHEMA if terminal else RUNTIME_ROLLBACK_JOURNAL_SCHEMA
+    phase="terminalized-prior" if terminal else record.get("phase")
+    if (set(record)!=keys or record.get("schema")!=schema or record.get("protocol")!=ROLLBACK_PROTOCOL
+            or record.get("phase")!=phase or record.get("root_artifact_state")!="committed"
+            or record.get("projection_state")!="terminalized"
+            or record.get("active_manifest")!=manifest
+            or re.fullmatch(r"legacy-[a-f0-9]{64}",manifest) is None
+            or re.fullmatch(r"[a-f0-9]{40}",record.get("candidate_commit","")) is None):
+        raise RuntimeError("runtime rollback start state differs")
+    if not terminal and phase in RUNTIME_ROLLBACK_EARLY_PHASES:
+        raise RuntimeError("runtime rollback phase is not start-authorized")
+    if not terminal and phase not in RUNTIME_ROLLBACK_START_PHASES:
+        raise RuntimeError("runtime rollback phase differs")
+    services=canonical_runtime_services(
+        record.get("active_services") if terminal else record.get("prior_active_services"),
+        "runtime rollback active")
+    baseline=record.get("consumer_baseline")
+    expected_consumer="prior-restored" if baseline=="present" else "prior-unchanged"
+    if (baseline not in {"present","absent"} or record.get("consumer_state")!=expected_consumer
+            or (terminal and record.get("public_manifest")!="")
+            or (not terminal and record.get("prior_manifest")!="")):
+        raise RuntimeError("runtime rollback public/consumer state differs")
+    for flag in ("database_backup_performed","database_migration_performed","database_replay_performed",
+                 "database_reseal_performed","database_restore_performed","database_rollback_performed"):
+        if record.get(flag) is not False: raise RuntimeError("runtime rollback database mutation flag differs")
+    for field in ("active_manifest_sha256","completion_sha256","consumer_approval_sha256",
+                  "consumer_publisher_sha256","consumer_renderer_sha256","cron_identity_sha256",
+                  "cron_original_sha256","intent_sha256","projection_helper_sha256",
+                  "projection_terminal_sha256","root_artifact_executor_sha256",
+                  "root_artifact_terminal_sha256","root_artifact_transaction_id","source_authority_sha256",
+                  "source_transaction_nonce","start_authorization_sha256"):
+        allow_empty=not terminal and field=="completion_sha256" and phase!="receipt-written"
+        require_sha(record.get(field),f"runtime rollback {field}",allow_empty=allow_empty)
+    require_sha(record.get("rollback_transaction_nonce"),"runtime rollback transaction nonce")
+    require_sha(record.get("prior_current_sha256"),"runtime rollback prior current authority",allow_empty=True)
+    if record["rollback_transaction_nonce"]==record["source_transaction_nonce"]:
+        raise RuntimeError("runtime rollback reused its source nonce")
+    if not terminal:
+        if (record.get("state_root")!=CONFIG["state"] or record.get("operator_uid")!=CONFIG["uid"]
+                or record.get("root_artifact_commit_policy")!="retain-on-activation-rollback"):
+            raise RuntimeError("runtime rollback operator/root state differs")
+        if (record.get("start_authorization_path")!=str(pathlib.Path(CONFIG["state"])/"runtime.start-authorized")
+                or (phase=="receipt-written")!=(record.get("completion_path")!="")):
+            raise RuntimeError("runtime rollback start/completion evidence differs")
+    if unit is not None and not terminal and unit not in services:
+        raise RuntimeError("systemd unit is outside rollback prior service membership")
+    return record
+
+
+def load_runtime_rollback_pending(trust_root, manifest):
+    path=trust_root/"runtime-rollback.pending"; raw=root_regular_bytes(path,0o600,4*1024*1024)
+    record=strict_json(raw)
+    runtime_rollback_start_authority(record,manifest)
+    if canonical_root_payload(record)!=raw:
+        raise RuntimeError("runtime rollback pending is not canonical JSON")
+    return record,raw
+
+
+def load_runtime_rollback_terminal(path, trust_root, manifest):
+    raw=root_regular_bytes(path,0o400,4*1024*1024); record=strict_json(raw)
+    match=re.fullmatch(r"runtime-rollback\.terminal\.([a-f0-9]{64})\.receipt",path.name)
+    if (match is None or path.parent!=trust_root
+            or record.get("rollback_transaction_nonce")!=match.group(1)):
+        raise RuntimeError("runtime rollback terminal filename/nonce differs")
+    runtime_rollback_start_authority(record,manifest,terminal=True)
+    if canonical_root_payload(record)!=raw:
+        raise RuntimeError("runtime rollback terminal is not canonical JSON")
+    return record,raw
+
+
+def load_runtime_rollback_current(trust_root, manifest):
+    path=trust_root/"runtime-rollback.current"; raw=root_regular_bytes(path,0o400,1024*1024)
+    current=strict_json(raw)
+    if (set(current)!=RUNTIME_ROLLBACK_CURRENT_KEYS
+            or current.get("schema")!=RUNTIME_ROLLBACK_CURRENT_SCHEMA
+            or current.get("protocol")!=ROLLBACK_PROTOCOL
+            or current.get("active_manifest")!=manifest
+            or re.fullmatch(r"legacy-[a-f0-9]{64}",manifest) is None
+            or re.fullmatch(r"[a-f0-9]{40}",current.get("candidate_commit","")) is None):
+        raise RuntimeError("runtime rollback current authority schema/identity differs")
+    for field in ("active_manifest_sha256","rollback_transaction_nonce","source_authority_sha256",
+                  "source_transaction_nonce","start_authorization_sha256","terminal_sha256"):
+        require_sha(current.get(field),f"runtime rollback current {field}")
+    require_sha(current.get("prior_current_sha256"),"runtime rollback current predecessor",allow_empty=True)
+    if (current["rollback_transaction_nonce"]==current["source_transaction_nonce"]
+            or current.get("terminal_path")!=str(
+                trust_root/f"runtime-rollback.terminal.{current['rollback_transaction_nonce']}.receipt")
+            or canonical_root_payload(current)!=raw):
+        raise RuntimeError("runtime rollback current authority path/canonical binding differs")
+    return current,raw
+
+
+def projection_helper_call(helper, helper_payload, helper_sha, arguments):
+    launcher=r"""import hashlib,pathlib,sys
+fixed=pathlib.Path(sys.argv[1]); expected=sys.argv[2]
+payload=sys.stdin.buffer.read(4*1024*1024+1)
+if len(payload)>4*1024*1024 or hashlib.sha256(payload).hexdigest()!=expected:
+    raise SystemExit("projection helper pipe bytes differ")
+sys.argv=[str(fixed),*sys.argv[3:]]; sys.dont_write_bytecode=True
+namespace={"__name__":"__main__","__file__":str(fixed),"__package__":None,"__cached__":None}
+exec(compile(payload,str(fixed),"exec"),namespace,namespace)"""
+    argv=["/usr/bin/env","-i","PATH=/usr/bin:/bin","/usr/bin/python3","-I","-P","-c",launcher,
+          str(helper),helper_sha,"--runtime-prefix",CONFIG["runtime_prefix"],"--state-root",CONFIG["state"],*arguments]
+    result=subprocess.run(argv,input=helper_payload,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                          check=False,timeout=300)
+    if result.returncode!=0 or len(result.stdout)>4*1024*1024:
+        raise RuntimeError("root projection helper rejected rollback/projection authority")
+    return result.stdout
+
+
+def acquire_projection_read_lock(trust_root):
+    global ROOT_PROJECTION_LOCK_FD
+    if ROOT_PROJECTION_LOCK_FD is not None: return
+    path=trust_root/"runtime-projection.lock"; flags=os.O_RDWR|getattr(os,"O_NOFOLLOW",0)
+    fd=os.open(path,flags)
+    try:
+        before=os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+                or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size!=0):
+            raise RuntimeError("root projection lock differs")
+        fcntl.flock(fd,fcntl.LOCK_SH)
+        after=os.stat(path,follow_symlinks=False)
+        if (after.st_dev,after.st_ino)!=(before.st_dev,before.st_ino):
+            raise RuntimeError("root projection lock identity drifted")
+    except Exception:
+        try: fcntl.flock(fd,fcntl.LOCK_UN)
+        finally: os.close(fd)
+        raise
+    ROOT_PROJECTION_LOCK_FD=fd
+
+
+def retained_rollback_entries(trust_root):
+    sources=[]; terminals=[]; count=0
+    with os.scandir(trust_root) as scan:
+        entries=sorted(scan,key=lambda item:os.fsencode(item.name))
+    if len(entries)>4096: raise RuntimeError("projection trust root entry limit exceeded")
+    for entry in entries:
+        source=re.fullmatch(r"runtime-projection\.rollback-source\.([a-f0-9]{64})\.json",entry.name)
+        terminal=re.fullmatch(r"runtime-rollback\.terminal\.([a-f0-9]{64})\.receipt",entry.name)
+        if source: sources.append(pathlib.Path(entry.path)); count+=1
+        elif terminal: terminals.append(pathlib.Path(entry.path)); count+=1
+        elif entry.name.startswith(("runtime-projection.rollback-source.","runtime-rollback.terminal.")):
+            raise RuntimeError("noncanonical retained rollback authority name")
+        if count>1024: raise RuntimeError("retained rollback authority limit exceeded")
+    return sources,terminals
+
+
+def _root_projection_guard_locked():
+    global ROOT_ROLLBACK_AUTHORITY
+    if os.geteuid()!=0:
+        raise RuntimeError("projection equality guard must run before UID drop")
+    trust_root=pathlib.Path(CONFIG["projection_trust"])
+    helper=pathlib.Path(CONFIG["projection_helper"]); helper_info=helper.lstat()
+    if (helper.resolve(strict=True)!=helper or helper.is_symlink() or not stat.S_ISREG(helper_info.st_mode)
+            or helper_info.st_uid!=0 or helper_info.st_gid!=0 or stat.S_IMODE(helper_info.st_mode)!=0o555
+            or helper_info.st_nlink!=1):
+        raise RuntimeError("installed projection helper metadata differs")
+    helper_payload=root_regular_bytes(helper,0o555); helper_sha=digest(helper_payload)
+    private_active=pathlib.Path(CONFIG["active"]); active_info=private_active.lstat()
+    if not stat.S_ISLNK(active_info.st_mode) or active_info.st_uid!=CONFIG["uid"]:
+        raise RuntimeError("private runtime selector is unsafe")
+    raw=os.readlink(private_active)
+    if not raw.startswith("sets/"):
+        raise RuntimeError("private runtime selector target differs")
+    manifest=raw.removeprefix("sets/")
+    if raw!=f"sets/{manifest}" or not re.fullmatch(r"(?:legacy-)?[a-f0-9]{64}",manifest):
+        raise RuntimeError("private runtime selector identity differs")
+    journal_path=pathlib.Path(CONFIG["journal"])
+    try: journal_info=journal_path.lstat(); private_pending=True
+    except FileNotFoundError: journal_info=None; private_pending=False
+    public_active=pathlib.Path(CONFIG["public_active"])
+    projection_pending=pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.pending"
+    rollback_projection_pending=pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.rollback.pending"
+    runtime_rollback_pending=pathlib.Path(CONFIG["projection_trust"])/"runtime-rollback.pending"
+    current_receipt=pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.receipt"
+    trust_info=trust_root.lstat()
+    if (trust_root.resolve(strict=True)!=trust_root or not stat.S_ISDIR(trust_info.st_mode)
+            or trust_info.st_uid!=0 or trust_info.st_gid!=0 or stat.S_IMODE(trust_info.st_mode)!=0o700):
+        raise RuntimeError("projection trust root is not canonical root:root/0700")
+    def present(path):
+        try: path.lstat()
+        except FileNotFoundError: return False
+        return True
+    rollback_pending=present(runtime_rollback_pending)
+    rollback_projection=present(rollback_projection_pending)
+    code_pending=present(pathlib.Path(CONFIG["code_journal"]))
+    generic_projection=present(projection_pending)
+    if (rollback_pending and (private_pending or code_pending or generic_projection)
+            or private_pending and code_pending
+            or rollback_projection and not rollback_pending):
+        raise RuntimeError("activation/code-release/projection/rollback states coexist")
+    if rollback_pending:
+        pending_raw=root_regular_bytes(runtime_rollback_pending,0o600,4*1024*1024)
+        pending_probe=strict_json(pending_raw)
+        if (set(pending_probe)!=RUNTIME_ROLLBACK_JOURNAL_KEYS
+                or pending_probe.get("schema")!=RUNTIME_ROLLBACK_JOURNAL_SCHEMA
+                or pending_probe.get("protocol")!=ROLLBACK_PROTOCOL
+                or pending_probe.get("phase") not in RUNTIME_ROLLBACK_PHASES):
+            raise RuntimeError("runtime rollback pending schema/phase differs")
+        if pending_probe["phase"] in RUNTIME_ROLLBACK_EARLY_PHASES:
+            raise RuntimeError("runtime rollback is before the authorized start frontier")
+        if rollback_projection:
+            raise RuntimeError("start-authorized rollback still has a projection rollback journal")
+        pending,pending_raw=load_runtime_rollback_pending(trust_root,manifest)
+        if pending.get("projection_helper_sha256")!=helper_sha:
+            raise RuntimeError("runtime rollback installed helper binding differs")
+        source,source_raw=rollback_record_source(pending,trust_root)
+        if source.get("prior_manifest")!="":
+            raise RuntimeError("committed Legacy rollback did not restore public none")
+        output=projection_helper_call(helper,helper_payload,helper_sha,[
+            "transition-runtime-rollback","--rollback-transaction-nonce",pending["rollback_transaction_nonce"],
+            "--expected-phase",pending["phase"],"--next-phase",pending["phase"]])
+        if output!=pending_raw:
+            raise RuntimeError("runtime rollback helper output differs from root pending journal")
+        acquire_projection_read_lock(trust_root)
+        if (root_regular_bytes(runtime_rollback_pending,0o600,4*1024*1024)!=pending_raw
+                or root_regular_bytes(pathlib.Path(pending["source_authority_path"]),0o400,4*1024*1024)!=source_raw):
+            raise RuntimeError("runtime rollback authority changed at the shared-lock boundary")
+        ROOT_ROLLBACK_AUTHORITY={"kind":"pending","record":pending,"record_raw":pending_raw,
+                                 "source":source,"source_raw":source_raw}
+        return None
+    if not manifest.startswith("legacy-") and not re.fullmatch(r"[a-f0-9]{64}",manifest):
+        raise RuntimeError("nonlegacy private selector is malformed")
+    if not private_pending and manifest.startswith("legacy-"):
+        for path in (public_active,projection_pending,rollback_projection_pending,current_receipt):
+            if present(path):
+                raise RuntimeError("legacy private runtime has unexpected public projection state")
+        current_path=trust_root/"runtime-rollback.current"
+        if not present(current_path):
+            sources,terminals=retained_rollback_entries(trust_root)
+            if sources or terminals:
+                raise RuntimeError("Legacy after a v7 target lacks its root current rollback authority")
+            return None
+        current,current_raw=load_runtime_rollback_current(trust_root,manifest)
+        terminal_path=pathlib.Path(current["terminal_path"])
+        terminal,terminal_raw=load_runtime_rollback_terminal(terminal_path,trust_root,manifest)
+        current_bindings={"active_manifest":"active_manifest","active_manifest_sha256":"active_manifest_sha256",
+                          "candidate_commit":"candidate_commit","prior_current_sha256":"prior_current_sha256",
+                          "rollback_transaction_nonce":"rollback_transaction_nonce",
+                          "source_authority_sha256":"source_authority_sha256",
+                          "source_transaction_nonce":"source_transaction_nonce",
+                          "start_authorization_sha256":"start_authorization_sha256"}
+        if (digest(terminal_raw)!=current["terminal_sha256"]
+                or any(current[left]!=terminal[right] for left,right in current_bindings.items())):
+            raise RuntimeError("runtime rollback current authority differs from its immutable terminal")
+        source,source_raw=rollback_record_source(terminal,trust_root)
+        current_approval_sha=digest(regular_bytes(CONFIG["approval"],0o600))
+        archived_current=(code_pending or sys.argv[1:2]==["--prepare-code-release-start"]
+                          or current_approval_sha!=current["start_authorization_sha256"])
+        current_arguments=["validate-runtime-rollback-current"]
+        if archived_current: current_arguments.append("--archived")
+        output=projection_helper_call(helper,helper_payload,helper_sha,current_arguments)
+        if output!=current_raw:
+            raise RuntimeError("runtime rollback helper output differs from root current authority")
+        acquire_projection_read_lock(trust_root)
+        if (root_regular_bytes(current_path,0o400,1024*1024)!=current_raw
+                or root_regular_bytes(terminal_path,0o400,4*1024*1024)!=terminal_raw
+                or root_regular_bytes(pathlib.Path(terminal["source_authority_path"]),0o400,4*1024*1024)!=source_raw):
+            raise RuntimeError("runtime rollback current/terminal changed at the shared-lock boundary")
+        ROOT_ROLLBACK_AUTHORITY={"kind":"terminal","record":terminal,"record_raw":terminal_raw,
+                                 "source":source,"source_raw":source_raw,"current":current,
+                                 "current_raw":current_raw,
+                                 "validation":"archived" if archived_current else "live"}
+        return None
+    command="validate-active"; terminal_expected=None; terminal_outcome=None
+    if private_pending:
+        journal,journal_raw=load_v7_journal(journal_path)
+        route=v7_start_route(journal,manifest)
+        if (journal.get("active_manifest")!=manifest
+                or digest(manifest_bytes(manifest))!=journal.get("active_manifest_sha256")
+                or digest(manifest_bytes(journal["target_manifest"]))!=journal["target_manifest_sha256"]
+                or journal.get("projection_helper_sha256")!=helper_sha):
+            raise RuntimeError("activation-v7 private selector/helper binding differs")
+        reservation=validate_root_artifact_terminal(journal,trust_root)
+        nonce=journal.get("projection_transaction_nonce","")
+        if re.fullmatch(r"[a-f0-9]{64}",nonce) is None:
+            raise RuntimeError("activation-v7 projection nonce is malformed")
+        approval_path=trust_root/f"runtime-projection.approval.{nonce}.json"
+        approval_raw=root_regular_bytes(approval_path,0o400,1024*1024)
+        projection_approval_raw=validate_v7_projection_approval(journal,reservation,trust_root,helper_sha)
+        if projection_approval_raw!=approval_raw:
+            raise RuntimeError("activation-v7 projection approval changed during root validation")
+        command=route[1]
+        if route[0]=="target" and command=="validate-terminal":
+            terminal_expected=manifest; terminal_outcome="target"
+        elif route[0]=="prior":
+            terminal_expected=journal["projection_prior_manifest"] or "none"
+            terminal_outcome="prior-or-none"
+    else:
+        try: projection_pending.lstat()
+        except FileNotFoundError: pass
+        else: raise RuntimeError("steady projection start still has a root pending journal")
+        steady_projection_helper_authorized(trust_root,manifest,helper_sha)
+    arguments=[command]
+    if command=="validate-active":
+        arguments.extend(["--private-set",str(pathlib.Path(CONFIG["sets"])/manifest)])
+    elif command=="validate-terminal":
+        arguments.extend(["--expected",terminal_expected,"--outcome",terminal_outcome,
+                          "--transaction-nonce",journal["projection_transaction_nonce"],
+                          "--plan-sha256",journal["projection_plan_sha256"]])
+    projection_helper_call(helper,helper_payload,helper_sha,arguments)
+    acquire_projection_read_lock(trust_root)
+    if private_pending:
+        validate_v7_consumer_authority(journal,route,trust_root,projection_approval_raw)
+        return digest(journal_raw)
+    return None
+
+def root_projection_guard():
+    global ROOT_ARTIFACT_LOCK_FD
+    if os.geteuid()!=0:
+        raise RuntimeError("projection artifact lock requires root")
+    trust=pathlib.Path(CONFIG["projection_trust"]); info=trust.lstat()
+    if (trust.resolve(strict=True)!=trust or trust.is_symlink() or not stat.S_ISDIR(info.st_mode)
+            or info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=0o700):
+        raise RuntimeError("projection trust root differs at artifact lock")
+    lock_path=trust/"runtime-artifacts.lock"; pending=trust/"runtime-artifacts.pending"
+    flags=os.O_RDWR|getattr(os,"O_NOFOLLOW",0)
+    try: lock_fd=os.open(lock_path,flags)
+    except FileNotFoundError:
+        try: lock_fd=os.open(lock_path,flags|os.O_CREAT|os.O_EXCL,0o600); created=True
+        except FileExistsError: lock_fd=os.open(lock_path,flags); created=False
+    else: created=False
+    try:
+        if created:
+            os.fchown(lock_fd,0,0); os.fchmod(lock_fd,0o600); os.fsync(lock_fd)
+            directory=os.open(trust,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+            try: os.fsync(directory)
+            finally: os.close(directory)
+        lock_info=os.fstat(lock_fd)
+        if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+                or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+            raise RuntimeError("root artifact lock differs")
+        fcntl.flock(lock_fd,fcntl.LOCK_SH)
+        lock_after=os.stat(lock_path,follow_symlinks=False)
+        if (lock_after.st_dev,lock_after.st_ino)!=(lock_info.st_dev,lock_info.st_ino):
+            raise RuntimeError("root artifact lock identity drifted")
+        try: pending.lstat()
+        except FileNotFoundError: pass
+        else: raise RuntimeError("root artifact migration is pending")
+        ROOT_ARTIFACT_LOCK_FD=lock_fd
+        return _root_projection_guard_locked()
+    except Exception:
+        if ROOT_ARTIFACT_LOCK_FD==lock_fd:
+            ROOT_ARTIFACT_LOCK_FD=None
+        try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+        finally: os.close(lock_fd)
+        raise
+
+
+def validate_runtime_rollback_approval(authority, approval, approval_sha256, unit):
+    record=authority["record"]; source=authority["source"]
+    terminal=authority["kind"]=="terminal"
+    runtime_rollback_start_authority(record,approval.get("active_manifest",""),unit,terminal=terminal)
+    if (approval.get("reason")!="rollback" or approval_sha256!=record["start_authorization_sha256"]
+            or record["start_authorization_path"]!=CONFIG["approval"]
+            or approval.get("repo_commit")!=source["candidate_commit"]
+            or approval.get("active_manifest")!=source["prior_active_manifest"]
+            or approval.get("active_manifest_sha256")!=source["prior_active_manifest_sha256"]
+            or any(approval.get(field)!="" for field in (
+                "readiness_path","readiness_sha256","series_path","series_sha256"))):
+        raise RuntimeError("rollback start authorization differs from root authority")
+    return record
+
+
+def workload_authority_self_probe(unit):
+    import grp
+
+    if os.geteuid()==0 or os.getuid()==0 or len(sys.argv)!=3:
+        raise RuntimeError("workload authority self-probe requires one non-root systemd unit")
+    accounts={
+        "genus-learner.service": ("genus-runtime","genus-runtime"),
+        "genus-telegram-bot.service": ("genus-telegram","genus-telegram"),
+        "genus-backup.service": ("genus-backup","genus-backup"),
+    }
+    if unit in accounts:
+        account,primary_group=accounts[unit]
+    elif re.fullmatch(r"genus-cron@[a-z0-9][a-z0-9-]*\.service",unit):
+        account,primary_group="genus-runtime","genus-runtime"
+    else:
+        raise RuntimeError("workload authority self-probe unit is outside the exact allowlist")
+    passwd=pwd.getpwnam(account); primary=grp.getgrnam(primary_group); data=grp.getgrnam("genus-data")
+    expected_uid=passwd.pw_uid; primary_gid=primary.gr_gid; data_gid=data.gr_gid
+    if expected_uid<=0 or passwd.pw_gid!=primary_gid or primary_gid==data_gid:
+        raise RuntimeError("workload authority self-probe account binding differs")
+    proc=pathlib.Path("/proc/self")
+    def identity():
+        raw=(proc/"stat").read_text(encoding="ascii")
+        fields=raw[raw.rfind(")")+2:].split()
+        if len(fields)<20: raise RuntimeError("workload authority self-probe stat is truncated")
+        status=(proc/"status").read_text(encoding="ascii").splitlines()
+        rows={row.partition(":")[0]:row.partition(":")[2].split() for row in status if ":" in row}
+        if rows.get("Uid")!=[str(expected_uid)]*4 or rows.get("Gid")!=[str(primary_gid)]*4:
+            raise RuntimeError("workload authority self-probe uid/gid identity differs")
+        observed_groups={int(value) for value in rows.get("Groups",[])}
+        if data_gid not in observed_groups or not observed_groups<={primary_gid,data_gid}:
+            raise RuntimeError("workload authority self-probe supplementary groups differ")
+        if rows.get("NoNewPrivs")!=["1"]:
+            raise RuntimeError("workload authority self-probe lacks NoNewPrivileges")
+        paths=[row.split(":",2)[-1] for row in (proc/"cgroup").read_text(encoding="ascii").splitlines()]
+        if not any(unit in pathlib.PurePosixPath(path).parts for path in paths):
+            raise RuntimeError("workload authority self-probe is outside its exact systemd unit cgroup")
+        return os.getpid(),int(fields[19]),expected_uid
+    before=identity(); subject=",".join(str(value) for value in before)
+    actions=(
+        "org.freedesktop.systemd1.manage-units",
+        "org.freedesktop.systemd1.manage-unit-files",
+        "org.freedesktop.systemd1.reload-daemon",
+        "org.freedesktop.systemd1.set-environment",
+    )
+    verbs=("start","stop","restart","reload","try-restart","reload-or-restart",
+           "try-reload-or-restart","kill","clean","freeze","thaw","reset-failed","set-property")
+    targets=("genus-network-watchdog.timer","genus-network-watchdog.service",
+             "genus-learner.service","genus-telegram-bot.service","genus-backup.service",
+             "genus-cron@.service","genus-telegram-bot-fallback.service")
+    if unit.startswith("genus-cron@"):
+        targets=targets+(unit,)
+    env={"PATH":"/usr/bin:/bin","LC_ALL":"C"}
+    def require_denial(action,*details):
+        command=["/usr/bin/pkcheck","--process",subject,"--action-id",action]
+        for key,value in details:
+            command.extend(("--detail",key,value))
+        result=subprocess.run(command,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL,env=env,timeout=10,check=False)
+        if result.returncode not in {1,2}:
+            raise RuntimeError(f"workload authority self-probe was not conclusively denied (rc={result.returncode})")
+    for action in actions:
+        require_denial(action)
+    for target in targets:
+        for verb in verbs:
+            require_denial("org.freedesktop.systemd1.manage-units",("unit",target),("verb",verb))
+    if identity()!=before:
+        raise RuntimeError("workload authority self-probe identity drifted during the Polkit matrix")
+
+
 def main():
+    if sys.argv[1:2]==["--probe-workload-authority"]:
+        workload_authority_self_probe(sys.argv[2] if len(sys.argv)==3 else "")
+        return
+    root_activation_journal_sha256=root_projection_guard()
+    if sys.argv[1:2]==["--prepare-code-release-start"]:
+        if len(sys.argv)!=3: raise RuntimeError("root capability preparation lacks an exact unit")
+        if (root_activation_journal_sha256 is not None
+                or ROOT_ROLLBACK_AUTHORITY is not None and ROOT_ROLLBACK_AUTHORITY["kind"]=="pending"):
+            raise RuntimeError("activation-v7/runtime-rollback and code release start preparation coexist")
+        root_prepare_code_release_start(sys.argv[2])
+        return
     drop_to_runtime_user()
-    approval = json.loads(regular_bytes(CONFIG["approval"], 0o600))
+    approval_payload=regular_bytes(CONFIG["approval"],0o600); approval=strict_json(approval_payload)
+    approval_sha256=digest(approval_payload)
+    if len(sys.argv)!=2: raise RuntimeError("boot guard requires an exact systemd unit")
+    unit=sys.argv[1]; marker_base=pathlib.Path(CONFIG["start_marker"])
+    marker=marker_base.with_name(f"{marker_base.name}.{unit}")
+    try: marker.lstat(); marker_present=True
+    except FileNotFoundError: marker_present=False
+    code_path=pathlib.Path(CONFIG["code_journal"]); anchor=root_trust_anchor()
+    rollback_authority=ROOT_ROLLBACK_AUTHORITY
+    approval_schema=approval.get("schema")
+    rollback_code_release_active=False
+    if rollback_authority is not None:
+        rollback_record=rollback_authority["record"]
+        if rollback_authority["kind"]=="terminal":
+            anchor_supersedes_current=(anchor is not None and (
+                anchor["state"]!="steady"
+                or anchor["approval_schema"]=="genus-a0.3c-runtime-start-authorization-v4"
+                or anchor["approval_sha256"]!=rollback_record["start_authorization_sha256"]
+                or anchor["repo_commit"]!=rollback_record["candidate_commit"]
+                or anchor["active_manifest"]!=rollback_record["active_manifest"]
+                or anchor["active_manifest_sha256"]!=rollback_record["active_manifest_sha256"]))
+            rollback_code_release_active=(code_path.exists() or marker_present
+                or approval_schema=="genus-a0.3c-runtime-start-authorization-v4"
+                or anchor_supersedes_current)
+            if rollback_code_release_active:
+                rollback_authority=None
+        if (rollback_authority is not None
+                and (approval_schema!="genus-a0.3c-runtime-start-authorization-v3"
+                    or code_path.exists() or marker_present
+                    or anchor is not None and (anchor["state"]!="steady"
+                        or anchor["repo_commit"]!=rollback_record["candidate_commit"]))):
+            raise RuntimeError("committed rollback conflicts with code-release start authority")
+    if rollback_authority is None and anchor is None:
+        if (approval_schema!="genus-a0.3c-runtime-start-authorization-v3"
+                or code_path.exists() or marker_present):
+            raise RuntimeError("unanchored boot is limited to the legacy v3 steady state")
+    elif rollback_authority is None:
+        if (anchor["approval_schema"]!=approval_schema or anchor["approval_sha256"]!=approval_sha256
+                or anchor["repo_commit"]!=approval.get("repo_commit")
+                or anchor["active_manifest"]!=approval.get("active_manifest")
+                or anchor["active_manifest_sha256"]!=approval.get("active_manifest_sha256")):
+            raise RuntimeError("start authorization differs from persistent root trust")
+        if anchor["state"]=="pending":
+            if not code_path.exists() or not marker_present:
+                raise RuntimeError("pending root trust lacks a controlled one-shot start")
+            if digest(regular_bytes(code_path,0o600))!=anchor["journal_sha256"]:
+                raise RuntimeError("pending journal differs from persistent root trust")
+        elif anchor["state"]=="terminal-ready":
+            if marker_present or not code_path.exists():
+                raise RuntimeError("terminal-ready root trust lacks its terminal journal boundary")
+            if digest(regular_bytes(code_path,0o600))!=anchor["journal_sha256"]:
+                raise RuntimeError("terminal-ready journal differs from persistent root trust")
+        elif marker_present:
+            raise RuntimeError("steady root trust carries a stale controlled-start marker")
+    if approval.get("schema")=="genus-a0.3c-runtime-start-authorization-v4":
+        code_release_v4(approval,approval_sha256,anchor)
+        return
     if set(approval) != {"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","series_path","series_sha256","reason"}:
         raise RuntimeError("authorization schema differs")
     if approval["schema"] != "genus-a0.3c-runtime-start-authorization-v3" or approval["reason"] not in {"activate","rollback","recovery"}:
         raise RuntimeError("authorization identity differs")
     if not re.fullmatch(r"[a-f0-9]{40}", approval["repo_commit"]):
         raise RuntimeError("authorization commit malformed")
-    commit = subprocess.run([CONFIG["git"], "-c", f"safe.directory={CONFIG['repo']}", "-C", CONFIG["repo"],
-        "rev-parse", "--verify", "HEAD"], check=True, text=True, capture_output=True).stdout.strip()
+    if rollback_authority is not None:
+        rollback_record=validate_runtime_rollback_approval(
+            rollback_authority,approval,approval_sha256,unit)
+        rollback_database_shape(rollback_record)
+        for forbidden in (pathlib.Path(CONFIG["public_active"]),
+                          pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.pending",
+                          pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.rollback.pending",
+                          pathlib.Path(CONFIG["projection_trust"])/"runtime-projection.receipt"):
+            try: forbidden.lstat()
+            except FileNotFoundError: continue
+            raise RuntimeError("rollback start retained unexpected public projection state")
+    commit = safe_git("rev-parse", "--verify", "HEAD", check=True, text=True, capture_output=True).stdout.strip()
     if commit != approval["repo_commit"]:
         raise RuntimeError("repo commit differs")
-    dirty = subprocess.run([CONFIG["git"], "-c", f"safe.directory={CONFIG['repo']}", "-C", CONFIG["repo"],
-        "status", "--porcelain=v1", "--untracked-files=all"], check=True, text=True, capture_output=True).stdout
+    dirty = safe_git("status", "--porcelain=v1", "--untracked-files=all", check=True, text=True, capture_output=True).stdout
     if dirty:
         raise RuntimeError("repo worktree is not exactly clean")
     active_path = pathlib.Path(CONFIG["active"])
@@ -2710,25 +6597,82 @@ def main():
         raise RuntimeError("activate lacks series evidence")
     if approval["reason"] != "activate" and (readiness or approval["readiness_sha256"] or series or approval["series_sha256"]):
         raise RuntimeError("non-activate authorization carries readiness evidence")
+    if code_path.exists():
+        if pathlib.Path(CONFIG["journal"]).exists():
+            raise RuntimeError("activation and code release journals coexist")
+        journal_payload=regular_bytes(code_path,0o600); journal=strict_json(journal_payload)
+        journal_keys={"schema","phase","transition_kind","old_commit","new_commit","old_tree","new_tree","release_seal","nonce",
+          "plan_path","plan_sha256","active_manifest","active_manifest_sha256","prior_active_services","cron_original_sha256",
+          "cron_disabled_sha256","prior_start_authorization_path","prior_start_authorization_sha256","prior_boot_guard_path",
+          "prior_boot_guard_sha256","repo_path","product_db_path","product_db_device","product_db_inode","operator_uid",
+          "operator_name","machine_id_sha256","branch_name","origin_remote_sha256","product_db_canary_path",
+          "product_db_canary_sha256","release_start_authorization_path","release_start_authorization_sha256",
+          "backup_receipt_path","backup_receipt_sha256","preflight_receipt_path","preflight_receipt_sha256",
+          "postflight_receipt_path","postflight_receipt_sha256","completion_receipt_path","completion_receipt_sha256",
+          "consumption_receipt_path","consumption_receipt_sha256","database_replay_performed",
+          "database_reseal_performed","database_restore_performed"}
+        if (set(journal)!=journal_keys or journal.get("schema")!="genus-a0.3c-code-release-pending-v1"
+                or journal.get("phase")!="rollback-authorized" or journal.get("old_commit")!=commit
+                or journal.get("active_manifest")!=approval["active_manifest"]
+                or journal.get("prior_start_authorization_sha256")!=digest(regular_bytes(CONFIG["approval"],0o600))):
+            raise RuntimeError("pending code release rollback does not bind restored v3 approval")
+        if anchor is None or anchor["state"]=="pending":
+            validate_code_release_start_marker(
+                commit,journal["release_seal"],journal["nonce"],journal["phase"],
+                approval_sha256,digest(journal_payload)
+            )
+        return
+    if rollback_authority is not None:
+        if ROOT_ARTIFACT_LOCK_FD is None or ROOT_PROJECTION_LOCK_FD is None:
+            raise RuntimeError("rollback root locks were not retained to the final start edge")
+        for fd in (ROOT_ARTIFACT_LOCK_FD,ROOT_PROJECTION_LOCK_FD):
+            lock_info=os.fstat(fd)
+            if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+                    or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+                raise RuntimeError("retained rollback lock identity differs")
+        try: pathlib.Path(CONFIG["journal"]).lstat()
+        except FileNotFoundError: pass
+        else: raise RuntimeError("runtime rollback and activation journal appeared together")
+        if digest(regular_bytes(CONFIG["approval"],0o600))!=rollback_authority["record"]["start_authorization_sha256"]:
+            raise RuntimeError("rollback authorization drifted at the final start edge")
+        rollback_database_shape(rollback_authority["record"])
+        return
     journal_path = pathlib.Path(CONFIG["journal"])
     try:
         journal_path.lstat()
     except FileNotFoundError:
+        if root_activation_journal_sha256 is not None:
+            raise RuntimeError("root-validated activation-v7 journal disappeared before UID-drop validation")
         return
-    journal = json.loads(regular_bytes(journal_path, 0o600))
-    if set(journal) != PENDING_KEYS or journal["schema"] != "genus-a0.3c-runtime-activation-pending-v2":
-        raise RuntimeError("pending schema differs")
-    if journal["candidate_commit"] != approval["repo_commit"] or journal["active_manifest"] != approval["active_manifest"]:
-        raise RuntimeError("pending authorization differs")
+    journal,journal_payload=load_v7_journal(journal_path)
+    if (root_activation_journal_sha256 is None
+            or digest(journal_payload)!=root_activation_journal_sha256):
+        raise RuntimeError("activation-v7 journal changed across the UID-drop boundary")
+    route=v7_start_route(journal,approval["active_manifest"])
+    if (journal["candidate_commit"]!=approval["repo_commit"]
+            or journal["root_artifact_new_commit"]!=approval["repo_commit"]
+            or journal["active_manifest"]!=approval["active_manifest"]
+            or journal["active_manifest_sha256"]!=approval["active_manifest_sha256"]):
+        raise RuntimeError("activation-v7 pending authorization differs")
     target_payload = manifest_bytes(journal["target_manifest"])
     if digest(target_payload) != journal["target_manifest_sha256"]:
-        raise RuntimeError("target manifest hash differs")
-    if journal["active_manifest"] not in {journal["target_manifest"], journal["prior_active_manifest"]}:
-        raise RuntimeError("ACTIVE is outside the journal transition")
-    if approval["reason"] == "activate" and (journal["active_manifest"] != journal["target_manifest"] or journal["readiness_path"] != approval["readiness_path"] or journal["readiness_sha256"] != approval["readiness_sha256"] or journal["series_path"] != approval["series_path"] or journal["series_sha256"] != approval["series_sha256"]):
-        raise RuntimeError("pending activate evidence differs")
-    if journal["phase"] not in {"guarded","target-verified","resumed","postflight","receipt-written"}:
-        raise RuntimeError("journal phase does not allow an autostart")
+        raise RuntimeError("activation-v7 target manifest hash differs")
+    if route[0]=="target":
+        if (approval["reason"]!="activate" or journal["active_manifest"]!=journal["target_manifest"]
+                or journal["readiness_path"]!=approval["readiness_path"]
+                or journal["readiness_sha256"]!=approval["readiness_sha256"]
+                or journal["series_path"]!=approval["series_path"]
+                or journal["series_sha256"]!=approval["series_sha256"]):
+            raise RuntimeError("activation-v7 target start authorization differs")
+    else:
+        if (approval["reason"]!="recovery"
+                or journal["active_manifest"]!=journal["prior_active_manifest"]):
+            raise RuntimeError("activation-v7 prior recovery authorization differs")
+    # Re-read once more at the final decision edge.  The root-side validation
+    # hash is the authority carried across the UID drop; user-owned replacement
+    # or mutation at any point before ExecCondition returns is fail-closed.
+    if digest(regular_bytes(journal_path,0o600))!=root_activation_journal_sha256:
+        raise RuntimeError("activation-v7 journal drifted at the final start edge")
 
 try:
     main()
@@ -2736,25 +6680,32 @@ except Exception:
     sys.exit(1)
 '''
 path = pathlib.Path(sys.argv[1])
-path.write_text(program.replace("__CONFIG__", repr(config)))
+payload=program.replace("__CONFIG__", repr(config)).encode("utf-8")
+path.write_bytes(payload)
+print(hashlib.sha256(payload).hexdigest())
 PY
+    )"
     generator_status=$?
     [ "$generator_status" -eq 0 ] || return "$generator_status"
+    [[ "$generator_hash" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Boot-Guard-Generator lieferte keinen gebundenen Payload-Hash" 70
     chmod 0600 "$output"
+    BOOT_GUARD_PAYLOAD_SHA256="$generator_hash"
 }
 
 write_boot_guard_payload_from_commit() {
-    local commit="$1" output="$2" source blob actual
+    local commit="$1" output="$2" source blob actual generated_hash
     [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Legacy-Boot-Guard-Commit ist malformed" 70
     source="$(mktemp "$STATE_ROOT/boot-guard-source.XXXXXX")"
-    blob="$("$GIT_BIN" -C "$REPO_DIR" rev-parse "$commit:deploy/pi_a0_3c_runtime.sh")" \
+    blob="$(safe_git rev-parse "$commit:deploy/pi_a0_3c_runtime.sh")" \
         || { rm -f -- "$source"; fail "Legacy-Boot-Guard-Quelle fehlt im gebundenen Commit" 70; }
-    "$GIT_BIN" -C "$REPO_DIR" show "$commit:deploy/pi_a0_3c_runtime.sh" > "$source" \
+    safe_git cat-file blob "$blob" > "$source" \
         || { rm -f -- "$source"; fail "Legacy-Boot-Guard-Quelle ist nicht lesbar" 70; }
     chmod 0600 "$source"
-    actual="$("$GIT_BIN" -C "$REPO_DIR" hash-object "$source")"
+    actual="$(safe_git hash-object "$source")"
     [ "$actual" = "$blob" ] \
         || { rm -f -- "$source"; fail "Legacy-Boot-Guard-Quelle driftet vom Git-Objekt" 70; }
+    generated_hash="$(
     (
         export GENUS_A03C_SOURCE_ONLY=1 GENUS_REPO_DIR="$REPO_DIR" GENUS_USER GENUS_HOME
         export GENUS_DB_PATH="$DB_PATH" GENUS_SD_BACKUP="$BACKUP_DIR"
@@ -2767,89 +6718,2561 @@ write_boot_guard_payload_from_commit() {
         # shellcheck disable=SC1090 -- exact source is read from the attested Git object above.
         source "$source"
         write_boot_guard_payload "$output"
+        printf '%s\n' "$BOOT_GUARD_PAYLOAD_SHA256"
     )
+    )"
     actual=$?
     rm -f -- "$source"
     [ "$actual" -eq 0 ] || return "$actual"
     [ -f "$output" ] && [ ! -L "$output" ] && [ "$(stat -c %a "$output")" = 600 ] \
         || fail "Legacy-Boot-Guard konnte nicht deterministisch erzeugt werden" 70
+    [[ "$generated_hash" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Legacy-Boot-Guard-Hash ist malformed" 70
+    BOOT_GUARD_PAYLOAD_SHA256="$generated_hash"
+}
+
+write_systemd_guard_payload_from_commit() {
+    local commit="$1" unit="$2" output="$3" source blob actual generated_hash
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "systemd-Guard-Commit ist malformed" 70
+    case "$unit" in
+        genus-backup.service|genus-cron@.service|genus-learner.service|genus-network-watchdog.service|genus-network-watchdog.timer|genus-telegram-bot.service) ;;
+        *) fail "systemd-Guard-Unit ist ausserhalb der exakten Sechser-Allowlist" 70 ;;
+    esac
+    [ ! -e "$output" ] && [ ! -L "$output" ] \
+        || fail "systemd-Guard-Ausgabepfad existiert bereits" 70
+    source="$(mktemp "$STATE_ROOT/systemd-guard-source.XXXXXX")"
+    blob="$(safe_git rev-parse "$commit:deploy/pi_a0_3c_runtime.sh")" \
+        || { rm -f -- "$source"; fail "systemd-Guard-Quelle fehlt im gebundenen Commit" 70; }
+    [[ "$blob" =~ ^[a-f0-9]{40,64}$ ]] \
+        || { rm -f -- "$source"; fail "systemd-Guard-Git-Blob ist malformed" 70; }
+    safe_git cat-file -e "$blob^{blob}" \
+        || { rm -f -- "$source"; fail "systemd-Guard-Git-Blob ist nicht lesbar" 70; }
+    safe_git cat-file blob "$blob" > "$source" \
+        || { rm -f -- "$source"; fail "systemd-Guard-Git-Blob ist nicht lesbar" 70; }
+    chmod 0600 "$source"
+    actual="$(safe_git hash-object "$source")"
+    [ "$actual" = "$blob" ] \
+        || { rm -f -- "$source"; fail "systemd-Guard-Quelle driftet vom Git-Objekt" 70; }
+    generated_hash="$(
+    (
+        export GENUS_A03C_SOURCE_ONLY=1 GENUS_REPO_DIR="$REPO_DIR" GENUS_USER GENUS_HOME
+        export GENUS_DB_PATH="$DB_PATH" GENUS_SD_BACKUP="$BACKUP_DIR"
+        export GENUS_A03C_BACKUP_SCRIPT="$BACKUP_SCRIPT" GENUS_A03C_RUNTIME_PREFIX="$RUNTIME_PREFIX"
+        export GENUS_A03C_STATE_ROOT="$STATE_ROOT" GENUS_A03C_SUDO="$SUDO_BIN"
+        export GENUS_A03C_SYSTEMCTL="$SYSTEMCTL_BIN" GENUS_A03C_FUSER="$FUSER_BIN"
+        export GENUS_A03C_GIT="$GIT_BIN" GENUS_A03C_CRONTAB="$CRONTAB_BIN"
+        export GENUS_A03C_SYSTEMD_GUARD_ROOT="$SYSTEMD_GUARD_ROOT"
+        export GENUS_A03C_BOOT_GUARD_PATH="$BOOT_GUARD_PATH"
+        export GENUS_A03C_CODE_RELEASE_TRUST_ROOT="$CODE_RELEASE_TRUST_ROOT"
+        # shellcheck disable=SC1090 -- exact source is read from the attested Git object above.
+        source "$source"
+        systemd_guard_payload "$unit" > "$output"
+        chmod 0600 "$output"
+        sha256_file "$output"
+    )
+    )"
+    actual=$?
+    rm -f -- "$source"
+    [ "$actual" -eq 0 ] || { rm -f -- "$output"; return "$actual"; }
+    [ -f "$output" ] && [ ! -L "$output" ] && [ "$(stat -c %a "$output")" = 600 ] \
+        && [ "$(stat -c %h "$output")" -eq 1 ] \
+        || { rm -f -- "$output"; fail "systemd-Guard konnte nicht deterministisch erzeugt werden" 70; }
+    [[ "$generated_hash" =~ ^[a-f0-9]{64}$ ]] \
+        || { rm -f -- "$output"; fail "systemd-Guard-Hash ist malformed" 70; }
+    SYSTEMD_GUARD_PAYLOAD_SHA256="$generated_hash"
+}
+
+write_projection_helper_payload_from_commit() {
+    local commit="$1" relative="$2" output="$3" blob actual
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Projection-Helper-Commit ist malformed" 70
+    [ "$relative" = "$PROJECTION_HELPER_REPO_REL" ] \
+        || fail "Projection-Helper-Quellpfad ist ausserhalb der exakten Allowlist" 70
+    [ ! -e "$output" ] && [ ! -L "$output" ] \
+        || fail "Projection-Helper-Ausgabepfad existiert bereits" 70
+    blob="$(safe_git rev-parse "$commit:$relative")" \
+        || fail "Projection-Helper fehlt im gebundenen Commit" 70
+    [[ "$blob" =~ ^[a-f0-9]{40,64}$ ]] \
+        || fail "Projection-Helper-Git-Blob ist malformed" 70
+    safe_git cat-file blob "$blob" > "$output" \
+        || { rm -f -- "$output"; fail "Projection-Helper-Git-Blob ist nicht lesbar" 70; }
+    chmod 0600 "$output"
+    actual="$(safe_git hash-object "$output")"
+    [ "$actual" = "$blob" ] \
+        || { rm -f -- "$output"; fail "Projection-Helper-Bytes driften vom gebundenen Git-Blob" 70; }
+}
+
+projection_helper_expected_sha256() {
+    local commit="$1" blob output digest
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Projection-Helper-Commit ist malformed" 70
+    blob="$(safe_git rev-parse "$commit:$PROJECTION_HELPER_REPO_REL")" \
+        || fail "Projection-Helper fehlt im gebundenen Commit" 70
+    [[ "$blob" =~ ^[a-f0-9]{40,64}$ ]] \
+        || fail "Projection-Helper-Git-Blob ist malformed" 70
+    safe_git cat-file -e "$blob^{blob}" \
+        || fail "Projection-Helper-Git-Blob ist nicht lesbar" 70
+    output="$(safe_git cat-file blob "$blob" | "$ROOT_SHA256_BIN")"
+    digest="${output%% *}"
+    [[ "$digest" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Projection-Helper-Git-Blob lieferte keinen SHA-256" 70
+    printf '%s\n' "$digest"
+}
+
+validate_projection_helper_parent() {
+    local helper_dir canonical
+    helper_dir="$(dirname "$PROJECTION_HELPER_PATH")"
+    [ "$helper_dir" = /usr/local/libexec/genus ] || return 1
+    as_root "$ROOT_TEST_BIN" -d "$helper_dir" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$helper_dir" \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$helper_dir" 2>/dev/null || printf 1)" -eq 0 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %g "$helper_dir" 2>/dev/null || printf 1)" -eq 0 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$helper_dir" 2>/dev/null || true)" = 755 ] \
+        || return 1
+    canonical="$(as_root "$ROOT_READLINK_BIN" -f -- "$helper_dir" 2>/dev/null || true)"
+    [ "$canonical" = "$helper_dir" ]
+}
+
+validate_projection_helper_install() {
+    local commit="${1:-$(repo_commit)}" expected_sha installed_sha
+    validate_projection_helper_parent || return 1
+    expected_sha="$(projection_helper_expected_sha256 "$commit")"
+    if ! as_root "$ROOT_TEST_BIN" -f "$PROJECTION_HELPER_PATH" \
+        || as_root "$ROOT_TEST_BIN" -L "$PROJECTION_HELPER_PATH" \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %u "$PROJECTION_HELPER_PATH" 2>/dev/null || printf 1)" -ne 0 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %g "$PROJECTION_HELPER_PATH" 2>/dev/null || printf 1)" -ne 0 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %a "$PROJECTION_HELPER_PATH" 2>/dev/null || true)" != 555 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %h "$PROJECTION_HELPER_PATH" 2>/dev/null || printf 0)" -ne 1 ] \
+        || [ "$(as_root "$ROOT_READLINK_BIN" -f -- "$PROJECTION_HELPER_PATH" 2>/dev/null || true)" != "$PROJECTION_HELPER_PATH" ]; then
+        return 1
+    fi
+    installed_sha="$(root_stable_sha256 "$PROJECTION_HELPER_PATH" 0555)" || return 1
+    [ "$installed_sha" = "$expected_sha" ]
+}
+
+install_projection_helper() {
+    local commit="${1:-$(repo_commit)}" expected expected_sha helper_dir
+    ensure_projection_trust_root
+    if validate_projection_helper_install "$commit"; then return 0; fi
+    if as_root "$ROOT_TEST_BIN" -e "$PROJECTION_HELPER_PATH" \
+        || as_root "$ROOT_TEST_BIN" -L "$PROJECTION_HELPER_PATH"; then
+        fail "vorhandener root-eigener Projection-Helper ist fremd oder driftet; kein automatisches Ueberschreiben" 70
+    fi
+    expected_sha="$(projection_helper_expected_sha256 "$commit")"
+    expected="$(mktemp "$STATE_ROOT/projection-helper-install.XXXXXX")"
+    rm -f -- "$expected"
+    write_projection_helper_payload_from_commit "$commit" "$PROJECTION_HELPER_REPO_REL" "$expected"
+    helper_dir="$(dirname "$PROJECTION_HELPER_PATH")"
+    if as_root "$ROOT_TEST_BIN" -e "$helper_dir" || as_root "$ROOT_TEST_BIN" -L "$helper_dir"; then
+        validate_projection_helper_parent \
+            || { rm -f -- "$expected"; fail "Projection-Helper-Verzeichnis ist nicht kanonisch root:root/0755" 70; }
+    fi
+    ensure_root_publish_parent "$PROJECTION_HELPER_PATH"
+    validate_projection_helper_parent \
+        || { rm -f -- "$expected"; fail "Projection-Helper-Verzeichnis konnte nicht sicher angelegt werden" 70; }
+    root_atomic_publish_verified_file "$expected" "$PROJECTION_HELPER_PATH" 0555 "$expected_sha"
+    rm -f -- "$expected"
+    validate_projection_helper_install "$commit" \
+        || fail "Projection-Helper-Installation ist nicht hashgebunden/root:root/0555" 70
+}
+
+projection_helper_call() {
+    local commit="${PROJECTION_HELPER_COMMIT:-$(repo_commit)}" expected_sha
+    validate_projection_helper_install "$commit" \
+        || fail "Projection-Helper driftet an der privilegierten Aufrufgrenze" 70
+    expected_sha="$(projection_helper_expected_sha256 "$commit")"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+        'import fcntl,hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; trust=pathlib.Path(sys.argv[3])
+lock_path=trust/"runtime-artifacts.lock"
+pending=trust/"runtime-artifacts.pending"
+if os.geteuid()!=0 or path!=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_projection.py"):
+ raise SystemExit("projection byte launcher identity differs")
+trust_info=trust.lstat()
+if (trust.resolve(strict=True)!=trust or trust.is_symlink() or not stat.S_ISDIR(trust_info.st_mode)
+    or trust_info.st_uid!=0 or trust_info.st_gid!=0 or stat.S_IMODE(trust_info.st_mode)!=0o700):
+ raise SystemExit("projection trust root differs at byte launcher")
+flags=os.O_RDWR|getattr(os,"O_NOFOLLOW",0)
+try: lock_fd=os.open(lock_path,flags)
+except FileNotFoundError:
+ try: lock_fd=os.open(lock_path,flags|os.O_CREAT|os.O_EXCL,0o600); created=True
+ except FileExistsError: lock_fd=os.open(lock_path,flags); created=False
+else: created=False
+try:
+ if created:
+  os.fchown(lock_fd,0,0); os.fchmod(lock_fd,0o600); os.fsync(lock_fd)
+  directory=os.open(trust,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+  try: os.fsync(directory)
+  finally: os.close(directory)
+ lock_info=os.fstat(lock_fd)
+ if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+     or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+  raise SystemExit("root artifact lock differs")
+ fcntl.flock(lock_fd,fcntl.LOCK_SH)
+ lock_after=os.stat(lock_path,follow_symlinks=False)
+ if (lock_after.st_dev,lock_after.st_ino)!=(lock_info.st_dev,lock_info.st_ino):
+  raise SystemExit("root artifact lock identity drifted")
+ try: pending.lstat()
+ except FileNotFoundError: pass
+ else: raise SystemExit("root artifact migration is pending")
+ before=path.lstat()
+ if (path.resolve(strict=True)!=path or path.is_symlink() or not stat.S_ISREG(before.st_mode)
+     or before.st_uid!=0 or before.st_gid!=0 or stat.S_IMODE(before.st_mode)!=0o555
+     or before.st_nlink!=1 or before.st_size>4*1024*1024):
+  raise SystemExit("installed projection helper metadata differs")
+ fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+ identity=lambda value:tuple(getattr(value,key) for key in fields)
+ fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+ try:
+  opened=os.fstat(fd)
+  while True:
+   chunk=os.read(fd,min(1024*1024,4*1024*1024+1-size))
+   if not chunk: break
+   size+=len(chunk)
+   if size>4*1024*1024: raise SystemExit("projection helper grew beyond bound")
+   chunks.append(chunk)
+  final=os.fstat(fd)
+ finally: os.close(fd)
+ after=path.lstat(); payload=b"".join(chunks)
+ if (not identity(before)==identity(opened)==identity(final)==identity(after)
+     or len(payload)!=before.st_size or hashlib.sha256(payload).hexdigest()!=expected):
+  raise SystemExit("projection helper bytes drifted before execution")
+ sys.argv=[str(path),*sys.argv[4:]]; sys.dont_write_bytecode=True
+ namespace={"__name__":"__main__","__file__":str(path),"__package__":None,"__cached__":None}
+ exec(compile(payload,str(path),"exec"),namespace,namespace)
+finally:
+ try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+ finally: os.close(lock_fd)' \
+        "$PROJECTION_HELPER_PATH" "$expected_sha" "$CODE_RELEASE_TRUST_ROOT" --runtime-prefix "$RUNTIME_PREFIX" \
+        --state-root "$STATE_ROOT" "$@"
+}
+
+commit_blob_sha256() {
+    local commit="$1" relative="$2" label="$3" blob output digest
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "$label-Commit ist malformed" 70
+    blob="$(safe_git rev-parse "$commit:$relative")" || fail "$label fehlt im gebundenen Commit" 70
+    [[ "$blob" =~ ^[a-f0-9]{40,64}$ ]] || fail "$label-Git-Blob ist malformed" 70
+    safe_git cat-file -e "$blob^{blob}" || fail "$label-Git-Blob ist nicht lesbar" 70
+    output="$(safe_git cat-file blob "$blob" | "$ROOT_SHA256_BIN")"; digest="${output%% *}"
+    [[ "$digest" =~ ^[a-f0-9]{64}$ ]] || fail "$label-Git-Blob lieferte keinen SHA-256" 70
+    printf '%s\n' "$digest"
+}
+
+write_commit_blob_payload() {
+    local commit="$1" relative="$2" output="$3" label="$4" blob actual
+    [ ! -e "$output" ] && [ ! -L "$output" ] || fail "$label-Ausgabepfad existiert bereits" 70
+    blob="$(safe_git rev-parse "$commit:$relative")" || fail "$label fehlt im gebundenen Commit" 70
+    [[ "$blob" =~ ^[a-f0-9]{40,64}$ ]] || fail "$label-Git-Blob ist malformed" 70
+    safe_git cat-file blob "$blob" > "$output" \
+        || { rm -f -- "$output"; fail "$label-Git-Blob ist nicht lesbar" 70; }
+    chmod 0600 "$output"; actual="$(safe_git hash-object "$output")"
+    [ "$actual" = "$blob" ] || { rm -f -- "$output"; fail "$label-Bytes driften vom Git-Blob" 70; }
+}
+
+root_artifact_executor_expected_sha256() {
+    local commit="${1:-$(repo_commit)}"
+    commit_blob_sha256 "$commit" "$ROOT_ARTIFACT_EXECUTOR_REPO_REL" Root-Artefakt-Executor
+}
+
+root_artifact_executor_call() {
+    local commit="${ROOT_ARTIFACT_NEW_COMMIT:-$(repo_commit)}" blob expected_sha
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || fail "Root-Artefakt-Executor-Commit ist malformed" 70
+    blob="$(safe_git rev-parse "$commit:$ROOT_ARTIFACT_EXECUTOR_REPO_REL")" \
+        || fail "Root-Artefakt-Executor fehlt im gebundenen Commit" 70
+    [[ "$blob" =~ ^[a-f0-9]{40,64}$ ]] \
+        || fail "Root-Artefakt-Executor-Git-Blob ist malformed" 70
+    safe_git cat-file -e "$blob^{blob}" || fail "Root-Artefakt-Executor-Git-Blob ist nicht lesbar" 70
+    expected_sha="$(root_artifact_executor_expected_sha256 "$commit")"
+    ROOT_ARTIFACT_EXECUTOR_SHA256="$expected_sha"
+    safe_git cat-file blob "$blob" | \
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+            GENUS_A03C_ROOT_ARTIFACT_EXECUTION=descriptor-bound-authorized-commit-blob-v1 \
+            GENUS_A03C_ROOT_ARTIFACT_EXECUTOR_SHA256="$expected_sha" \
+            "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import hashlib,sys
+expected=sys.argv[1]; logical="/authorized/commit/deploy/pi_a0_3c_root_artifact_transaction.py"
+payload=sys.stdin.buffer.read(8*1024*1024+1)
+if len(payload)>8*1024*1024 or hashlib.sha256(payload).hexdigest()!=expected:
+ raise SystemExit("root artifact executor bytes differ before execution")
+sys.argv=[logical,*sys.argv[2:]]; sys.dont_write_bytecode=True
+namespace={"__name__":"__main__","__file__":logical,"__package__":None,"__cached__":None}
+exec(compile(payload,logical,"exec"),namespace,namespace)' \
+            "$expected_sha" "$@"
+}
+
+prepare_root_artifact_inputs() {
+    local expected="${1:-$ROOT_ARTIFACT_NEW_COMMIT}" transaction="$ROOT_ARTIFACT_TRANSACTION_ID"
+    local local_source authority_source authority_copy authority_target name source target digest actual
+    local -a local_names=(
+        projection-helper.payload
+        boot-guard.payload
+        consumer-publisher.payload
+        consumer-renderer.payload
+        systemd-dropin-genus-backup.service.payload
+        systemd-dropin-genus-cron@.service.payload
+        systemd-dropin-genus-learner.service.payload
+        systemd-dropin-genus-network-watchdog.service.payload
+        systemd-dropin-genus-network-watchdog.timer.payload
+        systemd-dropin-genus-telegram-bot.service.payload
+    )
+    [[ "$expected" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "Root-Artefakt-NEW-Commit ist malformed" 70
+    [[ "$transaction" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Transaktions-ID fehlt vor der Input-Vorbereitung" 70
+    [ "$expected" = "$ROOT_ARTIFACT_NEW_COMMIT" ] \
+        || fail "Root-Artefakt-Input-Commit driftet von der validierten Reauthorization" 70
+    authority_source="$ROOT_ARTIFACT_AUTHORITY_PATH"
+    [[ "$ROOT_ARTIFACT_AUTHORITY_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Authority-Hash fehlt" 70
+    [ -f "$authority_source" ] && [ ! -L "$authority_source" ] \
+        || fail "Root-Artefakt-Authority-Quelle fehlt" 70
+    local_source="$(mktemp -d "$STATE_ROOT/.root-artifact-inputs.${transaction}.XXXXXX")"
+    chmod 0700 "$local_source"
+
+    write_projection_helper_payload_from_commit "$expected" "$PROJECTION_HELPER_REPO_REL" \
+        "$local_source/projection-helper.payload"
+    write_boot_guard_payload_from_commit "$expected" "$local_source/boot-guard.payload"
+    write_commit_blob_payload "$expected" "$CONSUMER_PUBLISHER_REPO_REL" \
+        "$local_source/consumer-publisher.payload" Consumer-Publisher
+    write_commit_blob_payload "$expected" "$CONSUMER_RENDERER_REPO_REL" \
+        "$local_source/consumer-renderer.payload" Consumer-Renderer
+    write_systemd_guard_payload_from_commit "$expected" genus-backup.service \
+        "$local_source/systemd-dropin-genus-backup.service.payload"
+    write_systemd_guard_payload_from_commit "$expected" genus-cron@.service \
+        "$local_source/systemd-dropin-genus-cron@.service.payload"
+    write_systemd_guard_payload_from_commit "$expected" genus-learner.service \
+        "$local_source/systemd-dropin-genus-learner.service.payload"
+    write_systemd_guard_payload_from_commit "$expected" genus-network-watchdog.service \
+        "$local_source/systemd-dropin-genus-network-watchdog.service.payload"
+    write_systemd_guard_payload_from_commit "$expected" genus-network-watchdog.timer \
+        "$local_source/systemd-dropin-genus-network-watchdog.timer.payload"
+    write_systemd_guard_payload_from_commit "$expected" genus-telegram-bot.service \
+        "$local_source/systemd-dropin-genus-telegram-bot.service.payload"
+
+    authority_copy="$local_source/authority.json"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$authority_source" "$authority_copy" "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        "$(id -u)" "$(id -g)" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); expected=sys.argv[3]; uid,gid=map(int,sys.argv[4:6])
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+before=source.lstat()
+if (source.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>4*1024*1024):
+    raise SystemExit("operator authority source metadata differs")
+descriptor=os.open(source,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+try:
+    opened=os.fstat(descriptor)
+    while True:
+        chunk=os.read(descriptor,min(1024*1024,4*1024*1024+1-size))
+        if not chunk: break
+        size+=len(chunk)
+        if size>4*1024*1024: raise SystemExit("operator authority source grew beyond bound")
+        chunks.append(chunk)
+    final=os.fstat(descriptor)
+finally: os.close(descriptor)
+after=source.lstat(); payload=b"".join(chunks)
+if (not identity(before)==identity(opened)==identity(final)==identity(after)
+        or len(payload)!=before.st_size or hashlib.sha256(payload).hexdigest()!=expected):
+    raise SystemExit("operator authority source changed or differs")
+value=json.loads(payload)
+canonical=(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if canonical!=payload: raise SystemExit("operator authority source is not canonical JSON")
+descriptor=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try:
+    view=memoryview(payload)
+    while view:
+        count=os.write(descriptor,view)
+        if count<=0: raise SystemExit("short operator authority copy write")
+        view=view[count:]
+    os.fchmod(descriptor,0o600); os.fsync(descriptor)
+finally: os.close(descriptor)
+directory=os.open(target.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+
+    ensure_root_artifact_private_roots "$transaction"
+    for name in "${local_names[@]}"; do
+        source="$local_source/$name"
+        target="$ROOT_ARTIFACT_SOURCE_ROOT/$transaction/$name"
+        digest="$(sha256_file "$source")"
+        root_atomic_publish_private_file "$source" "$target" "$digest" "$transaction"
+        actual="$(root_stable_sha256 "$target" 0400)"
+        [ "$actual" = "$digest" ] \
+            || fail "Root-Artefakt-Private-Payload driftete nach der Publikation: $name" 70
+    done
+    ROOT_ARTIFACT_SOURCE_DIRECTORY="$ROOT_ARTIFACT_SOURCE_ROOT/$ROOT_ARTIFACT_TRANSACTION_ID"
+    authority_target="$ROOT_ARTIFACT_AUTHORITY_ROOT/$ROOT_ARTIFACT_TRANSACTION_ID.json"
+    root_atomic_publish_private_file "$authority_copy" "$authority_target" \
+        "$ROOT_ARTIFACT_AUTHORITY_SHA256" "$transaction"
+    actual="$(root_stable_sha256 "$authority_target" 0400)"
+    [ "$actual" = "$ROOT_ARTIFACT_AUTHORITY_SHA256" ] \
+        || fail "Root-Artefakt-Authority driftete nach der root-eigenen Publikation" 70
+
+    ROOT_ARTIFACT_AUTHORITY_PATH="$authority_target"
+    rm -f -- "$authority_copy"
+    for name in "${local_names[@]}"; do rm -f -- "$local_source/$name"; done
+    rmdir -- "$local_source"
+    fsync_dir "$STATE_ROOT"
+}
+
+root_artifact_helper_call() {
+    root_artifact_executor_call "$@"
+}
+
+staged_consumer_renderer_call() {
+    root_artifact_helper_call render-consumer \
+        --transaction "$ROOT_ARTIFACT_TRANSACTION_ID" \
+        --authority-path "$ROOT_ARTIFACT_AUTHORITY_PATH" \
+        --authority-sha256 "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        --activation-reservation-sha256 "$ROOT_ARTIFACT_RESERVATION_SHA256" \
+        --operator-uid "$(id -u)" --old-commit "$ROOT_ARTIFACT_OLD_COMMIT" \
+        --new-commit "$ROOT_ARTIFACT_NEW_COMMIT" \
+        --root-artifact-inventory-sha256 "$ROOT_ARTIFACT_INVENTORY_SHA256" \
+        --projection-transaction-nonce "$PROJECTION_TRANSACTION_NONCE" \
+        --activation-reservation-path "$ACTIVATION_RESERVATION" "$@"
+}
+
+staged_consumer_snapshot_call() {
+    root_artifact_helper_call snapshot-consumer \
+        --transaction "$ROOT_ARTIFACT_TRANSACTION_ID" \
+        --authority-path "$ROOT_ARTIFACT_AUTHORITY_PATH" \
+        --authority-sha256 "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        --activation-reservation-sha256 "$ROOT_ARTIFACT_RESERVATION_SHA256" \
+        --operator-uid "$(id -u)" --old-commit "$ROOT_ARTIFACT_OLD_COMMIT" \
+        --new-commit "$ROOT_ARTIFACT_NEW_COMMIT" \
+        --root-artifact-inventory-sha256 "$ROOT_ARTIFACT_INVENTORY_SHA256" \
+        --projection-transaction-nonce "$PROJECTION_TRANSACTION_NONCE" \
+        --activation-reservation-path "$ACTIVATION_RESERVATION" "$@"
+}
+
+root_artifact_stage() {
+    local result
+    [ -n "$ROOT_ARTIFACT_SOURCE_DIRECTORY" ] \
+        && [[ "$ROOT_ARTIFACT_RESERVATION_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Stage fehlt Source- oder Reservation-Bindung" 70
+    result="$(root_artifact_helper_call stage \
+        --transaction "$ROOT_ARTIFACT_TRANSACTION_ID" \
+        --source-directory "$ROOT_ARTIFACT_SOURCE_DIRECTORY" \
+        --authority-path "$ROOT_ARTIFACT_AUTHORITY_PATH" \
+        --authority-sha256 "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        --activation-reservation-sha256 "$ROOT_ARTIFACT_RESERVATION_SHA256" \
+        --operator-uid "$(id -u)" --old-commit "$ROOT_ARTIFACT_OLD_COMMIT" \
+        --new-commit "$ROOT_ARTIFACT_NEW_COMMIT")"
+    ROOT_ARTIFACT_INVENTORY_SHA256="$(
+        RESULT="$result" TRANSACTION="$ROOT_ARTIFACT_TRANSACTION_ID" \
+        AUTHORITY_SHA="$ROOT_ARTIFACT_AUTHORITY_SHA256" RESERVATION_SHA="$ROOT_ARTIFACT_RESERVATION_SHA256" \
+        EXECUTOR_SHA="$ROOT_ARTIFACT_EXECUTOR_SHA256" OLD_COMMIT="$ROOT_ARTIFACT_OLD_COMMIT" \
+        NEW_COMMIT="$ROOT_ARTIFACT_NEW_COMMIT" OPERATOR_UID="$(id -u)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os,re
+raw=os.environ["RESULT"].encode()+b"\n"; data=json.loads(raw)
+keys={"activation_reservation_sha256","artifact_count","authority_sha256","executor_sha256",
+      "inventory_path","inventory_sha256","new_commit","old_commit","operator_uid","parent_count",
+      "schema","transaction_id"}
+expected={"activation_reservation_sha256":os.environ["RESERVATION_SHA"],"artifact_count":10,
+ "authority_sha256":os.environ["AUTHORITY_SHA"],"executor_sha256":os.environ["EXECUTOR_SHA"],
+ "new_commit":os.environ["NEW_COMMIT"],"old_commit":os.environ["OLD_COMMIT"],
+ "operator_uid":int(os.environ["OPERATOR_UID"]),"parent_count":6,
+ "schema":"genus-a0.3c-root-artifact-staged-v1","transaction_id":os.environ["TRANSACTION"]}
+if set(data)!=keys or any(data.get(key)!=value for key,value in expected.items()):
+    raise SystemExit("root artifact stage result differs")
+if re.fullmatch(r"[a-f0-9]{64}",str(data.get("inventory_sha256"))) is None:
+    raise SystemExit("root artifact stage inventory digest is malformed")
+if data.get("inventory_path")!=f"/var/lib/genus-a0-3c/runtime-artifacts.{data['transaction_id']}/inventory.json":
+    raise SystemExit("root artifact stage inventory path differs")
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if raw!=canonical: raise SystemExit("root artifact stage result is not canonical")
+print(data["inventory_sha256"])
+PY
+    )"
+}
+
+root_artifact_arm() {
+    local result
+    [[ "$ROOT_ARTIFACT_INVENTORY_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Arm fehlt die immutable Inventory-Bindung" 70
+    result="$(root_artifact_helper_call arm \
+        --transaction "$ROOT_ARTIFACT_TRANSACTION_ID" \
+        --authority-path "$ROOT_ARTIFACT_AUTHORITY_PATH" \
+        --authority-sha256 "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        --activation-reservation-sha256 "$ROOT_ARTIFACT_RESERVATION_SHA256" \
+        --operator-uid "$(id -u)" --old-commit "$ROOT_ARTIFACT_OLD_COMMIT" \
+        --new-commit "$ROOT_ARTIFACT_NEW_COMMIT")"
+    ROOT_RESULT="$result" ROOT_EXPECTED_CURSOR=0 ROOT_EXPECTED_PARENT_CURSOR=0 \
+        validate_root_artifact_pending_result
+}
+
+validate_root_artifact_pending_result() {
+    local raw="${ROOT_RESULT:-}" expected_cursor="${ROOT_EXPECTED_CURSOR:-}" \
+        expected_parent_cursor="${ROOT_EXPECTED_PARENT_CURSOR:-}"
+    RESULT="$raw" TRANSACTION="$ROOT_ARTIFACT_TRANSACTION_ID" INVENTORY_SHA="$ROOT_ARTIFACT_INVENTORY_SHA256" \
+    AUTHORITY_SHA="$ROOT_ARTIFACT_AUTHORITY_SHA256" RESERVATION_SHA="$ROOT_ARTIFACT_RESERVATION_SHA256" \
+    EXECUTOR_SHA="$ROOT_ARTIFACT_EXECUTOR_SHA256" OLD_COMMIT="$ROOT_ARTIFACT_OLD_COMMIT" \
+    NEW_COMMIT="$ROOT_ARTIFACT_NEW_COMMIT" OPERATOR_UID="$(id -u)" \
+    EXPECTED_CURSOR="$expected_cursor" EXPECTED_PARENT_CURSOR="$expected_parent_cursor" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os
+raw=os.environ["RESULT"].encode()+b"\n"; data=json.loads(raw)
+keys={"activation_reservation_sha256","artifact_count","authority_sha256","cursor","direction",
+      "executor_sha256","inventory_sha256","new_commit","old_commit","operator_uid","parent_count",
+      "parent_cursor","schema","transaction_id"}
+expected={"activation_reservation_sha256":os.environ["RESERVATION_SHA"],"artifact_count":10,
+ "authority_sha256":os.environ["AUTHORITY_SHA"],"cursor":int(os.environ["EXPECTED_CURSOR"]),
+ "direction":"forward","executor_sha256":os.environ["EXECUTOR_SHA"],
+ "inventory_sha256":os.environ["INVENTORY_SHA"],"new_commit":os.environ["NEW_COMMIT"],
+ "old_commit":os.environ["OLD_COMMIT"],"operator_uid":int(os.environ["OPERATOR_UID"]),
+ "parent_count":6,"parent_cursor":int(os.environ["EXPECTED_PARENT_CURSOR"]),
+ "schema":"genus-a0.3c-root-artifact-pending-v1","transaction_id":os.environ["TRANSACTION"]}
+if set(data)!=keys or any(data.get(key)!=value for key,value in expected.items()):
+    raise SystemExit("root artifact pending result differs")
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if raw!=canonical: raise SystemExit("root artifact pending result is not canonical")
+PY
+}
+
+root_artifact_apply() {
+    local result
+    result="$(root_artifact_helper_call apply)"
+    ROOT_RESULT="$result" ROOT_EXPECTED_CURSOR=10 ROOT_EXPECTED_PARENT_CURSOR=6 \
+        validate_root_artifact_pending_result
+}
+
+verify_root_artifacts_reloaded() {
+    local expected path actual unit output expected_sha
+    systemctl_root daemon-reload
+    expected="$(mktemp "$STATE_ROOT/root-artifact-verify.XXXXXX")"; rm -f -- "$expected"
+    write_projection_helper_payload_from_commit "$ROOT_ARTIFACT_NEW_COMMIT" \
+        "$PROJECTION_HELPER_REPO_REL" "$expected"
+    expected_sha="$(sha256_file "$expected")"; rm -f -- "$expected"
+    actual="$(root_stable_sha256 "$PROJECTION_HELPER_PATH" 0555)"
+    [ "$actual" = "$expected_sha" ] || fail "Projection-Helper blieb nach Root-Migration nicht exakt NEW" 70
+    expected="$(mktemp "$STATE_ROOT/root-artifact-verify.XXXXXX")"; rm -f -- "$expected"
+    write_boot_guard_payload_from_commit "$ROOT_ARTIFACT_NEW_COMMIT" "$expected"
+    expected_sha="$BOOT_GUARD_PAYLOAD_SHA256"; rm -f -- "$expected"
+    actual="$(root_stable_sha256 "$BOOT_GUARD_PATH" 0755)"
+    [ "$actual" = "$expected_sha" ] || fail "Boot-Guard blieb nach Root-Migration nicht exakt NEW" 70
+    expected_sha="$(commit_blob_sha256 "$ROOT_ARTIFACT_NEW_COMMIT" "$CONSUMER_PUBLISHER_REPO_REL" Consumer-Publisher)"
+    [ "$(root_stable_sha256 "$CONSUMER_PUBLISHER_PATH" 0755)" = "$expected_sha" ] \
+        || fail "Consumer-Publisher blieb nach Root-Migration nicht exakt NEW" 70
+    expected_sha="$(commit_blob_sha256 "$ROOT_ARTIFACT_NEW_COMMIT" "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer)"
+    [ "$(root_stable_sha256 "$CONSUMER_RENDERER_PATH" 0755)" = "$expected_sha" ] \
+        || fail "Consumer-Renderer blieb nach Root-Migration nicht exakt NEW" 70
+    for unit in genus-backup.service genus-cron@.service genus-learner.service \
+                genus-network-watchdog.service genus-network-watchdog.timer genus-telegram-bot.service; do
+        expected="$(mktemp "$STATE_ROOT/root-artifact-verify.XXXXXX")"; rm -f -- "$expected"
+        write_systemd_guard_payload_from_commit "$ROOT_ARTIFACT_NEW_COMMIT" "$unit" "$expected"
+        expected_sha="$SYSTEMD_GUARD_PAYLOAD_SHA256"; rm -f -- "$expected"
+        path="$SYSTEMD_GUARD_ROOT/$unit.d/90-genus-a0-3c-pending.conf"
+        [ "$(root_stable_sha256 "$path" 0644)" = "$expected_sha" ] \
+            || fail "systemd-Guard blieb nach Root-Migration nicht exakt NEW: $unit" 70
+        [ "$(systemctl_root show "$unit" --property=DropInPaths --value)" = "$path" ] \
+            && [ "$(systemctl_root show "$unit" --property=NeedDaemonReload --value)" = no ] \
+            || fail "systemd hat den exakten NEW-Guard nicht geladen: $unit" 70
+    done
+}
+
+root_artifact_commit() {
+    local result terminal expected_hash
+    result="$(root_artifact_helper_call commit)"
+    terminal="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.terminal.$ROOT_ARTIFACT_TRANSACTION_ID.json"
+    RESULT="$result" TRANSACTION="$ROOT_ARTIFACT_TRANSACTION_ID" INVENTORY_SHA="$ROOT_ARTIFACT_INVENTORY_SHA256" \
+    AUTHORITY_SHA="$ROOT_ARTIFACT_AUTHORITY_SHA256" RESERVATION_SHA="$ROOT_ARTIFACT_RESERVATION_SHA256" \
+    EXECUTOR_SHA="$ROOT_ARTIFACT_EXECUTOR_SHA256" OLD_COMMIT="$ROOT_ARTIFACT_OLD_COMMIT" \
+    NEW_COMMIT="$ROOT_ARTIFACT_NEW_COMMIT" OPERATOR_UID="$(id -u)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os
+raw=os.environ["RESULT"].encode()+b"\n"; data=json.loads(raw)
+keys={"activation_reservation_sha256","artifact_count","authority_sha256","executor_sha256",
+      "inventory_sha256","new_commit","old_commit","operator_uid","outcome","parent_count",
+      "schema","transaction_id"}
+expected={"activation_reservation_sha256":os.environ["RESERVATION_SHA"],"artifact_count":10,
+ "authority_sha256":os.environ["AUTHORITY_SHA"],"executor_sha256":os.environ["EXECUTOR_SHA"],
+ "inventory_sha256":os.environ["INVENTORY_SHA"],"new_commit":os.environ["NEW_COMMIT"],
+ "old_commit":os.environ["OLD_COMMIT"],"operator_uid":int(os.environ["OPERATOR_UID"]),
+ "outcome":"committed","parent_count":6,"schema":"genus-a0.3c-root-artifact-terminal-v1",
+ "transaction_id":os.environ["TRANSACTION"]}
+if set(data)!=keys or any(data.get(key)!=value for key,value in expected.items()):
+    raise SystemExit("root artifact terminal result differs")
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if raw!=canonical: raise SystemExit("root artifact terminal result is not canonical")
+PY
+    [ ! -e "$ROOT_ARTIFACT_JOURNAL" ] && [ ! -L "$ROOT_ARTIFACT_JOURNAL" ] \
+        || fail "Root-Artefakt-Pending blieb nach Commit sichtbar" 70
+    expected_hash="$(printf '%s\n' "$result" | "$ROOT_SHA256_BIN")"; expected_hash="${expected_hash%% *}"
+    [ "$(root_stable_sha256 "$terminal" 0400)" = "$expected_hash" ] \
+        || fail "Root-Artefakt-Terminal driftet vom descriptorgebundenen Commit-Ergebnis" 70
+    ROOT_ARTIFACT_TERMINAL_PATH="$terminal"
+    ROOT_ARTIFACT_TERMINAL_SHA256="$expected_hash"
+}
+
+root_artifact_validate_terminal() {
+    local outcome="$1" result expected_hash
+    case "$outcome" in committed|rolled-back) ;; *) fail "Root-Artefakt-Terminal-Outome ist unbekannt" 64 ;; esac
+    result="$(root_artifact_helper_call validate-terminal \
+        --transaction "$ROOT_ARTIFACT_TRANSACTION_ID" \
+        --authority-path "$ROOT_ARTIFACT_AUTHORITY_PATH" \
+        --authority-sha256 "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        --activation-reservation-sha256 "$ROOT_ARTIFACT_RESERVATION_SHA256" \
+        --operator-uid "$(id -u)" --old-commit "$ROOT_ARTIFACT_OLD_COMMIT" \
+        --new-commit "$ROOT_ARTIFACT_NEW_COMMIT" \
+        --inventory-sha256 "$ROOT_ARTIFACT_INVENTORY_SHA256" --outcome "$outcome")"
+    expected_hash="$(printf '%s\n' "$result" | "$ROOT_SHA256_BIN")"; expected_hash="${expected_hash%% *}"
+    ROOT_ARTIFACT_TERMINAL_PATH="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.terminal.$ROOT_ARTIFACT_TRANSACTION_ID.json"
+    [ "$(root_stable_sha256 "$ROOT_ARTIFACT_TERMINAL_PATH" 0400)" = "$expected_hash" ] \
+        || fail "Root-Artefakt-Terminalbytes driften von validate-terminal" 70
+    ROOT_ARTIFACT_TERMINAL_SHA256="$expected_hash"
+    printf '%s\n' "$result"
+}
+
+validate_consumer_tool_install() {
+    local commit="$1" path="$2" relative="$3" label="$4" expected actual
+    validate_projection_helper_parent || return 1
+    expected="$(commit_blob_sha256 "$commit" "$relative" "$label")" || return 1
+    if ! as_root "$ROOT_TEST_BIN" -f "$path" || as_root "$ROOT_TEST_BIN" -L "$path" \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %u "$path" 2>/dev/null || printf 1)" -ne 0 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %g "$path" 2>/dev/null || printf 1)" -ne 0 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %a "$path" 2>/dev/null || true)" != 755 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %h "$path" 2>/dev/null || printf 0)" -ne 1 ] \
+        || [ "$(as_root "$ROOT_READLINK_BIN" -f -- "$path" 2>/dev/null || true)" != "$path" ]; then
+        return 1
+    fi
+    actual="$(root_stable_sha256 "$path" 0755)" || return 1
+    [ "$actual" = "$expected" ]
+}
+
+install_consumer_tools() {
+    local commit="$1" path relative label expected source
+    ensure_projection_trust_root
+    for path in "$CONSUMER_PUBLISHER_PATH" "$CONSUMER_RENDERER_PATH"; do
+        if [ "$path" = "$CONSUMER_PUBLISHER_PATH" ]; then
+            relative="$CONSUMER_PUBLISHER_REPO_REL"; label=Consumer-Publisher
+        else
+            relative="$CONSUMER_RENDERER_REPO_REL"; label=Consumer-Renderer
+        fi
+        if validate_consumer_tool_install "$commit" "$path" "$relative" "$label"; then continue; fi
+        if as_root "$ROOT_TEST_BIN" -e "$path" || as_root "$ROOT_TEST_BIN" -L "$path"; then
+            fail "vorhandener $label ist fremd oder driftet; kein automatisches Ueberschreiben" 70
+        fi
+        expected="$(commit_blob_sha256 "$commit" "$relative" "$label")"
+        source="$(mktemp "$STATE_ROOT/consumer-tool.XXXXXX")"; rm -f -- "$source"
+        write_commit_blob_payload "$commit" "$relative" "$source" "$label"
+        ensure_root_publish_parent "$path"
+        root_atomic_publish_verified_file "$source" "$path" 0755 "$expected"
+        rm -f -- "$source"
+        validate_consumer_tool_install "$commit" "$path" "$relative" "$label" \
+            || fail "$label ist nicht commitgebunden/root:root/0755" 70
+    done
+}
+
+consumer_publisher_call() {
+    local commit="${CONSUMER_TOOL_COMMIT:-$(repo_commit)}" publisher_sha
+    validate_consumer_tool_install "$commit" "$CONSUMER_PUBLISHER_PATH" \
+        "$CONSUMER_PUBLISHER_REPO_REL" Consumer-Publisher \
+        || fail "Consumer-Publisher driftet an der privilegierten Aufrufgrenze" 70
+    validate_consumer_tool_install "$commit" "$CONSUMER_RENDERER_PATH" \
+        "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer \
+        || fail "Consumer-Renderer driftet an der privilegierten Aufrufgrenze" 70
+    publisher_sha="$(commit_blob_sha256 "$commit" "$CONSUMER_PUBLISHER_REPO_REL" Consumer-Publisher)"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+        'import fcntl,hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; trust=pathlib.Path(sys.argv[3])
+lock_path=trust/"runtime-artifacts.lock"; pending=trust/"runtime-artifacts.pending"
+if os.geteuid()!=0 or path!=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py"):
+ raise SystemExit("consumer publisher byte launcher identity differs")
+trust_info=trust.lstat()
+if (trust.resolve(strict=True)!=trust or trust.is_symlink() or not stat.S_ISDIR(trust_info.st_mode)
+    or trust_info.st_uid!=0 or trust_info.st_gid!=0 or stat.S_IMODE(trust_info.st_mode)!=0o700):
+ raise SystemExit("consumer trust root differs at byte launcher")
+flags=os.O_RDWR|getattr(os,"O_NOFOLLOW",0)
+try: lock_fd=os.open(lock_path,flags)
+except FileNotFoundError:
+ try: lock_fd=os.open(lock_path,flags|os.O_CREAT|os.O_EXCL,0o600); created=True
+ except FileExistsError: lock_fd=os.open(lock_path,flags); created=False
+else: created=False
+try:
+ if created:
+  os.fchown(lock_fd,0,0); os.fchmod(lock_fd,0o600); os.fsync(lock_fd)
+  directory=os.open(trust,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+  try: os.fsync(directory)
+  finally: os.close(directory)
+ lock_info=os.fstat(lock_fd)
+ if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+     or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+  raise SystemExit("root artifact lock differs")
+ fcntl.flock(lock_fd,fcntl.LOCK_SH)
+ lock_after=os.stat(lock_path,follow_symlinks=False)
+ if (lock_after.st_dev,lock_after.st_ino)!=(lock_info.st_dev,lock_info.st_ino):
+  raise SystemExit("root artifact lock identity drifted")
+ try: pending.lstat()
+ except FileNotFoundError: pass
+ else: raise SystemExit("root artifact migration is pending")
+ before=path.lstat()
+ if (path.resolve(strict=True)!=path or path.is_symlink() or not stat.S_ISREG(before.st_mode)
+     or before.st_uid!=0 or before.st_gid!=0 or stat.S_IMODE(before.st_mode)!=0o755
+     or before.st_nlink!=1 or before.st_size>8*1024*1024):
+  raise SystemExit("installed consumer publisher metadata differs")
+ fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+ identity=lambda value:tuple(getattr(value,key) for key in fields)
+ fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+ try:
+  opened=os.fstat(fd)
+  while True:
+   chunk=os.read(fd,min(1024*1024,8*1024*1024+1-size))
+   if not chunk: break
+   size+=len(chunk)
+   if size>8*1024*1024: raise SystemExit("consumer publisher grew beyond bound")
+   chunks.append(chunk)
+  final=os.fstat(fd)
+ finally: os.close(fd)
+ after=path.lstat(); payload=b"".join(chunks)
+ if (not identity(before)==identity(opened)==identity(final)==identity(after)
+     or len(payload)!=before.st_size or hashlib.sha256(payload).hexdigest()!=expected):
+  raise SystemExit("consumer publisher bytes drifted before execution")
+ sys.argv=[str(path),*sys.argv[4:]]; sys.dont_write_bytecode=True
+ namespace={"__name__":"__main__","__file__":str(path),"__package__":None,"__cached__":None}
+ exec(compile(payload,str(path),"exec"),namespace,namespace)
+finally:
+ try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+ finally: os.close(lock_fd)' \
+        "$CONSUMER_PUBLISHER_PATH" "$publisher_sha" "$CODE_RELEASE_TRUST_ROOT" "$@"
+}
+
+consumer_renderer_call() {
+    local commit="${CONSUMER_TOOL_COMMIT:-$(repo_commit)}" renderer_sha
+    validate_consumer_tool_install "$commit" "$CONSUMER_RENDERER_PATH" \
+        "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer \
+        || fail "Consumer-Renderer driftet an der privilegierten Aufrufgrenze" 70
+    renderer_sha="$(commit_blob_sha256 "$commit" "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer)"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+        'import fcntl,hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); expected=sys.argv[2]; trust=pathlib.Path(sys.argv[3])
+lock_path=trust/"runtime-artifacts.lock"; pending=trust/"runtime-artifacts.pending"
+if os.geteuid()!=0 or path!=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py"):
+ raise SystemExit("consumer renderer byte launcher identity differs")
+trust_info=trust.lstat()
+if (trust.resolve(strict=True)!=trust or trust.is_symlink() or not stat.S_ISDIR(trust_info.st_mode)
+    or trust_info.st_uid!=0 or trust_info.st_gid!=0 or stat.S_IMODE(trust_info.st_mode)!=0o700):
+ raise SystemExit("consumer trust root differs at renderer byte launcher")
+flags=os.O_RDWR|getattr(os,"O_NOFOLLOW",0)
+try: lock_fd=os.open(lock_path,flags)
+except FileNotFoundError:
+ try: lock_fd=os.open(lock_path,flags|os.O_CREAT|os.O_EXCL,0o600); created=True
+ except FileExistsError: lock_fd=os.open(lock_path,flags); created=False
+else: created=False
+try:
+ if created:
+  os.fchown(lock_fd,0,0); os.fchmod(lock_fd,0o600); os.fsync(lock_fd)
+  directory=os.open(trust,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+  try: os.fsync(directory)
+  finally: os.close(directory)
+ lock_info=os.fstat(lock_fd)
+ if (not stat.S_ISREG(lock_info.st_mode) or lock_info.st_uid!=0 or lock_info.st_gid!=0
+     or stat.S_IMODE(lock_info.st_mode)!=0o600 or lock_info.st_nlink!=1 or lock_info.st_size!=0):
+  raise SystemExit("root artifact lock differs")
+ fcntl.flock(lock_fd,fcntl.LOCK_SH)
+ lock_after=os.stat(lock_path,follow_symlinks=False)
+ if (lock_after.st_dev,lock_after.st_ino)!=(lock_info.st_dev,lock_info.st_ino):
+  raise SystemExit("root artifact lock identity drifted")
+ try: pending.lstat()
+ except FileNotFoundError: pass
+ else: raise SystemExit("root artifact migration is pending")
+ before=path.lstat()
+ if (path.resolve(strict=True)!=path or path.is_symlink() or not stat.S_ISREG(before.st_mode)
+     or before.st_uid!=0 or before.st_gid!=0 or stat.S_IMODE(before.st_mode)!=0o755
+     or before.st_nlink!=1 or before.st_size>4*1024*1024):
+  raise SystemExit("installed consumer renderer metadata differs")
+ fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+ identity=lambda value:tuple(getattr(value,key) for key in fields)
+ fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+ try:
+  opened=os.fstat(fd)
+  while True:
+   chunk=os.read(fd,min(1024*1024,4*1024*1024+1-size))
+   if not chunk: break
+   size+=len(chunk)
+   if size>4*1024*1024: raise SystemExit("consumer renderer grew beyond bound")
+   chunks.append(chunk)
+  final=os.fstat(fd)
+ finally: os.close(fd)
+ after=path.lstat(); payload=b"".join(chunks)
+ if (not identity(before)==identity(opened)==identity(final)==identity(after)
+     or len(payload)!=before.st_size or hashlib.sha256(payload).hexdigest()!=expected):
+  raise SystemExit("consumer renderer bytes drifted before execution")
+ sys.argv=[str(path),*sys.argv[4:]]; sys.dont_write_bytecode=True
+ namespace={"__name__":"__main__","__file__":str(path),"__package__":None,"__cached__":None}
+ exec(compile(payload,str(path),"exec"),namespace,namespace)
+finally:
+ try: fcntl.flock(lock_fd,fcntl.LOCK_UN)
+ finally: os.close(lock_fd)' \
+        "$CONSUMER_RENDERER_PATH" "$renderer_sha" "$CODE_RELEASE_TRUST_ROOT" "$@"
+}
+
+consumer_plan_values() {
+    local bot_state backup_state bot_env backup_env
+    bot_state="$($SYSTEMCTL_BIN show genus-telegram-bot.service --property=LoadState --value 2>/dev/null || true)"
+    backup_state="$($SYSTEMCTL_BIN show genus-backup.service --property=LoadState --value 2>/dev/null || true)"
+    if [ "$bot_state" = loaded ] && [ "$backup_state" = loaded ]; then
+        bot_env="$($SYSTEMCTL_BIN show genus-telegram-bot.service --property=Environment --value)"
+        backup_env="$($SYSTEMCTL_BIN show genus-backup.service --property=Environment --value)"
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin BOT="$bot_env" BACKUP="$backup_env" \
+            "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+def exact(raw,key,pattern):
+    values=[]
+    for item in shlex.split(raw):
+        name,sep,value=item.partition("=")
+        if sep and name==key: values.append(value)
+    if len(values)!=1 or re.fullmatch(pattern,values[0]) is None:
+        raise SystemExit(f"legacy consumer {key} is not one exact value")
+    return values[0]
+print("present")
+print(exact(os.environ["BOT"],"GENUS_TELEGRAM_ALLOWED_IDS",r"[1-9][0-9]{0,19}"))
+print(exact(os.environ["BACKUP"],"GENUS_EXPECTED_DB_DEVICE",r"/dev/[A-Za-z0-9][A-Za-z0-9._:+/-]{0,255}"))
+PY
+        return
+    fi
+    [ "$bot_state" = not-found ] && [ "$backup_state" = not-found ] \
+        || fail "Consumer-Bootstrap ist weder vollstaendig vorhanden noch vollstaendig abwesend" 70
+    [[ "${GENUS_A03C_TELEGRAM_OWNER_ID:-}" =~ ^[1-9][0-9]{0,19}$ ]] \
+        || fail "absenter Consumer-Bootstrap braucht GENUS_A03C_TELEGRAM_OWNER_ID" 77
+    [[ "${GENUS_A03C_EXPECTED_DB_DEVICE:-}" =~ ^/dev/[A-Za-z0-9][A-Za-z0-9._:+/-]{0,255}$ ]] \
+        || fail "absenter Consumer-Bootstrap braucht GENUS_A03C_EXPECTED_DB_DEVICE" 77
+    printf 'absent\n%s\n%s\n' "$GENUS_A03C_TELEGRAM_OWNER_ID" "$GENUS_A03C_EXPECTED_DB_DEVICE"
+}
+
+validate_consumer_bootstrap_prerequisites() {
+    local operator_uid runtime_uid telegram_uid backup_uid data_gid unit load_state
+    operator_uid="$(id -u)"; data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+    runtime_uid="$(validate_service_account_contract "$RUNTIME_USER" "$RUNTIME_GROUP")"
+    telegram_uid="$(validate_service_account_contract "$TELEGRAM_USER" "$TELEGRAM_GROUP")"
+    backup_uid="$(validate_service_account_contract "$BACKUP_USER" "$BACKUP_GROUP")"
+    [ "$runtime_uid" -ne "$telegram_uid" ] && [ "$runtime_uid" -ne "$backup_uid" ] \
+        && [ "$telegram_uid" -ne "$backup_uid" ] && [ "$runtime_uid" -ne "$operator_uid" ] \
+        && [ "$telegram_uid" -ne "$operator_uid" ] && [ "$backup_uid" -ne "$operator_uid" ] \
+        || fail "Consumer-Bootstrap braucht getrennte Operator/Runtime/Telegram/Backup-UIDs" 77
+    case " $(id -G -- "$GENUS_USER") " in *" $data_gid "*) ;; *)
+        fail "Consumer-Bootstrap: Operator fehlt in genus-data" 77 ;;
+    esac
+    validate_service_account_authority_boundary \
+        "$runtime_uid" "$telegram_uid" "$backup_uid" "$data_gid"
+    validate_product_data_contract
+    validate_shared_backup_lock_contract
+    validate_scheduled_runtime_template_contract
+    for unit in "${GUARDED_UNITS[@]}"; do
+        load_state="$($SYSTEMCTL_BIN show "$unit" --property=LoadState --value 2>/dev/null || true)"
+        [ "$load_state" = not-found ] \
+            || fail "Consumer-Bootstrap ist nicht vollstaendig absent: $unit ($load_state)" 70
+    done
+    [ "$($SYSTEMCTL_BIN show genus-telegram-bot-fallback.service --property=LoadState --value 2>/dev/null || true)" = not-found ] \
+        || fail "Consumer-Bootstrap traf eine transiente Telegram-Fallback-Unit" 70
+}
+
+bind_consumer_contract_to_journal() {
+    local plan="$1" plan_sha="$2" inventory="$3" inventory_sha="$4" snapshot="$5"
+    local publisher_sha="$6" renderer_sha="$7" baseline_hint="$8" python tmp
+    validate_activation_journal 1
+    python="$(journal_python)"; tmp="$ACTIVATION_JOURNAL.tmp.$$.$RANDOM"
+    PLAN="$plan" PLAN_SHA="$plan_sha" INVENTORY="$inventory" INVENTORY_SHA="$inventory_sha" \
+    SNAPSHOT="$snapshot" PUBLISHER_SHA="$publisher_sha" RENDERER_SHA="$renderer_sha" \
+    BASELINE_HINT="$baseline_hint" \
+        "$python" - "$ACTIVATION_JOURNAL" "$tmp" <<'PY'
+import json,os,pathlib,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text())
+if data["consumer_state"] not in {"unbound","contract-bound"}: raise SystemExit("consumer contract is already past binding")
+baseline=os.environ["BASELINE_HINT"]
+desired=["genus-network-watchdog.timer","genus-learner.service","genus-telegram-bot.service"]
+if baseline=="present":
+    if not data["prior_active_services"]: raise SystemExit("present consumer baseline has no active service inventory")
+    target_services=data["prior_active_services"]
+elif baseline=="absent":
+    if data["prior_active_services"]: raise SystemExit("absent consumer baseline has prior active services")
+    target_services=desired
+else: raise SystemExit("consumer baseline hint differs")
+if data.get("consumer_baseline_hint")!=baseline or data.get("target_active_services")!=target_services:
+    raise SystemExit("consumer reservation differs from rendered contract")
+bindings={"consumer_plan_path":os.environ["PLAN"],"consumer_plan_sha256":os.environ["PLAN_SHA"],
+ "consumer_inventory_path":os.environ["INVENTORY"],"consumer_inventory_sha256":os.environ["INVENTORY_SHA"],
+ "consumer_snapshot_path":os.environ["SNAPSHOT"],"consumer_publisher_sha256":os.environ["PUBLISHER_SHA"],
+ "consumer_renderer_sha256":os.environ["RENDERER_SHA"]}
+for key,value in bindings.items():
+    if data.get(key) not in {"",value}: raise SystemExit(f"consumer binding drifted: {key}")
+    data[key]=value
+data["consumer_baseline_hint"]=baseline; data["target_active_services"]=target_services
+data["consumer_state"]="contract-bound"
+flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(target,flags,0o600)
+try:
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short consumer contract journal write")
+        view=view[count:]
+    os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_activation_journal 1
+}
+
+create_consumer_contract_staged() {
+    local expected="${1:-$(journal_field candidate_commit)}" target="${2:-$(journal_field target_manifest)}"
+    local nonce plan inventory asset_sha values baseline_hint owner_id db_device plan_sha inventory_sha
+    local snapshot_name snapshot publisher_sha renderer_sha rendered_inventory
+    [ "$(journal_field root_artifact_state)" = staged ] \
+        && [ "$(journal_field consumer_state)" = unbound ] \
+        || fail "staged Consumer-Vertrag braucht staged Root-Artefakte und unbound Consumer" 70
+    nonce="$(journal_field projection_transaction_nonce)"
+    [ "$nonce" = "$PROJECTION_TRANSACTION_NONCE" ] \
+        || fail "staged Consumer-Nonce driftet von der Activation-Reservation-v2" 70
+    plan="$STATE_ROOT/consumer-plan.$nonce.json"; inventory="$STATE_ROOT/consumer-inventory.$nonce.json"
+    asset_sha="$(root_stable_sha256 "$PUBLIC_SETS_ROOT/$target/assets/receipt.sha256" 0444)"
+    values="${CONSUMER_PLAN_VALUES:-$(consumer_plan_values)}"; baseline_hint="${values%%$'\n'*}"; values="${values#*$'\n'}"
+    owner_id="${values%%$'\n'*}"; db_device="${values#*$'\n'}"
+    BASELINE_HINT="$baseline_hint" GENERATION="$target" COMMIT="$expected" ASSET_SHA="$asset_sha" \
+    OPERATOR="$GENUS_USER" OWNER_ID="$owner_id" DB_DEVICE="$db_device" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$plan" "$(id -u)" "$(id -g)" <<'PY'
+import ctypes,errno,json,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); uid,gid=map(int,sys.argv[2:4])
+data={"asset_receipt_sha256":os.environ["ASSET_SHA"],"expected_db_device":os.environ["DB_DEVICE"],
+ "generation_id":os.environ["GENERATION"],"operator_user":os.environ["OPERATOR"],
+ "repo_commit":os.environ["COMMIT"],"schema":"genus-a0.3c-consumer-plan-v1",
+ "telegram_owner_id":os.environ["OWNER_ID"]}
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+payload=canonical(data); fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(target):
+    before=target.lstat()
+    if (target.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>65536):
+        raise SystemExit("staged consumer plan metadata differs")
+    descriptor=os.open(target,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,65536)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=target.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("staged consumer plan changed during read")
+    return raw
+def fsync_parent():
+    descriptor=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for staged consumer plan")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+temporary=path.with_name(f".{path.name}.publishing")
+try: existing=stable(path)
+except FileNotFoundError:
+    try: pending=stable(temporary)
+    except FileNotFoundError:
+        descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o400)
+        try:
+            view=memoryview(payload)
+            while view:
+                count=os.write(descriptor,view)
+                if count<=0: raise SystemExit("short staged consumer plan write")
+                view=view[count:]
+            os.fchmod(descriptor,0o400); os.fsync(descriptor)
+        finally: os.close(descriptor)
+    else:
+        if pending!=payload: raise SystemExit("stale staged consumer plan temp differs")
+    if not rename_noreplace(temporary,path):
+        if stable(path)!=payload: raise SystemExit("raced staged consumer plan differs")
+        temporary.unlink()
+    fsync_parent(); existing=stable(path)
+if existing!=payload: raise SystemExit("staged consumer plan differs from reservation")
+PY
+    plan_sha="$(sha256_file "$plan")"
+    rendered_inventory="$(mktemp "$STATE_ROOT/.consumer-inventory-render.${nonce}.XXXXXX")"
+    chmod 0600 "$rendered_inventory"
+    staged_consumer_renderer_call --plan "$plan" --plan-sha256 "$plan_sha" \
+        --generation "$PUBLIC_SETS_ROOT/$target" >"$rendered_inventory"
+    "$SYSTEM_PYTHON_BIN" -I -P - "$rendered_inventory" "$inventory" "$(id -u)" "$(id -g)" <<'PY'
+import ctypes,errno,json,os,pathlib,stat,sys
+source=pathlib.Path(sys.argv[1]); path=pathlib.Path(sys.argv[2]); uid,gid=map(int,sys.argv[3:5])
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def read_source():
+    before=source.lstat()
+    if (source.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>1024*1024):
+        raise SystemExit("staged consumer renderer output metadata differs")
+    descriptor=os.open(source,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=source.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("staged consumer renderer output changed during read")
+    return raw
+payload=read_source()
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate staged consumer inventory key")
+        result[key]=value
+    return result
+data=json.loads(payload,object_pairs_hook=pairs)
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if payload!=canonical: raise SystemExit("staged consumer inventory is not canonical")
+def stable(target):
+    before=target.lstat()
+    if (target.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>1024*1024):
+        raise SystemExit("staged consumer inventory metadata differs")
+    descriptor=os.open(target,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=target.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("staged consumer inventory changed during read")
+    return raw
+def fsync_parent():
+    descriptor=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for staged consumer inventory")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+temporary=path.with_name(f".{path.name}.publishing")
+try: existing=stable(path)
+except FileNotFoundError:
+    try: pending=stable(temporary)
+    except FileNotFoundError:
+        descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o400)
+        try:
+            view=memoryview(payload)
+            while view:
+                count=os.write(descriptor,view)
+                if count<=0: raise SystemExit("short staged consumer inventory write")
+                view=view[count:]
+            os.fchmod(descriptor,0o400); os.fsync(descriptor)
+        finally: os.close(descriptor)
+    else:
+        if pending!=payload: raise SystemExit("stale staged consumer inventory temp differs")
+    if not rename_noreplace(temporary,path):
+        if stable(path)!=payload: raise SystemExit("raced staged consumer inventory differs")
+        temporary.unlink()
+    fsync_parent(); existing=stable(path)
+if existing!=payload: raise SystemExit("staged consumer inventory differs after publication")
+PY
+    rm -f -- "$rendered_inventory"
+    fsync_dir "$STATE_ROOT"
+    inventory_sha="$(sha256_file "$inventory")"
+    snapshot_name="$(printf 'genus-a0.3c-consumer-snapshot-v1\n%s\n' "$nonce" | "$ROOT_SHA256_BIN")"
+    snapshot_name="${snapshot_name%% *}"; [[ "$snapshot_name" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "staged Consumer-Snapshotname ist malformed" 70
+    snapshot="$CODE_RELEASE_TRUST_ROOT/consumer-snapshots/$snapshot_name"
+    publisher_sha="$(journal_field consumer_publisher_sha256)"; renderer_sha="$(journal_field consumer_renderer_sha256)"
+    [ "$publisher_sha" = "$(commit_blob_sha256 "$expected" "$CONSUMER_PUBLISHER_REPO_REL" Consumer-Publisher)" ] \
+        && [ "$renderer_sha" = "$(commit_blob_sha256 "$expected" "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer)" ] \
+        || fail "staged Consumer-Toolbindung driftet vom NEW-Commit" 70
+    STAGED_CONSUMER_PLAN_PATH="$plan"; STAGED_CONSUMER_PLAN_SHA256="$plan_sha"
+    STAGED_CONSUMER_INVENTORY_PATH="$inventory"; STAGED_CONSUMER_INVENTORY_SHA256="$inventory_sha"
+    STAGED_CONSUMER_SNAPSHOT_PATH="$snapshot"; STAGED_CONSUMER_PUBLISHER_SHA256="$publisher_sha"
+    STAGED_CONSUMER_RENDERER_SHA256="$renderer_sha"; CONSUMER_BASELINE_HINT="$baseline_hint"
+}
+
+bind_consumer_baseline_snapshot_to_journal() {
+    local snapshot_sha="$1"
+    [ "$(journal_field consumer_state)" = unbound ] \
+        && [ -z "$(journal_field consumer_baseline_authorization_sha256)" ] \
+        && [ -z "$(journal_field consumer_approval_path)" ] \
+        && [ -z "$(journal_field consumer_approval_sha256)" ] \
+        || fail "Consumer-Baseline-Snapshot ist nicht mehr unautorisiert/unbound" 70
+    activation_v7_transition consumer-baseline \
+        "consumer_plan_path=$STAGED_CONSUMER_PLAN_PATH" \
+        "consumer_plan_sha256=$STAGED_CONSUMER_PLAN_SHA256" \
+        "consumer_inventory_path=$STAGED_CONSUMER_INVENTORY_PATH" \
+        "consumer_inventory_sha256=$STAGED_CONSUMER_INVENTORY_SHA256" \
+        "consumer_snapshot_path=$STAGED_CONSUMER_SNAPSHOT_PATH" \
+        "consumer_snapshot_sha256=$snapshot_sha" \
+        "consumer_baseline=$CONSUMER_BASELINE_HINT"
+    [ "$(journal_field consumer_state)" = baseline-snapshotted ] \
+        && [ -z "$(journal_field consumer_baseline_authorization_sha256)" ] \
+        && [ -z "$(journal_field consumer_approval_path)" ] \
+        && [ -z "$(journal_field consumer_approval_sha256)" ] \
+        || fail "Consumer-Baseline-Snapshot wurde vor Root-Commit autorisiert" 70
+    validate_activation_journal 1
+}
+
+snapshot_consumers_staged() {
+    local output snapshot_sha expected target
+    expected="$(journal_field candidate_commit)"; target="$(journal_field target_manifest)"
+    create_consumer_contract_staged "$expected" "$target"
+    output="$(staged_consumer_snapshot_call \
+        --plan "$STAGED_CONSUMER_PLAN_PATH" --plan-sha256 "$STAGED_CONSUMER_PLAN_SHA256" \
+        --inventory "$STAGED_CONSUMER_INVENTORY_PATH" --inventory-sha256 "$STAGED_CONSUMER_INVENTORY_SHA256" \
+        --snapshot "$STAGED_CONSUMER_SNAPSHOT_PATH")"
+    snapshot_sha="$(parse_consumer_result snapshot "$output")"
+    bind_consumer_baseline_snapshot_to_journal "$snapshot_sha"
+}
+
+authorize_consumer_snapshot() {
+    local root_artifact_state consumer_state authorization approval_and_result approval result values baseline authorization_sha approval_sha
+    root_artifact_state="$(journal_field root_artifact_state)"; consumer_state="$(journal_field consumer_state)"
+    [ "$root_artifact_state" = committed ] \
+        || fail "Consumer-Autorisierung darf erst nach committed Root-Artefakten entstehen" 70
+    [ "$consumer_state" = baseline-snapshotted ] \
+        || fail "Consumer-Autorisierung braucht einen baseline-snapshotted Ausgangszustand" 70
+    [ "$(journal_field projection_state)" = authorized ] \
+        || fail "Consumer-Autorisierung braucht zuerst den authorized Projection-Vertrag" 70
+    authorization="${GENUS_A03C_CONSUMER_BASELINE_AUTHORIZATION:-}"
+    [ "$authorization" = "$(journal_field consumer_baseline):$(journal_field target_manifest)" ] \
+        || fail "Consumer-Baseline braucht die exakte menschliche present:/absent:-Autorisierung" 77
+    approval_and_result="$(publish_consumer_root_approval "$(journal_field consumer_snapshot_sha256)" "$authorization")"
+    approval="${approval_and_result%%$'\n'*}"; result="${approval_and_result#*$'\n'}"
+    values="$(RESULT="$result" EXPECTED_BASELINE="$(journal_field consumer_baseline)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os,re
+data=json.loads(os.environ["RESULT"])
+if (set(data)!={"approval_sha256","authorization_sha256","baseline"}
+        or data.get("baseline")!=os.environ["EXPECTED_BASELINE"]
+        or any(re.fullmatch(r"[a-f0-9]{64}",str(data.get(key,""))) is None for key in ("approval_sha256","authorization_sha256"))):
+    raise SystemExit("consumer root approval result differs")
+print(data["baseline"]); print(data["authorization_sha256"]); print(data["approval_sha256"])
+PY
+)"
+    mapfile -t values <<< "$values"; baseline="${values[0]:-}"; authorization_sha="${values[1]:-}"; approval_sha="${values[2]:-}"
+    [ "$baseline" = "$(journal_field consumer_baseline)" ] \
+        && [ "$(root_stable_sha256 "$approval" 0400)" = "$approval_sha" ] \
+        || fail "Consumer-Approval driftete vor der v7-Journalbindung" 70
+    activation_v7_transition consumer-authorize \
+        "consumer_baseline_authorization_sha256=$authorization_sha" \
+        "consumer_approval_path=$approval" "consumer_approval_sha256=$approval_sha"
+    [ "$(journal_field consumer_state)" = snapshotted-authorized ] \
+        || fail "Consumer-Approval erreichte snapshotted-authorized nicht" 70
+    validate_activation_journal 1
+}
+
+create_consumer_contract() {
+    local expected="$1" target="$2" nonce plan inventory asset_sha values baseline_hint owner_id db_device
+    local plan_sha inventory_sha snapshot_name snapshot publisher_sha renderer_sha
+    nonce="$(journal_field projection_transaction_nonce)"
+    plan="$STATE_ROOT/consumer-plan.$nonce.json"; inventory="$STATE_ROOT/consumer-inventory.$nonce.json"
+    [ ! -e "$plan" ] && [ ! -L "$plan" ] && [ ! -e "$inventory" ] && [ ! -L "$inventory" ] \
+        || fail "Consumer-Plan/-Inventory existieren vor der einmaligen Bindung" 70
+    asset_sha="$(root_stable_sha256 "$PUBLIC_SETS_ROOT/$target/assets/receipt.sha256" 0444)"
+    values="${CONSUMER_PLAN_VALUES:-$(consumer_plan_values)}"; baseline_hint="${values%%$'\n'*}"; values="${values#*$'\n'}"
+    owner_id="${values%%$'\n'*}"; db_device="${values#*$'\n'}"
+    BASELINE_HINT="$baseline_hint" GENERATION="$target" COMMIT="$expected" ASSET_SHA="$asset_sha" \
+    OPERATOR="$GENUS_USER" OWNER_ID="$owner_id" DB_DEVICE="$db_device" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$plan" <<'PY'
+import json,os,pathlib,sys
+data={"asset_receipt_sha256":os.environ["ASSET_SHA"],"expected_db_device":os.environ["DB_DEVICE"],
+ "generation_id":os.environ["GENERATION"],"operator_user":os.environ["OPERATOR"],
+ "repo_commit":os.environ["COMMIT"],"schema":"genus-a0.3c-consumer-plan-v1",
+ "telegram_owner_id":os.environ["OWNER_ID"]}
+path=pathlib.Path(sys.argv[1]); flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0)
+fd=os.open(path,flags,0o400)
+try:
+    payload=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short consumer plan write")
+        view=view[count:]
+    os.fchmod(fd,0o400); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    consumer_renderer_call --plan "$plan" \
+        --generation "$PUBLIC_SETS_ROOT/$target" > "$inventory"
+    chmod 0400 "$inventory"; sync -f "$inventory"; fsync_dir "$STATE_ROOT"
+    plan_sha="$(sha256_file "$plan")"; inventory_sha="$(sha256_file "$inventory")"
+    snapshot_name="$(printf 'genus-a0.3c-consumer-snapshot-v1\n%s\n' "$nonce" | "$ROOT_SHA256_BIN")"
+    snapshot_name="${snapshot_name%% *}"; [[ "$snapshot_name" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Consumer-Snapshotname ist malformed" 70
+    snapshot="$CODE_RELEASE_TRUST_ROOT/consumer-snapshots/$snapshot_name"
+    publisher_sha="$(root_stable_sha256 "$CONSUMER_PUBLISHER_PATH" 0755)"
+    renderer_sha="$(root_stable_sha256 "$CONSUMER_RENDERER_PATH" 0755)"
+    bind_consumer_contract_to_journal "$plan" "$plan_sha" "$inventory" "$inventory_sha" \
+        "$snapshot" "$publisher_sha" "$renderer_sha" "$baseline_hint"
+    CONSUMER_BASELINE_HINT="$baseline_hint"
+}
+
+parse_consumer_result() {
+    local expected_command="$1" raw="$2"
+    RAW="$raw" EXPECTED_COMMAND="$expected_command" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os,re
+raw=os.environ["RAW"]
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate consumer result key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+expected={"command":os.environ["EXPECTED_COMMAND"],"schema":"genus-a0.3c-consumer-publish-result-v1",
+          "snapshot_sha256":data.get("snapshot_sha256"),"status":"ok"}
+if data!=expected or not re.fullmatch(r"[a-f0-9]{64}",str(data.get("snapshot_sha256",""))):
+    raise SystemExit("consumer publisher result differs")
+if json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))!=raw:
+    raise SystemExit("consumer publisher result is not canonical")
+print(data["snapshot_sha256"])
+PY
+}
+
+consumer_publisher_from_journal() {
+    local command="$1" cron_location="${2:-}" plan plan_sha inventory inventory_sha snapshot snapshot_sha output
+    plan="$(journal_field consumer_plan_path)"; plan_sha="$(journal_field consumer_plan_sha256)"
+    inventory="$(journal_field consumer_inventory_path)"; inventory_sha="$(journal_field consumer_inventory_sha256)"
+    snapshot="$(journal_field consumer_snapshot_path)"; snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+    local -a arguments=("$command" --plan "$plan" --plan-sha256 "$plan_sha" \
+        --inventory "$inventory" --inventory-sha256 "$inventory_sha" --snapshot "$snapshot")
+    if [ "$command" != snapshot ]; then arguments+=(--snapshot-sha256 "$snapshot_sha"); fi
+    if [[ "$command" = validate-* ]]; then arguments+=(--cron-location "$cron_location"); fi
+    output="$(consumer_publisher_call "${arguments[@]}")"
+    parse_consumer_result "$command" "$output"
+}
+
+publish_consumer_root_approval() {
+    local snapshot_sha="$1" authorization="$2" nonce plan plan_sha inventory_sha snapshot
+    local publisher_sha renderer_sha approval output
+    nonce="$(journal_field projection_transaction_nonce)"; plan="$(journal_field consumer_plan_path)"
+    plan_sha="$(journal_field consumer_plan_sha256)"; inventory_sha="$(journal_field consumer_inventory_sha256)"
+    snapshot="$(journal_field consumer_snapshot_path)"
+    publisher_sha="$(journal_field consumer_publisher_sha256)"; renderer_sha="$(journal_field consumer_renderer_sha256)"
+    approval="$CODE_RELEASE_TRUST_ROOT/runtime-consumer.approval.$nonce.json"
+    output="$(
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import hashlib,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); state=pathlib.Path(sys.argv[2]); uid,gid=map(int,sys.argv[3:5]); expected=sys.argv[5]
+if path!=state/f"consumer-plan.{sys.argv[6]}.json": raise SystemExit("consumer plan path differs")
+before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>65536): raise SystemExit("consumer plan metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns"); ident=lambda value:tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+try:
+ opened=os.fstat(fd)
+ while True:
+  chunk=os.read(fd,min(65537-size,65536))
+  if not chunk: break
+  size+=len(chunk)
+  if size>65536: raise SystemExit("consumer plan grew beyond bound")
+  chunks.append(chunk)
+ final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat(); payload=b"".join(chunks)
+if not ident(before)==ident(opened)==ident(final)==ident(after) or len(payload)!=before.st_size or hashlib.sha256(payload).hexdigest()!=expected: raise SystemExit("consumer plan drifted")
+sys.stdout.buffer.write(payload)' \
+            "$plan" "$STATE_ROOT" "$(id -u)" "$(id -g)" "$plan_sha" "$nonce" | \
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import ctypes,errno,hashlib,json,os,pathlib,re,stat,sys
+nonce,snapshot_sha,inventory_sha,publisher_sha,renderer_sha,authorization=sys.argv[1:7]
+snapshot_name,expected_operator,expected_uid_raw,expected_state_root=sys.argv[7:11]
+if (re.fullmatch(r"[a-f0-9]{64}",nonce) is None
+        or any(re.fullmatch(r"[a-f0-9]{64}",value) is None for value in
+               (snapshot_sha,inventory_sha,publisher_sha,renderer_sha))):
+ raise SystemExit("consumer approval digest input differs")
+expected_snapshot_name=hashlib.sha256(f"genus-a0.3c-consumer-snapshot-v1\n{nonce}\n".encode()).hexdigest()
+if snapshot_name!=expected_snapshot_name: raise SystemExit("consumer snapshot name is not nonce-derived")
+expected_uid=int(expected_uid_raw)
+trust=pathlib.Path("/var/lib/genus-a0-3c"); snapshot=trust/"consumer-snapshots"/snapshot_name
+publisher=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py"); renderer=pathlib.Path("/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py")
+def strict(raw,label):
+ def pairs(items):
+  result={}
+  for key,value in items:
+   if key in result: raise SystemExit(f"duplicate {label} key")
+   result[key]=value
+  return result
+ value=json.loads(raw,object_pairs_hook=pairs)
+ if not isinstance(value,dict): raise SystemExit(f"{label} is not an object")
+ return value
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns"); ident=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path,mode,limit):
+ before=path.lstat()
+ if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+     or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit): raise SystemExit(f"unsafe root evidence: {path}")
+ fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+ try:
+  opened=os.fstat(fd)
+  while True:
+   chunk=os.read(fd,min(1024*1024,limit+1-size))
+   if not chunk: break
+   size+=len(chunk)
+   if size>limit: raise SystemExit("root evidence grew beyond bound")
+   chunks.append(chunk)
+  final=os.fstat(fd)
+ finally: os.close(fd)
+ after=path.lstat(); raw=b"".join(chunks)
+ if not ident(before)==ident(opened)==ident(final)==ident(after) or len(raw)!=before.st_size: raise SystemExit("root evidence drifted")
+ return raw
+trust_info=trust.lstat()
+if (trust.resolve(strict=True)!=trust or not stat.S_ISDIR(trust_info.st_mode) or trust_info.st_uid!=0 or trust_info.st_gid!=0 or stat.S_IMODE(trust_info.st_mode)!=0o700): raise SystemExit("consumer trust root differs")
+plan_raw=sys.stdin.buffer.read(65537)
+if len(plan_raw)>65536: raise SystemExit("consumer plan stdin is oversized")
+plan=strict(plan_raw,"consumer plan"); plan_sha=hashlib.sha256(plan_raw).hexdigest()
+plan_keys={"asset_receipt_sha256","expected_db_device","generation_id","operator_user","repo_commit",
+           "schema","telegram_owner_id"}
+if (canonical(plan)!=plan_raw or set(plan)!=plan_keys or plan.get("schema")!="genus-a0.3c-consumer-plan-v1"
+        or re.fullmatch(r"[a-f0-9]{64}",str(plan.get("asset_receipt_sha256",""))) is None
+        or re.fullmatch(r"[a-f0-9]{64}",str(plan.get("generation_id",""))) is None
+        or re.fullmatch(r"[a-f0-9]{40}",str(plan.get("repo_commit",""))) is None
+        or plan.get("operator_user")!=expected_operator
+        or re.fullmatch(r"[1-9][0-9]{0,19}",str(plan.get("telegram_owner_id",""))) is None
+        or re.fullmatch(r"/dev/[A-Za-z0-9][A-Za-z0-9._:+/-]{0,255}",str(plan.get("expected_db_device",""))) is None):
+ raise SystemExit("consumer plan is not the exact authorized schema")
+projection_raw=stable(trust/f"runtime-projection.approval.{nonce}.json",0o400,1024*1024); projection=strict(projection_raw,"projection approval")
+projection_keys={"authorization_sha256","candidate_commit","operator_uid","plan_sha256","prior_manifest",
+ "prior_manifest_sha256","prior_tree_inventory_sha256","protocol","publisher_sha256","readiness_sha256",
+ "schema","series_sha256","state_root","target_manifest","target_manifest_sha256",
+ "target_tree_inventory_sha256","transaction_nonce"}
+if (canonical(projection)!=projection_raw or set(projection)!=projection_keys
+        or projection.get("schema")!="genus-a0.3c-runtime-projection-approval-v1"
+        or projection.get("protocol")!="dual-selector-journal-v2"
+        or projection.get("transaction_nonce")!=nonce or projection.get("target_manifest")!=plan.get("generation_id")
+        or projection.get("candidate_commit")!=plan.get("repo_commit") or projection.get("operator_uid")!=expected_uid
+        or projection.get("state_root")!=expected_state_root):
+ raise SystemExit("consumer/projection approval identity differs")
+snapshot_info=snapshot.lstat()
+if (snapshot.resolve(strict=True)!=snapshot or not stat.S_ISDIR(snapshot_info.st_mode) or snapshot_info.st_uid!=0 or snapshot_info.st_gid!=0 or stat.S_IMODE(snapshot_info.st_mode)!=0o700): raise SystemExit("consumer snapshot directory differs")
+manifest_raw=stable(snapshot/"snapshot.json",0o400,2*1024*1024); manifest=strict(manifest_raw,"consumer snapshot")
+if (hashlib.sha256(manifest_raw).hexdigest()!=snapshot_sha or canonical(manifest)!=manifest_raw
+        or manifest.get("schema")!="genus-a0.3c-consumer-publish-snapshot-v1" or manifest.get("plan_sha256")!=plan_sha
+        or manifest.get("inventory_sha256")!=inventory_sha or manifest.get("baseline") not in {"present","absent"}):
+ raise SystemExit("consumer snapshot binding differs")
+baseline=manifest["baseline"]
+if authorization!=baseline+":"+str(projection["target_manifest"]): raise SystemExit("consumer baseline lacks exact human authorization")
+if hashlib.sha256(stable(publisher,0o755,4*1024*1024)).hexdigest()!=publisher_sha: raise SystemExit("consumer publisher binding differs")
+if hashlib.sha256(stable(renderer,0o755,4*1024*1024)).hexdigest()!=renderer_sha: raise SystemExit("consumer renderer binding differs")
+approval={"authorization_sha256":hashlib.sha256(authorization.encode()).hexdigest(),"baseline":baseline,
+ "candidate_commit":projection["candidate_commit"],"inventory_sha256":inventory_sha,"operator_uid":projection["operator_uid"],
+ "plan_sha256":plan_sha,"projection_approval_sha256":hashlib.sha256(projection_raw).hexdigest(),
+ "publisher_sha256":publisher_sha,"renderer_sha256":renderer_sha,"schema":"genus-a0.3c-runtime-consumer-approval-v1",
+ "snapshot_path":str(snapshot),"snapshot_sha256":snapshot_sha,"state_root":projection["state_root"],
+ "target_manifest":projection["target_manifest"],"transaction_nonce":nonce}
+raw=canonical(approval); path=trust/f"runtime-consumer.approval.{nonce}.json"
+temporary=trust/f".{path.name}.publishing"
+def fsync_trust():
+ directory=os.open(trust,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+ try: os.fsync(directory)
+ finally: os.close(directory)
+def rename_noreplace(source,target):
+ libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+ if function is None: raise SystemExit("renameat2 is unavailable for durable consumer approval")
+ function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+ function.restype=ctypes.c_int
+ if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+ error=ctypes.get_errno()
+ if error==errno.EEXIST: return False
+ raise OSError(error,os.strerror(error),str(target))
+try: existing=stable(path,0o400,1024*1024)
+except FileNotFoundError:
+ try: pending=stable(temporary,0o400,1024*1024)
+ except FileNotFoundError:
+  flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+  try:
+   view=memoryview(raw)
+   while view:
+    count=os.write(fd,view)
+    if count<=0: raise SystemExit("short consumer approval write")
+    view=view[count:]
+   os.fchmod(fd,0o400); os.fsync(fd)
+  finally: os.close(fd)
+ else:
+  if pending!=raw:
+   temporary.unlink(); fsync_trust()
+   flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+   try:
+    view=memoryview(raw)
+    while view:
+     count=os.write(fd,view)
+     if count<=0: raise SystemExit("short consumer approval rewrite")
+     view=view[count:]
+    os.fchmod(fd,0o400); os.fsync(fd)
+   finally: os.close(fd)
+ if not rename_noreplace(temporary,path):
+  if stable(path,0o400,1024*1024)!=raw: raise SystemExit("raced consumer approval differs")
+  temporary.unlink()
+ fsync_trust(); existing=stable(path,0o400,1024*1024)
+else:
+ try: pending=stable(temporary,0o400,1024*1024)
+ except FileNotFoundError: pass
+ else:
+  if pending!=raw: raise SystemExit("stale consumer approval temp differs")
+  temporary.unlink(); fsync_trust()
+if existing!=raw: raise SystemExit("consumer root approval drifted")
+print(json.dumps({"approval_sha256":hashlib.sha256(raw).hexdigest(),"authorization_sha256":approval["authorization_sha256"],"baseline":baseline},sort_keys=True,separators=(",",":")))' \
+             "$nonce" "$snapshot_sha" "$inventory_sha" "$publisher_sha" "$renderer_sha" "$authorization" \
+            "${snapshot##*/}" "$GENUS_USER" "$(id -u)" "$STATE_ROOT"
+    )"
+    printf '%s\n%s\n' "$approval" "$output"
+}
+
+bind_consumer_snapshot_to_journal() {
+    local snapshot_sha="$1" approval="$2" result="$3" python tmp
+    validate_activation_journal 1
+    python="$(journal_python)"; tmp="$ACTIVATION_JOURNAL.tmp.$$.$RANDOM"
+    SNAPSHOT_SHA="$snapshot_sha" APPROVAL="$approval" RESULT="$result" \
+        "$python" - "$ACTIVATION_JOURNAL" "$tmp" <<'PY'
+import hashlib,json,os,pathlib,re,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text()); result=json.loads(os.environ["RESULT"])
+if (data["consumer_state"] not in {"contract-bound","snapshotted"} or set(result)!={"approval_sha256","authorization_sha256","baseline"}
+        or result["baseline"] not in {"present","absent"}
+        or result["baseline"]!=data["consumer_baseline_hint"]
+        or any(re.fullmatch(r"[a-f0-9]{64}",result[key]) is None for key in ("approval_sha256","authorization_sha256"))):
+    raise SystemExit("consumer snapshot approval result differs")
+bindings={"consumer_snapshot_sha256":os.environ["SNAPSHOT_SHA"],"consumer_baseline":result["baseline"],
+ "consumer_baseline_authorization_sha256":result["authorization_sha256"],"consumer_approval_path":os.environ["APPROVAL"],
+ "consumer_approval_sha256":result["approval_sha256"]}
+for key,value in bindings.items():
+    if data.get(key) not in {"",value}: raise SystemExit(f"consumer snapshot binding drifted: {key}")
+    data[key]=value
+data["consumer_state"]="snapshotted"
+flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(target,flags,0o600)
+try:
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short consumer snapshot journal write")
+        view=view[count:]
+    os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_activation_journal 1
+}
+
+snapshot_and_authorize_consumers() {
+    local snapshot_sha authorization approval_and_result approval result expected
+    snapshot_sha="$(consumer_publisher_from_journal snapshot)"
+    expected="$(journal_field target_manifest)"; authorization="${GENUS_A03C_CONSUMER_BASELINE_AUTHORIZATION:-}"
+    [ "$authorization" = "present:$expected" ] || [ "$authorization" = "absent:$expected" ] \
+        || fail "Consumer-Baseline braucht GENUS_A03C_CONSUMER_BASELINE_AUTHORIZATION=present:$expected oder absent:$expected" 77
+    approval_and_result="$(publish_consumer_root_approval "$snapshot_sha" "$authorization")"
+    approval="${approval_and_result%%$'\n'*}"; result="${approval_and_result#*$'\n'}"
+    bind_consumer_snapshot_to_journal "$snapshot_sha" "$approval" "$result"
+}
+
+validate_consumer_root_approval() {
+    local completed="${1:-0}" approval recorded_approval approval_sha projection_approval_sha nonce
+    [ "$completed" = 1 ] || validate_activation_journal 1
+    nonce="$(journal_field projection_transaction_nonce)"
+    [[ "$nonce" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Consumer-Approval-Nonce ist malformed" 70
+    approval="$CODE_RELEASE_TRUST_ROOT/runtime-consumer.approval.$nonce.json"
+    recorded_approval="$(journal_field consumer_approval_path)"
+    [ "$recorded_approval" = "$approval" ] \
+        || fail "Consumer-Approval-Pfad ist nicht exakt nonce-abgeleitet" 70
+    approval_sha="$(journal_field consumer_approval_sha256)"
+    projection_approval_sha="$(journal_field projection_approval_sha256)"
+    [ "$(root_stable_sha256 "$approval" 0400)" = "$approval_sha" ] \
+        || fail "root-eigene Consumer-Approval driftet vom privaten Journal" 70
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        EXPECTED_APPROVAL_SHA="$approval_sha" \
+        EXPECTED_AUTHORIZATION_SHA="$(journal_field consumer_baseline_authorization_sha256)" \
+        EXPECTED_BASELINE="$(journal_field consumer_baseline)" \
+        EXPECTED_COMMIT="$(journal_field candidate_commit)" \
+        EXPECTED_INVENTORY_SHA="$(journal_field consumer_inventory_sha256)" \
+        EXPECTED_OPERATOR_UID="$(journal_field operator_uid)" \
+        EXPECTED_PLAN_SHA="$(journal_field consumer_plan_sha256)" \
+        EXPECTED_PROJECTION_APPROVAL_SHA="$projection_approval_sha" \
+        EXPECTED_PUBLISHER_SHA="$(journal_field consumer_publisher_sha256)" \
+        EXPECTED_RENDERER_SHA="$(journal_field consumer_renderer_sha256)" \
+        EXPECTED_SNAPSHOT_PATH="$(journal_field consumer_snapshot_path)" \
+        EXPECTED_SNAPSHOT_SHA="$(journal_field consumer_snapshot_sha256)" \
+        EXPECTED_STATE_ROOT="$STATE_ROOT" \
+        EXPECTED_TARGET="$(journal_field target_manifest)" \
+        EXPECTED_NONCE="$(journal_field projection_transaction_nonce)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$approval" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+        or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>1024*1024):
+    raise SystemExit("consumer approval metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+try:
+    opened=os.fstat(fd)
+    while True:
+        chunk=os.read(fd,min(1024*1024,1024*1024+1-size))
+        if not chunk: break
+        size+=len(chunk)
+        if size>1024*1024: raise SystemExit("consumer approval grew beyond bound")
+        chunks.append(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat(); raw=b"".join(chunks)
+if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+    raise SystemExit("consumer approval changed during descriptor-bound read")
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate consumer approval key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+keys={"authorization_sha256","baseline","candidate_commit","inventory_sha256","operator_uid",
+      "plan_sha256","projection_approval_sha256","publisher_sha256","renderer_sha256","schema",
+      "snapshot_path","snapshot_sha256","state_root","target_manifest","transaction_nonce"}
+expected={
+ "authorization_sha256":os.environ["EXPECTED_AUTHORIZATION_SHA"],"baseline":os.environ["EXPECTED_BASELINE"],
+ "candidate_commit":os.environ["EXPECTED_COMMIT"],"inventory_sha256":os.environ["EXPECTED_INVENTORY_SHA"],
+ "operator_uid":int(os.environ["EXPECTED_OPERATOR_UID"]),"plan_sha256":os.environ["EXPECTED_PLAN_SHA"],
+ "projection_approval_sha256":os.environ["EXPECTED_PROJECTION_APPROVAL_SHA"],
+ "publisher_sha256":os.environ["EXPECTED_PUBLISHER_SHA"],"renderer_sha256":os.environ["EXPECTED_RENDERER_SHA"],
+ "schema":"genus-a0.3c-runtime-consumer-approval-v1","snapshot_path":os.environ["EXPECTED_SNAPSHOT_PATH"],
+ "snapshot_sha256":os.environ["EXPECTED_SNAPSHOT_SHA"],"state_root":os.environ["EXPECTED_STATE_ROOT"],
+ "target_manifest":os.environ["EXPECTED_TARGET"],"transaction_nonce":os.environ["EXPECTED_NONCE"]}
+if (set(data)!=keys or data!=expected or raw!=canonical
+        or hashlib.sha256(raw).hexdigest()!=os.environ["EXPECTED_APPROVAL_SHA"]):
+    raise SystemExit("consumer approval differs from exact private journal binding")
+PY
+}
+
+validate_consumer_snapshot_evidence() {
+    local nonce recorded snapshot snapshot_sha plan inventory plan_sha inventory_sha baseline
+    nonce="$(journal_field projection_transaction_nonce)"
+    [[ "$nonce" =~ ^[a-f0-9]{64}$ ]] || fail "Consumer-Snapshot-Nonce ist malformed" 70
+    snapshot="$CODE_RELEASE_TRUST_ROOT/consumer-snapshots/$(printf 'genus-a0.3c-consumer-snapshot-v1\n%s\n' "$nonce" | "$ROOT_SHA256_BIN" | awk '{print $1}')"
+    recorded="$(journal_field consumer_snapshot_path)"
+    [ "$recorded" = "$snapshot" ] || fail "Consumer-Snapshot-Pfad ist nicht exakt nonce-abgeleitet" 70
+    snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+    plan="$(journal_field consumer_plan_path)"; plan_sha="$(journal_field consumer_plan_sha256)"
+    inventory="$(journal_field consumer_inventory_path)"; inventory_sha="$(journal_field consumer_inventory_sha256)"
+    baseline="$(journal_field consumer_baseline)"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$snapshot" "$snapshot_sha" "$plan" "$plan_sha" "$inventory" "$inventory_sha" \
+        "$baseline" "$(id -u)" "$(id -g)" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+snapshot=pathlib.Path(sys.argv[1]); snapshot_sha=sys.argv[2]; plan=pathlib.Path(sys.argv[3]); plan_sha=sys.argv[4]
+inventory=pathlib.Path(sys.argv[5]); inventory_sha=sys.argv[6]; baseline=sys.argv[7]; uid,gid=map(int,sys.argv[8:10])
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path,mode,owner_uid,owner_gid,limit):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=owner_uid or before.st_gid!=owner_gid
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit):
+        raise SystemExit(f"consumer snapshot evidence metadata differs: {path}")
+    descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("consumer snapshot evidence changed during read")
+    return raw
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    if not isinstance(value,dict) or canonical(value)!=raw: raise SystemExit(f"{label} is not canonical")
+    return value
+info=snapshot.lstat()
+if (snapshot.is_symlink() or not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_gid!=0
+        or stat.S_IMODE(info.st_mode)!=0o700 or snapshot.resolve(strict=True)!=snapshot):
+    raise SystemExit("consumer snapshot directory differs")
+def names():
+    result=[]
+    with os.scandir(snapshot) as entries:
+        for entry in entries:
+            if len(result)>=64 or len(os.fsencode(entry.name))>255: raise SystemExit("consumer snapshot directory is oversized")
+            result.append(entry.name)
+    return set(result)
+before_names=names()
+plan_raw=stable(plan,0o400,uid,gid,64*1024); inventory_raw=stable(inventory,0o400,uid,gid,1024*1024)
+if hashlib.sha256(plan_raw).hexdigest()!=plan_sha or hashlib.sha256(inventory_raw).hexdigest()!=inventory_sha:
+    raise SystemExit("consumer snapshot plan/inventory digest differs")
+inventory_value=strict(inventory_raw,"consumer inventory")
+manifest_raw=stable(snapshot/"snapshot.json",0o400,0,0,2*1024*1024); manifest=strict(manifest_raw,"consumer snapshot")
+snapshot_keys={"baseline","entries","inventory_sha256","plan_sha256","schema"}
+if (set(manifest)!=snapshot_keys or manifest.get("schema")!="genus-a0.3c-consumer-publish-snapshot-v1"
+        or manifest.get("baseline")!=baseline or baseline not in {"present","absent"}
+        or manifest.get("plan_sha256")!=plan_sha or manifest.get("inventory_sha256")!=inventory_sha
+        or hashlib.sha256(manifest_raw).hexdigest()!=snapshot_sha or type(manifest.get("entries")) is not list):
+    raise SystemExit("consumer snapshot manifest binding differs")
+inventory_entries=inventory_value.get("entries")
+if type(inventory_entries) is not list: raise SystemExit("consumer inventory entries differ")
+target_sha={row.get("target_path"):row.get("sha256") for row in inventory_entries if type(row) is dict}
+payloads=sorted((path,mode) for path,mode in (
+ ("/etc/cron.d/genus-pi-seed","0644"),("/etc/systemd/system/genus-backup.service","0644"),
+ ("/etc/systemd/system/genus-cron@.service","0644"),("/etc/systemd/system/genus-learner.service","0644"),
+ ("/etc/systemd/system/genus-network-watchdog.service","0644"),("/etc/systemd/system/genus-network-watchdog.timer","0644"),
+ ("/etc/systemd/system/genus-telegram-bot.service","0644"),("/etc/tmpfiles.d/genus-runtime.conf","0644"),
+ ("/usr/local/libexec/genus/pi_cron_dispatch.sh","0755"),("/usr/local/libexec/genus/pi_network_watchdog.sh","0755"),
+ ("/usr/local/libexec/genus/pi_telegram_launcher.py","0755")))
+symlinks={
+ "/etc/systemd/system/multi-user.target.wants/genus-learner.service":"../genus-learner.service",
+ "/etc/systemd/system/multi-user.target.wants/genus-telegram-bot.service":"../genus-telegram-bot.service",
+ "/etc/systemd/system/timers.target.wants/genus-network-watchdog.timer":"../genus-network-watchdog.timer"}
+rows={row.get("path"):row for row in manifest["entries"] if type(row) is dict}
+if len(rows)!=14 or set(rows)!=({path for path,_mode in payloads}|set(symlinks)):
+    raise SystemExit("consumer snapshot managed topology differs")
+expected_names={"snapshot.json"}
+for index,(path,mode) in enumerate(payloads):
+    row=rows[path]; expected={"kind":"regular","mode":mode,"path":path,"prior_state":baseline,"target_sha256":target_sha.get(path)}
+    if not re.fullmatch(r"[a-f0-9]{64}",str(expected["target_sha256"])): raise SystemExit("consumer snapshot target digest differs")
+    if baseline=="present":
+        name=f"prior-{index:02d}.bin"; prior=stable(snapshot/name,0o400,0,0,4*1024*1024)
+        expected.update({"prior_sha256":hashlib.sha256(prior).hexdigest(),"snapshot_file":name}); expected_names.add(name)
+    if row!=expected: raise SystemExit(f"consumer snapshot regular row differs: {path}")
+for path,link_target in symlinks.items():
+    row=rows[path]; expected={"kind":"symlink","link_target":link_target,"path":path,"prior_state":baseline}
+    if baseline=="present":
+        prior=row.get("prior_link_target")
+        if not isinstance(prior,str) or not prior or "\x00" in prior or "\n" in prior or "\r" in prior:
+            raise SystemExit("consumer snapshot prior symlink differs")
+        expected["prior_link_target"]=prior
+    if row!=expected: raise SystemExit(f"consumer snapshot symlink row differs: {path}")
+if before_names!=expected_names or names()!=expected_names:
+    raise SystemExit("consumer snapshot directory topology changed or differs")
+PY
+}
+
+update_consumer_journal_state() {
+    local expected="$1" next="$2" python tmp
+    validate_activation_journal 1
+    python="$(journal_python)"; tmp="$ACTIVATION_JOURNAL.tmp.$$.$RANDOM"
+    EXPECTED_STATE="$expected" NEXT_STATE="$next" \
+        "$python" - "$ACTIVATION_JOURNAL" "$tmp" <<'PY'
+import json,os,pathlib,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text())
+expected=os.environ["EXPECTED_STATE"].split(","); current=data["consumer_state"]; next_state=os.environ["NEXT_STATE"]
+if current==next_state: raise SystemExit(0)
+if current not in expected: raise SystemExit(f"consumer state {current} cannot transition to {next_state}")
+allowed={
+ ("snapshotted","published"),("published","target-verified"),
+ ("snapshotted","prior-restored"),("published","prior-restored"),
+ ("target-verified","prior-restored"),("prior-restored","prior-restored"),
+ ("unbound","prior-unchanged"),("contract-bound","prior-unchanged"),
+ ("prior-unchanged","prior-unchanged")}
+if (current,next_state) not in allowed: raise SystemExit("consumer state transition is outside the fixed graph")
+data["consumer_state"]=next_state
+flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(target,flags,0o600)
+try:
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short consumer state journal write")
+        view=view[count:]
+    os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_activation_journal 1
+}
+
+verify_consumer_units_loaded() {
+    local expected="$1" baseline="${2:-}" unit load_state fragment
+    case "$expected" in target|prior) ;; *) fail "unbekannter Consumer-Daemon-Zustand" 64 ;; esac
+    [ -n "$baseline" ] || baseline="$(journal_field consumer_baseline)"
+    case "$baseline" in present|absent) ;; *) fail "Consumer-Baseline ist unbekannt" 70 ;; esac
+    for unit in "${GUARDED_UNITS[@]}"; do
+        load_state="$($SYSTEMCTL_BIN show "$unit" --property=LoadState --value 2>/dev/null || true)"
+        if [ "$expected" = prior ] && [ "$baseline" = absent ]; then
+            [ "$load_state" = not-found ] \
+                || fail "absente Consumer-Baseline lud nach daemon-reload unerwartet $unit" 70
+            continue
+        fi
+        [ "$load_state" = loaded ] \
+            || fail "Consumer-Ziel lud $unit nach daemon-reload nicht" 70
+        fragment="$($SYSTEMCTL_BIN show "$unit" --property=FragmentPath --value)"
+        [ "$fragment" = "$SYSTEMD_GUARD_ROOT/$unit" ] \
+            && [ "$($SYSTEMCTL_BIN show "$unit" --property=NeedDaemonReload --value)" = no ] \
+            || fail "Consumer-Unit $unit hat nach daemon-reload fremde/stale Herkunft" 70
+    done
+}
+
+reload_and_verify_consumer_units() {
+    systemctl_root daemon-reload
+    verify_consumer_units_loaded "$1" "${2:-}"
+}
+
+publish_and_verify_consumers() {
+    local snapshot_sha schema
+    schema="$(journal_field schema)"
+    if [ "$schema" = genus-a0.3c-runtime-activation-pending-v7 ]; then
+        [ "$(journal_field consumer_state)" = snapshotted-authorized ] \
+            || fail "Consumer-Publish-v7 braucht einen autorisierten Snapshot" 70
+        validate_consumer_root_approval
+        snapshot_sha="$(consumer_publisher_from_journal publish)"
+        [ "$snapshot_sha" = "$(journal_field consumer_snapshot_sha256)" ] \
+            || fail "Consumer-Publish-v7 resultiert in fremdem Snapshot" 70
+        activation_v7_transition consumer-published
+        reload_and_verify_consumer_units target
+        [ "$(consumer_publisher_from_journal validate-target disabled)" = "$snapshot_sha" ] \
+            || fail "Consumer-Zieltopologie-v7 ist nach Publish nicht exakt/quiescent" 70
+        activation_v7_transition consumer-target-verified
+        validate_activation_journal 1
+        return 0
+    fi
+    [ "$(journal_field consumer_state)" = snapshotted ] \
+        || fail "Consumer-Publish braucht einen autorisierten Snapshot" 70
+    validate_consumer_root_approval
+    snapshot_sha="$(consumer_publisher_from_journal publish)"
+    [ "$snapshot_sha" = "$(journal_field consumer_snapshot_sha256)" ] \
+        || fail "Consumer-Publish resultiert in fremdem Snapshot" 70
+    update_consumer_journal_state snapshotted published
+    reload_and_verify_consumer_units target
+    [ "$(consumer_publisher_from_journal validate-target disabled)" = "$snapshot_sha" ] \
+        || fail "Consumer-Zieltopologie ist nach Publish nicht exakt/quiescent" 70
+    update_consumer_journal_state published target-verified
+}
+
+restore_and_verify_prior_consumers() {
+    local state snapshot_sha schema
+    schema="$(journal_field schema)"
+    state="$(journal_field consumer_state)"
+    if [ "$schema" = genus-a0.3c-runtime-activation-pending-v7 ]; then
+        case "$state" in
+            baseline-snapshotted)
+                fail "Consumer-v7-Ausgangszustand ist noch nicht menschlich autorisiert" 77
+                ;;
+            snapshotted-authorized)
+                validate_consumer_root_approval
+                snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+                reload_and_verify_consumer_units prior
+                [ "$(consumer_publisher_from_journal validate-prior disabled)" = "$snapshot_sha" ] \
+                    || fail "unveraenderte Consumer-v7-Ausgangstopologie ist nicht exakt/quiescent" 70
+                activation_v7_transition consumer-prior-unchanged
+                ;;
+            published|target-verified)
+                validate_consumer_root_approval
+                snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+                [ "$(consumer_publisher_from_journal restore)" = "$snapshot_sha" ] \
+                    || fail "Consumer-v7-Restore resultiert in fremdem Snapshot" 70
+                reload_and_verify_consumer_units prior
+                [ "$(consumer_publisher_from_journal validate-prior disabled)" = "$snapshot_sha" ] \
+                    || fail "Consumer-v7-Ausgangstopologie ist nach Restore nicht exakt/quiescent" 70
+                activation_v7_transition consumer-prior-restored
+                ;;
+            prior-restored|prior-unchanged)
+                validate_consumer_root_approval
+                snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+                reload_and_verify_consumer_units prior
+                [ "$(consumer_publisher_from_journal validate-prior disabled)" = "$snapshot_sha" ] \
+                    || fail "Consumer-v7-Restore driftete nach Unterbrechung" 70
+                ;;
+            unbound)
+                fail "Consumer-v7-Recovery fehlt der vor Quiescence geforderte Baseline-Snapshot" 70
+                ;;
+            *) fail "Consumer-v7-Recovery traf unbekannten Journalzustand" 70 ;;
+        esac
+        validate_activation_journal 1
+        return 0
+    fi
+    case "$state" in
+        unbound|contract-bound) return 0 ;;
+        snapshotted|published|target-verified|prior-restored) ;;
+        *) fail "Consumer-Recovery traf unbekannten Journalzustand" 70 ;;
+    esac
+    snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+    [ "$(consumer_publisher_from_journal restore)" = "$snapshot_sha" ] \
+        || fail "Consumer-Restore resultiert in fremdem Snapshot" 70
+    reload_and_verify_consumer_units prior
+    [ "$(consumer_publisher_from_journal validate-prior disabled)" = "$snapshot_sha" ] \
+        || fail "Consumer-Ausgangstopologie ist nach Restore nicht exakt/quiescent" 70
+    update_consumer_journal_state snapshotted,published,target-verified,prior-restored prior-restored
+}
+
+activate_consumer_cron_from_journal() {
+    local desired="$1" command snapshot_sha
+    case "$desired" in
+        target) command=validate-target ;;
+        prior) command=validate-prior ;;
+        *) fail "unbekanntes Consumer-Cron-Ziel" 64 ;;
+    esac
+    snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+    if [ "$(consumer_publisher_from_journal "$command" active 2>/dev/null || true)" = "$snapshot_sha" ]; then
+        return 0
+    fi
+    [ "$(consumer_publisher_from_journal "$command" disabled)" = "$snapshot_sha" ] \
+        || fail "Consumer-Cron ist vor Reaktivierung nicht exakt deaktiviert" 70
+    as_root "$ROOT_MV_BIN" -T -n -- "$ROOT_CRON_DISABLED_FILE" "$ROOT_CRON_FILE"
+    as_root "$ROOT_SYNC_BIN" -f "$(dirname "$ROOT_CRON_FILE")"
+    [ "$(consumer_publisher_from_journal "$command" active)" = "$snapshot_sha" ] \
+        || fail "Consumer-Cron ist nach Reaktivierung nicht exakt aktiv" 70
+}
+
+disable_consumer_cron_from_journal() {
+    local desired command snapshot_sha
+    snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+    for desired in target prior; do
+        if [ "$desired" = target ]; then command=validate-target; else command=validate-prior; fi
+        if [ "$(consumer_publisher_from_journal "$command" disabled 2>/dev/null || true)" = "$snapshot_sha" ]; then
+            return 0
+        fi
+        if [ "$(consumer_publisher_from_journal "$command" active 2>/dev/null || true)" = "$snapshot_sha" ]; then
+            as_root "$ROOT_MV_BIN" -T -n -- "$ROOT_CRON_FILE" "$ROOT_CRON_DISABLED_FILE"
+            as_root "$ROOT_SYNC_BIN" -f "$(dirname "$ROOT_CRON_FILE")"
+            [ "$(consumer_publisher_from_journal "$command" disabled)" = "$snapshot_sha" ] \
+                || fail "Consumer-Cron blieb nach fail-closed Deaktivierung aktiv/unsicher" 70
+            return 0
+        fi
+    done
+    return 1
+}
+
+public_projection_manifest() {
+    local target manifest
+    if ! as_root "$ROOT_TEST_BIN" -e "$RUNTIME_VIEW_ROOT" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$RUNTIME_VIEW_ROOT"; then
+        printf '\n'
+        return 0
+    fi
+    as_root "$ROOT_TEST_BIN" -L "$RUNTIME_VIEW_ROOT" \
+        || fail "oeffentlicher Runtime-Selector ist kein Symlink" 70
+    target="$(as_root "$ROOT_READLINK_BIN" -- "$RUNTIME_VIEW_ROOT")"
+    case "$target" in runtime-sets/[a-f0-9][a-f0-9]*) ;; *)
+        fail "oeffentlicher Runtime-Selector hat kein kanonisches Generation-Ziel" 70 ;;
+    esac
+    manifest="${target#runtime-sets/}"
+    [[ "$manifest" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "oeffentlicher Runtime-Selector hat keine SHA-256-Generation" 70
+    [ "$target" = "runtime-sets/$manifest" ] \
+        || fail "oeffentlicher Runtime-Selector ist nicht exakt kanonisch" 70
+    printf '%s\n' "$manifest"
+}
+
+validate_projection_steady_state() {
+    local private_active="$1" public_active
+    [ ! -e "$RUNTIME_PROJECTION_JOURNAL" ] && [ ! -L "$RUNTIME_PROJECTION_JOURNAL" ] \
+        || fail "root-eigenes Projection-Journal ist ausserhalb einer gebundenen Recovery pending" 70
+    public_active="$(public_projection_manifest)"
+    if [[ "$private_active" = legacy-* ]]; then
+        [ -z "$public_active" ] \
+            || fail "Legacy-Privatselector hat unerwartet eine oeffentliche Generation" 70
+        [ ! -e "$RUNTIME_PROJECTION_RECEIPT" ] && [ ! -L "$RUNTIME_PROJECTION_RECEIPT" ] \
+            || fail "Legacy-Privatselector hat unerwartet ein oeffentliches Current-Receipt" 70
+        return 0
+    fi
+    [[ "$private_active" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "privater Runtime-Selector ist weder Legacy noch SHA-256" 70
+    [ "$public_active" = "$private_active" ] \
+        || fail "private und oeffentliche Runtime-Selector divergieren" 70
+    projection_helper_call validate-active --private-set "$(set_path "$private_active")" >/dev/null
+}
+
+create_activation_reservation_v2() {
+    local expected="$1" target="$2" mode="$3" readiness_hash="$4" series_hash="$5" private_active="$6"
+    local public_prior target_manifest_hash target_tree_hash prior_manifest_hash="" prior_tree_hash=""
+    local projection_sha publisher_sha renderer_sha executor_sha expected_file boot_sha binding_rows=""
+    local name path mode_value digest unit values
+    local -a reservation_values=()
+    [ "$mode" = activate ] \
+        || fail "Activation-Reservation-v2 ist nur fuer den autorisierten Roll-forward definiert" 70
+    [ "$expected" = "$ROOT_ARTIFACT_NEW_COMMIT" ] \
+        && [[ "$ROOT_ARTIFACT_OLD_COMMIT" =~ ^[a-f0-9]{40}$ ]] \
+        && [[ "$ROOT_ARTIFACT_AUTHORITY_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Activation-Reservation-v2 fehlt die validierte Root-Reauthorization" 70
+    validate_projection_steady_state "$private_active"
+    public_prior="$(public_projection_manifest)"
+    target_manifest_hash="$(sha256_file "$(set_path "$target")/manifest.json")"
+    target_tree_hash="$(sha256_file "$(set_path "$target")/tree.inventory")"
+    if [ -n "$public_prior" ]; then
+        prior_manifest_hash="$(sha256_file "$(set_path "$public_prior")/manifest.json")"
+        prior_tree_hash="$(sha256_file "$(set_path "$public_prior")/tree.inventory")"
+    fi
+    projection_sha="$(commit_blob_sha256 "$expected" "$PROJECTION_HELPER_REPO_REL" Projection-Helper)"
+    publisher_sha="$(commit_blob_sha256 "$expected" "$CONSUMER_PUBLISHER_REPO_REL" Consumer-Publisher)"
+    renderer_sha="$(commit_blob_sha256 "$expected" "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer)"
+    executor_sha="$(root_artifact_executor_expected_sha256 "$expected")"
+    [ "$executor_sha" = "$ROOT_ARTIFACT_EXECUTOR_SHA256" ] \
+        || fail "Activation-Reservation-v2 Executor driftet von der Human-Authority" 70
+
+    expected_file="$(mktemp "$STATE_ROOT/root-artifact-reservation.XXXXXX")"; rm -f -- "$expected_file"
+    write_projection_helper_payload_from_commit "$expected" \
+        "$PROJECTION_HELPER_REPO_REL" "$expected_file"
+    digest="$(sha256_file "$expected_file")"; rm -f -- "$expected_file"
+    binding_rows+="projection-helper|${ROOT_ARTIFACT_TARGETS[0]}|0555|$digest"$'\n'
+    expected_file="$(mktemp "$STATE_ROOT/root-artifact-reservation.XXXXXX")"; rm -f -- "$expected_file"
+    write_boot_guard_payload_from_commit "$expected" "$expected_file"; boot_sha="$BOOT_GUARD_PAYLOAD_SHA256"
+    rm -f -- "$expected_file"
+    binding_rows+="boot-guard|${ROOT_ARTIFACT_TARGETS[1]}|0755|$boot_sha"$'\n'
+    binding_rows+="consumer-publisher|${ROOT_ARTIFACT_TARGETS[2]}|0755|$publisher_sha"$'\n'
+    binding_rows+="consumer-renderer|${ROOT_ARTIFACT_TARGETS[3]}|0755|$renderer_sha"$'\n'
+    for unit in genus-backup.service genus-cron@.service genus-learner.service \
+                genus-network-watchdog.service genus-network-watchdog.timer genus-telegram-bot.service; do
+        expected_file="$(mktemp "$STATE_ROOT/root-artifact-reservation.XXXXXX")"; rm -f -- "$expected_file"
+        write_systemd_guard_payload_from_commit "$expected" "$unit" "$expected_file"
+        digest="$SYSTEMD_GUARD_PAYLOAD_SHA256"; rm -f -- "$expected_file"
+        case "$unit" in
+            genus-backup.service) name=systemd-dropin-genus-backup.service; path="${ROOT_ARTIFACT_TARGETS[4]}" ;;
+            genus-cron@.service) name=systemd-dropin-genus-cron@.service; path="${ROOT_ARTIFACT_TARGETS[5]}" ;;
+            genus-learner.service) name=systemd-dropin-genus-learner.service; path="${ROOT_ARTIFACT_TARGETS[6]}" ;;
+            genus-network-watchdog.service) name=systemd-dropin-genus-network-watchdog.service; path="${ROOT_ARTIFACT_TARGETS[7]}" ;;
+            genus-network-watchdog.timer) name=systemd-dropin-genus-network-watchdog.timer; path="${ROOT_ARTIFACT_TARGETS[8]}" ;;
+            genus-telegram-bot.service) name=systemd-dropin-genus-telegram-bot.service; path="${ROOT_ARTIFACT_TARGETS[9]}" ;;
+        esac
+        binding_rows+="$name|$path|0644|$digest"$'\n'
+    done
+
+    values="$(
+        EXPECTED="$expected" OLD_COMMIT="$ROOT_ARTIFACT_OLD_COMMIT" MODE="$mode" OPERATOR_UID="$(id -u)" \
+        PRIVATE_ACTIVE="$private_active" PUBLIC_PRIOR="$public_prior" PROJECTION_SHA="$projection_sha" \
+        PUBLISHER_SHA="$publisher_sha" RENDERER_SHA="$renderer_sha" EXECUTOR_SHA="$executor_sha" \
+        AUTHORITY_SHA="$ROOT_ARTIFACT_AUTHORITY_SHA256" COMMIT_POLICY="$ROOT_ARTIFACT_COMMIT_POLICY" \
+        READINESS_SHA="$readiness_hash" SERIES_SHA="$series_hash" STATE_ROOT_VALUE="$STATE_ROOT" \
+        TARGET_MANIFEST="$target" TARGET_MANIFEST_SHA="$target_manifest_hash" TARGET_TREE_SHA="$target_tree_hash" \
+        PRIOR_MANIFEST_SHA="$prior_manifest_hash" PRIOR_TREE_SHA="$prior_tree_hash" \
+        ROOT_BINDINGS="$binding_rows" AUTHORITY_ROOT="$ROOT_ARTIFACT_AUTHORITY_ROOT" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$ACTIVATION_RESERVATION" <<'PY'
+import ctypes,errno,hashlib,json,os,pathlib,re,secrets,stat,sys
+path=pathlib.Path(sys.argv[1]); uid=os.geteuid(); gid=os.getegid()
+rows=[]
+for line in os.environ["ROOT_BINDINGS"].splitlines():
+    artifact_id,target,mode,digest=line.split("|",3)
+    rows.append({"artifact_id":artifact_id,"mode":mode,"new_sha256":digest,"target":target})
+if len(rows)!=10 or len({row["artifact_id"] for row in rows})!=10 or len({row["target"] for row in rows})!=10:
+    raise SystemExit("activation reservation root artifact bindings differ")
+fixed={
+ "candidate_commit":os.environ["EXPECTED"],"consumer_publisher_sha256":os.environ["PUBLISHER_SHA"],
+ "consumer_renderer_sha256":os.environ["RENDERER_SHA"],"mode":os.environ["MODE"],
+ "old_commit":os.environ["OLD_COMMIT"],"operator_uid":int(os.environ["OPERATOR_UID"]),
+ "prior_manifest_sha256":os.environ["PRIOR_MANIFEST_SHA"],"prior_tree_inventory_sha256":os.environ["PRIOR_TREE_SHA"],
+ "private_active":os.environ["PRIVATE_ACTIVE"],"projection_helper_sha256":os.environ["PROJECTION_SHA"],
+ "public_prior":os.environ["PUBLIC_PRIOR"],"readiness_sha256":os.environ["READINESS_SHA"],
+ "root_artifact_authority_sha256":os.environ["AUTHORITY_SHA"],
+ "root_artifact_commit_policy":os.environ["COMMIT_POLICY"],
+ "root_artifact_executor_sha256":os.environ["EXECUTOR_SHA"],
+ "root_artifact_paths":[row["target"] for row in rows],"root_artifact_payloads":rows,
+ "schema":"genus-a0.3c-activation-reservation-v2","series_sha256":os.environ["SERIES_SHA"],
+ "state_root":os.environ["STATE_ROOT_VALUE"],"target_manifest":os.environ["TARGET_MANIFEST"],
+ "target_manifest_sha256":os.environ["TARGET_MANIFEST_SHA"],
+ "target_tree_inventory_sha256":os.environ["TARGET_TREE_SHA"]}
+keys=set(fixed)|{"root_artifact_authority_path","root_artifact_transaction_id","transaction_nonce"}
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(target):
+    before=target.lstat()
+    if (target.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>2*1024*1024):
+        raise SystemExit("activation reservation v2 metadata differs")
+    descriptor=os.open(target,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,min(1024*1024,2*1024*1024+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>2*1024*1024: raise SystemExit("activation reservation v2 grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=target.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation reservation v2 changed during read")
+    return raw
+def validate(raw):
+    data=json.loads(raw)
+    if set(data)!=keys or canonical(data)!=raw: raise SystemExit("activation reservation v2 schema differs")
+    projection_nonce=data.get("transaction_nonce"); root_nonce=data.get("root_artifact_transaction_id")
+    if (re.fullmatch(r"[a-f0-9]{64}",str(projection_nonce)) is None
+            or re.fullmatch(r"[a-f0-9]{64}",str(root_nonce)) is None or projection_nonce==root_nonce):
+        raise SystemExit("activation reservation v2 nonce domains differ")
+    authority_path=f"{os.environ['AUTHORITY_ROOT']}/{root_nonce}.json"
+    if data.get("root_artifact_authority_path")!=authority_path:
+        raise SystemExit("activation reservation v2 authority target differs")
+    actual={key:data[key] for key in fixed}
+    if actual!=fixed: raise SystemExit("activation reservation v2 parameters differ")
+    return data
+def fsync_parent():
+    descriptor=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for activation reservation v2")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+temporary=path.with_name(f".{path.name}.v2.publishing")
+try:
+    data=validate(stable(path)); raw=canonical(data)
+except FileNotFoundError:
+    try: data=validate(stable(temporary)); raw=canonical(data)
+    except FileNotFoundError:
+        projection_nonce=secrets.token_hex(32); root_nonce=secrets.token_hex(32)
+        while root_nonce==projection_nonce: root_nonce=secrets.token_hex(32)
+        data={**fixed,"root_artifact_authority_path":f"{os.environ['AUTHORITY_ROOT']}/{root_nonce}.json",
+              "root_artifact_transaction_id":root_nonce,"transaction_nonce":projection_nonce}
+        raw=canonical(data)
+        descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+        try:
+            view=memoryview(raw)
+            while view:
+                count=os.write(descriptor,view)
+                if count<=0: raise SystemExit("short activation reservation v2 write")
+                view=view[count:]
+            os.fchmod(descriptor,0o600); os.fsync(descriptor)
+        finally: os.close(descriptor)
+    if not rename_noreplace(temporary,path):
+        if stable(path)!=raw: raise SystemExit("raced activation reservation v2 differs")
+        temporary.unlink()
+    fsync_parent(); data=validate(stable(path))
+print(data["transaction_nonce"])
+print(data["root_artifact_transaction_id"])
+PY
+    )"
+    mapfile -t reservation_values <<< "$values"
+    [ "${#reservation_values[@]}" -eq 2 ] \
+        && [[ "${reservation_values[0]}" =~ ^[a-f0-9]{64}$ ]] \
+        && [[ "${reservation_values[1]}" =~ ^[a-f0-9]{64}$ ]] \
+        && [ "${reservation_values[0]}" != "${reservation_values[1]}" ] \
+        || fail "Activation-Reservation-v2 lieferte keine getrennten Nonces" 70
+    PROJECTION_TRANSACTION_NONCE="${reservation_values[0]}"
+    ROOT_ARTIFACT_TRANSACTION_ID="${reservation_values[1]}"
+    ROOT_ARTIFACT_RESERVATION_SHA256="$(sha256_file "$ACTIVATION_RESERVATION")"
+    [[ "$ROOT_ARTIFACT_RESERVATION_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Activation-Reservation-v2-Hash ist malformed" 70
+}
+
+create_projection_plan() {
+    local expected="$1" target="$2" mode="$3" readiness="$4" readiness_hash="$5"
+    local series="$6" series_hash="$7" private_active="$8"
+    local public_prior target_manifest_hash target_tree_hash prior_manifest_hash="" prior_tree_hash=""
+    local nonce plan helper_sha approval approval_sha
+    [ "$mode" = activate ] \
+        || fail "A0-Projection-Plan unterstuetzt derzeit nur den autorisierten Roll-forward; Legacy-Restore bleibt human-recovery" 70
+    validate_projection_helper_install "$expected" \
+        || fail "Projection-Helper ist vor der Approval-Erzeugung nicht commitgebunden/root:root/0555" 70
+    validate_projection_steady_state "$private_active"
+    public_prior="$(public_projection_manifest)"
+    target_manifest_hash="$(sha256_file "$(set_path "$target")/manifest.json")"
+    target_tree_hash="$(sha256_file "$(set_path "$target")/tree.inventory")"
+    if [ -n "$public_prior" ]; then
+        prior_manifest_hash="$(sha256_file "$(set_path "$public_prior")/manifest.json")"
+        prior_tree_hash="$(sha256_file "$(set_path "$public_prior")/tree.inventory")"
+    fi
+    helper_sha="$(root_stable_sha256 "$PROJECTION_HELPER_PATH" 0555)"
+    [[ "$helper_sha" =~ ^[a-f0-9]{64}$ ]] || fail "installierter Projection-Helper-Hash ist malformed" 70
+    nonce="$PROJECTION_TRANSACTION_NONCE"
+    [[ "$nonce" =~ ^[a-f0-9]{64}$ ]] \
+        && [ "$(sha256_file "$ACTIVATION_RESERVATION")" = "$ROOT_ARTIFACT_RESERVATION_SHA256" ] \
+        || fail "Projection-Vertrag fehlt die unveraenderte Activation-Reservation-v2" 70
+    plan="$STATE_ROOT/projection-plan.$nonce.json"
+    [ ! -L "$plan" ] || fail "Projection-Plan-Nonce kollidiert mit Symlink" 70
+    CANDIDATE_COMMIT="$expected" OPERATOR_UID="$(id -u)" PRIOR_MANIFEST="$public_prior" \
+    PRIOR_MANIFEST_SHA="$prior_manifest_hash" PRIOR_TREE_SHA="$prior_tree_hash" \
+    PUBLISHER_SHA="$helper_sha" STATE_ROOT_VALUE="$STATE_ROOT" TARGET_MANIFEST="$target" \
+    TARGET_MANIFEST_SHA="$target_manifest_hash" TARGET_TREE_SHA="$target_tree_hash" NONCE="$nonce" \
+    READINESS_SHA="$readiness_hash" SERIES_SHA="$series_hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$plan" <<'PY'
+import ctypes,errno,hashlib,json,os,pathlib,stat,sys
+data={
+    "candidate_commit":os.environ["CANDIDATE_COMMIT"],
+    "operator_uid":int(os.environ["OPERATOR_UID"]),
+    "prior_manifest":os.environ["PRIOR_MANIFEST"],
+    "prior_manifest_sha256":os.environ["PRIOR_MANIFEST_SHA"],
+    "prior_tree_inventory_sha256":os.environ["PRIOR_TREE_SHA"],
+    "publisher_sha256":os.environ["PUBLISHER_SHA"],
+    "readiness_sha256":os.environ["READINESS_SHA"],
+    "schema":"genus-a0.3c-runtime-projection-plan-v2",
+    "series_sha256":os.environ["SERIES_SHA"],
+    "state_root":os.environ["STATE_ROOT_VALUE"],
+    "target_manifest":os.environ["TARGET_MANIFEST"],
+    "target_manifest_sha256":os.environ["TARGET_MANIFEST_SHA"],
+    "target_tree_inventory_sha256":os.environ["TARGET_TREE_SHA"],
+    "transaction_nonce":os.environ["NONCE"],
+}
+binding={"schema":"genus-a0.3c-runtime-projection-authorization-v1",
+         "protocol":"dual-selector-journal-v2","mode":"activate",**data}
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":"))+"\n").encode()
+data["authorization_sha256"]=hashlib.sha256(canonical(binding)).hexdigest()
+path=pathlib.Path(sys.argv[1]); payload=canonical(data); uid=os.geteuid(); gid=os.getegid()
+def stable(target):
+    before=target.lstat()
+    if (target.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>4*1024*1024):
+        raise SystemExit("projection plan metadata differs")
+    fd=os.open(target,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+    try:
+        opened=os.fstat(fd)
+        while True:
+            chunk=os.read(fd,65536)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=target.lstat(); fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+    if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) or getattr(before,key)!=getattr(after,key) for key in fields):
+        raise SystemExit("projection plan changed during read")
+    raw=b"".join(chunks)
+    if len(raw)!=before.st_size: raise SystemExit("projection plan read is incomplete")
+    return raw
+temporary=path.with_name(f".{path.name}.publishing")
+def fsync_parent():
+    directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(directory)
+    finally: os.close(directory)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for durable projection plan")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+try: existing=stable(path)
+except FileNotFoundError:
+    try: pending=stable(temporary)
+    except FileNotFoundError:
+        flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+        try:
+            view=memoryview(payload)
+            while view:
+                count=os.write(fd,view)
+                if count<=0: raise SystemExit("short projection plan write")
+                view=view[count:]
+            os.fchmod(fd,0o400); os.fsync(fd)
+        finally: os.close(fd)
+    else:
+        if pending!=payload:
+            temporary.unlink(); fsync_parent()
+            flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+            try:
+                view=memoryview(payload)
+                while view:
+                    count=os.write(fd,view)
+                    if count<=0: raise SystemExit("short projection plan rewrite")
+                    view=view[count:]
+                os.fchmod(fd,0o400); os.fsync(fd)
+            finally: os.close(fd)
+    if not rename_noreplace(temporary,path):
+        if stable(path)!=payload: raise SystemExit("raced projection plan differs")
+        temporary.unlink()
+    fsync_parent(); existing=stable(path)
+else:
+    try: pending=stable(temporary)
+    except FileNotFoundError: pass
+    else:
+        if pending!=payload: raise SystemExit("stale projection plan temp differs")
+        temporary.unlink(); fsync_parent()
+if existing!=payload: raise SystemExit("projection plan differs from durable reservation")
+PY
+    [ -f "$plan" ] && [ ! -L "$plan" ] && [ "$(stat -c %u "$plan")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$plan")" = 400 ] && [ "$(stat -c %h "$plan")" -eq 1 ] \
+        || fail "Projection-Plan ist nicht privat/versiegelt/einfach verlinkt" 70
+    approval="$CODE_RELEASE_TRUST_ROOT/runtime-projection.approval.$nonce.json"
+    ensure_projection_trust_root
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin EXPECTED_UID="$(id -u)" \
+        READINESS_PATH="$readiness" SERIES_PATH="$series" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_TRUST_ROOT" "$plan" "$approval" \
+        "$PROJECTION_HELPER_PATH" <<'PY'
+import ctypes,errno,hashlib,json,os,pathlib,re,stat,sys
+root,plan_path,approval_path,helper=map(pathlib.Path,sys.argv[1:5]); uid=int(os.environ["EXPECTED_UID"])
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":"))+"\n").encode()
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit(f"{label} is not an object")
+    return value
+def stable(path,owner,gid,modes,limit=4*1024*1024):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=owner
+            or (gid is not None and before.st_gid!=gid) or stat.S_IMODE(before.st_mode) not in modes
+            or before.st_nlink!=1 or before.st_size>limit): raise SystemExit(f"unsafe evidence: {path}")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd); chunks=[]
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,k)!=getattr(opened,k) or getattr(before,k)!=getattr(final,k) for k in fields):
+        raise SystemExit(f"evidence changed during read: {path}")
+    raw=b"".join(chunks)
+    if len(raw)!=before.st_size: raise SystemExit(f"incomplete evidence read: {path}")
+    return raw
+if os.geteuid()!=0: raise SystemExit("projection approval writer is not root")
+root_info=root.lstat()
+if (root.resolve(strict=True)!=root or not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=0
+        or root_info.st_gid!=0 or stat.S_IMODE(root_info.st_mode)!=0o700):
+    raise SystemExit("projection trust root is not canonical root:root/0700")
+plan_raw=stable(plan_path,uid,None,{0o400}); plan=strict(plan_raw,"projection plan")
+keys={"authorization_sha256","candidate_commit","operator_uid","prior_manifest","prior_manifest_sha256",
+      "prior_tree_inventory_sha256","publisher_sha256","readiness_sha256","schema","series_sha256",
+      "state_root","target_manifest","target_manifest_sha256","target_tree_inventory_sha256","transaction_nonce"}
+sha=lambda value:isinstance(value,str) and re.fullmatch(r"[a-f0-9]{64}",value) is not None
+if (set(plan)!=keys or canonical(plan)!=plan_raw or plan.get("schema")!="genus-a0.3c-runtime-projection-plan-v2"
+        or plan.get("operator_uid")!=uid or pathlib.Path(plan.get("state_root",""))!=plan_path.parent
+        or plan_path.name!=f"projection-plan.{plan.get('transaction_nonce')}.json"
+        or not re.fullmatch(r"[a-f0-9]{40}",plan.get("candidate_commit",""))
+        or any(not sha(plan.get(k)) for k in ("authorization_sha256","publisher_sha256","readiness_sha256",
+                                                "series_sha256","target_manifest","target_manifest_sha256",
+                                                "target_tree_inventory_sha256","transaction_nonce"))):
+    raise SystemExit("projection plan schema/evidence differs")
+binding={"schema":"genus-a0.3c-runtime-projection-authorization-v1","protocol":"dual-selector-journal-v2",
+         "mode":"activate",**{k:v for k,v in plan.items() if k!="authorization_sha256"}}
+if plan["authorization_sha256"]!=hashlib.sha256(canonical(binding)).hexdigest():
+    raise SystemExit("projection authorization binding differs")
+helper_raw=stable(helper,0,0,{0o555})
+if helper.resolve(strict=True)!=helper or hashlib.sha256(helper_raw).hexdigest()!=plan["publisher_sha256"]:
+    raise SystemExit("projection publisher binding differs")
+state_root=pathlib.Path(plan["state_root"]); private_set=state_root/"sets"/plan["target_manifest"]
+if private_set.resolve(strict=True)!=private_set: raise SystemExit("target private set is not canonical")
+for name,key in (("manifest.json","target_manifest_sha256"),("tree.inventory","target_tree_inventory_sha256")):
+    if hashlib.sha256(stable(private_set/name,uid,None,{0o400})).hexdigest()!=plan[key]:
+        raise SystemExit(f"target {name} binding differs")
+prior=plan["prior_manifest"]
+if prior:
+    if not sha(prior) or not sha(plan["prior_manifest_sha256"]) or not sha(plan["prior_tree_inventory_sha256"]):
+        raise SystemExit("prior projection binding is malformed")
+    prior_set=state_root/"sets"/prior
+    if hashlib.sha256(stable(prior_set/"manifest.json",uid,None,{0o400})).hexdigest()!=plan["prior_manifest_sha256"]:
+        raise SystemExit("prior manifest binding differs")
+    if hashlib.sha256(stable(prior_set/"tree.inventory",uid,None,{0o400})).hexdigest()!=plan["prior_tree_inventory_sha256"]:
+        raise SystemExit("prior tree binding differs")
+elif plan["prior_manifest_sha256"] or plan["prior_tree_inventory_sha256"]:
+    raise SystemExit("absent prior carries hashes")
+for env_name,key,label in (("READINESS_PATH","readiness_sha256","readiness"),("SERIES_PATH","series_sha256","series")):
+    path=pathlib.Path(os.environ[env_name])
+    if hashlib.sha256(stable(path,uid,None,{0o400,0o600},32*1024*1024)).hexdigest()!=plan[key]:
+        raise SystemExit(f"{label} evidence binding differs")
+plan_sha=hashlib.sha256(plan_raw).hexdigest()
+approval={"authorization_sha256":plan["authorization_sha256"],"candidate_commit":plan["candidate_commit"],
+          "operator_uid":uid,"plan_sha256":plan_sha,"prior_manifest":prior,
+          "prior_manifest_sha256":plan["prior_manifest_sha256"],
+          "prior_tree_inventory_sha256":plan["prior_tree_inventory_sha256"],
+          "protocol":"dual-selector-journal-v2","publisher_sha256":plan["publisher_sha256"],
+          "readiness_sha256":plan["readiness_sha256"],"schema":"genus-a0.3c-runtime-projection-approval-v1",
+          "series_sha256":plan["series_sha256"],"state_root":plan["state_root"],
+          "target_manifest":plan["target_manifest"],"target_manifest_sha256":plan["target_manifest_sha256"],
+          "target_tree_inventory_sha256":plan["target_tree_inventory_sha256"],
+          "transaction_nonce":plan["transaction_nonce"]}
+expected=root/f"runtime-projection.approval.{plan['transaction_nonce']}.json"
+if approval_path!=expected: raise SystemExit("projection approval path differs")
+payload=canonical(approval)
+temporary=root/f".{approval_path.name}.publishing"
+def fsync_root():
+    directory=os.open(root,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(directory)
+    finally: os.close(directory)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for durable projection approval")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+try: existing=stable(approval_path,0,0,{0o400})
+except FileNotFoundError:
+    try: pending=stable(temporary,0,0,{0o400})
+    except FileNotFoundError:
+        flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+        try:
+            view=memoryview(payload)
+            while view:
+                count=os.write(fd,view)
+                if count<=0: raise SystemExit("short projection approval write")
+                view=view[count:]
+            os.fchmod(fd,0o400); os.fsync(fd)
+        finally: os.close(fd)
+    else:
+        if pending!=payload:
+            temporary.unlink(); fsync_root()
+            flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+            try:
+                view=memoryview(payload)
+                while view:
+                    count=os.write(fd,view)
+                    if count<=0: raise SystemExit("short projection approval rewrite")
+                    view=view[count:]
+                os.fchmod(fd,0o400); os.fsync(fd)
+            finally: os.close(fd)
+    if not rename_noreplace(temporary,approval_path):
+        if stable(approval_path,0,0,{0o400})!=payload: raise SystemExit("raced projection approval differs")
+        temporary.unlink()
+    fsync_root(); existing=stable(approval_path,0,0,{0o400})
+else:
+    try: pending=stable(temporary,0,0,{0o400})
+    except FileNotFoundError: pass
+    else:
+        if pending!=payload: raise SystemExit("stale projection approval temp differs")
+        temporary.unlink(); fsync_root()
+if existing!=payload: raise SystemExit("projection approval differs from durable reservation")
+PY
+    as_root "$ROOT_TEST_BIN" -f "$approval" && ! as_root "$ROOT_TEST_BIN" -L "$approval" \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$approval")" -eq 0 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %g "$approval")" -eq 0 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$approval")" = 400 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$approval")" -eq 1 ] \
+        || fail "Projection-Approval ist nicht root:root/0400/einfach verlinkt" 70
+    approval_sha="$(as_root "$ROOT_SHA256_BIN" "$approval" | awk '{print $1}')"
+    [[ "$approval_sha" =~ ^[a-f0-9]{64}$ ]] || fail "Projection-Approval-Hash ist malformed" 70
+    PROJECTION_TRANSACTION_NONCE="$nonce"
+    PROJECTION_PLAN_PATH="$plan"
+    PROJECTION_PLAN_SHA256="$(sha256_file "$plan")"
+    PROJECTION_HELPER_SHA256="$helper_sha"
+    PROJECTION_PRIOR_MANIFEST="$public_prior"
+    PROJECTION_APPROVAL_PATH="$approval"
+    PROJECTION_APPROVAL_SHA256="$approval_sha"
+}
+
+bind_projection_contract_to_journal() {
+    local root_artifact_state projection_state expected target mode readiness readiness_hash series series_hash private_active
+    validate_activation_journal 1
+    root_artifact_state="$(journal_field root_artifact_state)"
+    projection_state="$(journal_field projection_state)"
+    [ "$root_artifact_state" = committed ] \
+        || fail "Projection-Vertrag darf erst nach committed Root-Artefakten entstehen" 70
+    [ "$projection_state" = unbound ] \
+        || fail "Projection-Vertrag ist nicht mehr im unbound-Ausgangszustand" 70
+    expected="$(journal_field candidate_commit)"; target="$(journal_field target_manifest)"
+    mode="$(journal_field mode)"; readiness="$(journal_field readiness_path)"
+    readiness_hash="$(journal_field readiness_sha256)"; series="$(journal_field series_path)"
+    series_hash="$(journal_field series_sha256)"; private_active="$(journal_field prior_active_manifest)"
+    create_projection_plan "$expected" "$target" "$mode" "$readiness" "$readiness_hash" \
+        "$series" "$series_hash" "$private_active"
+    activation_v7_transition projection-contract \
+        "projection_plan_path=$PROJECTION_PLAN_PATH" \
+        "projection_plan_sha256=$PROJECTION_PLAN_SHA256" \
+        "projection_helper_sha256=$PROJECTION_HELPER_SHA256" \
+        "projection_approval_path=$PROJECTION_APPROVAL_PATH" \
+        "projection_approval_sha256=$PROJECTION_APPROVAL_SHA256"
+    [ "$(journal_field projection_state)" = authorized ] \
+        || fail "Projection-Vertrag erreichte den authorized-Zustand nicht" 70
+    validate_activation_journal 1
+}
+
+validate_projection_approval_evidence() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin EXPECTED_UID="$(id -u)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$ACTIVATION_JOURNAL" "$CODE_RELEASE_TRUST_ROOT" \
+        "$PROJECTION_HELPER_PATH" "$STATE_ROOT" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+journal_path,root,helper,state_root=map(pathlib.Path,sys.argv[1:5]); uid=int(os.environ["EXPECTED_UID"])
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":"))+"\n").encode()
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit(f"{label} is not an object")
+    return value
+def stable(path,owner,gid,modes,limit=8*1024*1024):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=owner
+            or (gid is not None and before.st_gid!=gid) or stat.S_IMODE(before.st_mode) not in modes
+            or before.st_nlink!=1 or before.st_size>limit): raise SystemExit(f"unsafe evidence: {path}")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd); chunks=[]
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,k)!=getattr(opened,k) or getattr(before,k)!=getattr(final,k) for k in fields):
+        raise SystemExit(f"evidence changed during read: {path}")
+    raw=b"".join(chunks)
+    if len(raw)!=before.st_size: raise SystemExit(f"incomplete evidence: {path}")
+    return raw
+root_info=root.lstat()
+if (root.resolve(strict=True)!=root or not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=0
+        or root_info.st_gid!=0 or stat.S_IMODE(root_info.st_mode)!=0o700):
+    raise SystemExit("projection trust root is not canonical root:root/0700")
+journal_raw=stable(journal_path,uid,None,{0o600}); journal=strict(journal_raw,"activation journal")
+if (canonical(journal)!=journal_raw or journal.get("schema") not in {
+        "genus-a0.3c-runtime-activation-pending-v6",
+        "genus-a0.3c-runtime-activation-pending-v7",
+    }):
+    raise SystemExit("activation journal is not canonical projection-aware v6/v7")
+nonce=journal.get("projection_transaction_nonce","")
+if not re.fullmatch(r"[a-f0-9]{64}",nonce): raise SystemExit("projection nonce differs")
+approval_path=root/f"runtime-projection.approval.{nonce}.json"
+if pathlib.Path(journal.get("projection_approval_path",""))!=approval_path:
+    raise SystemExit("activation journal approval path differs")
+approval_raw=stable(approval_path,0,0,{0o400}); approval=strict(approval_raw,"projection approval")
+if canonical(approval)!=approval_raw or hashlib.sha256(approval_raw).hexdigest()!=journal.get("projection_approval_sha256"):
+    raise SystemExit("root projection approval bytes differ")
+plan_path=state_root/f"projection-plan.{nonce}.json"
+if pathlib.Path(journal.get("projection_plan_path",""))!=plan_path:
+    raise SystemExit("activation journal plan path differs")
+plan_raw=stable(plan_path,uid,None,{0o400}); plan=strict(plan_raw,"projection plan")
+plan_sha=hashlib.sha256(plan_raw).hexdigest()
+if canonical(plan)!=plan_raw or plan_sha!=journal.get("projection_plan_sha256"):
+    raise SystemExit("projection plan bytes differ")
+plan_keys={"authorization_sha256","candidate_commit","operator_uid","prior_manifest","prior_manifest_sha256",
+ "prior_tree_inventory_sha256","publisher_sha256","readiness_sha256","schema","series_sha256","state_root",
+ "target_manifest","target_manifest_sha256","target_tree_inventory_sha256","transaction_nonce"}
+if set(plan)!=plan_keys or plan.get("schema")!="genus-a0.3c-runtime-projection-plan-v2":
+    raise SystemExit("projection plan schema differs")
+binding={"schema":"genus-a0.3c-runtime-projection-authorization-v1","protocol":"dual-selector-journal-v2",
+         "mode":"activate",**{key:value for key,value in plan.items() if key!="authorization_sha256"}}
+if plan.get("authorization_sha256")!=hashlib.sha256(canonical(binding)).hexdigest():
+    raise SystemExit("projection authorization digest differs")
+approval_expected={"authorization_sha256":plan["authorization_sha256"],"candidate_commit":plan["candidate_commit"],
+ "operator_uid":plan["operator_uid"],"plan_sha256":plan_sha,"prior_manifest":plan["prior_manifest"],
+ "prior_manifest_sha256":plan["prior_manifest_sha256"],"prior_tree_inventory_sha256":plan["prior_tree_inventory_sha256"],
+ "protocol":"dual-selector-journal-v2","publisher_sha256":plan["publisher_sha256"],
+ "readiness_sha256":plan["readiness_sha256"],"schema":"genus-a0.3c-runtime-projection-approval-v1",
+ "series_sha256":plan["series_sha256"],"state_root":plan["state_root"],"target_manifest":plan["target_manifest"],
+ "target_manifest_sha256":plan["target_manifest_sha256"],
+ "target_tree_inventory_sha256":plan["target_tree_inventory_sha256"],"transaction_nonce":nonce}
+if approval!=approval_expected: raise SystemExit("root approval differs from the exact projection plan")
+helper_raw=stable(helper,0,0,{0o555})
+if helper.resolve(strict=True)!=helper or hashlib.sha256(helper_raw).hexdigest()!=plan["publisher_sha256"]:
+    raise SystemExit("installed projection helper differs from approval")
+expected_prior="" if str(journal.get("prior_active_manifest","")).startswith("legacy-") else journal.get("prior_active_manifest","")
+bindings={"candidate_commit":journal.get("candidate_commit"),"operator_uid":journal.get("operator_uid"),
+ "readiness_sha256":journal.get("readiness_sha256"),"series_sha256":journal.get("series_sha256"),
+ "target_manifest":journal.get("target_manifest"),"target_manifest_sha256":journal.get("target_manifest_sha256"),
+ "prior_manifest":expected_prior,"publisher_sha256":journal.get("projection_helper_sha256"),
+ "state_root":str(state_root),"transaction_nonce":nonce}
+if any(plan.get(key)!=value for key,value in bindings.items()):
+    raise SystemExit("activation journal differs from projection approval")
+PY
 }
 
 systemd_guard_payload() {
     local unit="${1:-}"
-    printf '[Unit]\nConditionPathExists=%s\n' "$AUTOSTART_APPROVAL"
+    printf '[Unit]\nConditionPathExists=%s\nConditionPathExists=!%s\n' \
+        "$AUTOSTART_APPROVAL" "$ROOT_ARTIFACT_JOURNAL"
     if [[ "$unit" != *.timer ]]; then
-        printf '[Service]\nExecCondition=%s\n' "$BOOT_GUARD_PATH"
+        printf '[Service]\n'
+        if [ "$unit" != genus-backup.service ] && [ "$unit" != genus-cron@.service ]; then
+            printf 'ExecCondition=+%s --prepare-code-release-start %%n\n' "$BOOT_GUARD_PATH"
+        fi
+        printf 'ExecCondition=+%s %%n\n' "$BOOT_GUARD_PATH"
     fi
 }
 
 install_systemd_autostart_guard() {
-    local unit directory path expected boot_expected
+    local unit directory path expected boot_expected expected_sha output
+    ensure_projection_trust_root
     boot_expected="$(mktemp "$STATE_ROOT/boot-guard.XXXXXX")"
     write_boot_guard_payload "$boot_expected"
+    expected_sha="$BOOT_GUARD_PAYLOAD_SHA256"
     if as_root "$ROOT_TEST_BIN" -e "$BOOT_GUARD_PATH" || as_root "$ROOT_TEST_BIN" -L "$BOOT_GUARD_PATH"; then
         as_root "$ROOT_TEST_BIN" -f "$BOOT_GUARD_PATH" && ! as_root "$ROOT_TEST_BIN" -L "$BOOT_GUARD_PATH" \
             && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$BOOT_GUARD_PATH")" -eq 0 ] \
+            && [ "$(as_root "$ROOT_STAT_BIN" -c %g "$BOOT_GUARD_PATH")" -eq 0 ] \
             && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$BOOT_GUARD_PATH")" = 755 ] \
             && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$BOOT_GUARD_PATH")" -eq 1 ] \
-            && as_root "$ROOT_CMP_BIN" -s -- "$boot_expected" "$BOOT_GUARD_PATH" \
+            && [ "$(root_stable_sha256 "$BOOT_GUARD_PATH" 0755)" = "$expected_sha" ] \
             || { rm -f -- "$boot_expected"; fail "fremder/ungueltiger root Boot-Guard" 70; }
     else
-        as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0755 "$(dirname "$BOOT_GUARD_PATH")"
-        as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0755 "$boot_expected" "$BOOT_GUARD_PATH"
-        as_root "$ROOT_SYNC_BIN" -f "$BOOT_GUARD_PATH"
-        as_root "$ROOT_SYNC_BIN" -f "$(dirname "$BOOT_GUARD_PATH")"
+        ensure_root_publish_parent "$BOOT_GUARD_PATH"
+        root_atomic_publish_verified_file "$boot_expected" "$BOOT_GUARD_PATH" 0755 "$expected_sha"
     fi
     rm -f -- "$boot_expected"
     expected="$(mktemp "$STATE_ROOT/systemd-guard.XXXXXX")"
-    for unit in "${AUTOSTART_UNITS[@]}"; do
+    for unit in "${GUARDED_UNITS[@]}"; do
+        output="$(systemd_guard_payload "$unit" | "$ROOT_SHA256_BIN")"; expected_sha="${output%% *}"
+        [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]] \
+            || { rm -f -- "$expected"; fail "systemd Activation-Guard-Hash ist malformed" 70; }
         systemd_guard_payload "$unit" > "$expected"; chmod 0600 "$expected"
         directory="$SYSTEMD_GUARD_ROOT/$unit.d"
         path="$directory/90-genus-a0-3c-pending.conf"
         if as_root "$ROOT_TEST_BIN" -e "$path" || as_root "$ROOT_TEST_BIN" -L "$path"; then
             as_root "$ROOT_TEST_BIN" -f "$path" && ! as_root "$ROOT_TEST_BIN" -L "$path" \
                 && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$path")" -eq 0 ] \
+                && [ "$(as_root "$ROOT_STAT_BIN" -c %g "$path")" -eq 0 ] \
                 && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$path")" = 644 ] \
                 && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$path")" -eq 1 ] \
-                && as_root "$ROOT_CMP_BIN" -s -- "$expected" "$path" \
+                && [ "$(root_stable_sha256 "$path" 0644)" = "$expected_sha" ] \
                 || { rm -f -- "$expected"; fail "fremder/ungueltiger systemd Activation-Guard" 70; }
             continue
         fi
-        as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0755 "$directory"
-        as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0644 "$expected" "$path"
-        as_root "$ROOT_SYNC_BIN" -f "$path"
-        as_root "$ROOT_SYNC_BIN" -f "$directory"
+        ensure_root_publish_parent "$path"
+        root_atomic_publish_verified_file "$expected" "$path" 0644 "$expected_sha"
     done
     rm -f -- "$expected"
     systemctl_root daemon-reload
 }
 
 systemd_autostart_guard_present() {
-    local legacy_commit="${1:-}" unit path expected boot_expected
+    local legacy_commit="${1:-}" unit path expected boot_expected expected_sha output
     boot_expected="$(mktemp "$STATE_ROOT/boot-guard-check.XXXXXX")"
     if [ -n "$legacy_commit" ]; then
         write_boot_guard_payload_from_commit "$legacy_commit" "$boot_expected"
     else
         write_boot_guard_payload "$boot_expected"
     fi
+    expected_sha="$BOOT_GUARD_PAYLOAD_SHA256"
     if ! as_root "$ROOT_TEST_BIN" -f "$BOOT_GUARD_PATH" || as_root "$ROOT_TEST_BIN" -L "$BOOT_GUARD_PATH" \
         || [ "$(as_root "$ROOT_STAT_BIN" -c %u "$BOOT_GUARD_PATH" 2>/dev/null || printf 1)" -ne 0 ] \
+        || [ "$(as_root "$ROOT_STAT_BIN" -c %g "$BOOT_GUARD_PATH" 2>/dev/null || printf 1)" -ne 0 ] \
         || [ "$(as_root "$ROOT_STAT_BIN" -c %a "$BOOT_GUARD_PATH" 2>/dev/null || true)" != 755 ] \
         || [ "$(as_root "$ROOT_STAT_BIN" -c %h "$BOOT_GUARD_PATH" 2>/dev/null || printf 0)" -ne 1 ] \
-        || ! as_root "$ROOT_CMP_BIN" -s -- "$boot_expected" "$BOOT_GUARD_PATH"; then
+        || [ "$(root_stable_sha256 "$BOOT_GUARD_PATH" 0755 2>/dev/null || true)" != "$expected_sha" ]; then
         rm -f -- "$boot_expected"
         return 1
     fi
     rm -f -- "$boot_expected"
     expected="$(mktemp "$STATE_ROOT/systemd-guard-check.XXXXXX")"
-    for unit in "${AUTOSTART_UNITS[@]}"; do
-        systemd_guard_payload "$unit" > "$expected"
+    for unit in "${GUARDED_UNITS[@]}"; do
+        output="$(systemd_guard_payload "$unit" | "$ROOT_SHA256_BIN")"; expected_sha="${output%% *}"
+        [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]] || { rm -f -- "$expected"; return 1; }
         path="$SYSTEMD_GUARD_ROOT/$unit.d/90-genus-a0-3c-pending.conf"
         if ! as_root "$ROOT_TEST_BIN" -f "$path" || as_root "$ROOT_TEST_BIN" -L "$path" \
             || [ "$(as_root "$ROOT_STAT_BIN" -c %u "$path" 2>/dev/null || printf 1)" -ne 0 ] \
+            || [ "$(as_root "$ROOT_STAT_BIN" -c %g "$path" 2>/dev/null || printf 1)" -ne 0 ] \
             || [ "$(as_root "$ROOT_STAT_BIN" -c %a "$path" 2>/dev/null || true)" != 644 ] \
             || [ "$(as_root "$ROOT_STAT_BIN" -c %h "$path" 2>/dev/null || printf 0)" -ne 1 ] \
-            || ! as_root "$ROOT_CMP_BIN" -s -- "$expected" "$path"; then
+            || [ "$(root_stable_sha256 "$path" 0644 2>/dev/null || true)" != "$expected_sha" ]; then
             rm -f -- "$expected"
             return 1
         fi
@@ -2864,26 +9287,21 @@ transition_boot_guard_present() {
 }
 
 migrate_boot_guard_to_current() {
-    local old_commit="$1" expected guard_dir root_tmp
+    local old_commit="$1" expected expected_sha old_expected old_expected_sha
+    ensure_projection_trust_root
+    ensure_root_publish_parent "$BOOT_GUARD_PATH"
     systemd_autostart_guard_present && return 0
     systemd_autostart_guard_present "$old_commit" \
         || fail "Boot-Guard ist weder das gebundene OLD- noch das aktuelle Format" 70
+    old_expected="$(mktemp "$STATE_ROOT/boot-guard-old.XXXXXX")"
+    write_boot_guard_payload_from_commit "$old_commit" "$old_expected"
+    old_expected_sha="$BOOT_GUARD_PAYLOAD_SHA256"
+    rm -f -- "$old_expected"
     expected="$(mktemp "$STATE_ROOT/boot-guard-migrate.XXXXXX")"
     write_boot_guard_payload "$expected"
-    guard_dir="$(dirname "$BOOT_GUARD_PATH")"
-    root_tmp="$(as_root "$ROOT_MKTEMP_BIN" -p "$guard_dir" '.genus-a0-3c-boot-guard.XXXXXX')"
-    case "$root_tmp" in "$guard_dir"/.genus-a0-3c-boot-guard.*) ;; *)
-        rm -f -- "$expected"; fail "root Boot-Guard-Temp entkommt Zielverzeichnis" 70 ;;
-    esac
-    as_root "$ROOT_TEST_BIN" -f "$root_tmp" && ! as_root "$ROOT_TEST_BIN" -L "$root_tmp" \
-        && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$root_tmp")" -eq 0 ] \
-        && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$root_tmp")" = 600 ] \
-        && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$root_tmp")" -eq 1 ] \
-        || { rm -f -- "$expected"; fail "root Boot-Guard-Temp ist nicht exklusiv/privat" 70; }
-    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0755 "$expected" "$root_tmp"
-    as_root "$ROOT_SYNC_BIN" -f "$root_tmp"
-    as_root "$ROOT_MV_BIN" -Tf -- "$root_tmp" "$BOOT_GUARD_PATH"
-    as_root "$ROOT_SYNC_BIN" -f "$guard_dir"
+    expected_sha="$BOOT_GUARD_PAYLOAD_SHA256"
+    root_atomic_publish_verified_file \
+        "$expected" "$BOOT_GUARD_PATH" 0755 "$expected_sha" "$old_expected_sha"
     rm -f -- "$expected"
     systemd_autostart_guard_present \
         || fail "Boot-Guard-v2-zu-v3-Migration blieb unvollstaendig" 70
@@ -2892,7 +9310,7 @@ migrate_boot_guard_to_current() {
 remove_systemd_autostart_guard() {
     local unit directory path result=0
     systemd_autostart_guard_present
-    for unit in "${AUTOSTART_UNITS[@]}"; do
+    for unit in "${GUARDED_UNITS[@]}"; do
         directory="$SYSTEMD_GUARD_ROOT/$unit.d"
         path="$directory/90-genus-a0-3c-pending.conf"
         as_root "$ROOT_RM_BIN" -f -- "$path" || result=70
@@ -2911,9 +9329,278 @@ journal_python() {
     fi
 }
 
+consume_activation_reservation() {
+    local required="${1:-0}" python
+    if [ ! -e "$ACTIVATION_RESERVATION" ] && [ ! -L "$ACTIVATION_RESERVATION" ]; then
+        [ "$required" = 0 ] || fail "durable Activation-Journal hat keine zugehoerige Nonce-Reservierung" 70
+        return 0
+    fi
+    python="$(journal_python)"
+    "$python" - "$ACTIVATION_RESERVATION" "$ACTIVATION_JOURNAL" "$(id -u)" "$(id -g)" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+reservation_path,journal_path=map(pathlib.Path,sys.argv[1:3]); uid,gid=map(int,sys.argv[3:5])
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path,mode,limit):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit):
+        raise SystemExit(f"unsafe activation reservation evidence: {path}")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(fd)
+        while True:
+            chunk=os.read(fd,min(1024*1024,limit+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>limit: raise SystemExit("activation reservation evidence grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation reservation evidence drifted")
+    return raw,after
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit(f"{label} is not an object")
+    canonical=(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+    if raw!=canonical: raise SystemExit(f"{label} is not canonical")
+    return value
+reservation_raw,reservation_info=stable(reservation_path,0o600,1024*1024)
+journal_raw,_=stable(journal_path,0o600,8*1024*1024)
+reservation=strict(reservation_raw,"activation reservation"); journal=strict(journal_raw,"activation journal")
+reservation_keys={"candidate_commit","mode","operator_uid","private_active","prior_manifest_sha256",
+ "prior_tree_inventory_sha256","public_prior","publisher_sha256","readiness_sha256","schema","series_sha256",
+ "state_root","target_manifest","target_manifest_sha256","target_tree_inventory_sha256","transaction_nonce"}
+if set(reservation)!=reservation_keys or reservation.get("schema")!="genus-a0.3c-activation-reservation-v1":
+    raise SystemExit("activation reservation schema differs")
+if journal.get("schema")!="genus-a0.3c-runtime-activation-pending-v6":
+    raise SystemExit("activation journal schema differs during reservation consume")
+plan_path=pathlib.Path(str(journal.get("projection_plan_path","")))
+plan_raw,_=stable(plan_path,0o400,4*1024*1024); plan=strict(plan_raw,"projection plan")
+expected={
+ "candidate_commit":journal.get("candidate_commit"),"mode":journal.get("mode"),
+ "operator_uid":journal.get("operator_uid"),"private_active":journal.get("active_manifest"),
+ "public_prior":journal.get("projection_prior_manifest"),"publisher_sha256":journal.get("projection_helper_sha256"),
+ "readiness_sha256":journal.get("readiness_sha256"),"series_sha256":journal.get("series_sha256"),
+ "state_root":str(journal_path.parent),"target_manifest":journal.get("target_manifest"),
+ "target_manifest_sha256":journal.get("target_manifest_sha256"),
+ "target_tree_inventory_sha256":plan.get("target_tree_inventory_sha256"),
+ "prior_manifest_sha256":plan.get("prior_manifest_sha256"),
+ "prior_tree_inventory_sha256":plan.get("prior_tree_inventory_sha256"),
+ "transaction_nonce":journal.get("projection_transaction_nonce")}
+for key,value in expected.items():
+    if reservation.get(key)!=value: raise SystemExit(f"activation reservation/journal binding differs: {key}")
+if (plan_path.parent!=journal_path.parent or str(plan_path)!=journal.get("projection_plan_path")
+        or hashlib.sha256(plan_raw).hexdigest()!=journal.get("projection_plan_sha256")
+        or plan.get("transaction_nonce")!=reservation.get("transaction_nonce")
+        or plan.get("candidate_commit")!=reservation.get("candidate_commit")
+        or plan.get("operator_uid")!=reservation.get("operator_uid")
+        or plan.get("prior_manifest")!=reservation.get("public_prior")
+        or plan.get("publisher_sha256")!=reservation.get("publisher_sha256")
+        or plan.get("readiness_sha256")!=reservation.get("readiness_sha256")
+        or plan.get("series_sha256")!=reservation.get("series_sha256")
+        or plan.get("state_root")!=reservation.get("state_root")
+        or plan.get("target_manifest")!=reservation.get("target_manifest")
+        or plan.get("target_manifest_sha256")!=reservation.get("target_manifest_sha256")):
+    raise SystemExit("activation reservation/projection plan binding differs")
+if identity(reservation_path.lstat())!=identity(reservation_info):
+    raise SystemExit("activation reservation changed before consume")
+reservation_path.unlink()
+directory=os.open(reservation_path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    [ ! -e "$ACTIVATION_RESERVATION" ] && [ ! -L "$ACTIVATION_RESERVATION" ] \
+        || fail "verbrauchte Activation-Reservierung blieb sichtbar" 70
+}
+
+create_activation_intent_journal() {
+    local expected="$1" target="$2" mode="$3" readiness="$4" readiness_hash="$5"
+    local series="$6" series_hash="$7" active active_hash previous target_hash services_csv target_services_csv
+    local projection_prior projection_helper_sha publisher_sha renderer_sha inventory_path inventory_sha python
+    [ ! -e "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
+        || fail "Activation-Intent-Journal existiert bereits" 70
+    [ "$mode" = activate ] && [ -n "$readiness" ] && [[ "$readiness_hash" =~ ^[a-f0-9]{64}$ ]] \
+        && [ -n "$series" ] && [[ "$series_hash" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Activation-Intent-v7 verlangt den autorisierten Roll-forward mit Readiness/Serie" 70
+    [ "$(sha256_file "$readiness")" = "$readiness_hash" ] \
+        && [ "$(sha256_file "$series")" = "$series_hash" ] \
+        || fail "Readiness-/Serien-Evidence driftete vor Activation-Intent-v7" 70
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    previous="$(selector_manifest "$PREVIOUS_LINK")"; target_hash="$(manifest_file_hash "$target")"
+    projection_prior="$(public_projection_manifest)"
+    projection_helper_sha="$(commit_blob_sha256 "$expected" "$PROJECTION_HELPER_REPO_REL" Projection-Helper)"
+    publisher_sha="$(commit_blob_sha256 "$expected" "$CONSUMER_PUBLISHER_REPO_REL" Consumer-Publisher)"
+    renderer_sha="$(commit_blob_sha256 "$expected" "$CONSUMER_RENDERER_REPO_REL" Consumer-Renderer)"
+    inventory_path="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.$ROOT_ARTIFACT_TRANSACTION_ID/inventory.json"
+    inventory_sha="$(root_stable_sha256 "$inventory_path" 0400)"
+    [ "$inventory_sha" = "$ROOT_ARTIFACT_INVENTORY_SHA256" ] \
+        || fail "Root-Artefakt-Inventory driftete vor Activation-Intent-v7" 70
+    [ "$(root_stable_sha256 "$ROOT_ARTIFACT_AUTHORITY_PATH" 0400)" = "$ROOT_ARTIFACT_AUTHORITY_SHA256" ] \
+        || fail "Root-Artefakt-Authority driftete vor Activation-Intent-v7" 70
+    [ "$(sha256_file "$ACTIVATION_RESERVATION")" = "$ROOT_ARTIFACT_RESERVATION_SHA256" ] \
+        || fail "Activation-Reservation-v2 driftete vor Intent-Publikation" 70
+    services_csv="$(IFS=,; printf '%s' "${active_services[*]}")"
+    if [ "${CONSUMER_BASELINE_HINT:-}" = present ]; then
+        target_services_csv="$services_csv"
+    elif [ "${CONSUMER_BASELINE_HINT:-}" = absent ]; then
+        target_services_csv="genus-network-watchdog.timer,genus-learner.service,genus-telegram-bot.service"
+    else
+        fail "Activation-Intent-v7 braucht einen expliziten Consumer-Baseline-Hinweis" 70
+    fi
+    python="$(journal_python)"
+    EXPECTED="$expected" TARGET="$target" TARGET_HASH="$target_hash" MODE="$mode" \
+    READINESS="$readiness" READINESS_HASH="$readiness_hash" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+    SERIES="$series" SERIES_HASH="$series_hash" PREVIOUS="$previous" SERVICES_CSV="$services_csv" \
+    TARGET_SERVICES_CSV="$target_services_csv" CONSUMER_BASELINE_HINT_VALUE="$CONSUMER_BASELINE_HINT" \
+    PROJECTION_NONCE="$PROJECTION_TRANSACTION_NONCE" PROJECTION_PRIOR="$projection_prior" \
+    PROJECTION_HELPER_SHA="$projection_helper_sha" CONSUMER_PUBLISHER_SHA="$publisher_sha" \
+    CONSUMER_RENDERER_SHA="$renderer_sha" OPERATOR_UID="$(id -u)" \
+    CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
+    CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
+    RESERVATION_PATH="$ACTIVATION_RESERVATION" RESERVATION_SHA="$ROOT_ARTIFACT_RESERVATION_SHA256" \
+    ROOT_TRANSACTION="$ROOT_ARTIFACT_TRANSACTION_ID" ROOT_INVENTORY_SHA="$ROOT_ARTIFACT_INVENTORY_SHA256" \
+    ROOT_AUTHORITY_PATH="$ROOT_ARTIFACT_AUTHORITY_PATH" ROOT_AUTHORITY_SHA="$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+    ROOT_EXECUTOR_SHA="$ROOT_ARTIFACT_EXECUTOR_SHA256" ROOT_OLD_COMMIT="$ROOT_ARTIFACT_OLD_COMMIT" \
+    ROOT_NEW_COMMIT="$ROOT_ARTIFACT_NEW_COMMIT" ROOT_COMMIT_POLICY="$ROOT_ARTIFACT_COMMIT_POLICY" \
+    STATE_ROOT_VALUE="$STATE_ROOT" \
+        "$python" - "$ACTIVATION_JOURNAL" <<'PY'
+import ctypes,errno,hashlib,json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); uid=os.geteuid(); gid=os.getegid()
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(target,mode,limit,owner_uid=uid,owner_gid=gid):
+    target=pathlib.Path(target); before=target.lstat()
+    if (target.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=owner_uid
+            or before.st_gid!=owner_gid or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1
+            or before.st_size>limit):
+        raise SystemExit(f"activation intent evidence metadata differs: {target}")
+    descriptor=os.open(target,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,min(1024*1024,limit+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>limit: raise SystemExit("activation intent evidence grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=target.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation intent evidence changed during read")
+    return raw
+reservation_raw=stable(os.environ["RESERVATION_PATH"],0o600,2*1024*1024)
+if hashlib.sha256(reservation_raw).hexdigest()!=os.environ["RESERVATION_SHA"]:
+    raise SystemExit("activation reservation v2 digest differs")
+reservation=json.loads(reservation_raw)
+reservation_keys={"schema","candidate_commit","old_commit","mode","operator_uid","private_active","public_prior",
+ "projection_helper_sha256","consumer_publisher_sha256","consumer_renderer_sha256","root_artifact_executor_sha256",
+ "root_artifact_authority_path","root_artifact_authority_sha256","root_artifact_commit_policy","root_artifact_paths",
+ "root_artifact_payloads","readiness_sha256","series_sha256","state_root","target_manifest","target_manifest_sha256",
+ "target_tree_inventory_sha256","prior_manifest_sha256","prior_tree_inventory_sha256","transaction_nonce",
+ "root_artifact_transaction_id"}
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if set(reservation)!=reservation_keys or canonical(reservation)!=reservation_raw or reservation.get("schema")!="genus-a0.3c-activation-reservation-v2":
+    raise SystemExit("activation reservation v2 schema differs")
+bindings={"candidate_commit":os.environ["EXPECTED"],"old_commit":os.environ["ROOT_OLD_COMMIT"],
+ "mode":os.environ["MODE"],"operator_uid":int(os.environ["OPERATOR_UID"]),"private_active":os.environ["ACTIVE"],
+ "public_prior":os.environ["PROJECTION_PRIOR"],"projection_helper_sha256":os.environ["PROJECTION_HELPER_SHA"],
+ "consumer_publisher_sha256":os.environ["CONSUMER_PUBLISHER_SHA"],"consumer_renderer_sha256":os.environ["CONSUMER_RENDERER_SHA"],
+ "root_artifact_executor_sha256":os.environ["ROOT_EXECUTOR_SHA"],"root_artifact_authority_path":os.environ["ROOT_AUTHORITY_PATH"],
+ "root_artifact_authority_sha256":os.environ["ROOT_AUTHORITY_SHA"],"root_artifact_commit_policy":os.environ["ROOT_COMMIT_POLICY"],
+ "readiness_sha256":os.environ["READINESS_HASH"],"series_sha256":os.environ["SERIES_HASH"],
+ "state_root":os.environ["STATE_ROOT_VALUE"],"target_manifest":os.environ["TARGET"],
+ "target_manifest_sha256":os.environ["TARGET_HASH"],"transaction_nonce":os.environ["PROJECTION_NONCE"],
+ "root_artifact_transaction_id":os.environ["ROOT_TRANSACTION"]}
+if any(reservation.get(key)!=value for key,value in bindings.items()):
+    raise SystemExit("activation reservation v2 differs from intent")
+data = {
+    "schema":"genus-a0.3c-runtime-activation-pending-v7", "phase":"intent-staged",
+    "operator_uid":int(os.environ["OPERATOR_UID"]), "candidate_commit":os.environ["EXPECTED"],
+    "mode":os.environ["MODE"], "target_manifest":os.environ["TARGET"],
+    "target_manifest_sha256":os.environ["TARGET_HASH"], "readiness_path":os.environ["READINESS"],
+    "readiness_sha256":os.environ["READINESS_HASH"], "series_path":os.environ["SERIES"],
+    "series_sha256":os.environ["SERIES_HASH"], "active_manifest":os.environ["ACTIVE"],
+    "active_manifest_sha256":os.environ["ACTIVE_HASH"], "prior_active_manifest":os.environ["ACTIVE"],
+    "prior_previous_manifest":os.environ["PREVIOUS"],
+    "prior_active_services":[item for item in os.environ["SERVICES_CSV"].split(",") if item],
+    "target_active_services":[item for item in os.environ["TARGET_SERVICES_CSV"].split(",") if item],
+    "cron_original_sha256":os.environ["CRON_ORIGINAL_HASH"],
+    "cron_disabled_sha256":os.environ["CRON_DISABLED_HASH"],
+    "activation_reservation_sha256":os.environ["RESERVATION_SHA"],
+    "root_artifact_transaction_id":os.environ["ROOT_TRANSACTION"],
+    "root_artifact_inventory_sha256":os.environ["ROOT_INVENTORY_SHA"],
+    "root_artifact_authority_path":os.environ["ROOT_AUTHORITY_PATH"],
+    "root_artifact_authority_sha256":os.environ["ROOT_AUTHORITY_SHA"],
+    "root_artifact_executor_sha256":os.environ["ROOT_EXECUTOR_SHA"],
+    "root_artifact_old_commit":os.environ["ROOT_OLD_COMMIT"],
+    "root_artifact_new_commit":os.environ["ROOT_NEW_COMMIT"],
+    "root_artifact_commit_policy":os.environ["ROOT_COMMIT_POLICY"],
+    "root_artifact_state":"staged", "root_artifact_terminal_path":"", "root_artifact_terminal_sha256":"",
+    "projection_state":"unbound", "projection_transaction_nonce":os.environ["PROJECTION_NONCE"],
+    "projection_plan_path":"", "projection_plan_sha256":"",
+    "projection_helper_sha256":os.environ["PROJECTION_HELPER_SHA"],
+    "projection_approval_path":"", "projection_approval_sha256":"",
+    "projection_prior_manifest":os.environ["PROJECTION_PRIOR"],
+    "projection_prior_receipt_sha256":"", "projection_target_receipt_sha256":"",
+    "consumer_state":"unbound", "consumer_baseline_hint":os.environ["CONSUMER_BASELINE_HINT_VALUE"],
+    "consumer_plan_path":"", "consumer_plan_sha256":"", "consumer_inventory_path":"",
+    "consumer_inventory_sha256":"", "consumer_snapshot_path":"", "consumer_snapshot_sha256":"",
+    "consumer_publisher_sha256":os.environ["CONSUMER_PUBLISHER_SHA"],
+    "consumer_renderer_sha256":os.environ["CONSUMER_RENDERER_SHA"],
+    "consumer_baseline":"", "consumer_baseline_authorization_sha256":"",
+    "consumer_approval_path":"", "consumer_approval_sha256":"",
+    "activation_receipt_path":"", "activation_receipt_sha256":"",
+}
+payload=canonical(data); temporary=path.with_name(f".{path.name}.v7.publishing")
+def fsync_parent():
+    descriptor=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for activation intent v7")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+try: pending=stable(temporary,0o600,8*1024*1024)
+except FileNotFoundError: pending=None
+if pending is not None and pending!=payload:
+    temporary.unlink(); fsync_parent(); pending=None
+if pending is None:
+    descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+    try:
+        view=memoryview(payload)
+        while view:
+            count=os.write(descriptor,view)
+            if count<=0: raise SystemExit("short activation intent v7 write")
+            view=view[count:]
+        os.fchmod(descriptor,0o600); os.fsync(descriptor)
+    finally: os.close(descriptor)
+if not rename_noreplace(temporary,path):
+    if stable(path,0o600,8*1024*1024)!=payload: raise SystemExit("raced activation intent v7 differs")
+    temporary.unlink()
+fsync_parent()
+if stable(path,0o600,8*1024*1024)!=payload: raise SystemExit("published activation intent v7 differs")
+PY
+    validate_activation_journal 1
+}
+
 create_activation_journal() {
     local expected="$1" target="$2" mode="$3" readiness="$4" readiness_hash="$5"
-    local series="$6" series_hash="$7" active active_hash previous target_hash services_csv python
+    local series="$6" series_hash="$7" active active_hash previous target_hash services_csv target_services_csv python
     [ ! -e "$ACTIVATION_JOURNAL" ] || fail "Activation-Journal existiert bereits" 70
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     previous="$(selector_manifest "$PREVIOUS_LINK")"
@@ -2930,20 +9617,34 @@ create_activation_journal() {
         [ -z "$readiness$readiness_hash$series$series_hash" ] \
             || fail "Rollback-Journal darf keine Readiness-/Serienbindung tragen" 70
     fi
-    [ "${#active_services[@]}" -gt 0 ] || fail "kein aktives GENUS-Service-Inventar fuer Recovery" 70
+    create_projection_plan "$expected" "$target" "$mode" "$readiness" "$readiness_hash" \
+        "$series" "$series_hash" "$active"
     services_csv="$(IFS=,; printf '%s' "${active_services[*]}")"
+    if [ "${CONSUMER_BASELINE_HINT:-}" = present ]; then
+        target_services_csv="$services_csv"
+    elif [ "${CONSUMER_BASELINE_HINT:-}" = absent ]; then
+        target_services_csv="genus-network-watchdog.timer,genus-learner.service,genus-telegram-bot.service"
+    else
+        fail "Activation-Journal braucht einen expliziten Consumer-Baseline-Hinweis" 70
+    fi
     python="$(journal_python)"
     EXPECTED="$expected" TARGET="$target" TARGET_HASH="$target_hash" MODE="$mode" \
     READINESS="$readiness" READINESS_HASH="$readiness_hash" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
     SERIES="$series" SERIES_HASH="$series_hash" \
-    PREVIOUS="$previous" SERVICES_CSV="$services_csv" \
+    PREVIOUS="$previous" SERVICES_CSV="$services_csv" TARGET_SERVICES_CSV="$target_services_csv" \
+    CONSUMER_BASELINE_HINT_VALUE="$CONSUMER_BASELINE_HINT" \
+    PROJECTION_NONCE="$PROJECTION_TRANSACTION_NONCE" PROJECTION_PLAN="$PROJECTION_PLAN_PATH" \
+    PROJECTION_PLAN_SHA="$PROJECTION_PLAN_SHA256" PROJECTION_HELPER_SHA="$PROJECTION_HELPER_SHA256" \
+    PROJECTION_APPROVAL="$PROJECTION_APPROVAL_PATH" PROJECTION_APPROVAL_SHA="$PROJECTION_APPROVAL_SHA256" \
+    PROJECTION_PRIOR="$PROJECTION_PRIOR_MANIFEST" OPERATOR_UID="$(id -u)" \
     CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
     CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
         "$python" - "$ACTIVATION_JOURNAL" <<'PY'
-import json, os, pathlib, sys
+import ctypes, errno, json, os, pathlib, stat, sys
 path = pathlib.Path(sys.argv[1])
 data = {
-    "schema":"genus-a0.3c-runtime-activation-pending-v2", "phase":"prepared",
+    "schema":"genus-a0.3c-runtime-activation-pending-v6", "phase":"prepared",
+    "operator_uid":int(os.environ["OPERATOR_UID"]) if "OPERATOR_UID" in os.environ else os.geteuid(),
     "candidate_commit":os.environ["EXPECTED"], "mode":os.environ["MODE"],
     "target_manifest":os.environ["TARGET"], "target_manifest_sha256":os.environ["TARGET_HASH"],
     "readiness_path":os.environ["READINESS"], "readiness_sha256":os.environ["READINESS_HASH"],
@@ -2951,25 +9652,91 @@ data = {
     "active_manifest":os.environ["ACTIVE"], "active_manifest_sha256":os.environ["ACTIVE_HASH"],
     "prior_active_manifest":os.environ["ACTIVE"], "prior_previous_manifest":os.environ["PREVIOUS"],
     "prior_active_services":[item for item in os.environ["SERVICES_CSV"].split(",") if item],
+    "target_active_services":[item for item in os.environ["TARGET_SERVICES_CSV"].split(",") if item],
     "cron_original_sha256":os.environ["CRON_ORIGINAL_HASH"],
     "cron_disabled_sha256":os.environ["CRON_DISABLED_HASH"],
+    "projection_transaction_nonce":os.environ["PROJECTION_NONCE"],
+    "projection_plan_path":os.environ["PROJECTION_PLAN"],
+    "projection_plan_sha256":os.environ["PROJECTION_PLAN_SHA"],
+    "projection_helper_sha256":os.environ["PROJECTION_HELPER_SHA"],
+    "projection_approval_path":os.environ["PROJECTION_APPROVAL"],
+    "projection_approval_sha256":os.environ["PROJECTION_APPROVAL_SHA"],
+    "projection_prior_manifest":os.environ["PROJECTION_PRIOR"],
+    "projection_prior_receipt_sha256":"", "projection_target_receipt_sha256":"",
+    "consumer_state":"unbound", "consumer_baseline_hint":os.environ["CONSUMER_BASELINE_HINT_VALUE"],
+    "consumer_plan_path":"", "consumer_plan_sha256":"",
+    "consumer_inventory_path":"", "consumer_inventory_sha256":"", "consumer_snapshot_path":"",
+    "consumer_snapshot_sha256":"", "consumer_publisher_sha256":"", "consumer_renderer_sha256":"",
+    "consumer_baseline":"", "consumer_baseline_authorization_sha256":"",
+    "consumer_approval_path":"", "consumer_approval_sha256":"",
     "activation_receipt_path":"", "activation_receipt_sha256":"",
 }
-flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-if hasattr(os, "O_NOFOLLOW"): flags |= os.O_NOFOLLOW
-fd = os.open(path, flags, 0o600)
-try:
-    payload = (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()
-    os.write(fd, payload); os.fsync(fd)
-finally: os.close(fd)
-directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-try: os.fsync(directory)
-finally: os.close(directory)
+payload = (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()
+temporary=path.with_name(f".{path.name}.publishing"); uid=os.geteuid(); gid=os.getegid()
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(target):
+    before=target.lstat()
+    if (target.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+        raise SystemExit("activation journal publish metadata differs")
+    fd=os.open(target,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(fd)
+        while True:
+            chunk=os.read(fd,min(1024*1024,8*1024*1024+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>8*1024*1024: raise SystemExit("activation journal publish grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=target.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation journal publish drifted")
+    return raw
+def fsync_parent():
+    directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(directory)
+    finally: os.close(directory)
+def rename_noreplace(source,target):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for durable activation journal")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source),-100,os.fsencode(target),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target))
+try: pending=stable(temporary)
+except FileNotFoundError:
+    pending=None
+if pending is not None and pending!=payload:
+    temporary.unlink(); fsync_parent(); pending=None
+if pending is None:
+    flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o600)
+    try:
+        view=memoryview(payload)
+        while view:
+            count=os.write(fd,view)
+            if count<=0: raise SystemExit("short activation journal write")
+            view=view[count:]
+        os.fchmod(fd,0o600); os.fsync(fd)
+    finally: os.close(fd)
+if not rename_noreplace(temporary,path):
+    if stable(path)!=payload: raise SystemExit("raced activation journal differs")
+    temporary.unlink()
+fsync_parent()
+if stable(path)!=payload: raise SystemExit("published activation journal differs")
 PY
+    validate_activation_journal 1
+    consume_activation_reservation 1
 }
 
 validate_activation_journal() {
-    local allow_active_mismatch="${1:-0}" python active active_hash
+    local allow_active_mismatch="${1:-0}" python active active_hash schema bindings authority_path inventory_path
+    local terminal_path discovered_terminal root_pending authority_actual inventory_actual terminal_actual=""
+    local projection_state consumer_state root_artifact_state journal_dispatch_sha expected_terminal_sha terminal_outcome
     [ -f "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
         && [ "$(stat -c %u "$ACTIVATION_JOURNAL")" -eq "$(id -u)" ] \
         && [ "$(stat -c %a "$ACTIVATION_JOURNAL")" = 600 ] \
@@ -2985,21 +9752,400 @@ validate_activation_journal() {
         && [ "$(stat -c %a "$ACTIVATION_CRON_DISABLED")" = 600 ] \
         && [ "$(stat -c %h "$ACTIVATION_CRON_DISABLED")" -eq 1 ] \
         || fail "deaktivierter Activation-Crontab ist ungueltig" 70
-    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     python="$(journal_python)"
+    bindings="$("$python" - "$ACTIVATION_JOURNAL" "$(id -u)" "$(id -g)" \
+        "$CODE_RELEASE_TRUST_ROOT" "$ROOT_ARTIFACT_AUTHORITY_ROOT" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); uid,gid=map(int,sys.argv[2:4]); trust=pathlib.Path(sys.argv[4]); authority_root=pathlib.Path(sys.argv[5]); before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+    raise SystemExit("activation journal dispatch metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+try:
+    opened=os.fstat(descriptor)
+    while True:
+        chunk=os.read(descriptor,min(1024*1024,8*1024*1024+1-size))
+        if not chunk: break
+        size+=len(chunk)
+        if size>8*1024*1024: raise SystemExit("activation journal dispatch grew beyond bound")
+        chunks.append(chunk)
+    final=os.fstat(descriptor)
+finally: os.close(descriptor)
+after=path.lstat(); raw=b"".join(chunks)
+if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+    raise SystemExit("activation journal dispatch changed during read")
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate activation journal dispatch key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+schema=data.get("schema","") if isinstance(data,dict) else ""
+if schema=="genus-a0.3c-runtime-activation-pending-v7":
+    required={"schema","phase","candidate_commit","mode","target_manifest","target_manifest_sha256",
+     "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
+     "prior_active_manifest","prior_previous_manifest","prior_active_services","target_active_services",
+     "cron_original_sha256","cron_disabled_sha256","operator_uid","activation_reservation_sha256",
+     "root_artifact_transaction_id","root_artifact_inventory_sha256","root_artifact_authority_path",
+     "root_artifact_authority_sha256","root_artifact_executor_sha256","root_artifact_old_commit",
+     "root_artifact_new_commit","root_artifact_commit_policy","root_artifact_state","root_artifact_terminal_path",
+     "root_artifact_terminal_sha256","projection_state","projection_transaction_nonce","projection_plan_path",
+     "projection_plan_sha256","projection_helper_sha256","projection_approval_path","projection_approval_sha256",
+     "projection_prior_manifest","projection_prior_receipt_sha256","projection_target_receipt_sha256","consumer_state",
+     "consumer_baseline_hint","consumer_plan_path","consumer_plan_sha256","consumer_inventory_path",
+     "consumer_inventory_sha256","consumer_snapshot_path","consumer_snapshot_sha256","consumer_publisher_sha256",
+     "consumer_renderer_sha256","consumer_baseline","consumer_baseline_authorization_sha256","consumer_approval_path",
+     "consumer_approval_sha256","activation_receipt_path","activation_receipt_sha256"}
+    if set(data)!=required or raw!=canonical: raise SystemExit("activation-v7 dispatch schema/canonical bytes differ")
+    transaction=data.get("root_artifact_transaction_id","")
+    if re.fullmatch(r"[a-f0-9]{64}",str(transaction)) is None:
+        raise SystemExit("activation-v7 dispatch transaction differs")
+    authority=authority_root/f"{transaction}.json"
+    inventory=trust/f"runtime-artifacts.{transaction}"/"inventory.json"
+    terminal=trust/f"runtime-artifacts.terminal.{transaction}.json"
+    if pathlib.Path(data.get("root_artifact_authority_path",""))!=authority:
+        raise SystemExit("activation-v7 dispatch authority path differs")
+    terminal_value=data.get("root_artifact_terminal_path","")
+    if terminal_value and pathlib.Path(terminal_value)!=terminal:
+        raise SystemExit("activation-v7 dispatch terminal path differs")
+    print(schema); print(authority); print(inventory); print(terminal_value); print(transaction); print(hashlib.sha256(raw).hexdigest())
+else:
+    print(schema); print(); print(); print(); print(); print(hashlib.sha256(raw).hexdigest())
+PY
+    )"
+    mapfile -t bindings <<< "$bindings"
+    schema="${bindings[0]:-}"
+    if [ "$schema" = genus-a0.3c-runtime-activation-pending-v7 ]; then
+        authority_path="${bindings[1]:-}"; inventory_path="${bindings[2]:-}"; terminal_path="${bindings[3]:-}"
+        journal_dispatch_sha="${bindings[5]:-}"
+        authority_actual="$(root_stable_sha256 "$authority_path" 0400)"
+        inventory_actual="$(root_stable_sha256 "$inventory_path" 0400)"
+        discovered_terminal="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.terminal.${bindings[4]:-}.json"
+        if [ -n "$terminal_path" ]; then
+            [ "$terminal_path" = "$discovered_terminal" ] \
+                || fail "Activation-v7 bindet einen fremden Root-Terminalpfad" 70
+            terminal_actual="$(root_stable_sha256 "$terminal_path" 0400)"
+        elif as_root "$ROOT_TEST_BIN" -e "$discovered_terminal" || as_root "$ROOT_TEST_BIN" -L "$discovered_terminal"; then
+            terminal_actual="$(root_stable_sha256 "$discovered_terminal" 0400)"
+        fi
+        if as_root "$ROOT_TEST_BIN" -e "$ROOT_ARTIFACT_JOURNAL" || as_root "$ROOT_TEST_BIN" -L "$ROOT_ARTIFACT_JOURNAL"; then
+            root_pending=1
+        else
+            root_pending=0
+        fi
+        active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+        COMMIT="$(repo_commit)" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+        ALLOW_ACTIVE_MISMATCH="$allow_active_mismatch" EXPECTED_UID="$(id -u)" EXPECTED_GID="$(id -g)" \
+        STATE_ROOT_VALUE="$STATE_ROOT" TARGET_ROOT="$SETS_ROOT" TRUST_ROOT_VALUE="$CODE_RELEASE_TRUST_ROOT" \
+        RESERVATION_PATH="$ACTIVATION_RESERVATION" AUTHORITY_ACTUAL="$authority_actual" \
+        INVENTORY_ACTUAL="$inventory_actual" TERMINAL_ACTUAL="$terminal_actual" \
+        DISCOVERED_TERMINAL="$discovered_terminal" ROOT_PENDING="$root_pending" \
+        CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
+        CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
+            "$python" - "$ACTIVATION_JOURNAL" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+uid=int(os.environ["EXPECTED_UID"]); gid=int(os.environ["EXPECTED_GID"])
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path,mode,limit):
+    path=pathlib.Path(path); before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit):
+        raise SystemExit(f"activation-v7 private evidence metadata differs: {path}")
+    descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,min(1024*1024,limit+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>limit: raise SystemExit("activation-v7 private evidence grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation-v7 private evidence changed during read")
+    return raw
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    canonical=(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+    if not isinstance(value,dict) or raw!=canonical: raise SystemExit(f"{label} is not canonical")
+    return value
+raw=stable(sys.argv[1],0o600,8*1024*1024); data=strict(raw,"activation-v7 journal")
+required={"schema","phase","candidate_commit","mode","target_manifest","target_manifest_sha256",
+ "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
+ "prior_active_manifest","prior_previous_manifest","prior_active_services","target_active_services",
+ "cron_original_sha256","cron_disabled_sha256","operator_uid","activation_reservation_sha256",
+ "root_artifact_transaction_id","root_artifact_inventory_sha256","root_artifact_authority_path",
+ "root_artifact_authority_sha256","root_artifact_executor_sha256","root_artifact_old_commit",
+ "root_artifact_new_commit","root_artifact_commit_policy","root_artifact_state","root_artifact_terminal_path",
+ "root_artifact_terminal_sha256","projection_state","projection_transaction_nonce","projection_plan_path",
+ "projection_plan_sha256","projection_helper_sha256","projection_approval_path","projection_approval_sha256",
+ "projection_prior_manifest","projection_prior_receipt_sha256","projection_target_receipt_sha256","consumer_state",
+ "consumer_baseline_hint","consumer_plan_path","consumer_plan_sha256","consumer_inventory_path",
+ "consumer_inventory_sha256","consumer_snapshot_path","consumer_snapshot_sha256","consumer_publisher_sha256",
+ "consumer_renderer_sha256","consumer_baseline","consumer_baseline_authorization_sha256","consumer_approval_path",
+ "consumer_approval_sha256","activation_receipt_path","activation_receipt_sha256"}
+root_states={"staged","pending","applied-reloaded","committed","rolled-back"}
+projection_states={"unbound","authorized","prepared","activated","committed","restored"}
+consumer_states={"unbound","baseline-snapshotted","snapshotted-authorized","published","target-verified",
+                 "prior-restored","prior-unchanged"}
+HEX=re.compile(r"[a-f0-9]{64}"); COMMIT=re.compile(r"[a-f0-9]{40}")
+if set(data)!=required or data.get("schema")!="genus-a0.3c-runtime-activation-pending-v7":
+    raise SystemExit("activation-v7 journal keys/schema differ")
+if (data.get("root_artifact_state") not in root_states or data.get("projection_state") not in projection_states
+        or data.get("consumer_state") not in consumer_states):
+    raise SystemExit("activation-v7 state machine differs")
+if (data.get("operator_uid")!=uid or data.get("candidate_commit")!=os.environ["COMMIT"]
+        or data.get("mode")!="activate" or data.get("root_artifact_new_commit")!=data.get("candidate_commit")
+        or data.get("root_artifact_commit_policy")!="retain-on-activation-rollback"):
+    raise SystemExit("activation-v7 principal/commit/policy differs")
+if any(COMMIT.fullmatch(str(data.get(key))) is None for key in ("candidate_commit","root_artifact_old_commit","root_artifact_new_commit")):
+    raise SystemExit("activation-v7 commit binding is malformed")
+digest_keys=("target_manifest_sha256","readiness_sha256","series_sha256","active_manifest_sha256",
+ "cron_original_sha256","cron_disabled_sha256","activation_reservation_sha256","root_artifact_transaction_id",
+ "root_artifact_inventory_sha256","root_artifact_authority_sha256","root_artifact_executor_sha256",
+ "projection_transaction_nonce","projection_helper_sha256","consumer_publisher_sha256","consumer_renderer_sha256")
+if any(HEX.fullmatch(str(data.get(key))) is None for key in digest_keys):
+    raise SystemExit("activation-v7 digest/nonce binding is malformed")
+if data["projection_transaction_nonce"]==data["root_artifact_transaction_id"]:
+    raise SystemExit("activation-v7 nonce domains overlap")
+expected_authority=f"/var/lib/genus-a0-3c/runtime-artifact-authorities/{data['root_artifact_transaction_id']}.json"
+if data["root_artifact_authority_path"]!=expected_authority:
+    raise SystemExit("activation-v7 authority path differs")
+if (os.environ["AUTHORITY_ACTUAL"]!=data["root_artifact_authority_sha256"]
+        or os.environ["INVENTORY_ACTUAL"]!=data["root_artifact_inventory_sha256"]):
+    raise SystemExit("activation-v7 root immutable evidence differs")
+reservation_raw=stable(os.environ["RESERVATION_PATH"],0o600,2*1024*1024)
+reservation=strict(reservation_raw,"activation reservation v2")
+reservation_keys={"schema","candidate_commit","old_commit","mode","operator_uid","private_active","public_prior",
+ "projection_helper_sha256","consumer_publisher_sha256","consumer_renderer_sha256","root_artifact_executor_sha256",
+ "root_artifact_authority_path","root_artifact_authority_sha256","root_artifact_commit_policy","root_artifact_paths",
+ "root_artifact_payloads","readiness_sha256","series_sha256","state_root","target_manifest","target_manifest_sha256",
+ "target_tree_inventory_sha256","prior_manifest_sha256","prior_tree_inventory_sha256","transaction_nonce",
+ "root_artifact_transaction_id"}
+if (set(reservation)!=reservation_keys or reservation.get("schema")!="genus-a0.3c-activation-reservation-v2"
+        or hashlib.sha256(reservation_raw).hexdigest()!=data["activation_reservation_sha256"]):
+    raise SystemExit("activation-v7 reservation binding differs")
+cross={"candidate_commit":"candidate_commit","old_commit":"root_artifact_old_commit","mode":"mode",
+ "operator_uid":"operator_uid","private_active":"prior_active_manifest","public_prior":"projection_prior_manifest",
+ "projection_helper_sha256":"projection_helper_sha256","consumer_publisher_sha256":"consumer_publisher_sha256",
+ "consumer_renderer_sha256":"consumer_renderer_sha256","root_artifact_executor_sha256":"root_artifact_executor_sha256",
+ "root_artifact_authority_path":"root_artifact_authority_path","root_artifact_authority_sha256":"root_artifact_authority_sha256",
+ "root_artifact_commit_policy":"root_artifact_commit_policy","readiness_sha256":"readiness_sha256",
+ "series_sha256":"series_sha256","target_manifest":"target_manifest","target_manifest_sha256":"target_manifest_sha256",
+ "transaction_nonce":"projection_transaction_nonce","root_artifact_transaction_id":"root_artifact_transaction_id"}
+if reservation.get("state_root")!=os.environ["STATE_ROOT_VALUE"] or any(reservation.get(left)!=data.get(right) for left,right in cross.items()):
+    raise SystemExit("activation-v7 reservation crossbinding differs")
+if (data["cron_original_sha256"]!=os.environ["CRON_ORIGINAL_HASH"]
+        or data["cron_disabled_sha256"]!=os.environ["CRON_DISABLED_HASH"]):
+    raise SystemExit("activation-v7 cron evidence differs")
+if hashlib.sha256(stable(data["readiness_path"],0o600,16*1024*1024)).hexdigest()!=data["readiness_sha256"]:
+    raise SystemExit("activation-v7 readiness evidence differs")
+if hashlib.sha256(stable(data["series_path"],0o600,16*1024*1024)).hexdigest()!=data["series_sha256"]:
+    raise SystemExit("activation-v7 series evidence differs")
+target_path=pathlib.Path(os.environ["TARGET_ROOT"])/data["target_manifest"]/"manifest.json"
+if hashlib.sha256(stable(target_path,0o400,4*1024*1024)).hexdigest()!=data["target_manifest_sha256"]:
+    raise SystemExit("activation-v7 target manifest differs")
+if os.environ["ALLOW_ACTIVE_MISMATCH"]!="1":
+    if data["active_manifest"]!=os.environ["ACTIVE"] or data["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"]:
+        raise SystemExit("activation-v7 ACTIVE binding differs")
+elif data["active_manifest"] not in {data["prior_active_manifest"],data["target_manifest"]}:
+    raise SystemExit("activation-v7 ACTIVE is outside the transition")
+def pair(path_key,sha_key):
+    if bool(data[path_key])!=bool(data[sha_key]): raise SystemExit(f"activation-v7 path/hash pair differs: {path_key}")
+for path_key,sha_key in (("projection_plan_path","projection_plan_sha256"),("projection_approval_path","projection_approval_sha256"),
+ ("consumer_plan_path","consumer_plan_sha256"),("consumer_inventory_path","consumer_inventory_sha256"),
+ ("consumer_snapshot_path","consumer_snapshot_sha256"),("consumer_approval_path","consumer_approval_sha256"),
+ ("activation_receipt_path","activation_receipt_sha256"),("root_artifact_terminal_path","root_artifact_terminal_sha256")):
+    pair(path_key,sha_key)
+root_state=data["root_artifact_state"]; projection_state=data["projection_state"]; consumer_state=data["consumer_state"]
+pending=os.environ["ROOT_PENDING"]=="1"; terminal_actual=os.environ["TERMINAL_ACTUAL"]
+if root_state=="staged" and (pending or terminal_actual): raise SystemExit("staged root state has pending/terminal evidence")
+if root_state in {"pending","applied-reloaded"} and not pending and not terminal_actual:
+    raise SystemExit("in-flight root state lacks pending or discoverable terminal")
+if root_state in {"committed","rolled-back"}:
+    if pending or not data["root_artifact_terminal_path"] or os.environ["TERMINAL_ACTUAL"]!=data["root_artifact_terminal_sha256"]:
+        raise SystemExit("terminal root state differs")
+if root_state!="committed" and projection_state!="unbound":
+    raise SystemExit("projection was authorized before root commit")
+if root_state not in {"committed","rolled-back"} and consumer_state not in {"unbound","baseline-snapshotted"}:
+    raise SystemExit("consumer was authorized/mutated before root terminal")
+if projection_state=="unbound" and any(data[key] for key in ("projection_plan_path","projection_plan_sha256","projection_approval_path","projection_approval_sha256")):
+    raise SystemExit("unbound projection carries authority")
+if projection_state!="unbound" and not all(data[key] for key in ("projection_plan_path","projection_plan_sha256","projection_approval_path","projection_approval_sha256")):
+    raise SystemExit("bound projection lacks authority")
+snapshot_keys=("consumer_plan_path","consumer_plan_sha256","consumer_inventory_path","consumer_inventory_sha256",
+               "consumer_snapshot_path","consumer_snapshot_sha256","consumer_baseline")
+if consumer_state=="unbound" and any(data[key] for key in (*snapshot_keys,"consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256")):
+    raise SystemExit("unbound consumer carries staged evidence")
+if consumer_state!="unbound" and not all(data[key] for key in snapshot_keys):
+    raise SystemExit("bound consumer lacks baseline snapshot")
+if consumer_state=="baseline-snapshotted" and any(data[key] for key in ("consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256")):
+    raise SystemExit("baseline snapshot was authorized too early")
+if consumer_state in {"snapshotted-authorized","published","target-verified","prior-restored","prior-unchanged"} and not all(data[key] for key in ("consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256")):
+    raise SystemExit("authorized consumer lacks approval evidence")
+if data["consumer_baseline"] and data["consumer_baseline"]!=data["consumer_baseline_hint"]:
+    raise SystemExit("consumer baseline differs from preflight hint")
+phase_states={
+ "intent-staged":("staged","unbound","unbound"),
+ "consumer-baseline":("staged","unbound","baseline-snapshotted"),
+ "quiescence-guarded":("staged","unbound","baseline-snapshotted"),
+ "quiescence-paused":("staged","unbound","baseline-snapshotted"),
+ "quiescence-stopped":("staged","unbound","baseline-snapshotted"),
+ "root-pending":("pending","unbound","baseline-snapshotted"),
+ "root-handoff":("applied-reloaded","unbound","baseline-snapshotted"),
+ "root-terminal":("committed","unbound","baseline-snapshotted"),
+ "root-rolled-back":("rolled-back","unbound","baseline-snapshotted"),
+ "projection-contract":("committed","authorized","baseline-snapshotted"),
+ "consumer-authorize":("committed","authorized","snapshotted-authorized"),
+ "projection-prepared":("committed","prepared","snapshotted-authorized"),
+ "consumer-published":("committed","prepared","published"),
+ "consumer-target-verified":("committed","prepared","target-verified"),
+ "projection-activated":("committed","activated","target-verified"),
+ "projection-committed":("committed","committed","target-verified"),
+}
+phase=data.get("phase")
+if phase=="projection-restored":
+    if (root_state,projection_state)!=("committed","restored") or consumer_state not in {
+            "baseline-snapshotted","snapshotted-authorized","published","target-verified"}:
+        raise SystemExit("activation-v7 projection restore frontier differs")
+elif phase=="consumer-prior-restored":
+    if (root_state,projection_state,consumer_state)!=("committed","restored","prior-restored"):
+        raise SystemExit("activation-v7 restored consumer frontier differs")
+elif phase=="consumer-prior-unchanged":
+    if (root_state,projection_state,consumer_state)!=("committed","restored","prior-unchanged"):
+        raise SystemExit("activation-v7 unchanged consumer frontier differs")
+elif phase=="restore-receipt-written":
+    if (root_state,projection_state)!=("committed","restored") or consumer_state not in {"prior-restored","prior-unchanged"}:
+        raise SystemExit("activation-v7 restore receipt frontier differs")
+    if not all(data[key] for key in ("activation_receipt_path","activation_receipt_sha256")):
+        raise SystemExit("activation-v7 restore receipt binding is incomplete")
+elif phase not in phase_states or phase_states[phase]!=(root_state,projection_state,consumer_state):
+    raise SystemExit("activation-v7 phase/state coupling differs")
+trust=pathlib.Path(os.environ["TRUST_ROOT_VALUE"]); state_root=pathlib.Path(os.environ["STATE_ROOT_VALUE"])
+nonce=data["projection_transaction_nonce"]
+if projection_state!="unbound":
+    projection_plan=state_root/f"projection-plan.{nonce}.json"
+    projection_approval=trust/f"runtime-projection.approval.{nonce}.json"
+    if (pathlib.Path(data["projection_plan_path"])!=projection_plan
+            or pathlib.Path(data["projection_approval_path"])!=projection_approval
+            or any(HEX.fullmatch(str(data[key])) is None for key in (
+                "projection_plan_sha256","projection_approval_sha256","projection_helper_sha256"))):
+        raise SystemExit("activation-v7 projection fixed paths/digests differ")
+    plan_raw=stable(projection_plan,0o400,1024*1024); plan=strict(plan_raw,"activation-v7 projection plan")
+    plan_keys={"authorization_sha256","candidate_commit","operator_uid","prior_manifest","prior_manifest_sha256",
+     "prior_tree_inventory_sha256","publisher_sha256","readiness_sha256","schema","series_sha256","state_root",
+     "target_manifest","target_manifest_sha256","target_tree_inventory_sha256","transaction_nonce"}
+    expected_prior=reservation["public_prior"]
+    projection_bindings={"candidate_commit":data["candidate_commit"],"operator_uid":uid,
+     "prior_manifest":expected_prior,"publisher_sha256":data["projection_helper_sha256"],
+     "readiness_sha256":data["readiness_sha256"],"series_sha256":data["series_sha256"],
+     "state_root":str(state_root),"target_manifest":data["target_manifest"],
+     "target_manifest_sha256":data["target_manifest_sha256"],
+     "target_tree_inventory_sha256":reservation["target_tree_inventory_sha256"],"transaction_nonce":nonce}
+    if (set(plan)!=plan_keys or plan.get("schema")!="genus-a0.3c-runtime-projection-plan-v2"
+            or hashlib.sha256(plan_raw).hexdigest()!=data["projection_plan_sha256"]
+            or any(plan.get(key)!=value for key,value in projection_bindings.items())):
+        raise SystemExit("activation-v7 projection plan binding differs")
+    authorization={"schema":"genus-a0.3c-runtime-projection-authorization-v1",
+     "protocol":"dual-selector-journal-v2","mode":"activate",
+     **{key:value for key,value in plan.items() if key!="authorization_sha256"}}
+    if plan.get("authorization_sha256")!=hashlib.sha256(canonical(authorization)).hexdigest():
+        raise SystemExit("activation-v7 projection authorization digest differs")
+if consumer_state!="unbound":
+    consumer_plan_path=state_root/f"consumer-plan.{nonce}.json"
+    consumer_inventory_path=state_root/f"consumer-inventory.{nonce}.json"
+    snapshot_name=hashlib.sha256(f"genus-a0.3c-consumer-snapshot-v1\n{nonce}\n".encode()).hexdigest()
+    consumer_snapshot_path=trust/"consumer-snapshots"/snapshot_name
+    if (pathlib.Path(data["consumer_plan_path"])!=consumer_plan_path
+            or pathlib.Path(data["consumer_inventory_path"])!=consumer_inventory_path
+            or pathlib.Path(data["consumer_snapshot_path"])!=consumer_snapshot_path
+            or any(HEX.fullmatch(str(data[key])) is None for key in (
+                "consumer_plan_sha256","consumer_inventory_sha256","consumer_snapshot_sha256",
+                "consumer_publisher_sha256","consumer_renderer_sha256"))):
+        raise SystemExit("activation-v7 consumer fixed paths/digests differ")
+    plan_raw=stable(consumer_plan_path,0o400,1024*1024); consumer_plan=strict(plan_raw,"activation-v7 consumer plan")
+    inventory_raw=stable(consumer_inventory_path,0o400,1024*1024); inventory=strict(inventory_raw,"activation-v7 consumer inventory")
+    if (hashlib.sha256(plan_raw).hexdigest()!=data["consumer_plan_sha256"]
+            or hashlib.sha256(inventory_raw).hexdigest()!=data["consumer_inventory_sha256"]
+            or set(consumer_plan)!={"asset_receipt_sha256","expected_db_device","generation_id","operator_user",
+                "repo_commit","schema","telegram_owner_id"}
+            or consumer_plan.get("schema")!="genus-a0.3c-consumer-plan-v1"
+            or consumer_plan.get("generation_id")!=data["target_manifest"]
+            or consumer_plan.get("repo_commit")!=data["candidate_commit"]
+            or set(inventory)!={"entries","generation_id","plan_sha256","schema","template_set_sha256"}
+            or inventory.get("schema")!="genus-a0.3c-consumer-bundle-inventory-v1"
+            or inventory.get("generation_id")!=data["target_manifest"]
+            or inventory.get("plan_sha256")!=data["consumer_plan_sha256"]):
+        raise SystemExit("activation-v7 consumer plan/inventory binding differs")
+    if consumer_state in {"snapshotted-authorized","published","target-verified","prior-restored"}:
+        consumer_approval=trust/f"runtime-consumer.approval.{nonce}.json"
+        if (pathlib.Path(data["consumer_approval_path"])!=consumer_approval
+                or any(HEX.fullmatch(str(data[key])) is None for key in (
+                    "consumer_baseline_authorization_sha256","consumer_approval_sha256"))):
+            raise SystemExit("activation-v7 consumer approval fixed path/digests differ")
+PY
+        projection_state="$(journal_field projection_state)"
+        consumer_state="$(journal_field consumer_state)"
+        root_artifact_state="$(journal_field root_artifact_state)"
+        case "$root_artifact_state" in
+            committed|rolled-back)
+                expected_terminal_sha="$(journal_field root_artifact_terminal_sha256)"
+                [ "$ROOT_ARTIFACT_TRANSACTION_ID" = "$(journal_field root_artifact_transaction_id)" ] \
+                    || hydrate_root_artifact_v7_context
+                if [ "$root_artifact_state" = committed ]; then terminal_outcome=committed; else terminal_outcome=rolled-back; fi
+                root_artifact_validate_terminal "$terminal_outcome" >/dev/null
+                [ "$ROOT_ARTIFACT_TERMINAL_SHA256" = "$expected_terminal_sha" ] \
+                    || fail "Activation-v7-Terminalinhalt driftet von der Journalbindung" 70
+                ;;
+        esac
+        if [ "$projection_state" != unbound ]; then
+            validate_projection_approval_evidence
+        fi
+        if [ "$consumer_state" != unbound ]; then
+            validate_consumer_snapshot_evidence
+        fi
+        case "$consumer_state" in
+            snapshotted-authorized|published|target-verified|prior-restored|prior-unchanged)
+                validate_consumer_root_approval 1
+                ;;
+        esac
+        [ "$(user_stable_sha256 "$ACTIVATION_JOURNAL" 0600)" = "$journal_dispatch_sha" ] \
+            || fail "Activation-v7-Journal driftete waehrend der privilegierten Evidence-Pruefung" 70
+        return 0
+    fi
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
     COMMIT="$(repo_commit)" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
     ALLOW_ACTIVE_MISMATCH="$allow_active_mismatch" \
     TARGET_ROOT="$SETS_ROOT" SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" EXPECTED_UID="$(id -u)" \
+    STATE_ROOT_VALUE="$STATE_ROOT" PROJECTION_HELPER="$PROJECTION_HELPER_PATH" \
+    PROJECTION_TRUST_ROOT="$CODE_RELEASE_TRUST_ROOT" \
+    PROJECTION_HELPER_SHA="$(root_stable_sha256 "$PROJECTION_HELPER_PATH" 0555)" \
+    CONSUMER_PUBLISHER="$CONSUMER_PUBLISHER_PATH" CONSUMER_RENDERER="$CONSUMER_RENDERER_PATH" \
+    CONSUMER_PUBLISHER_SHA="$(root_stable_sha256 "$CONSUMER_PUBLISHER_PATH" 0755)" \
+    CONSUMER_RENDERER_SHA="$(root_stable_sha256 "$CONSUMER_RENDERER_PATH" 0755)" \
     CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
     CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
         "$python" - "$ACTIVATION_JOURNAL" <<'PY'
 import hashlib, json, os, pathlib, stat, sys
 
-def regular_bytes(path, label):
+def regular_bytes(path, label, expected_mode=0o600):
     path = pathlib.Path(path)
     before = path.lstat()
     if (not stat.S_ISREG(before.st_mode) or before.st_uid != int(os.environ["EXPECTED_UID"])
-            or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1):
+            or stat.S_IMODE(before.st_mode) != expected_mode or before.st_nlink != 1):
         raise SystemExit(f"{label} is not private regular evidence")
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     try:
@@ -3070,14 +10216,23 @@ def series_bytes(value, expected_commit=None):
     return final_payload
 
 path = pathlib.Path(sys.argv[1]); data = json.loads(regular_bytes(path, "activation journal"))
-required = {"schema","phase","candidate_commit","mode","target_manifest","target_manifest_sha256",
+required = {"schema","phase","operator_uid","candidate_commit","mode","target_manifest","target_manifest_sha256",
  "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
- "prior_active_manifest","prior_previous_manifest","prior_active_services","cron_original_sha256",
- "cron_disabled_sha256","activation_receipt_path","activation_receipt_sha256"}
-if set(data) != required or data["schema"] != "genus-a0.3c-runtime-activation-pending-v2":
+ "prior_active_manifest","prior_previous_manifest","prior_active_services","target_active_services","cron_original_sha256",
+ "cron_disabled_sha256","projection_transaction_nonce","projection_plan_path","projection_plan_sha256",
+ "projection_helper_sha256","projection_approval_path","projection_approval_sha256",
+ "projection_prior_manifest","projection_prior_receipt_sha256",
+ "consumer_state","consumer_plan_path","consumer_plan_sha256","consumer_inventory_path",
+ "consumer_inventory_sha256","consumer_snapshot_path","consumer_snapshot_sha256",
+ "consumer_publisher_sha256","consumer_renderer_sha256","consumer_baseline_hint","consumer_baseline",
+ "consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256",
+ "projection_target_receipt_sha256","activation_receipt_path","activation_receipt_sha256"}
+if set(data) != required or data["schema"] != "genus-a0.3c-runtime-activation-pending-v6":
     raise SystemExit("activation journal schema differs")
 if data["candidate_commit"] != os.environ["COMMIT"]:
     raise SystemExit("activation journal commit differs")
+if data["operator_uid"] != int(os.environ["EXPECTED_UID"]):
+    raise SystemExit("activation journal operator UID differs")
 if os.environ["ALLOW_ACTIVE_MISMATCH"] != "1" and (data["active_manifest"] != os.environ["ACTIVE"] or data["active_manifest_sha256"] != os.environ["ACTIVE_HASH"]):
     raise SystemExit("activation journal ACTIVE binding differs")
 target = pathlib.Path(os.environ["TARGET_ROOT"]) / data["target_manifest"] / "manifest.json"
@@ -3085,6 +10240,115 @@ if target.is_symlink() or not target.is_file() or target.stat().st_nlink != 1:
     raise SystemExit("target manifest is not a regular single-link file")
 if hashlib.sha256(target.read_bytes()).hexdigest() != data["target_manifest_sha256"]:
     raise SystemExit("target manifest hash differs")
+tree = pathlib.Path(os.environ["TARGET_ROOT"]) / data["target_manifest"] / "tree.inventory"
+plan_path = pathlib.Path(data["projection_plan_path"])
+expected_plan = pathlib.Path(os.environ["STATE_ROOT_VALUE"]) / f"projection-plan.{data['projection_transaction_nonce']}.json"
+if plan_path != expected_plan:
+    raise SystemExit("projection plan path differs")
+plan_payload = regular_bytes(plan_path, "projection plan", 0o400)
+if hashlib.sha256(plan_payload).hexdigest() != data["projection_plan_sha256"]:
+    raise SystemExit("projection plan hash differs")
+plan = strict_json(plan_payload)
+plan_keys={"authorization_sha256","candidate_commit","operator_uid","prior_manifest","prior_manifest_sha256",
+ "prior_tree_inventory_sha256","publisher_sha256","readiness_sha256","schema","series_sha256","state_root","target_manifest",
+ "target_manifest_sha256","target_tree_inventory_sha256","transaction_nonce"}
+expected_prior="" if data["prior_active_manifest"].startswith("legacy-") else data["prior_active_manifest"]
+def sha(value): return isinstance(value,str) and len(value)==64 and all(ch in "0123456789abcdef" for ch in value)
+if (set(plan)!=plan_keys or plan.get("schema")!="genus-a0.3c-runtime-projection-plan-v2"
+        or plan.get("candidate_commit")!=data["candidate_commit"] or plan.get("operator_uid")!=int(os.environ["EXPECTED_UID"])
+        or plan.get("state_root")!=os.environ["STATE_ROOT_VALUE"] or plan.get("transaction_nonce")!=data["projection_transaction_nonce"]
+        or plan.get("target_manifest")!=data["target_manifest"] or plan.get("target_manifest_sha256")!=data["target_manifest_sha256"]
+        or plan.get("target_tree_inventory_sha256")!=hashlib.sha256(tree.read_bytes()).hexdigest()
+        or plan.get("prior_manifest")!=expected_prior or data["projection_prior_manifest"]!=expected_prior
+        or plan.get("readiness_sha256")!=data["readiness_sha256"] or plan.get("series_sha256")!=data["series_sha256"]
+        or plan.get("publisher_sha256")!=data["projection_helper_sha256"]
+        or data["projection_helper_sha256"]!=os.environ["PROJECTION_HELPER_SHA"]
+        or any(not sha(plan.get(key)) for key in ("authorization_sha256","publisher_sha256","readiness_sha256","series_sha256"))
+        or any(not sha(data.get(key)) for key in ("projection_transaction_nonce","projection_plan_sha256","projection_helper_sha256","projection_approval_sha256"))):
+    raise SystemExit("projection plan/journal binding differs")
+binding={"schema":"genus-a0.3c-runtime-projection-authorization-v1","protocol":"dual-selector-journal-v2",
+         "mode":"activate",**{key:value for key,value in plan.items() if key!="authorization_sha256"}}
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":"))+"\n").encode()
+if plan["authorization_sha256"]!=hashlib.sha256(canonical(binding)).hexdigest():
+    raise SystemExit("projection authorization binding differs")
+expected_approval=pathlib.Path(os.environ["PROJECTION_TRUST_ROOT"])/f"runtime-projection.approval.{data['projection_transaction_nonce']}.json"
+if pathlib.Path(data["projection_approval_path"])!=expected_approval:
+    raise SystemExit("projection approval path differs")
+if expected_prior:
+    prior_root=pathlib.Path(os.environ["TARGET_ROOT"])/expected_prior
+    if (plan.get("prior_manifest_sha256")!=hashlib.sha256((prior_root/"manifest.json").read_bytes()).hexdigest()
+            or plan.get("prior_tree_inventory_sha256")!=hashlib.sha256((prior_root/"tree.inventory").read_bytes()).hexdigest()):
+        raise SystemExit("projection prior plan binding differs")
+elif plan.get("prior_manifest_sha256") or plan.get("prior_tree_inventory_sha256"):
+    raise SystemExit("legacy/no-public prior unexpectedly has projection hashes")
+helper=pathlib.Path(os.environ["PROJECTION_HELPER"]); helper_info=helper.lstat()
+if (helper.is_symlink() or not stat.S_ISREG(helper_info.st_mode) or helper_info.st_uid!=0 or helper_info.st_gid!=0
+        or stat.S_IMODE(helper_info.st_mode)!=0o555 or helper_info.st_nlink!=1
+        or hashlib.sha256(helper.read_bytes()).hexdigest()!=data["projection_helper_sha256"]):
+    raise SystemExit("installed projection helper differs")
+contract_names=("consumer_plan_path","consumer_plan_sha256","consumer_inventory_path","consumer_inventory_sha256",
+ "consumer_snapshot_path","consumer_publisher_sha256","consumer_renderer_sha256")
+snapshot_names=("consumer_snapshot_sha256","consumer_baseline","consumer_baseline_authorization_sha256",
+ "consumer_approval_path","consumer_approval_sha256")
+consumer_state=data["consumer_state"]
+desired=["genus-network-watchdog.timer","genus-learner.service","genus-telegram-bot.service"]
+if data["consumer_baseline_hint"]=="present":
+    if not data["prior_active_services"] or data["target_active_services"]!=data["prior_active_services"]:
+        raise SystemExit("present consumer service transition differs")
+elif data["consumer_baseline_hint"]=="absent":
+    if data["prior_active_services"] or data["target_active_services"]!=desired:
+        raise SystemExit("absent consumer bootstrap service transition differs")
+else: raise SystemExit("consumer baseline hint differs")
+if consumer_state=="unbound" or (consumer_state=="prior-unchanged" and not data["consumer_plan_path"]):
+    if any(data[name] for name in (*contract_names,*snapshot_names)):
+        raise SystemExit("unbound/unchanged consumer journal carries evidence")
+else:
+    if consumer_state not in {"contract-bound","snapshotted","published","target-verified","prior-restored","prior-unchanged"}:
+        raise SystemExit("consumer journal state differs")
+    nonce=data["projection_transaction_nonce"]; state_root=pathlib.Path(os.environ["STATE_ROOT_VALUE"])
+    expected_plan=state_root/f"consumer-plan.{nonce}.json"
+    expected_inventory=state_root/f"consumer-inventory.{nonce}.json"
+    snapshot_name=hashlib.sha256(f"genus-a0.3c-consumer-snapshot-v1\n{nonce}\n".encode()).hexdigest()
+    expected_snapshot=pathlib.Path(os.environ["PROJECTION_TRUST_ROOT"])/"consumer-snapshots"/snapshot_name
+    if (pathlib.Path(data["consumer_plan_path"])!=expected_plan
+            or pathlib.Path(data["consumer_inventory_path"])!=expected_inventory
+            or pathlib.Path(data["consumer_snapshot_path"])!=expected_snapshot):
+        raise SystemExit("consumer journal path binding differs")
+    plan_raw=regular_bytes(expected_plan,"consumer plan",0o400)
+    inventory_raw=regular_bytes(expected_inventory,"consumer inventory",0o400)
+    if (hashlib.sha256(plan_raw).hexdigest()!=data["consumer_plan_sha256"]
+            or hashlib.sha256(inventory_raw).hexdigest()!=data["consumer_inventory_sha256"]):
+        raise SystemExit("consumer plan/inventory hash differs")
+    consumer_plan=strict_json(plan_raw); consumer_inventory=strict_json(inventory_raw)
+    if (json.dumps(consumer_plan,sort_keys=True,separators=(",", ":"))+"\n").encode()!=plan_raw:
+        raise SystemExit("consumer plan is not canonical")
+    if (set(consumer_plan)!={"asset_receipt_sha256","expected_db_device","generation_id","operator_user",
+            "repo_commit","schema","telegram_owner_id"}
+            or consumer_plan.get("schema")!="genus-a0.3c-consumer-plan-v1"
+            or consumer_plan.get("generation_id")!=data["target_manifest"]
+            or consumer_plan.get("repo_commit")!=data["candidate_commit"]):
+        raise SystemExit("consumer plan identity differs")
+    if (consumer_inventory.get("schema")!="genus-a0.3c-consumer-bundle-inventory-v1"
+            or consumer_inventory.get("generation_id")!=data["target_manifest"]
+            or consumer_inventory.get("plan_sha256")!=data["consumer_plan_sha256"]):
+        raise SystemExit("consumer inventory identity differs")
+    if (data["consumer_publisher_sha256"]!=os.environ["CONSUMER_PUBLISHER_SHA"]
+            or data["consumer_renderer_sha256"]!=os.environ["CONSUMER_RENDERER_SHA"]
+            or any(not sha(data[name]) for name in ("consumer_plan_sha256","consumer_inventory_sha256",
+                                                    "consumer_publisher_sha256","consumer_renderer_sha256"))):
+        raise SystemExit("installed consumer tool binding differs")
+    if consumer_state in {"contract-bound","prior-unchanged"}:
+        if any(data[name] for name in ("consumer_snapshot_sha256","consumer_baseline",
+                "consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256")):
+            raise SystemExit("consumer snapshot evidence appeared before authorization")
+    else:
+        expected_approval=pathlib.Path(os.environ["PROJECTION_TRUST_ROOT"])/f"runtime-consumer.approval.{nonce}.json"
+        if (data["consumer_baseline"] not in {"present","absent"}
+                or data["consumer_baseline"]!=data["consumer_baseline_hint"]
+                or pathlib.Path(data["consumer_approval_path"])!=expected_approval
+                or any(not sha(data[name]) for name in ("consumer_snapshot_sha256",
+                    "consumer_baseline_authorization_sha256","consumer_approval_sha256"))):
+            raise SystemExit("consumer snapshot/approval binding differs")
 readiness = data["readiness_path"]
 if readiness:
     if hashlib.sha256(regular_bytes(readiness, "readiness manifest")).hexdigest() != data["readiness_sha256"]:
@@ -3099,17 +10363,41 @@ elif data["series_sha256"]:
     raise SystemExit("empty series path has a hash")
 if data["cron_original_sha256"] != os.environ["CRON_ORIGINAL_HASH"] or data["cron_disabled_sha256"] != os.environ["CRON_DISABLED_HASH"]:
     raise SystemExit("crontab snapshot hash differs")
-allowed_services={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service","genus-telegram-bot-fallback.service"}
-if not data["prior_active_services"] or len(data["prior_active_services"]) != len(set(data["prior_active_services"])) or any(item not in allowed_services for item in data["prior_active_services"]):
+allowed_services={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+if (len(data["prior_active_services"]) != len(set(data["prior_active_services"]))
+        or any(item not in allowed_services for item in data["prior_active_services"])
+        or len(data["target_active_services"]) != len(set(data["target_active_services"]))
+        or any(item not in allowed_services for item in data["target_active_services"])):
     raise SystemExit("service inventory differs")
-allowed = {"prepared","guarded","paused","stopped","legacy-ready","swapped","target-verified","resumed","postflight","receipt-written"}
+allowed = {"prepared","guarded","paused","stopped","legacy-ready","projection-prepared","private-swapped",
+ "public-swapped","selectors-verified","target-verified","resumed","postflight","receipt-written","projection-committed"}
+allowed |= {"restored-prior","human-recovery-required"}
+allowed.add("restore-receipt-written")
 if data["phase"] not in allowed or data["mode"] not in {"activate","rollback"}:
     raise SystemExit("activation journal state differs")
+bound_phases={"projection-prepared","private-swapped","public-swapped","selectors-verified","target-verified",
+ "resumed","postflight","receipt-written","projection-committed","restore-receipt-written"}
+if data["phase"] in bound_phases:
+    if not sha(data["projection_target_receipt_sha256"]): raise SystemExit("projection target receipt is unbound")
+    if bool(data["projection_prior_manifest"]) != bool(data["projection_prior_receipt_sha256"]):
+        raise SystemExit("projection prior receipt pair differs")
+    if data["projection_prior_receipt_sha256"] and not sha(data["projection_prior_receipt_sha256"]):
+        raise SystemExit("projection prior receipt hash differs")
+elif data["projection_target_receipt_sha256"] or data["projection_prior_receipt_sha256"]:
+    if data["phase"] not in {"restored-prior","human-recovery-required"}:
+        raise SystemExit("projection receipts appeared before root prepare")
+    if not sha(data["projection_target_receipt_sha256"]):
+        raise SystemExit("recovery projection target receipt differs")
+    if bool(data["projection_prior_manifest"]) != bool(data["projection_prior_receipt_sha256"]):
+        raise SystemExit("recovery projection prior receipt pair differs")
+    if data["projection_prior_receipt_sha256"] and not sha(data["projection_prior_receipt_sha256"]):
+        raise SystemExit("recovery projection prior receipt hash differs")
 if data["mode"] == "activate" and (not readiness or not series):
     raise SystemExit("activate journal lacks readiness or series evidence")
 if data["mode"] == "rollback" and (readiness or data["readiness_sha256"] or series or data["series_sha256"]):
     raise SystemExit("rollback journal carries activation evidence")
 PY
+    validate_projection_approval_evidence
 }
 
 rebind_activation_journal() {
@@ -3138,7 +10426,12 @@ flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
 if hasattr(os, "O_NOFOLLOW"): flags |= os.O_NOFOLLOW
 fd = os.open(target, flags, 0o600)
 try:
-    os.write(fd, (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()); os.fsync(fd)
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short activation journal update")
+        view=view[count:]
+    os.fsync(fd)
 finally: os.close(fd)
 os.replace(target, source)
 directory = os.open(source.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
@@ -3173,13 +10466,332 @@ flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
 if hasattr(os, "O_NOFOLLOW"): flags |= os.O_NOFOLLOW
 fd = os.open(target, flags, 0o600)
 try:
-    os.write(fd, (json.dumps(data, sort_keys=True, separators=(",", ":")) + "\n").encode()); os.fsync(fd)
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short activation phase journal write")
+        view=view[count:]
+    os.fsync(fd)
 finally: os.close(fd)
 os.replace(target, source)
 directory = os.open(source.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
 try: os.fsync(directory)
 finally: os.close(directory)
 PY
+}
+
+activation_v7_transition() {
+    local operation="$1" python
+    shift
+    python="$(journal_python)"
+    OPERATION="$operation" "$python" - "$ACTIVATION_JOURNAL" "$@" <<'PY'
+import json,os,pathlib,stat,sys
+source=pathlib.Path(sys.argv[1]); operation=os.environ["OPERATION"]; uid=os.geteuid(); gid=os.getegid()
+updates={}
+for item in sys.argv[2:]:
+    if "=" not in item: raise SystemExit("activation-v7 transition argument lacks key/value separator")
+    key,value=item.split("=",1)
+    if key in updates: raise SystemExit("duplicate activation-v7 transition update")
+    updates[key]=value
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+        raise SystemExit("activation-v7 transition source metadata differs")
+    descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,min(1024*1024,8*1024*1024+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>8*1024*1024: raise SystemExit("activation-v7 transition source grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation-v7 transition source changed during read")
+    return raw
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate activation-v7 transition key")
+        result[key]=value
+    return result
+raw=stable(source); data=json.loads(raw,object_pairs_hook=pairs)
+if canonical(data)!=raw or data.get("schema")!="genus-a0.3c-runtime-activation-pending-v7":
+    raise SystemExit("activation-v7 transition schema differs")
+specs={
+ "root-pending":(set(),{"staged"},"root_artifact_state","pending"),
+ "root-handoff":(set(),{"pending"},"root_artifact_state","applied-reloaded"),
+ "root-terminal":({"root_artifact_terminal_path","root_artifact_terminal_sha256"},{"applied-reloaded"},"root_artifact_state","committed"),
+ "root-rolled-back":({"root_artifact_terminal_path","root_artifact_terminal_sha256"},{"pending","applied-reloaded"},"root_artifact_state","rolled-back"),
+ "quiescence-guarded":(set(),{"consumer-baseline"},"phase","quiescence-guarded"),
+ "quiescence-paused":(set(),{"quiescence-guarded"},"phase","quiescence-paused"),
+ "quiescence-stopped":(set(),{"quiescence-paused"},"phase","quiescence-stopped"),
+ "consumer-baseline":({"consumer_plan_path","consumer_plan_sha256","consumer_inventory_path","consumer_inventory_sha256",
+    "consumer_snapshot_path","consumer_snapshot_sha256","consumer_baseline"},{"unbound"},"consumer_state","baseline-snapshotted"),
+ "projection-contract":({"projection_plan_path","projection_plan_sha256","projection_helper_sha256",
+    "projection_approval_path","projection_approval_sha256"},{"unbound"},"projection_state","authorized"),
+ "consumer-authorize":({"consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256"},
+    {"baseline-snapshotted"},"consumer_state","snapshotted-authorized"),
+ "projection-prepared":({"projection_target_receipt_sha256","projection_prior_receipt_sha256"},{"authorized"},"projection_state","prepared"),
+ "projection-activated":({"active_manifest","active_manifest_sha256"},{"prepared"},"projection_state","activated"),
+ "projection-committed":({"activation_receipt_path","activation_receipt_sha256"},{"activated"},"projection_state","committed"),
+ "projection-restored":({"active_manifest","active_manifest_sha256"},{"authorized","prepared","activated"},"projection_state","restored"),
+ "consumer-published":(set(),{"snapshotted-authorized"},"consumer_state","published"),
+ "consumer-target-verified":(set(),{"published"},"consumer_state","target-verified"),
+ "consumer-prior-restored":(set(),{"published","target-verified"},"consumer_state","prior-restored"),
+ "consumer-prior-unchanged":(set(),{"unbound","baseline-snapshotted","snapshotted-authorized"},"consumer_state","prior-unchanged"),
+ "restore-receipt-written":({"activation_receipt_path","activation_receipt_sha256"},
+    {"consumer-prior-restored","consumer-prior-unchanged"},"phase","restore-receipt-written"),
+}
+if operation not in specs: raise SystemExit("unknown activation-v7 transition")
+allowed,old_states,state_key,new_state=specs[operation]
+if set(updates)!=allowed: raise SystemExit("activation-v7 transition update keys differ")
+if operation in {"projection-contract","consumer-authorize","projection-prepared","projection-activated","projection-committed"}:
+    if data.get("root_artifact_state")!="committed": raise SystemExit("activation-v7 mutation precedes root commit")
+if operation=="projection-contract" and data.get("projection_state")!="unbound":
+    raise SystemExit("projection contract is not an unbound-to-authorized transition")
+if operation=="consumer-authorize" and data.get("projection_state")=="unbound":
+    raise SystemExit("consumer authorization precedes projection authorization")
+if operation=="projection-prepared" and data.get("consumer_state")!="snapshotted-authorized":
+    raise SystemExit("projection prepare precedes consumer authorization")
+if operation=="consumer-published" and data.get("projection_state")!="prepared":
+    raise SystemExit("consumer publication precedes projection prepare")
+if operation=="consumer-target-verified" and data.get("projection_state")!="prepared":
+    raise SystemExit("consumer target verification has an invalid projection frontier")
+if operation=="projection-activated" and data.get("consumer_state")!="target-verified":
+    raise SystemExit("projection activation precedes consumer target verification")
+if operation=="projection-committed" and data.get("consumer_state")!="target-verified":
+    raise SystemExit("projection commit lacks consumer target verification")
+if operation in {"consumer-prior-restored","consumer-prior-unchanged"} and data.get("projection_state")!="restored":
+    raise SystemExit("consumer prior transition precedes projection restore")
+if operation=="restore-receipt-written" and (data.get("root_artifact_state")!="committed"
+        or data.get("projection_state")!="restored"
+        or data.get("consumer_state") not in {"prior-restored","prior-unchanged"}):
+    raise SystemExit("restore completion receipt has an invalid v7 frontier")
+current=data.get(state_key)
+if current==new_state:
+    if any(data.get(key)!=value for key,value in updates.items()):
+        raise SystemExit("idempotent activation-v7 transition differs")
+    raise SystemExit(0)
+if current not in old_states: raise SystemExit("activation-v7 transition source state differs")
+for key,value in updates.items():
+    if not value and not (operation=="projection-prepared" and key=="projection_prior_receipt_sha256"
+                          and data.get("projection_prior_manifest")==""):
+        raise SystemExit("activation-v7 transition may not bind an empty value")
+    data[key]=value
+data[state_key]=new_state; data["phase"]=operation
+payload=canonical(data); target=source.with_name(f".{source.name}.{operation}.publishing")
+try: pending=stable(target)
+except FileNotFoundError: pending=None
+if pending is not None and pending!=payload: raise SystemExit("stale activation-v7 transition temp differs")
+if pending is None:
+    descriptor=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+    try:
+        view=memoryview(payload)
+        while view:
+            count=os.write(descriptor,view)
+            if count<=0: raise SystemExit("short activation-v7 transition write")
+            view=view[count:]
+        os.fchmod(descriptor,0o600); os.fsync(descriptor)
+    finally: os.close(descriptor)
+if stable(source)!=raw: raise SystemExit("activation-v7 transition source changed before replace")
+os.replace(target,source)
+directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+if stable(source)!=payload: raise SystemExit("activation-v7 transition differs after fsync")
+PY
+}
+
+bind_root_artifact_handoff() {
+    activation_v7_transition root-handoff
+    validate_activation_journal 1
+}
+
+bind_root_artifact_terminal() {
+    [ "$ROOT_ARTIFACT_TERMINAL_PATH" = "$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.terminal.$ROOT_ARTIFACT_TRANSACTION_ID.json" ] \
+        && [[ "$ROOT_ARTIFACT_TERMINAL_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Root-Artefakt-Terminalbindung ist unvollstaendig" 70
+    activation_v7_transition root-terminal \
+        "root_artifact_terminal_path=$ROOT_ARTIFACT_TERMINAL_PATH" \
+        "root_artifact_terminal_sha256=$ROOT_ARTIFACT_TERMINAL_SHA256"
+    validate_activation_journal 1
+}
+
+bind_projection_journal() {
+    local expected_root_phase="$1" private_phase="$2" pending python tmp schema values
+    local target_receipt prior_receipt projection_state active active_hash
+    validate_activation_journal 1
+    pending="$(projection_helper_call inspect-pending)"
+    schema="$(journal_field schema)"
+    if [ "$schema" = genus-a0.3c-runtime-activation-pending-v7 ]; then
+        values="$(ROOT_PENDING="$pending" EXPECTED_ROOT_PHASE="$expected_root_phase" \
+            "$SYSTEM_PYTHON_BIN" -I -P - "$ACTIVATION_JOURNAL" "$(id -u)" "$(id -g)" <<'PY'
+import json,os,pathlib,stat,sys
+source=pathlib.Path(sys.argv[1]); uid,gid=map(int,sys.argv[2:4])
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+before=source.lstat()
+if (source.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+    raise SystemExit("private projection binding journal metadata differs")
+descriptor=os.open(source,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+try:
+    opened=os.fstat(descriptor)
+    while True:
+        chunk=os.read(descriptor,min(1024*1024,8*1024*1024+1-size))
+        if not chunk: break
+        size+=len(chunk)
+        if size>8*1024*1024: raise SystemExit("private projection binding journal grew beyond bound")
+        chunks.append(chunk)
+    final=os.fstat(descriptor)
+finally: os.close(descriptor)
+after=source.lstat(); private_raw=b"".join(chunks)
+if not identity(before)==identity(opened)==identity(final)==identity(after) or len(private_raw)!=before.st_size:
+    raise SystemExit("private projection binding journal changed during read")
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    canonical=(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+    if not isinstance(value,dict) or canonical!=raw: raise SystemExit(f"{label} is not canonical")
+    return value
+private=strict(private_raw,"private projection binding journal")
+root_raw=os.environ["ROOT_PENDING"].encode()+b"\n"; root=strict(root_raw,"root projection pending result")
+root_keys={"approval_path","approval_sha256","operator_uid","phase","plan_sha256","prior_manifest","prior_manifest_sha256","prior_private_set",
+ "prior_receipt_sha256","prior_tree_inventory_sha256","schema","state_root","target_manifest",
+ "target_manifest_sha256","target_private_set","target_receipt_sha256","target_tree_inventory_sha256","transaction_nonce"}
+if (private.get("schema")!="genus-a0.3c-runtime-activation-pending-v7" or set(root)!=root_keys
+        or root.get("schema")!="genus-a0.3c-runtime-projection-pending-v2"
+        or root.get("phase")!=os.environ["EXPECTED_ROOT_PHASE"]):
+    raise SystemExit("root/private projection v7 schema/phase differs")
+bindings={"transaction_nonce":"projection_transaction_nonce","plan_sha256":"projection_plan_sha256",
+ "approval_path":"projection_approval_path","approval_sha256":"projection_approval_sha256",
+ "operator_uid":"operator_uid","target_manifest":"target_manifest",
+ "target_manifest_sha256":"target_manifest_sha256","prior_manifest":"projection_prior_manifest"}
+if any(root.get(left)!=private.get(right) for left,right in bindings.items()):
+    raise SystemExit("root/private projection v7 transaction binding differs")
+for key in ("target_receipt_sha256","target_tree_inventory_sha256","target_manifest_sha256"):
+    value=root.get(key)
+    if not isinstance(value,str) or len(value)!=64 or any(ch not in "0123456789abcdef" for ch in value):
+        raise SystemExit(f"root projection {key} differs")
+prior=root.get("prior_receipt_sha256","")
+if bool(root.get("prior_manifest"))!=bool(prior) or (prior and (len(prior)!=64 or any(ch not in "0123456789abcdef" for ch in prior))):
+    raise SystemExit("root projection prior receipt pair differs")
+print(root["target_receipt_sha256"]); print(prior or "-")
+PY
+)"
+        mapfile -t values <<< "$values"
+        [ "${#values[@]}" -eq 2 ] && [[ "${values[0]}" =~ ^[a-f0-9]{64}$ ]] \
+            || fail "Projection-v7-Pending lieferte keine exakte Receipt-Bindung" 70
+        target_receipt="${values[0]}"; prior_receipt="${values[1]}"
+        [ "$prior_receipt" != - ] || prior_receipt=""
+        if [ -n "$(journal_field projection_prior_manifest)" ]; then
+            [[ "$prior_receipt" =~ ^[a-f0-9]{64}$ ]] \
+                || fail "Projection-v7-Prior-Receipt fehlt" 70
+        else
+            [ -z "$prior_receipt" ] || fail "Projection-v7 traegt ein verwaistes Prior-Receipt" 70
+        fi
+        projection_state="$(journal_field projection_state)"
+        if [ "$projection_state" = authorized ]; then
+            activation_v7_transition projection-prepared \
+                "projection_target_receipt_sha256=$target_receipt" \
+                "projection_prior_receipt_sha256=$prior_receipt"
+            projection_state=prepared
+        else
+            [ "$(journal_field projection_target_receipt_sha256)" = "$target_receipt" ] \
+                && [ "$(journal_field projection_prior_receipt_sha256)" = "$prior_receipt" ] \
+                || fail "Projection-v7-Receipts drifteten zwischen Root- und Private-Journal" 70
+        fi
+        case "$expected_root_phase:$private_phase" in
+            prepared:projection-prepared)
+                [ "$projection_state" = prepared ] \
+                    || fail "Projection-v7-Prepare traf einen falschen privaten Zustand" 70
+                ;;
+            activated:projection-activated)
+                [ "$projection_state" = prepared ] \
+                    || fail "Projection-v7-Aktivierung traf einen falschen privaten Zustand" 70
+                active="$(selector_manifest)"
+                [ "$active" = "$(journal_field target_manifest)" ] \
+                    || fail "Projection-v7-Aktivierung bindet nicht den privaten Zielselector" 70
+                active_hash="$(manifest_file_hash "$active")"
+                activation_v7_transition projection-activated \
+                    "active_manifest=$active" "active_manifest_sha256=$active_hash"
+                ;;
+            restored:projection-restored)
+                case "$projection_state" in prepared|activated|restored) ;; *)
+                    fail "Projection-v7-Restore traf einen falschen privaten Zustand" 70 ;;
+                esac
+                active="$(selector_manifest)"
+                [ "$active" = "$(journal_field prior_active_manifest)" ] \
+                    || fail "Projection-v7-Restore bindet nicht den privaten Prior-Selector" 70
+                active_hash="$(manifest_file_hash "$active")"
+                activation_v7_transition projection-restored \
+                    "active_manifest=$active" "active_manifest_sha256=$active_hash"
+                ;;
+            *) fail "unbekannte Projection-v7 Root/Private-Phasenkopplung" 70 ;;
+        esac
+        validate_activation_journal 1
+        return 0
+    fi
+    python="$(journal_python)"; tmp="$ACTIVATION_JOURNAL.tmp.$$.$RANDOM"
+    ROOT_PENDING="$pending" EXPECTED_ROOT_PHASE="$expected_root_phase" PRIVATE_PHASE="$private_phase" \
+        "$python" - "$ACTIVATION_JOURNAL" "$tmp" <<'PY'
+import json, os, pathlib, sys
+source,target=map(pathlib.Path,sys.argv[1:3]); private=json.loads(source.read_text()); root=json.loads(os.environ["ROOT_PENDING"])
+root_keys={"approval_path","approval_sha256","operator_uid","phase","plan_sha256","prior_manifest","prior_manifest_sha256","prior_private_set",
+ "prior_receipt_sha256","prior_tree_inventory_sha256","schema","state_root","target_manifest",
+ "target_manifest_sha256","target_private_set","target_receipt_sha256","target_tree_inventory_sha256","transaction_nonce"}
+if set(root)!=root_keys or root.get("schema")!="genus-a0.3c-runtime-projection-pending-v2" or root.get("phase")!=os.environ["EXPECTED_ROOT_PHASE"]:
+    raise SystemExit("root projection journal schema/phase differs")
+if (root.get("transaction_nonce")!=private["projection_transaction_nonce"]
+        or root.get("plan_sha256")!=private["projection_plan_sha256"]
+        or root.get("approval_path")!=private["projection_approval_path"]
+        or root.get("approval_sha256")!=private["projection_approval_sha256"]
+        or root.get("operator_uid")!=private["operator_uid"]):
+    raise SystemExit("root/private projection transaction binding differs")
+if (root.get("target_manifest")!=private["target_manifest"]
+        or root.get("target_manifest_sha256")!=private["target_manifest_sha256"]
+        or root.get("prior_manifest")!=private["projection_prior_manifest"]):
+    raise SystemExit("root/private projection selector binding differs")
+for key in ("target_receipt_sha256","target_tree_inventory_sha256","target_manifest_sha256"):
+    value=root.get(key)
+    if not isinstance(value,str) or len(value)!=64 or any(ch not in "0123456789abcdef" for ch in value):
+        raise SystemExit(f"root projection {key} differs")
+prior_receipt=root.get("prior_receipt_sha256","")
+if bool(root.get("prior_manifest")) != bool(prior_receipt):
+    raise SystemExit("root projection prior receipt pair differs")
+if prior_receipt and (len(prior_receipt)!=64 or any(ch not in "0123456789abcdef" for ch in prior_receipt)):
+    raise SystemExit("root projection prior receipt hash differs")
+for key,value in (("projection_target_receipt_sha256",root["target_receipt_sha256"]),("projection_prior_receipt_sha256",prior_receipt)):
+    if private.get(key) not in {"",value}: raise SystemExit(f"private {key} drifted")
+    private[key]=value
+private["phase"]=os.environ["PRIVATE_PHASE"]
+flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(target,flags,0o600)
+try:
+    payload=(json.dumps(private,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short projection journal binding write")
+        view=view[count:]
+    os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_activation_journal
 }
 
 remove_autostart_approval() {
@@ -3225,8 +10837,23 @@ PY
     validate_autostart_approval
 }
 
+start_authorization_schema() {
+    [ -f "$AUTOSTART_APPROVAL" ] && [ ! -L "$AUTOSTART_APPROVAL" ] \
+        || fail "Autostart-Approval fehlt oder ist kein regulaeres File" 70
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+value=json.loads(pathlib.Path(sys.argv[1]).read_text()).get("schema","")
+if not isinstance(value,str): raise SystemExit("authorization schema malformed")
+print(value)
+PY
+}
+
 validate_autostart_approval() {
     local python active active_hash has_journal=0
+    if [ "$(start_authorization_schema)" = "genus-a0.3c-runtime-start-authorization-v4" ]; then
+        validate_code_release_autostart_approval
+        return
+    fi
     [ -f "$AUTOSTART_APPROVAL" ] && [ ! -L "$AUTOSTART_APPROVAL" ] \
         && [ "$(stat -c %u "$AUTOSTART_APPROVAL")" -eq "$(id -u)" ] \
         && [ "$(stat -c %a "$AUTOSTART_APPROVAL")" = 600 ] \
@@ -3434,7 +11061,7 @@ if not legacy_v2:
     elif approval["series_sha256"] or approval["reason"]=="activate": raise SystemExit("stale activate approval lacks series")
     if approval["reason"]!="activate" and any(approval[key] for key in ("readiness_path","readiness_sha256","series_path","series_sha256")): raise SystemExit("stale non-activate approval carries activation evidence")
 manifest=json.loads(manifest_path.read_text())
-if not active.startswith("legacy-") and (manifest.get("schema")!="genus-a0.3c-runtime-set-v1" or manifest.get("manifest_id")!=active or manifest.get("repo_commit")!=old): raise SystemExit("stale active manifest is not old-commit-bound")
+if not active.startswith("legacy-") and (manifest.get("schema")!="genus-a0.3c-runtime-set-v2" or manifest.get("manifest_id")!=active or manifest.get("repo_commit")!=old): raise SystemExit("stale active manifest is not old-commit-bound")
 PY
 }
 
@@ -3473,17 +11100,17 @@ print(value)
 PY
     )"
     [[ "$old" =~ ^[a-f0-9]{40}$ ]] || fail "Reauthorization-OLD ist malformed" 70
-    "$GIT_BIN" -C "$REPO_DIR" merge-base --is-ancestor "$old" "$(repo_commit)" \
+    safe_git merge-base --is-ancestor "$old" "$(repo_commit)" \
         || fail "Reauthorization-OLD ist kein vertrauenswuerdiger Vorfahr" 70
     transition_boot_guard_present "$old" \
         || fail "Boot-Guard ist weder exakt OLD noch exakt aktuell" 70
     legacy_expected="$(mktemp "$STATE_ROOT/boot-guard-old-verify.XXXXXX")"
     write_boot_guard_payload_from_commit "$old" "$legacy_expected"
-    legacy_guard_hash="$(sha256_file "$legacy_expected")"; rm -f -- "$legacy_expected"
+    legacy_guard_hash="$BOOT_GUARD_PAYLOAD_SHA256"; rm -f -- "$legacy_expected"
     current_expected="$(mktemp "$STATE_ROOT/boot-guard-current-verify.XXXXXX")"
     write_boot_guard_payload "$current_expected"
-    current_guard_hash="$(sha256_file "$current_expected")"; rm -f -- "$current_expected"
-    guard_hash="$(sha256_file "$BOOT_GUARD_PATH")"; approval_hash="$(sha256_file "$AUTOSTART_APPROVAL")"
+    current_guard_hash="$BOOT_GUARD_PAYLOAD_SHA256"; rm -f -- "$current_expected"
+    guard_hash="$(root_stable_sha256 "$BOOT_GUARD_PATH" 0755)"; approval_hash="$(sha256_file "$AUTOSTART_APPROVAL")"
     stale_hash="$(sha256_file "$stale_path")"
     [ "$approval_hash" = "$stale_hash" ] || fail "live stale Approval driftete von Reauthorization-Evidence" 70
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
@@ -3491,16 +11118,22 @@ PY
         LIVE_GUARD_HASH="$guard_hash" LEGACY_GUARD_HASH="$legacy_guard_hash" CURRENT_GUARD_HASH="$current_guard_hash" \
         GUARD_PATH="$BOOT_GUARD_PATH" APPROVAL_HASH="$approval_hash" \
         STALE_PATH="$stale_path" STALE_HASH="$stale_hash" COMMIT="$(repo_commit)" \
+        EXPECTED_EXECUTOR_SHA="$(root_artifact_executor_expected_sha256 "$(repo_commit)")" \
         "$SYSTEM_PYTHON_BIN" -I -P - \
-        "$OPERATOR_REAUTH_TOKEN" "$receipt" "$AUTOSTART_APPROVAL" <<'PY'
+        "$OPERATOR_REAUTH_TOKEN" "$receipt" "$AUTOSTART_APPROVAL" "${ROOT_ARTIFACT_TARGETS[@]}" <<'PY'
 import hashlib,json,os,pathlib,re,sys
 token=json.loads(pathlib.Path(sys.argv[1]).read_text()); receipt=json.loads(pathlib.Path(sys.argv[2]).read_text())
-token_keys={"schema","receipt_path","receipt_sha256","old_commit","new_commit","active_manifest","active_manifest_sha256","guard_sha256","intended_command"}
-receipt_keys={"schema","old_commit","new_commit","old_tree","new_tree","active_manifest","active_manifest_sha256","stale_approval_path","stale_approval_sha256","guard_path","guard_sha256","allowed_diff_sha256","intended_command","boot_approval_updated","paths_logged","payloads_logged"}
-if set(token)!=token_keys or token["schema"]!="genus-a0.3c-operator-reauthorization-token-v1" or set(receipt)!=receipt_keys or receipt["schema"]!="genus-a0.3c-operator-reauthorization-v1": raise SystemExit("reauthorization schema differs")
+token_keys={"schema","receipt_path","receipt_sha256","old_commit","new_commit","active_manifest","active_manifest_sha256","guard_sha256","intended_command","root_artifact_executor_sha256","root_artifact_commit_policy"}
+receipt_keys={"schema","old_commit","new_commit","old_tree","new_tree","active_manifest","active_manifest_sha256","stale_approval_path","stale_approval_sha256","guard_path","guard_sha256","allowed_diff_sha256","intended_command","boot_approval_updated","paths_logged","payloads_logged","root_artifact_paths","root_artifact_executor_sha256","root_artifact_commit_policy"}
+if set(token)!=token_keys or token["schema"]!="genus-a0.3c-operator-reauthorization-token-v2" or set(receipt)!=receipt_keys or receipt["schema"]!="genus-a0.3c-operator-reauthorization-v2": raise SystemExit("reauthorization schema differs")
 if token["receipt_path"]!=sys.argv[2] or token["receipt_sha256"]!=os.environ["TOKEN_HASH"] or token["new_commit"]!=os.environ["COMMIT"] or token["active_manifest"]!=os.environ["ACTIVE"] or token["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"] or token["guard_sha256"]!=os.environ["LEGACY_GUARD_HASH"] or token["intended_command"]!="stage-and-activate": raise SystemExit("reauthorization token binding differs")
-for key in ("old_commit","new_commit","active_manifest","active_manifest_sha256","guard_sha256","intended_command"):
+for key in ("old_commit","new_commit","active_manifest","active_manifest_sha256","guard_sha256","intended_command","root_artifact_executor_sha256","root_artifact_commit_policy"):
     if receipt[key]!=token[key]: raise SystemExit("reauthorization receipt/token crossbinding differs")
+targets=sys.argv[4:]
+if len(targets)!=10 or receipt["root_artifact_paths"]!=targets: raise SystemExit("reauthorization root artifact scope differs")
+if (receipt["root_artifact_executor_sha256"]!=os.environ["EXPECTED_EXECUTOR_SHA"]
+        or receipt["root_artifact_commit_policy"]!="retain-on-activation-rollback"):
+    raise SystemExit("reauthorization root artifact retention authority differs")
 if receipt["stale_approval_path"]!=os.environ["STALE_PATH"] or receipt["stale_approval_sha256"]!=os.environ["STALE_HASH"] or receipt["stale_approval_sha256"]!=os.environ["APPROVAL_HASH"] or receipt["guard_path"]!=os.environ["GUARD_PATH"]: raise SystemExit("reauthorization stale evidence differs")
 if receipt["guard_sha256"]!=os.environ["LEGACY_GUARD_HASH"] or os.environ["LIVE_GUARD_HASH"] not in {os.environ["LEGACY_GUARD_HASH"],os.environ["CURRENT_GUARD_HASH"]}: raise SystemExit("reauthorization guard migration binding differs")
 if receipt["boot_approval_updated"] is not False or receipt["paths_logged"] is not True or receipt["payloads_logged"] is not False: raise SystemExit("reauthorization safety booleans differ")
@@ -3510,15 +11143,15 @@ if any(not re.fullmatch(r"[0-9a-f]{64}",receipt[key]) for key in ("active_manife
 PY
     new="$(repo_commit)"
     assert_expected_commit "$new"
-    "$GIT_BIN" -C "$REPO_DIR" merge-base --is-ancestor "$old" "$new" \
+    safe_git merge-base --is-ancestor "$old" "$new" \
         || fail "reauthorisierter Commit ist kein Fast-Forward" 65
-    old_tree="$("$GIT_BIN" -C "$REPO_DIR" rev-parse "$old^{tree}")"
-    new_tree="$("$GIT_BIN" -C "$REPO_DIR" rev-parse "$new^{tree}")"
+    old_tree="$(safe_git rev-parse "$old^{tree}")"
+    new_tree="$(safe_git rev-parse "$new^{tree}")"
     diff_file="$(mktemp "$STATE_ROOT/reauthorize-verify.diff.XXXXXX")"
-    "$GIT_BIN" -C "$REPO_DIR" diff --name-only -z "$old" "$new" > "$diff_file"
+    safe_git diff --name-only -z "$old" "$new" > "$diff_file"
     while IFS= read -r -d '' path; do
         case "$path" in
-            deploy/pi_a0_3c_runtime.sh|deploy/backup_ledger_to_sd.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
+            deploy/pi_a0_3c_runtime.sh|deploy/pi_a0_3c_projection.py|deploy/pi_a0_3c_consumer_publish.py|deploy/pi_a0_3c_consumer_bundle.py|deploy/pi_a0_3c_root_artifact_transaction.py|deploy/a0_3c_consumers/*|deploy/backup_ledger_to_sd.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
             *) fail "reauthorisierter Diff enthaelt nun einen nicht freigegebenen Pfad" 70 ;;
         esac
     done < "$diff_file"
@@ -3531,8 +11164,13 @@ data=json.loads(pathlib.Path(sys.argv[1]).read_text())
 if data["old_tree"]!=os.environ["OLD_TREE"] or data["new_tree"]!=os.environ["NEW_TREE"] or data["allowed_diff_sha256"]!=os.environ["DIFF_HASH"]: raise SystemExit("reauthorization git-object/diff binding differs")
 PY
     validate_stale_autostart_approval "$old"
-    migrate_boot_guard_to_current "$old"
     OPERATOR_REAUTH_RECEIPT="$receipt"
+    OPERATOR_REAUTH_OLD_COMMIT="$old"
+    ROOT_ARTIFACT_OLD_COMMIT="$old"
+    ROOT_ARTIFACT_NEW_COMMIT="$new"
+    ROOT_ARTIFACT_AUTHORITY_PATH="$receipt"
+    ROOT_ARTIFACT_AUTHORITY_SHA256="$(sha256_file "$receipt")"
+    ROOT_ARTIFACT_EXECUTOR_SHA256="$(root_artifact_executor_expected_sha256 "$new")"
 }
 
 consume_operator_reauthorization() {
@@ -3540,19 +11178,308 @@ consume_operator_reauthorization() {
     rm -f -- "$OPERATOR_REAUTH_TOKEN"
     fsync_dir "$STATE_ROOT"
     OPERATOR_REAUTH_RECEIPT=""
+    OPERATOR_REAUTH_OLD_COMMIT=""
 }
 
 clear_activation_state() {
-    # The crontab snapshots remain as durable recovery evidence until the next
-    # locked invocation observes the established no-journal state and removes
-    # them.  Thus a finalization error can always disable the exact GENUS block.
+    local python consumer_state schema phase terminal_sha
+    validate_activation_journal 1
+    consumer_state="$(journal_field consumer_state)"; schema="$(journal_field schema)"
+    phase="$(journal_field phase)"
+    if [ "$consumer_state" = prior-unchanged ] \
+        && [ "$schema" != genus-a0.3c-runtime-activation-pending-v7 ]; then
+        rm -f -- "$ACTIVATION_JOURNAL"
+        fsync_dir "$STATE_ROOT"
+        return 0
+    fi
+    python="$(journal_python)"
+    "$python" - "$ACTIVATION_JOURNAL" "$ACTIVATION_TERMINAL" "$(id -u)" "$(id -g)" <<'PY'
+import ctypes,errno,json,os,pathlib,stat,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); uid,gid=map(int,sys.argv[3:5])
+source_fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+source_identity=lambda value:tuple(getattr(value,key) for key in source_fields)
+def stable_private(path):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+        raise SystemExit("activation terminalization source metadata differs")
+    descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,min(1024*1024,8*1024*1024+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>8*1024*1024: raise SystemExit("activation terminalization source grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not source_identity(before)==source_identity(opened)==source_identity(final)==source_identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("activation terminalization source changed during read")
+    return raw
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate activation terminalization key")
+        result[key]=value
+    return result
+source_raw=stable_private(source); data=json.loads(source_raw,object_pairs_hook=pairs)
+canonical=lambda value:(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if canonical(data)!=source_raw: raise SystemExit("activation terminalization source is not canonical")
+if data.get("schema")=="genus-a0.3c-runtime-activation-pending-v6":
+    if (data.get("phase") not in {"projection-committed","restore-receipt-written"}
+            or data.get("consumer_state") not in {"target-verified","prior-restored"}):
+        raise SystemExit("activation-v6 is not terminalizable")
+    data["schema"]="genus-a0.3c-runtime-activation-terminal-v1"; data["phase"]="terminalized"
+elif data.get("schema")=="genus-a0.3c-runtime-activation-pending-v7":
+    target=(data.get("phase")=="projection-committed" and data.get("root_artifact_state")=="committed"
+            and data.get("projection_state")=="committed" and data.get("consumer_state")=="target-verified")
+    prior=(data.get("phase") in {"consumer-prior-restored","consumer-prior-unchanged","restore-receipt-written"}
+           and data.get("root_artifact_state")=="committed" and data.get("projection_state")=="restored"
+           and data.get("consumer_state") in {"prior-restored","prior-unchanged"})
+    if not (target or prior): raise SystemExit("activation-v7 is not terminalizable")
+    required=("activation_reservation_sha256","root_artifact_transaction_id","root_artifact_inventory_sha256",
+              "root_artifact_authority_sha256","root_artifact_executor_sha256","root_artifact_terminal_path",
+              "root_artifact_terminal_sha256","projection_transaction_nonce","projection_plan_sha256",
+              "projection_approval_sha256","consumer_snapshot_sha256","consumer_approval_sha256",
+              "activation_receipt_path","activation_receipt_sha256")
+    if any(not data.get(key) for key in required): raise SystemExit("activation-v7 terminal lacks authority binding")
+    data["schema"]="genus-a0.3c-runtime-activation-terminal-v2"
+    data["phase"]="terminalized-target" if target else "terminalized-prior"
+else:
+    raise SystemExit("activation terminalization schema differs")
+raw=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path):
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+        raise SystemExit("activation terminal metadata differs")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(fd)
+        while True:
+            chunk=os.read(fd,min(1024*1024,8*1024*1024+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>8*1024*1024: raise SystemExit("activation terminal grew beyond bound")
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=path.lstat(); payload=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(payload)!=before.st_size:
+        raise SystemExit("activation terminal drifted")
+    return payload
+temporary=target.with_name(f".{target.name}.publishing")
+def fsync_parent():
+    directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(directory)
+    finally: os.close(directory)
+def rename_noreplace(source_path,target_path):
+    libc=ctypes.CDLL(None,use_errno=True); function=getattr(libc,"renameat2",None)
+    if function is None: raise SystemExit("renameat2 is unavailable for durable activation terminal")
+    function.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+    function.restype=ctypes.c_int
+    if function(-100,os.fsencode(source_path),-100,os.fsencode(target_path),1)==0: return True
+    error=ctypes.get_errno()
+    if error==errno.EEXIST: return False
+    raise OSError(error,os.strerror(error),str(target_path))
+try: existing=stable(target)
+except FileNotFoundError:
+    try: pending=stable(temporary)
+    except FileNotFoundError: pending=None
+    if pending is not None and pending!=raw:
+        temporary.unlink(); fsync_parent(); pending=None
+    if pending is None:
+        flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(temporary,flags,0o400)
+        try:
+            view=memoryview(raw)
+            while view:
+                count=os.write(fd,view)
+                if count<=0: raise SystemExit("short activation terminal write")
+                view=view[count:]
+            os.fchmod(fd,0o400); os.fsync(fd)
+        finally: os.close(fd)
+    if not rename_noreplace(temporary,target):
+        if stable(target)!=raw: raise SystemExit("raced activation terminal differs")
+        temporary.unlink()
+    fsync_parent(); existing=stable(target)
+else:
+    try: pending=stable(temporary)
+    except FileNotFoundError: pass
+    else:
+        if pending!=raw: raise SystemExit("stale activation terminal temp differs")
+        temporary.unlink(); fsync_parent()
+if existing!=raw: raise SystemExit("existing activation terminal differs")
+PY
+    # A committed v7 target may later be rolled back only from this durable,
+    # root-owned authority.  Seal it while activation.completed and every
+    # nonce-bound input are still present; cleanup is allowed only afterwards.
+    if [ "$schema" = genus-a0.3c-runtime-activation-pending-v7 ] \
+        && [ "$phase" = projection-committed ] \
+        && [ "$consumer_state" = target-verified ]; then
+        terminal_sha="$(user_stable_sha256 "$ACTIVATION_TERMINAL" 0400)"
+        projection_helper_call seal-rollback-source \
+            --activation-terminal-sha256 "$terminal_sha" >/dev/null
+    fi
+    # The pending journal is removed only after a durable, idempotent terminal
+    # marker exists.  That marker is sufficient for the next locked observer to
+    # revalidate the live consumer topology before deleting the old cron pair.
     rm -f -- "$ACTIVATION_JOURNAL"
     fsync_dir "$STATE_ROOT"
+    if [ "$schema" = genus-a0.3c-runtime-activation-pending-v7 ]; then
+        rm -f -- "$ACTIVATION_RESERVATION"
+        fsync_dir "$STATE_ROOT"
+    fi
 }
 
 cleanup_completed_activation_artifacts() {
+    local desired expected command nonce plan_sha candidate snapshot_sha output terminal_status terminal_schema
+    local PROJECTION_HELPER_COMMIT CONSUMER_TOOL_COMMIT
     [ ! -e "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
         || fail "Activation-Artefakte duerfen bei offenem Journal nicht bereinigt werden" 70
+    if [ -e "$ACTIVATION_TERMINAL" ] || [ -L "$ACTIVATION_TERMINAL" ]; then
+        desired="$($SYSTEM_PYTHON_BIN -I -P - "$ACTIVATION_TERMINAL" "$(id -u)" "$(id -g)" <<'PY'
+import json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); uid,gid=map(int,sys.argv[2:4]); before=path.lstat()
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+    raise SystemExit("activation terminal metadata differs")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+try:
+    opened=os.fstat(fd)
+    while True:
+        chunk=os.read(fd,min(1024*1024,8*1024*1024+1-size))
+        if not chunk: break
+        size+=len(chunk)
+        if size>8*1024*1024: raise SystemExit("activation terminal grew beyond bound")
+        chunks.append(chunk)
+    final=os.fstat(fd)
+finally: os.close(fd)
+after=path.lstat(); raw=b"".join(chunks)
+if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+    raise SystemExit("activation terminal changed during descriptor-bound read")
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate activation terminal key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+required={"schema","phase","operator_uid","candidate_commit","mode","target_manifest","target_manifest_sha256",
+ "readiness_path","readiness_sha256","series_path","series_sha256","active_manifest","active_manifest_sha256",
+ "prior_active_manifest","prior_previous_manifest","prior_active_services","target_active_services","cron_original_sha256","cron_disabled_sha256",
+ "projection_transaction_nonce","projection_plan_path","projection_plan_sha256","projection_helper_sha256",
+ "projection_approval_path","projection_approval_sha256","projection_prior_manifest","projection_prior_receipt_sha256",
+ "consumer_state","consumer_plan_path","consumer_plan_sha256","consumer_inventory_path","consumer_inventory_sha256",
+ "consumer_snapshot_path","consumer_snapshot_sha256","consumer_publisher_sha256","consumer_renderer_sha256",
+ "consumer_baseline_hint","consumer_baseline","consumer_baseline_authorization_sha256","consumer_approval_path","consumer_approval_sha256",
+ "projection_target_receipt_sha256","activation_receipt_path","activation_receipt_sha256"}
+root_v7={"activation_reservation_sha256","root_artifact_transaction_id","root_artifact_inventory_sha256",
+ "root_artifact_authority_path","root_artifact_authority_sha256","root_artifact_executor_sha256",
+ "root_artifact_old_commit","root_artifact_new_commit","root_artifact_commit_policy","root_artifact_state",
+ "root_artifact_terminal_path","root_artifact_terminal_sha256","projection_state"}
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if raw!=canonical: raise SystemExit("activation terminal is not canonical")
+if data.get("schema")=="genus-a0.3c-runtime-activation-terminal-v1":
+    if (set(data)!=required or data.get("phase")!="terminalized"
+            or data.get("consumer_state") not in {"target-verified","prior-restored"}):
+        raise SystemExit("activation-v1 terminal schema differs")
+elif data.get("schema")=="genus-a0.3c-runtime-activation-terminal-v2":
+    target=(data.get("phase")=="terminalized-target" and data.get("root_artifact_state")=="committed"
+            and data.get("projection_state")=="committed" and data.get("consumer_state")=="target-verified")
+    prior=(data.get("phase")=="terminalized-prior" and data.get("root_artifact_state")=="committed"
+           and data.get("projection_state")=="restored"
+           and data.get("consumer_state") in {"prior-restored","prior-unchanged"})
+    if set(data)!=(required|root_v7) or not (target or prior):
+        raise SystemExit("activation-v2 terminal schema/state differs")
+    for key in ("activation_reservation_sha256","root_artifact_transaction_id","root_artifact_inventory_sha256",
+                "root_artifact_authority_sha256","root_artifact_executor_sha256","root_artifact_terminal_sha256",
+                "projection_transaction_nonce"):
+        if re.fullmatch(r"[a-f0-9]{64}",str(data.get(key,""))) is None:
+            raise SystemExit(f"activation-v2 terminal digest differs: {key}")
+    if (data.get("root_artifact_new_commit")!=data.get("candidate_commit")
+            or data.get("root_artifact_commit_policy")!="retain-on-activation-rollback"):
+        raise SystemExit("activation-v2 terminal commit policy differs")
+else:
+    raise SystemExit("activation terminal schema differs")
+if re.fullmatch(r"[a-f0-9]{64}",str(data.get("projection_transaction_nonce",""))) is None:
+    raise SystemExit("activation terminal projection nonce differs")
+print("target" if data["consumer_state"]=="target-verified" else "prior")
+PY
+)" || fail "completed Activation-Terminal ist nicht descriptor-stabil/kanonisch" 70
+        local ACTIVATION_JOURNAL="$ACTIVATION_TERMINAL"
+        terminal_schema="$(journal_field schema)"
+        candidate="$(journal_field candidate_commit)"; nonce="$(journal_field projection_transaction_nonce)"
+        plan_sha="$(journal_field projection_plan_sha256)"; snapshot_sha="$(journal_field consumer_snapshot_sha256)"
+        PROJECTION_HELPER_COMMIT="$candidate"; CONSUMER_TOOL_COMMIT="$candidate"
+        if [ "$terminal_schema" = genus-a0.3c-runtime-activation-terminal-v2 ]; then
+            if [ -e "$ACTIVATION_RESERVATION" ] || [ -L "$ACTIVATION_RESERVATION" ]; then
+                [ "$(user_stable_sha256 "$ACTIVATION_RESERVATION" 0600)" \
+                    = "$(journal_field activation_reservation_sha256)" ] \
+                    || fail "completed Activation-v2 hat eine fremde verwaiste Reservation" 70
+            fi
+            ROOT_ARTIFACT_TRANSACTION_ID="$(journal_field root_artifact_transaction_id)"
+            ROOT_ARTIFACT_INVENTORY_SHA256="$(journal_field root_artifact_inventory_sha256)"
+            ROOT_ARTIFACT_AUTHORITY_PATH="$(journal_field root_artifact_authority_path)"
+            ROOT_ARTIFACT_AUTHORITY_SHA256="$(journal_field root_artifact_authority_sha256)"
+            ROOT_ARTIFACT_EXECUTOR_SHA256="$(journal_field root_artifact_executor_sha256)"
+            ROOT_ARTIFACT_OLD_COMMIT="$(journal_field root_artifact_old_commit)"
+            ROOT_ARTIFACT_NEW_COMMIT="$(journal_field root_artifact_new_commit)"
+            ROOT_ARTIFACT_COMMIT_POLICY="$(journal_field root_artifact_commit_policy)"
+            ROOT_ARTIFACT_RESERVATION_SHA256="$(journal_field activation_reservation_sha256)"
+            expected="$(journal_field root_artifact_terminal_sha256)"
+            root_artifact_validate_terminal committed >/dev/null
+            [ "$ROOT_ARTIFACT_TERMINAL_SHA256" = "$expected" ] \
+                || fail "completed Activation-v2-Terminal driftet von der Root-Artefakt-Autoritaet" 70
+        fi
+        if [ "$desired" = target ]; then
+            expected="$(journal_field target_manifest)"; command=validate-target
+            [ "$(selector_manifest)" = "$expected" ] && [ "$(public_projection_manifest)" = "$expected" ] \
+                || fail "completed Consumer-Ziel ist nicht mehr der Dual-Selector-Stand" 70
+            projection_helper_call validate-terminal --expected "$expected" --outcome target \
+                --transaction-nonce "$nonce" --plan-sha256 "$plan_sha" >/dev/null
+        else
+            expected="$(journal_field prior_active_manifest)"; command=validate-prior
+            [ "$(selector_manifest)" = "$expected" ] && [ "$(public_projection_manifest)" = "$expected" ] \
+                || fail "completed Consumer-Restore ist nicht mehr der Dual-Selector-Stand" 70
+            projection_helper_call validate-terminal --expected "$expected" --outcome prior-or-none \
+                --transaction-nonce "$nonce" --plan-sha256 "$plan_sha" >/dev/null
+        fi
+        validate_projection_steady_state "$expected"
+        validate_consumer_root_approval 1
+        output="$(consumer_publisher_from_journal "$command" active)"
+        [ "$output" = "$snapshot_sha" ] \
+            || fail "completed Consumer-Cron/Bundle ist nicht exakt aktiv" 70
+        verify_consumer_units_loaded "$desired"
+        if [ -e "$ACTIVATION_CRON_SNAPSHOT" ] || [ -L "$ACTIVATION_CRON_SNAPSHOT" ]; then
+            [ -f "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -L "$ACTIVATION_CRON_SNAPSHOT" ] \
+                && [ "$(stat -c %u "$ACTIVATION_CRON_SNAPSHOT")" -eq "$(id -u)" ] \
+                && [ "$(stat -c %a "$ACTIVATION_CRON_SNAPSHOT")" = 600 ] \
+                && [ "$(stat -c %h "$ACTIVATION_CRON_SNAPSHOT")" -eq 1 ] \
+                || fail "completed Activation-Crontab-Snapshot ist nicht privat/regulaer" 70
+        fi
+        if [ -e "$ACTIVATION_CRON_DISABLED" ] || [ -L "$ACTIVATION_CRON_DISABLED" ]; then
+            [ -f "$ACTIVATION_CRON_DISABLED" ] && [ ! -L "$ACTIVATION_CRON_DISABLED" ] \
+                && [ "$(stat -c %u "$ACTIVATION_CRON_DISABLED")" -eq "$(id -u)" ] \
+                && [ "$(stat -c %a "$ACTIVATION_CRON_DISABLED")" = 600 ] \
+                && [ "$(stat -c %h "$ACTIVATION_CRON_DISABLED")" -eq 1 ] \
+                || fail "completed deaktivierte Crontab-Evidenz ist nicht privat/regulaer" 70
+        fi
+        rm -f -- "$ACTIVATION_CRON_SNAPSHOT" "$ACTIVATION_CRON_DISABLED"
+        fsync_dir "$STATE_ROOT"
+        if [ "$terminal_schema" = genus-a0.3c-runtime-activation-terminal-v2 ]; then
+            rm -f -- "$ACTIVATION_RESERVATION"
+            fsync_dir "$STATE_ROOT"
+        fi
+        rm -f -- "$ACTIVATION_TERMINAL"
+        fsync_dir "$STATE_ROOT"
+        return 0
+    fi
     if [ ! -e "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -L "$ACTIVATION_CRON_SNAPSHOT" ] \
         && [ ! -e "$ACTIVATION_CRON_DISABLED" ] && [ ! -L "$ACTIVATION_CRON_DISABLED" ]; then
         return 0
@@ -3591,8 +11518,6 @@ remember_services() {
         fi
         case "$active" in
         active)
-            [ "$service" != genus-telegram-bot-fallback.service ] \
-                || fail "aktive transiente Telegram-Fallback-Unit ist nicht verlustfrei restartbar" 70
             active_services+=("$service")
             invocation="$($SYSTEMCTL_BIN show "$service" -p InvocationID --value 2>/dev/null || true)"
             entered="$($SYSTEMCTL_BIN show "$service" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || true)"
@@ -3617,9 +11542,27 @@ remember_services() {
     done
 }
 
+stop_scheduled_runtime_instances() {
+    local listing line first second unit result=0
+    listing="$("$SYSTEMCTL_BIN" list-units 'genus-cron@*.service' --all --no-legend --plain --no-pager 2>/dev/null)" \
+        || { printf '[A0.3c] FEHLER: aktive genus-cron@ Instanzen sind nicht inventarisierbar\n' >&2; return 70; }
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        read -r first second _ <<<"$line"
+        case "$first" in
+            '●'|'*') unit="$second" ;;
+            *) unit="$first" ;;
+        esac
+        [[ "$unit" =~ ^genus-cron@[A-Za-z0-9_.:-]+\.service$ ]] \
+            || { printf '[A0.3c] FEHLER: unsicherer Scheduled-Unit-Name: %s\n' "$unit" >&2; result=70; continue; }
+        systemctl_root stop "$unit" || result=70
+    done <<<"$listing"
+    return "$result"
+}
+
 stop_services() {
     local service load_state result=0 step
-    for service in "${AUTOSTART_UNITS[@]}"; do
+    for service in "${AUTOSTART_UNITS[@]}" "${QUIESCE_ONLY_UNITS[@]}"; do
         load_state="$($SYSTEMCTL_BIN show "$service" -p LoadState --value 2>/dev/null || true)"
         if [ "$load_state" != not-found ]; then
             if systemctl_root stop "$service"; then
@@ -3630,6 +11573,9 @@ stop_services() {
             fi
         fi
     done
+    if ! stop_scheduled_runtime_instances; then
+        [ "$result" -ne 0 ] || result=70
+    fi
     return "$result"
 }
 
@@ -4032,7 +11978,13 @@ for offset in range(2, len(sys.argv), 4):
     entries.append({"name":name,"source_path":source,"snapshot_path":snapshot,"sha256":digest})
 data={"schema":"genus-a0.3c-backup-config-inventory-v1","files":entries,"paths_logged":True,"payloads_logged":False}
 path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
-try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+try:
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short activation completion receipt write")
+        view=view[count:]
+    os.fsync(fd)
 finally: os.close(fd)
 PY
     find "$partial" -type d -exec chmod 0500 {} +
@@ -4290,12 +12242,14 @@ attest_restarted_services() {
             case "$service" in
                 genus-telegram-bot.service)
                     if ! as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
-                        "$pid" "$RUNTIME_PREFIX" "$CORE_POINTER/bin/python" <<'PY' >/dev/null 2>&1
+                        "$pid" "$RUNTIME_PREFIX" "$RUNTIME_VIEW_ROOT/core/bin/python" \
+                        "$TELEGRAM_LAUNCHER_PATH" "$RUNTIME_VIEW_ROOT/source" <<'PY' >/dev/null 2>&1
 import os, pathlib, sys
-pid, prefix, stable = sys.argv[1:4]
+pid, prefix, stable, launcher, source = sys.argv[1:6]
 command = pathlib.Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
 maps = pathlib.Path(f"/proc/{pid}/maps").read_bytes()
-if os.fsencode(stable) not in command or os.fsencode(prefix + "/") not in maps:
+if (os.fsencode(stable) not in command or os.fsencode(launcher) not in command
+        or os.fsencode(source) not in command or os.fsencode(prefix + "/") not in maps):
     raise SystemExit("bot process does not use the selected private runtime")
 PY
                     then sample_ok=0; break; fi
@@ -4303,11 +12257,11 @@ PY
                     ;;
                 genus-learner.service)
                     if ! as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
-                        "$pid" "$REPO_DIR/deploy/pi_learn.sh" <<'PY' >/dev/null 2>&1
+                        "$pid" "$RUNTIME_VIEW_ROOT/source/deploy/pi_learn.sh" <<'PY' >/dev/null 2>&1
 import os, pathlib, sys
 command = pathlib.Path(f"/proc/{sys.argv[1]}/cmdline").read_bytes().split(b"\0")
 if os.fsencode(sys.argv[2]) not in command:
-    raise SystemExit("learner process is not the pinned repository script")
+    raise SystemExit("learner process is not the pinned public source script")
 PY
                     then sample_ok=0; break; fi
                     learner_attested=1
@@ -4449,7 +12403,11 @@ PY
 write_transition_completion_receipt() {
     local outcome="$1" active active_hash services_csv target python
     active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
-    [ "${#recovery_services[@]}" -gt 0 ] || fail "Completion-Receipt braucht Service-Inventar" 70
+    if [ "${#recovery_services[@]}" -eq 0 ]; then
+        [ "$(journal_field consumer_baseline_hint)" = absent ] \
+            && [ "$active" = "$(journal_field prior_active_manifest)" ] \
+            || fail "leeres Completion-Service-Inventar ist nur fuer absent Restore erlaubt" 70
+    fi
     services_csv="$(IFS=,; printf '%s' "${recovery_services[*]}")"
     target="$RECEIPT_ROOT/completion-$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
     [ ! -e "$target" ] || fail "Completion-Receipt existiert bereits" 70
@@ -4469,7 +12427,13 @@ data={"schema":"genus-a0.3c-runtime-transition-completion-v1","outcome":os.envir
 path=pathlib.Path(sys.argv[1]); flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL
 if hasattr(os,"O_NOFOLLOW"): flags|=os.O_NOFOLLOW
 fd=os.open(path,flags,0o600)
-try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode()); os.fsync(fd)
+try:
+    payload=(json.dumps(data,sort_keys=True,separators=(",",":"))+"\n").encode(); view=memoryview(payload)
+    while view:
+        count=os.write(fd,view)
+        if count<=0: raise SystemExit("short transition completion receipt write")
+        view=view[count:]
+    os.fsync(fd)
 finally: os.close(fd)
 directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
 try: os.fsync(directory)
@@ -4483,16 +12447,18 @@ private_stable_sha256() {
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
         "$source" "$(id -u)" <<'PY'
 import hashlib, os, pathlib, stat, sys
-path=pathlib.Path(sys.argv[1]); uid=int(sys.argv[2]); before=path.lstat()
-if not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1: raise SystemExit("private evidence metadata differs")
+path=pathlib.Path(sys.argv[1]); uid=int(sys.argv[2]); before=path.lstat(); limit=32*1024*1024
+if not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>limit: raise SystemExit("private evidence metadata differs")
 fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
 try:
     opened=os.fstat(fd)
     if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit("private evidence changed before open")
-    chunks=[]
+    chunks=[]; size=0
     while True:
         chunk=os.read(fd,1024*1024)
         if not chunk: break
+        size+=len(chunk)
+        if size>limit: raise SystemExit("private evidence grew beyond bound")
         chunks.append(chunk)
     final=os.fstat(fd)
 finally: os.close(fd)
@@ -4537,7 +12503,7 @@ PY
 
 validate_completion_receipt() {
     local receipt="$1" source_receipt snapshot receipt_pin python active previous schema backup
-    local bindings readiness series series_hash final_hash
+    local bindings readiness series series_hash final_hash allow_empty_services=0
     [ -f "$receipt" ] && [ ! -L "$receipt" ] \
         && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
         && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
@@ -4551,6 +12517,11 @@ validate_completion_receipt() {
     [[ "$receipt_pin" =~ ^[a-f0-9]{64}$ ]] || fail "Completion-Pin ist malformed" 70
     receipt="$snapshot"
     active="$(selector_manifest)"; python="$(journal_python)"
+    if [ -f "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
+        && [ "$(journal_field consumer_baseline_hint 2>/dev/null || true)" = absent ] \
+        && [ "$active" = "$(journal_field prior_active_manifest 2>/dev/null || true)" ]; then
+        allow_empty_services=1
+    fi
     schema="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" "$receipt_pin" <<'PY'
 import hashlib, json, pathlib, sys
 payload=pathlib.Path(sys.argv[1]).read_bytes()
@@ -4597,6 +12568,7 @@ PY
             SERIES_ROOT="$GENUS_HOME/.genus/a0.3c/series" SETS_ROOT_ENV="$SETS_ROOT" \
             CORE_STABLE="$CORE_POINTER/bin/python" JOURNAL="$ACTIVATION_JOURNAL" \
             BOOT_GUARD="$BOOT_GUARD_PATH" CURRENT_BOOT_GUARD_HASH="$(sha256_file "$BOOT_GUARD_PATH")" \
+            ROOT_ARTIFACT_EXECUTOR_SHA="$(root_artifact_executor_expected_sha256 "$(repo_commit)")" \
             RECEIPT_PIN="$receipt_pin" \
             "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
 import hashlib, json, os, pathlib, re, stat, sys
@@ -4649,7 +12621,7 @@ if set(top)!=keys or top["schema"]!="genus-a0.3c-runtime-activation-v3" or top["
 if top["core_embed_single_selector"] is not True or top["database_rollback_performed"] is not False or top["paths_logged"] is not True or top["payloads_logged"] is not False: raise SystemExit("activation receipt safety booleans differ")
 target_path,target=load(top["activated_set_manifest_path"],top["activated_set_manifest_sha256"],sets_root/active,False,(0o400,0o600))
 previous_path,previous_data=load(top["previous_set_manifest_path"],top["previous_set_manifest_sha256"],sets_root/previous,False,(0o400,0o600))
-if target_path!=(sets_root/active/"manifest.json") or previous_path!=(sets_root/previous/"manifest.json") or target.get("schema")!="genus-a0.3c-runtime-set-v1" or target.get("manifest_id")!=active or target.get("repo_commit")!=commit or previous_data.get("manifest_id")!=previous: raise SystemExit("set manifest evidence differs")
+if target_path!=(sets_root/active/"manifest.json") or previous_path!=(sets_root/previous/"manifest.json") or target.get("schema")!="genus-a0.3c-runtime-set-v2" or target.get("manifest_id")!=active or target.get("repo_commit")!=commit or previous_data.get("manifest_id")!=previous: raise SystemExit("set manifest evidence differs")
 _,backup=load(top["backup_receipt_path"],top["backup_receipt_sha256"],receipt_root,True)
 if backup.get("schema")!="genus-a0.3c-backup-v2" or backup.get("repo_commit")!=commit: raise SystemExit("backup crossbinding differs")
 _,readiness=load(top["readiness_manifest_path"],top["readiness_manifest_sha256"],readiness_root)
@@ -4683,16 +12655,17 @@ if postflight["service_state_sha256"]!=hashlib.sha256(canonical(services)).hexdi
 journal_path=pathlib.Path(os.environ["JOURNAL"]); journal_info=journal_path.lstat()
 if journal_path.is_symlink() or journal_info.st_uid!=os.geteuid() or stat.S_IMODE(journal_info.st_mode)!=0o600 or journal_info.st_nlink!=1: raise SystemExit("activation journal privacy differs")
 journal=json.loads(stable_bytes(journal_path))
-allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service","genus-telegram-bot-fallback.service"}
-if [item.get("service") for item in services]!=journal["prior_active_services"] or len({item.get("service") for item in services})!=len(services) or any(set(item)!={"service","unit_type","main_pid","nrestarts","active_state","invocation_id","active_enter_timestamp_monotonic"} or item.get("service") not in allowed or item.get("active_state")!="active" or item.get("unit_type")!=("timer" if item.get("service","").endswith(".timer") else "service") or not isinstance(item.get("main_pid"),int) or isinstance(item.get("main_pid"),bool) or item.get("main_pid",-1)<0 or not isinstance(item.get("nrestarts"),int) or isinstance(item.get("nrestarts"),bool) or item.get("nrestarts",-1)<0 or not isinstance(item.get("active_enter_timestamp_monotonic"),int) or isinstance(item.get("active_enter_timestamp_monotonic"),bool) or item.get("active_enter_timestamp_monotonic",0)<=0 or not isinstance(item.get("invocation_id"),str) or not item.get("invocation_id") for item in services): raise SystemExit("postflight service inventory differs")
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+if [item.get("service") for item in services]!=journal["target_active_services"] or len({item.get("service") for item in services})!=len(services) or any(set(item)!={"service","unit_type","main_pid","nrestarts","active_state","invocation_id","active_enter_timestamp_monotonic"} or item.get("service") not in allowed or item.get("active_state")!="active" or item.get("unit_type")!=("timer" if item.get("service","").endswith(".timer") else "service") or not isinstance(item.get("main_pid"),int) or isinstance(item.get("main_pid"),bool) or item.get("main_pid",-1)<0 or not isinstance(item.get("nrestarts"),int) or isinstance(item.get("nrestarts"),bool) or item.get("nrestarts",-1)<0 or not isinstance(item.get("active_enter_timestamp_monotonic"),int) or isinstance(item.get("active_enter_timestamp_monotonic"),bool) or item.get("active_enter_timestamp_monotonic",0)<=0 or not isinstance(item.get("invocation_id"),str) or not item.get("invocation_id") for item in services): raise SystemExit("postflight service inventory differs")
 names={item["service"] for item in services}
 if postflight["bot_private_runtime_attested"] is not ("genus-telegram-bot.service" in names) or postflight["learner_pinned_script_attested"] is not ("genus-learner.service" in names): raise SystemExit("postflight invocation booleans differ")
 reauth_path,reauth_hash=top["operator_reauthorization_receipt_path"],top["operator_reauthorization_receipt_sha256"]
 if bool(reauth_path)!=bool(reauth_hash): raise SystemExit("reauthorization path/hash pair differs")
 if reauth_path:
     _,reauth=load(reauth_path,reauth_hash,receipt_root,True)
-    reauth_keys={"schema","old_commit","new_commit","old_tree","new_tree","active_manifest","active_manifest_sha256","stale_approval_path","stale_approval_sha256","guard_path","guard_sha256","allowed_diff_sha256","intended_command","boot_approval_updated","paths_logged","payloads_logged"}
-    if set(reauth)!=reauth_keys or reauth["schema"]!="genus-a0.3c-operator-reauthorization-v1" or reauth["new_commit"]!=commit or reauth["active_manifest"]!=previous or reauth["active_manifest_sha256"]!=top["previous_set_manifest_sha256"] or reauth["intended_command"]!="stage-and-activate" or reauth["boot_approval_updated"] is not False or reauth["paths_logged"] is not True or reauth["payloads_logged"] is not False: raise SystemExit("operator reauthorization binding differs")
+    reauth_keys={"schema","old_commit","new_commit","old_tree","new_tree","active_manifest","active_manifest_sha256","stale_approval_path","stale_approval_sha256","guard_path","guard_sha256","allowed_diff_sha256","intended_command","boot_approval_updated","paths_logged","payloads_logged","root_artifact_paths","root_artifact_executor_sha256","root_artifact_commit_policy"}
+    expected_root_artifacts=["/usr/local/libexec/genus/pi_a0_3c_projection.py","/usr/local/libexec/genus-a0-3c-boot-guard","/usr/local/libexec/genus/pi_a0_3c_consumer_publish.py","/usr/local/libexec/genus/pi_a0_3c_consumer_bundle.py","/etc/systemd/system/genus-backup.service.d/90-genus-a0-3c-pending.conf","/etc/systemd/system/genus-cron@.service.d/90-genus-a0-3c-pending.conf","/etc/systemd/system/genus-learner.service.d/90-genus-a0-3c-pending.conf","/etc/systemd/system/genus-network-watchdog.service.d/90-genus-a0-3c-pending.conf","/etc/systemd/system/genus-network-watchdog.timer.d/90-genus-a0-3c-pending.conf","/etc/systemd/system/genus-telegram-bot.service.d/90-genus-a0-3c-pending.conf"]
+    if set(reauth)!=reauth_keys or reauth["schema"]!="genus-a0.3c-operator-reauthorization-v2" or reauth["new_commit"]!=commit or reauth["active_manifest"]!=previous or reauth["active_manifest_sha256"]!=top["previous_set_manifest_sha256"] or reauth["intended_command"]!="stage-and-activate" or reauth["boot_approval_updated"] is not False or reauth["paths_logged"] is not True or reauth["payloads_logged"] is not False or reauth["root_artifact_paths"]!=expected_root_artifacts or reauth["root_artifact_executor_sha256"]!=os.environ["ROOT_ARTIFACT_EXECUTOR_SHA"] or reauth["root_artifact_commit_policy"]!="retain-on-activation-rollback": raise SystemExit("operator reauthorization binding differs")
     if any(not re.fullmatch(r"[0-9a-f]{40}",reauth[key]) for key in ("old_commit","new_commit","old_tree","new_tree")): raise SystemExit("operator reauthorization git id differs")
     if any(not HEX.fullmatch(str(reauth[key])) for key in ("active_manifest_sha256","stale_approval_sha256","guard_sha256","allowed_diff_sha256")): raise SystemExit("operator reauthorization digest differs")
     stale_path,stale=load(reauth["stale_approval_path"],reauth["stale_approval_sha256"],receipt_root,True)
@@ -4734,6 +12707,7 @@ PY
         return 0
     fi
     COMMIT="$(repo_commit)" ACTIVE="$active" ACTIVE_HASH="$(manifest_file_hash "$active")" \
+    ALLOW_EMPTY_SERVICES="$allow_empty_services" \
     AUTH_HASH="$(sha256_file "$AUTOSTART_APPROVAL")" RECEIPT_PIN="$receipt_pin" \
         "$python" - "$receipt" <<'PY'
 import hashlib, json, os, pathlib, sys
@@ -4743,7 +12717,9 @@ data=json.loads(payload)
 if data.get("schema") == "genus-a0.3c-runtime-transition-completion-v1":
     if set(data) != {"schema","outcome","repo_commit","active_manifest","active_manifest_sha256","start_authorization_sha256","active_services","database_rollback_performed"}:
         raise SystemExit("transition completion schema differs")
-    if data["outcome"] not in {"rollback-restored","interrupted-restored"} or data["repo_commit"] != os.environ["COMMIT"] or data["active_manifest"] != os.environ["ACTIVE"] or data["active_manifest_sha256"] != os.environ["ACTIVE_HASH"] or data["start_authorization_sha256"] != os.environ["AUTH_HASH"] or not data["active_services"] or data["database_rollback_performed"] is not False:
+    allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+    services=data["active_services"]
+    if data["outcome"] not in {"rollback-restored","interrupted-restored"} or data["repo_commit"] != os.environ["COMMIT"] or data["active_manifest"] != os.environ["ACTIVE"] or data["active_manifest_sha256"] != os.environ["ACTIVE_HASH"] or data["start_authorization_sha256"] != os.environ["AUTH_HASH"] or (not services and os.environ["ALLOW_EMPTY_SERVICES"]!="1") or len(services)!=len(set(services)) or any(item not in allowed for item in services) or data["database_rollback_performed"] is not False:
         raise SystemExit("transition completion binding differs")
 else: raise SystemExit("completion receipt schema differs")
 PY
@@ -4771,7 +12747,7 @@ journal_service_lines() {
     python="$(journal_python)"
     "$python" - "$ACTIVATION_JOURNAL" <<'PY'
 import json, pathlib, sys
-allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service","genus-telegram-bot-fallback.service"}
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
 values=json.loads(pathlib.Path(sys.argv[1]).read_text())["prior_active_services"]
 if len(values)!=len(set(values)) or any(value not in allowed for value in values):
     raise SystemExit("journal service inventory differs")
@@ -4779,13 +12755,45 @@ print("\n".join(values))
 PY
 }
 
+journal_target_service_lines() {
+    local python
+    python="$(journal_python)"
+    "$python" - "$ACTIVATION_JOURNAL" <<'PY'
+import json,pathlib,sys
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+values=json.loads(pathlib.Path(sys.argv[1]).read_text())["target_active_services"]
+if not values or len(values)!=len(set(values)) or any(value not in allowed for value in values):
+    raise SystemExit("target service inventory differs")
+print("\n".join(values))
+PY
+}
+
+prepare_target_service_inventory() {
+    local services_output service
+    services_output="$(journal_target_service_lines)"
+    if [ "$(journal_field consumer_baseline)" = present ]; then
+        [ "$(IFS=$'\n'; printf '%s' "${active_services[*]}")" = "$services_output" ] \
+            || fail "vorhandenes Target-Service-Inventar driftet vom Start-Snapshot" 70
+        return 0
+    fi
+    active_services=(); old_pids=(); old_restarts=(); old_invocations=(); old_active_enters=(); stopped_services=()
+    while IFS= read -r service; do
+        [ -n "$service" ] || continue
+        active_services+=("$service"); old_pids+=(0); old_restarts+=(0)
+        old_invocations+=(""); old_active_enters+=(0); stopped_services+=("$service")
+    done <<<"$services_output"
+    [ "${#active_services[@]}" -gt 0 ] \
+        || fail "absenter Bootstrap lieferte kein Target-Service-Inventar" 70
+}
+
 stop_all_genus_units() {
     local unit load_state result=0
-    for unit in "${AUTOSTART_UNITS[@]}"; do
+    for unit in "${AUTOSTART_UNITS[@]}" "${QUIESCE_ONLY_UNITS[@]}"; do
         load_state="$($SYSTEMCTL_BIN show "$unit" -p LoadState --value 2>/dev/null || true)"
         [ "$load_state" = not-found ] && continue
         systemctl_root stop "$unit" || result=70
     done
+    stop_scheduled_runtime_instances || result=70
     return "$result"
 }
 
@@ -4802,6 +12810,11 @@ start_recorded_services() {
 
 attest_recovered_services() {
     local deadline=$((SECONDS + 30)) consecutive=0 unit active pid restarts entered ok
+    if [ "${#recovery_services[@]}" -eq 0 ]; then
+        [ "$(journal_field consumer_baseline_hint)" = absent ] \
+            || fail "leere Recovery-Service-Liste ohne absente Baseline" 70
+        return 0
+    fi
     while [ "$SECONDS" -lt "$deadline" ]; do
         ok=1
         for unit in "${recovery_services[@]}"; do
@@ -4818,15 +12831,16 @@ attest_recovered_services() {
             case "$unit" in
                 genus-telegram-bot.service)
                     [ "$pid" -gt 0 ] && as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
-                        "$SYSTEM_PYTHON_BIN" -I -P - "$pid" "$CORE_POINTER/bin/python" <<'PY' >/dev/null 2>&1 || { ok=0; break; }
+                        "$SYSTEM_PYTHON_BIN" -I -P - "$pid" "$RUNTIME_VIEW_ROOT/core/bin/python" \
+                        "$TELEGRAM_LAUNCHER_PATH" "$RUNTIME_VIEW_ROOT/source" <<'PY' >/dev/null 2>&1 || { ok=0; break; }
 import os, pathlib, sys
 command=pathlib.Path(f"/proc/{sys.argv[1]}/cmdline").read_bytes().split(b"\0")
-if os.fsencode(sys.argv[2]) not in command: raise SystemExit("recovered bot invocation differs")
+if any(os.fsencode(value) not in command for value in sys.argv[2:]): raise SystemExit("recovered bot invocation differs")
 PY
                     ;;
                 genus-learner.service)
                     [ "$pid" -gt 0 ] && as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
-                        "$SYSTEM_PYTHON_BIN" -I -P - "$pid" "$REPO_DIR/deploy/pi_learn.sh" <<'PY' >/dev/null 2>&1 || { ok=0; break; }
+                        "$SYSTEM_PYTHON_BIN" -I -P - "$pid" "$RUNTIME_VIEW_ROOT/source/deploy/pi_learn.sh" <<'PY' >/dev/null 2>&1 || { ok=0; break; }
 import os, pathlib, sys
 command=pathlib.Path(f"/proc/{sys.argv[1]}/cmdline").read_bytes().split(b"\0")
 if os.fsencode(sys.argv[2]) not in command: raise SystemExit("recovered learner invocation differs")
@@ -4872,7 +12886,7 @@ restore_selector_from_journal() {
         else
             rm -f -- "$PREVIOUS_LINK"; fsync_dir "$STATE_ROOT"
         fi
-        rebind_activation_journal guarded "$prior"
+        rebind_activation_journal restored-prior "$prior"
         verify_target "$prior" >/dev/null
         [ "$(selector_manifest)" = "$prior" ] \
             && [ "$(selector_manifest "$PREVIOUS_LINK")" = "$previous" ] \
@@ -4886,12 +12900,333 @@ restore_selector_from_journal() {
     fi
 }
 
+ROOT_ARTIFACT_CLASSIFICATION=none
+ROOT_ARTIFACT_TERMINAL_OUTCOME=""
+
+hydrate_root_artifact_v7_context() {
+    local values expected_executor pending_exists terminal_exists kind terminal actual_terminal_sha
+    [ -f "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] || return 1
+    values="$("$SYSTEM_PYTHON_BIN" -I -P - "$ACTIVATION_JOURNAL" "$(id -u)" "$(id -g)" \
+        "$CODE_RELEASE_TRUST_ROOT" "$ROOT_ARTIFACT_AUTHORITY_ROOT" <<'PY'
+import json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); uid,gid=map(int,sys.argv[2:4]); trust=pathlib.Path(sys.argv[4]); authority_root=pathlib.Path(sys.argv[5])
+before=path.lstat(); fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid
+        or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1 or before.st_size>8*1024*1024):
+    raise SystemExit("root recovery journal metadata differs")
+descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+try:
+    opened=os.fstat(descriptor)
+    while True:
+        chunk=os.read(descriptor,1024*1024)
+        if not chunk: break
+        chunks.append(chunk)
+    final=os.fstat(descriptor)
+finally: os.close(descriptor)
+after=path.lstat(); raw=b"".join(chunks)
+if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+    raise SystemExit("root recovery journal changed during read")
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate root recovery journal key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+if not isinstance(data,dict) or raw!=canonical or data.get("schema")!="genus-a0.3c-runtime-activation-pending-v7":
+    raise SystemExit("root recovery requires canonical activation-v7")
+tx=data.get("root_artifact_transaction_id",""); digest=re.compile(r"[a-f0-9]{64}"); commit=re.compile(r"[a-f0-9]{40}")
+if (digest.fullmatch(str(tx)) is None
+        or any(digest.fullmatch(str(data.get(key))) is None for key in (
+            "root_artifact_inventory_sha256","root_artifact_authority_sha256","root_artifact_executor_sha256",
+            "activation_reservation_sha256","projection_transaction_nonce"))
+        or any(commit.fullmatch(str(data.get(key))) is None for key in ("root_artifact_old_commit","root_artifact_new_commit"))
+        or data.get("root_artifact_new_commit")!=data.get("candidate_commit")
+        or data.get("root_artifact_commit_policy")!="retain-on-activation-rollback"
+        or data.get("operator_uid")!=uid
+        or data.get("projection_transaction_nonce")==tx):
+    raise SystemExit("root recovery journal identity differs")
+authority=authority_root/f"{tx}.json"; terminal=trust/f"runtime-artifacts.terminal.{tx}.json"
+if pathlib.Path(data.get("root_artifact_authority_path",""))!=authority:
+    raise SystemExit("root recovery authority path differs")
+terminal_value=data.get("root_artifact_terminal_path","")
+if terminal_value and pathlib.Path(terminal_value)!=terminal:
+    raise SystemExit("root recovery terminal path differs")
+values=(tx,data["root_artifact_inventory_sha256"],str(authority),data["root_artifact_authority_sha256"],
+ data["root_artifact_executor_sha256"],data["root_artifact_old_commit"],data["root_artifact_new_commit"],
+ data["root_artifact_commit_policy"],data["activation_reservation_sha256"],data["projection_transaction_nonce"],
+ data["root_artifact_state"],terminal_value,data.get("root_artifact_terminal_sha256",""))
+if any("\n" in str(value) or "\r" in str(value) for value in values): raise SystemExit("root recovery field contains controls")
+print("\n".join(map(str,values)))
+PY
+)" || return 1
+    mapfile -t values <<< "$values"
+    [ "${#values[@]}" -eq 13 ] || fail "Root-Recovery-Kontext ist unvollstaendig" 70
+    ROOT_ARTIFACT_TRANSACTION_ID="${values[0]}"
+    ROOT_ARTIFACT_INVENTORY_SHA256="${values[1]}"
+    ROOT_ARTIFACT_AUTHORITY_PATH="${values[2]}"
+    ROOT_ARTIFACT_AUTHORITY_SHA256="${values[3]}"
+    ROOT_ARTIFACT_EXECUTOR_SHA256="${values[4]}"
+    ROOT_ARTIFACT_OLD_COMMIT="${values[5]}"
+    ROOT_ARTIFACT_NEW_COMMIT="${values[6]}"
+    ROOT_ARTIFACT_COMMIT_POLICY="${values[7]}"
+    ROOT_ARTIFACT_RESERVATION_SHA256="${values[8]}"
+    PROJECTION_TRANSACTION_NONCE="${values[9]}"
+    ROOT_ARTIFACT_TERMINAL_PATH="${values[11]}"
+    ROOT_ARTIFACT_TERMINAL_SHA256="${values[12]}"
+    [ "$(repo_commit)" = "$ROOT_ARTIFACT_NEW_COMMIT" ] \
+        || fail "Root-Recovery darf nur den ausgecheckten NEW-Commit-Executor laden" 70
+    expected_executor="$(root_artifact_executor_expected_sha256 "$ROOT_ARTIFACT_NEW_COMMIT")"
+    [ "$expected_executor" = "$ROOT_ARTIFACT_EXECUTOR_SHA256" ] \
+        || fail "Root-Recovery-Executor driftet vom NEW-Git-Blob" 70
+    if as_root "$ROOT_TEST_BIN" -e "$ROOT_ARTIFACT_JOURNAL" || as_root "$ROOT_TEST_BIN" -L "$ROOT_ARTIFACT_JOURNAL"; then
+        pending_exists=1
+    else
+        pending_exists=0
+    fi
+    terminal="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.terminal.$ROOT_ARTIFACT_TRANSACTION_ID.json"
+    if as_root "$ROOT_TEST_BIN" -e "$terminal" || as_root "$ROOT_TEST_BIN" -L "$terminal"; then
+        terminal_exists=1
+    else
+        terminal_exists=0
+    fi
+    [ "$pending_exists" -eq 0 ] || [ "$terminal_exists" -eq 0 ] \
+        || fail "Root-Recovery traf gleichzeitig Pending und Terminal" 70
+    if [ "$pending_exists" -eq 1 ]; then kind=pending
+    elif [ "$terminal_exists" -eq 1 ]; then kind=terminal
+    else kind=staged
+    fi
+    ROOT_ARTIFACT_TERMINAL_OUTCOME="$(validate_fixed_root_artifact_identity "$kind")"
+    if [ "$kind" = terminal ]; then
+        case "$ROOT_ARTIFACT_TERMINAL_OUTCOME" in committed|rolled-back) ;; *)
+            fail "Root-Recovery-Terminal hat kein bekanntes Outcome" 70 ;;
+        esac
+        terminal="$CODE_RELEASE_TRUST_ROOT/runtime-artifacts.terminal.$ROOT_ARTIFACT_TRANSACTION_ID.json"
+        actual_terminal_sha="$(root_stable_sha256 "$terminal" 0400)"
+        if [ -n "$ROOT_ARTIFACT_TERMINAL_PATH" ]; then
+            [ "$ROOT_ARTIFACT_TERMINAL_PATH" = "$terminal" ] \
+                && [ "$ROOT_ARTIFACT_TERMINAL_SHA256" = "$actual_terminal_sha" ] \
+                || fail "Root-Recovery-Terminal driftet von der privaten Journalbindung" 70
+        fi
+        ROOT_ARTIFACT_TERMINAL_PATH="$terminal"
+        ROOT_ARTIFACT_TERMINAL_SHA256="$actual_terminal_sha"
+    else
+        [ -z "$ROOT_ARTIFACT_TERMINAL_OUTCOME" ] \
+            || fail "nichtterminaler Root-Zustand lieferte ein Terminal-Outcome" 70
+    fi
+    ROOT_ARTIFACT_CLASSIFICATION="$kind"
+    return 0
+}
+
+validate_fixed_root_artifact_identity() {
+    local kind="$1"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$kind" "$ROOT_ARTIFACT_TRANSACTION_ID" "$ROOT_ARTIFACT_INVENTORY_SHA256" \
+        "$ROOT_ARTIFACT_AUTHORITY_PATH" "$ROOT_ARTIFACT_AUTHORITY_SHA256" \
+        "$ROOT_ARTIFACT_EXECUTOR_SHA256" "$ROOT_ARTIFACT_OLD_COMMIT" "$ROOT_ARTIFACT_NEW_COMMIT" \
+        "$ROOT_ARTIFACT_RESERVATION_SHA256" "$(id -u)" "$CODE_RELEASE_TRUST_ROOT" \
+        "${ROOT_ARTIFACT_TARGETS[@]}" <<'PY'
+import fcntl,hashlib,json,os,pathlib,re,stat,sys
+kind,tx,inventory_sha,authority_name,authority_sha,executor,old,new,reservation=sys.argv[1:10]
+uid=int(sys.argv[10]); trust=pathlib.Path(sys.argv[11]); targets=sys.argv[12:]
+if kind not in {"staged","pending","terminal"} or len(targets)!=10 or len(set(targets))!=10:
+    raise SystemExit("fixed root artifact identity arguments differ")
+if trust!=pathlib.Path("/var/lib/genus-a0-3c") or not re.fullmatch(r"[a-f0-9]{64}",tx):
+    raise SystemExit("fixed root artifact identity root/transaction differs")
+lock_path=trust/"runtime-artifacts.lock"; lock_before=lock_path.lstat()
+if (lock_path.is_symlink() or not stat.S_ISREG(lock_before.st_mode) or lock_before.st_uid!=0
+        or lock_before.st_gid!=0 or stat.S_IMODE(lock_before.st_mode)!=0o600
+        or lock_before.st_nlink!=1 or lock_before.st_size!=0):
+    raise SystemExit("fixed root artifact lock metadata differs")
+lock_fd=os.open(lock_path,os.O_RDWR|getattr(os,"O_NOFOLLOW",0)); fcntl.flock(lock_fd,fcntl.LOCK_SH)
+lock_open=os.fstat(lock_fd); lock_after=lock_path.lstat()
+if ((lock_open.st_dev,lock_open.st_ino)!=(lock_before.st_dev,lock_before.st_ino)
+        or (lock_after.st_dev,lock_after.st_ino)!=(lock_before.st_dev,lock_before.st_ino)):
+    raise SystemExit("fixed root artifact lock identity drifted")
+pending_exists=os.path.lexists(trust/"runtime-artifacts.pending")
+terminal_exists=os.path.lexists(trust/f"runtime-artifacts.terminal.{tx}.json")
+if ((kind=="staged" and (pending_exists or terminal_exists))
+        or (kind=="pending" and (not pending_exists or terminal_exists))
+        or (kind=="terminal" and (pending_exists or not terminal_exists))):
+    raise SystemExit("fixed root artifact classification changed under lock")
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+identity=lambda value:tuple(getattr(value,key) for key in fields)
+def stable(path,mode,limit=16*1024*1024):
+    path=pathlib.Path(path); before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit):
+        raise SystemExit(f"fixed root artifact evidence metadata differs: {path}")
+    descriptor=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]
+    try:
+        opened=os.fstat(descriptor)
+        while True:
+            chunk=os.read(descriptor,1024*1024)
+            if not chunk: break
+            chunks.append(chunk)
+        final=os.fstat(descriptor)
+    finally: os.close(descriptor)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not identity(before)==identity(opened)==identity(final)==identity(after) or len(raw)!=before.st_size:
+        raise SystemExit("fixed root artifact evidence changed during read")
+    return raw
+def strict(raw,label):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit(f"duplicate {label} key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    canonical=(json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+    if not isinstance(value,dict) or canonical!=raw: raise SystemExit(f"{label} is not canonical")
+    return value
+inventory_path=trust/f"runtime-artifacts.{tx}"/"inventory.json"
+inventory_raw=stable(inventory_path,0o400); inventory=strict(inventory_raw,"root artifact inventory")
+inventory_keys={"activation_reservation_sha256","artifacts","authority_sha256","authority_stage","executor_sha256",
+ "new_commit","old_commit","operator_uid","parents","schema","transaction_id"}
+if (set(inventory)!=inventory_keys or inventory.get("schema")!="genus-a0.3c-root-artifact-inventory-v1"
+        or hashlib.sha256(inventory_raw).hexdigest()!=inventory_sha or inventory.get("transaction_id")!=tx
+        or len(inventory.get("artifacts",[]))!=10 or len(inventory.get("parents",[]))!=6):
+    raise SystemExit("root artifact inventory identity differs")
+common={"activation_reservation_sha256":reservation,"authority_sha256":authority_sha,"executor_sha256":executor,
+ "new_commit":new,"old_commit":old,"operator_uid":uid}
+if any(inventory.get(key)!=value for key,value in common.items()):
+    raise SystemExit("root artifact inventory authority binding differs")
+authority_path=pathlib.Path(authority_name)
+if authority_path!=trust/"runtime-artifact-authorities"/f"{tx}.json":
+    raise SystemExit("root artifact authority fixed path differs")
+authority_raw=stable(authority_path,0o400); authority=strict(authority_raw,"root artifact authority")
+authority_keys={"active_manifest","active_manifest_sha256","allowed_diff_sha256","boot_approval_updated","guard_path",
+ "guard_sha256","intended_command","new_commit","new_tree","old_commit","old_tree","paths_logged",
+ "payloads_logged","root_artifact_commit_policy","root_artifact_executor_sha256","root_artifact_paths","schema",
+ "stale_approval_path","stale_approval_sha256"}
+if (set(authority)!=authority_keys or authority.get("schema")!="genus-a0.3c-operator-reauthorization-v2"
+        or hashlib.sha256(authority_raw).hexdigest()!=authority_sha or authority.get("old_commit")!=old
+        or authority.get("new_commit")!=new or authority.get("root_artifact_executor_sha256")!=executor
+        or authority.get("root_artifact_commit_policy")!="retain-on-activation-rollback"
+        or authority.get("root_artifact_paths")!=targets or authority.get("intended_command")!="stage-and-activate"
+        or authority.get("boot_approval_updated") is not False or authority.get("paths_logged") is not True
+        or authority.get("payloads_logged") is not False):
+    raise SystemExit("root artifact human authority differs")
+if kind=="pending":
+    primary_raw=stable(trust/"runtime-artifacts.pending",0o600); primary=strict(primary_raw,"root artifact pending")
+    keys={"activation_reservation_sha256","artifact_count","authority_sha256","cursor","direction","executor_sha256",
+     "inventory_sha256","new_commit","old_commit","operator_uid","parent_count","parent_cursor","schema","transaction_id"}
+    if (set(primary)!=keys or primary.get("schema")!="genus-a0.3c-root-artifact-pending-v1"
+            or primary.get("inventory_sha256")!=inventory_sha or primary.get("transaction_id")!=tx
+            or primary.get("artifact_count")!=10 or primary.get("parent_count")!=6
+            or primary.get("direction") not in {"forward","rollback"}
+            or type(primary.get("cursor")) is not int or not 0<=primary["cursor"]<=10
+            or type(primary.get("parent_cursor")) is not int or not 0<=primary["parent_cursor"]<=6
+            or any(primary.get(key)!=value for key,value in common.items())):
+        raise SystemExit("root artifact pending identity differs")
+elif kind=="terminal":
+    primary_raw=stable(trust/f"runtime-artifacts.terminal.{tx}.json",0o400); primary=strict(primary_raw,"root artifact terminal")
+    keys={"activation_reservation_sha256","artifact_count","authority_sha256","executor_sha256","inventory_sha256",
+     "new_commit","old_commit","operator_uid","outcome","parent_count","schema","transaction_id"}
+    if (set(primary)!=keys or primary.get("schema")!="genus-a0.3c-root-artifact-terminal-v1"
+            or primary.get("inventory_sha256")!=inventory_sha or primary.get("transaction_id")!=tx
+            or primary.get("artifact_count")!=10 or primary.get("parent_count")!=6
+            or primary.get("outcome") not in {"committed","rolled-back"}
+            or any(primary.get(key)!=value for key,value in common.items())):
+        raise SystemExit("root artifact terminal identity differs")
+    print(primary["outcome"])
+fcntl.flock(lock_fd,fcntl.LOCK_UN); os.close(lock_fd)
+PY
+}
+
+recover_root_artifact_transaction_first() {
+    local root_state result
+    ROOT_ARTIFACT_CLASSIFICATION=none
+    ROOT_ARTIFACT_TERMINAL_OUTCOME=""
+    if [ ! -e "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ]; then
+        if as_root "$ROOT_TEST_BIN" -e "$ROOT_ARTIFACT_JOURNAL" || as_root "$ROOT_TEST_BIN" -L "$ROOT_ARTIFACT_JOURNAL"; then
+            fail "Root-Artefakt-Pending ohne privates Activation-v7-Journal; menschliche Recovery erforderlich" 70
+        fi
+        return 0
+    fi
+    hydrate_root_artifact_v7_context || return 0
+    root_state="$(journal_field root_artifact_state)"
+    if [ "$ROOT_ARTIFACT_CLASSIFICATION" = pending ] && [ "$root_state" = staged ]; then
+        activation_v7_transition root-pending
+        root_state=pending
+    fi
+    validate_activation_journal 1
+    case "$ROOT_ARTIFACT_CLASSIFICATION:$root_state" in
+        staged:staged) return 0 ;;
+        pending:pending|pending:applied-reloaded)
+            remove_autostart_approval
+            disable_genus_cron_block
+            GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
+                --reason "A0.3c root artifact crash recovery" >/dev/null 2>&1 || true
+            stop_all_genus_units
+            prove_no_old_runtime_processes
+            prove_no_db_handles
+            result="$(root_artifact_helper_call recover --policy forward)"
+            ROOT_RESULT="$result" ROOT_EXPECTED_CURSOR=10 ROOT_EXPECTED_PARENT_CURSOR=6 \
+                validate_root_artifact_pending_result
+            verify_root_artifacts_reloaded
+            if [ "$root_state" = pending ]; then bind_root_artifact_handoff; fi
+            root_artifact_commit
+            bind_root_artifact_terminal
+            root_artifact_validate_terminal committed >/dev/null
+            ROOT_ARTIFACT_CLASSIFICATION=terminal
+            ;;
+        terminal:staged|terminal:pending)
+            if [ "$root_state" = staged ]; then activation_v7_transition root-pending; fi
+            if [ "$ROOT_ARTIFACT_TERMINAL_OUTCOME" = rolled-back ]; then
+                activation_v7_transition root-rolled-back \
+                    "root_artifact_terminal_path=$ROOT_ARTIFACT_TERMINAL_PATH" \
+                    "root_artifact_terminal_sha256=$ROOT_ARTIFACT_TERMINAL_SHA256"
+                root_artifact_validate_terminal rolled-back >/dev/null
+            else
+                verify_root_artifacts_reloaded
+                bind_root_artifact_handoff
+                root_artifact_validate_terminal committed >/dev/null
+                bind_root_artifact_terminal
+            fi
+            ROOT_ARTIFACT_CLASSIFICATION=terminal
+            ;;
+        terminal:applied-reloaded)
+            if [ "$ROOT_ARTIFACT_TERMINAL_OUTCOME" = rolled-back ]; then
+                activation_v7_transition root-rolled-back \
+                    "root_artifact_terminal_path=$ROOT_ARTIFACT_TERMINAL_PATH" \
+                    "root_artifact_terminal_sha256=$ROOT_ARTIFACT_TERMINAL_SHA256"
+                root_artifact_validate_terminal rolled-back >/dev/null
+            else
+                verify_root_artifacts_reloaded
+                root_artifact_validate_terminal committed >/dev/null
+                bind_root_artifact_terminal
+            fi
+            ;;
+        terminal:committed)
+            [ "$ROOT_ARTIFACT_TERMINAL_OUTCOME" = committed ] \
+                || fail "privates committed widerspricht rolled-back Root-Terminal" 70
+            root_artifact_validate_terminal committed >/dev/null
+            ;;
+        terminal:rolled-back)
+            [ "$ROOT_ARTIFACT_TERMINAL_OUTCOME" = rolled-back ] \
+                || fail "privates rolled-back widerspricht committed Root-Terminal" 70
+            root_artifact_validate_terminal rolled-back >/dev/null
+            ;;
+        *) fail "Root-Artefakt-Recovery traf einen unmoeglichen Journal/Root-Zustand: $ROOT_ARTIFACT_CLASSIFICATION/$root_state" 70 ;;
+    esac
+    validate_activation_journal 1
+}
+
 force_pending_transition_fail_closed() (
-    local result=0 attempt_status
+    local result=0 attempt_status consumer_state
     set +e
     (
         set -Eeuo pipefail
-        install_systemd_autostart_guard
+        recover_root_artifact_transaction_first
+    )
+    attempt_status=$?
+    [ "$attempt_status" -eq 0 ] || result=70
+    (
+        set -Eeuo pipefail
         systemd_autostart_guard_present
     )
     attempt_status=$?
@@ -4905,11 +13240,17 @@ force_pending_transition_fail_closed() (
     if [ -e "$AUTOSTART_APPROVAL" ] || [ -L "$AUTOSTART_APPROVAL" ]; then result=70; fi
     (
         set -Eeuo pipefail
-        disable_genus_cron_block
+        consumer_state="$(journal_field consumer_state 2>/dev/null || true)"
+        case "$consumer_state" in
+            baseline-snapshotted|snapshotted-authorized|snapshotted|published|target-verified|prior-restored|prior-unchanged)
+                disable_consumer_cron_from_journal
+                ;;
+            *) disable_genus_cron_block ;;
+        esac
     )
     attempt_status=$?
     [ "$attempt_status" -eq 0 ] || result=70
-    GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" pause \
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
         --reason "A0.3c transition verification/finalization failed" >/dev/null 2>&1 || result=70
     (
         set -Eeuo pipefail
@@ -4935,21 +13276,349 @@ force_pending_transition_fail_closed() (
     return "$result"
 )
 
+runtime_rollback_root_state_present() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$CODE_RELEASE_TRUST_ROOT" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+root=pathlib.Path(sys.argv[1]); info=root.lstat()
+if (root.resolve(strict=True)!=root or root.is_symlink() or not stat.S_ISDIR(info.st_mode)
+        or info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=0o700):
+    raise SystemExit(70)
+fixed={"runtime-rollback.pending","runtime-projection.rollback.pending"}
+present=False; count=0
+with os.scandir(root) as entries:
+    for entry in entries:
+        count+=1
+        if count>4096: raise SystemExit(70)
+        if entry.name in fixed or entry.name.startswith("runtime-projection.rollback.begin."):
+            present=True
+if present: raise SystemExit(0)
+current=root/"runtime-rollback.current"
+try: before=current.lstat()
+except FileNotFoundError: raise SystemExit(1)
+if (current.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_gid!=0
+        or stat.S_IMODE(before.st_mode)!=0o400 or before.st_nlink!=1 or before.st_size>1024*1024):
+    raise SystemExit(70)
+fd=os.open(current,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try:
+    opened=os.fstat(fd); raw=b""
+    while True:
+        chunk=os.read(fd,65536)
+        if not chunk: break
+        raw+=chunk
+        if len(raw)>1024*1024: raise SystemExit(70)
+    final=os.fstat(fd)
+finally: os.close(fd)
+fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) for key in fields):
+    raise SystemExit(70)
+try:
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise ValueError
+            result[key]=value
+        return result
+    data=json.loads(raw,object_pairs_hook=pairs)
+    canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+except (ValueError,TypeError,json.JSONDecodeError): raise SystemExit(70)
+keys={"active_manifest","active_manifest_sha256","candidate_commit","prior_current_sha256","protocol",
+      "rollback_transaction_nonce","schema","source_authority_sha256","source_transaction_nonce",
+      "start_authorization_sha256","terminal_path","terminal_sha256"}
+digests=("active_manifest_sha256","rollback_transaction_nonce","source_authority_sha256",
+         "source_transaction_nonce","start_authorization_sha256","terminal_sha256")
+if (not isinstance(data,dict) or raw!=canonical or set(data)!=keys
+        or data.get("schema")!="genus-a0.3c-runtime-rollback-current-v1"
+        or data.get("protocol")!="committed-runtime-rollback-v1"
+        or re.fullmatch(r"legacy-[a-f0-9]{64}",data.get("active_manifest","")) is None
+        or re.fullmatch(r"[a-f0-9]{40}",data.get("candidate_commit","")) is None
+        or any(re.fullmatch(r"[a-f0-9]{64}",data.get(key,"")) is None for key in digests)
+        or data.get("prior_current_sha256")!="" and re.fullmatch(r"[a-f0-9]{64}",data["prior_current_sha256"]) is None
+        or data.get("rollback_transaction_nonce")==data.get("source_transaction_nonce")
+        or data.get("terminal_path")!=str(root/f"runtime-rollback.terminal.{data.get('rollback_transaction_nonce')}.receipt")):
+    raise SystemExit(70)
+raise SystemExit(2)
+PY
+}
+
 finalize_guarded_transition() {
+    local consumer_state
     systemd_autostart_guard_present
     validate_autostart_approval
-    restore_genus_cron_block
-    verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT"
+    consumer_state="$(journal_field consumer_state)"
+    case "$consumer_state" in
+        target-verified)
+            validate_consumer_root_approval
+            reload_and_verify_consumer_units target
+            activate_consumer_cron_from_journal target
+            ;;
+        prior-restored|prior-unchanged)
+            validate_consumer_root_approval
+            reload_and_verify_consumer_units prior
+            activate_consumer_cron_from_journal prior
+            ;;
+        *)
+            restore_genus_cron_block
+            verify_live_crontab "$ACTIVATION_CRON_SNAPSHOT"
+            ;;
+    esac
     systemd_autostart_guard_present
     validate_autostart_approval
-    consume_operator_reauthorization
     clear_activation_state
+    # clear_activation_state seals the committed v7 rollback source before any
+    # one-shot human reauthorization evidence is consumed.
+    consume_operator_reauthorization
+}
+
+projection_pending_phase_v7() {
+    local pending
+    pending="$(projection_helper_call inspect-pending)"
+    ROOT_PENDING="$pending" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os
+raw=os.environ["ROOT_PENDING"].encode()+b"\n"
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate root projection pending key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+keys={"approval_path","approval_sha256","operator_uid","phase","plan_sha256","prior_manifest","prior_manifest_sha256",
+      "prior_private_set","prior_receipt_sha256","prior_tree_inventory_sha256","schema","state_root","target_manifest",
+      "target_manifest_sha256","target_private_set","target_receipt_sha256","target_tree_inventory_sha256","transaction_nonce"}
+if (raw!=canonical or set(data)!=keys or data.get("schema")!="genus-a0.3c-runtime-projection-pending-v2"
+        or data.get("phase") not in {"prepared","activated","restored"}):
+    raise SystemExit("root projection pending phase differs")
+print(data["phase"])
+PY
+}
+
+restore_private_selector_v7() {
+    local prior previous current
+    prior="$(journal_field prior_active_manifest)"; previous="$(journal_field prior_previous_manifest)"
+    [ -n "$prior" ] || fail "Activation-v7-Restore fehlt der private Prior-Selector" 70
+    verify_target "$prior" >/dev/null
+    current="$(selector_manifest)"
+    [ "$current" = "$prior" ] || atomic_link "sets/$prior" "$ACTIVE_LINK"
+    if [ -n "$previous" ]; then
+        verify_target "$previous" >/dev/null
+        [ "$(selector_manifest "$PREVIOUS_LINK")" = "$previous" ] \
+            || atomic_link "sets/$previous" "$PREVIOUS_LINK"
+    else
+        rm -f -- "$PREVIOUS_LINK"; fsync_dir "$STATE_ROOT"
+    fi
+    [ "$(selector_manifest)" = "$prior" ] \
+        && [ "$(selector_manifest "$PREVIOUS_LINK")" = "$previous" ] \
+        || fail "Activation-v7 konnte die privaten Prior-Selectoren nicht exakt restaurieren" 70
+}
+
+recover_pending_activation_v7() {
+    local phase root_state projection_state consumer_state projection_phase projection_prior desired
+    local receipt receipt_hash services_output target approval
+    local -a recovery_services=()
+    validate_activation_journal 1
+    root_state="$(journal_field root_artifact_state)"
+    if [ "$root_state" = rolled-back ]; then
+        remove_autostart_approval
+        disable_genus_cron_block
+        stop_all_genus_units
+        prove_no_old_runtime_processes
+        prove_no_db_handles
+        fail "Root-Artefakte wurden gerollt-back; NEW-Datenpfad bleibt bis zur menschlichen Abnahme fail-closed" 77
+    fi
+    if [ "$root_state" = staged ]; then
+        consumer_state="$(journal_field consumer_state)"
+        case "$consumer_state" in
+            unbound) snapshot_consumers_staged ;;
+            baseline-snapshotted) ;;
+            *) fail "staged Root-Recovery traf einen zu weit fortgeschrittenen Consumer" 70 ;;
+        esac
+        quiesce_for_root_artifact_migration
+        root_artifact_arm
+        activation_v7_transition root-pending
+        root_artifact_apply
+        verify_root_artifacts_reloaded
+        bind_root_artifact_handoff
+        root_artifact_commit
+        bind_root_artifact_terminal
+        root_artifact_validate_terminal committed >/dev/null
+    fi
+    [ "$(journal_field root_artifact_state)" = committed ] \
+        || fail "Activation-v7-Recovery erreichte keinen committed Root-Control-Plane" 70
+    root_artifact_validate_terminal committed >/dev/null
+
+    phase="$(journal_field phase)"
+    projection_state="$(journal_field projection_state)"; consumer_state="$(journal_field consumer_state)"
+    if [ "$phase" = restore-receipt-written ]; then
+        [ "$projection_state" = restored ] \
+            && { [ "$consumer_state" = prior-restored ] || [ "$consumer_state" = prior-unchanged ]; } \
+            || fail "Restore-Receipt-v7 hat keinen prior-sicheren Datenpfad" 70
+        projection_prior="$(journal_field projection_prior_manifest)"
+        restore_private_selector_v7
+        projection_helper_call validate-terminal --expected "${projection_prior:-none}" --outcome prior-or-none \
+            --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+            --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+        validate_projection_steady_state "$(journal_field prior_active_manifest)"
+        validate_consumer_root_approval
+        [ "$(consumer_publisher_from_journal validate-prior disabled)" \
+            = "$(journal_field consumer_snapshot_sha256)" ] \
+            || fail "Restore-Receipt-v7 Consumer ist nicht quiescent/prior-sicher" 70
+        validate_autostart_approval
+        receipt="$(journal_field activation_receipt_path)"; receipt_hash="$(journal_field activation_receipt_sha256)"
+        [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(sha256_file "$receipt")" = "$receipt_hash" ] \
+            || fail "Restore-Receipt-v7 driftet" 70
+        validate_completion_receipt "$receipt"
+        [ "$VERIFIED_COMPLETION_RECEIPT_SHA256" = "$receipt_hash" ] \
+            || fail "Restore-Receipt-v7 ist nicht vollstaendig revalidiert" 70
+        services_output="$(journal_service_lines)"
+        [ -z "$services_output" ] || mapfile -t recovery_services <<< "$services_output"
+        attest_recovered_services
+        finalize_guarded_transition
+        return 0
+    fi
+    if [ "$projection_state" = committed ]; then
+        [ "$consumer_state" = target-verified ] \
+            || fail "committed Projection-v7 hat keinen verifizierten Consumer" 70
+        target="$(journal_field target_manifest)"
+        [ "$(selector_manifest)" = "$target" ] && [ "$(public_projection_manifest)" = "$target" ] \
+            || fail "committed Projection-v7 driftet vom Dual-Selector-Ziel" 70
+        projection_helper_call validate-terminal --expected "$target" --outcome target \
+            --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+            --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+        validate_consumer_root_approval
+        [ "$(consumer_publisher_from_journal validate-target disabled)" \
+            = "$(journal_field consumer_snapshot_sha256)" ] \
+            || fail "committed Consumer-v7 ist an der Recovery-Grenze nicht quiescent" 70
+        validate_autostart_approval
+        receipt="$(journal_field activation_receipt_path)"; receipt_hash="$(journal_field activation_receipt_sha256)"
+        [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(sha256_file "$receipt")" = "$receipt_hash" ] \
+            || fail "committed Activation-v7-Receipt driftet" 70
+        validate_completion_receipt "$receipt"
+        [ "$VERIFIED_COMPLETION_RECEIPT_SHA256" = "$receipt_hash" ] \
+            || fail "committed Activation-v7-Receipt ist nicht vollstaendig revalidiert" 70
+        services_output="$(journal_target_service_lines)"
+        [ -z "$services_output" ] || mapfile -t recovery_services <<< "$services_output"
+        attest_recovered_services
+        finalize_guarded_transition
+        return 0
+    fi
+
+    remove_autostart_approval
+    consumer_state="$(journal_field consumer_state)"
+    if [ "$consumer_state" != unbound ]; then
+        disable_consumer_cron_from_journal \
+            || fail "Consumer-v7-Cron konnte fuer Recovery nicht fail-closed deaktiviert werden" 70
+    else
+        disable_genus_cron_block
+    fi
+    if ! GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" paused >/dev/null 2>&1; then
+        GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
+            --reason "A0.3c activation-v7 crash recovery"
+    fi
+    stop_all_genus_units
+    prove_no_old_runtime_processes
+    prove_no_db_handles
+
+    projection_state="$(journal_field projection_state)"
+    if [ "$projection_state" = unbound ]; then bind_projection_contract_to_journal; fi
+    consumer_state="$(journal_field consumer_state)"
+    if [ "$consumer_state" = baseline-snapshotted ]; then
+        approval="$CODE_RELEASE_TRUST_ROOT/runtime-consumer.approval.$(journal_field projection_transaction_nonce).json"
+        if as_root "$ROOT_TEST_BIN" -e "$approval" && ! as_root "$ROOT_TEST_BIN" -L "$approval"; then
+            GENUS_A03C_CONSUMER_BASELINE_AUTHORIZATION="$(journal_field consumer_baseline):$(journal_field target_manifest)" \
+                authorize_consumer_snapshot
+        else
+            authorize_consumer_snapshot
+        fi
+    fi
+
+    projection_state="$(journal_field projection_state)"
+    projection_prior="$(journal_field projection_prior_manifest)"; desired=none
+    [ -z "$projection_prior" ] || desired=prior
+    if [ "$projection_state" != restored ]; then
+        if [ ! -e "$RUNTIME_PROJECTION_JOURNAL" ] && [ ! -L "$RUNTIME_PROJECTION_JOURNAL" ]; then
+            [ "$projection_state" = authorized ] \
+                || fail "Projection-v7-Recovery fehlt ein recoverbares Root-Pending-Journal" 70
+            projection_helper_call prepare --private-set "$(set_path "$(journal_field target_manifest)")" \
+                --manifest "$(journal_field target_manifest)" --prior "${projection_prior:-none}" \
+                --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+                --plan "$(journal_field projection_plan_path)" \
+                --plan-sha256 "$(journal_field projection_plan_sha256)"
+        fi
+        projection_phase="$(projection_pending_phase_v7)"
+        if [ "$projection_phase" != restored ]; then
+            projection_helper_call restore --desired "$desired"
+        fi
+        restore_private_selector_v7
+        bind_projection_journal restored projection-restored
+        projection_helper_call commit --expected "${projection_prior:-none}"
+    else
+        restore_private_selector_v7
+        if [ -e "$RUNTIME_PROJECTION_JOURNAL" ] || [ -L "$RUNTIME_PROJECTION_JOURNAL" ]; then
+            [ "$(projection_pending_phase_v7)" = restored ] \
+                || fail "restored Projection-v7 hat ein fremdes Root-Pending-Journal" 70
+            projection_helper_call commit --expected "${projection_prior:-none}"
+        fi
+    fi
+    projection_helper_call validate-terminal --expected "${projection_prior:-none}" --outcome prior-or-none \
+        --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+        --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+    restore_and_verify_prior_consumers
+    validate_projection_steady_state "$(journal_field prior_active_manifest)"
+    write_autostart_approval
+    services_output="$(journal_service_lines)"
+    [ -z "$services_output" ] || mapfile -t recovery_services <<< "$services_output"
+    start_recorded_services
+    attest_recovered_services
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" resume
+    receipt="$(write_transition_completion_receipt interrupted-restored)"
+    validate_completion_receipt "$receipt"; receipt_hash="$VERIFIED_COMPLETION_RECEIPT_SHA256"
+    activation_v7_transition restore-receipt-written \
+        "activation_receipt_path=$receipt" "activation_receipt_sha256=$receipt_hash"
+    finalize_guarded_transition
 }
 
 recover_pending_activation() {
-    local phase receipt receipt_hash actual_hash services_output recovery_status fail_closed_status approval_status guard_status
+    local phase receipt receipt_hash actual_hash services_output recovery_status fail_closed_status approval_status guard_status target projection_prior desired consumer_state rollback_root_status
     local -a recovery_services=()
+    recover_root_artifact_transaction_first
     if [ ! -e "$ACTIVATION_JOURNAL" ]; then
+        set +e; runtime_rollback_root_state_present; rollback_root_status=$?; set -e
+        case "$rollback_root_status" in
+            0)
+                projection_helper_call recover-committed-rollback-begin >/dev/null
+                recover_pending_runtime_rollback
+                return 0
+                ;;
+            2)
+                active="$(selector_manifest)"
+                if [[ "$active" =~ ^legacy-[a-f0-9]{64}$ ]]; then
+                    if [ -e "$CODE_RELEASE_JOURNAL" ] || [ -L "$CODE_RELEASE_JOURNAL" ]; then
+                        projection_helper_call validate-runtime-rollback-current --archived >/dev/null
+                        fail "Runtime-Rollback-Current ist nur historische Baseline; pending Code-Release braucht release-recover" 70
+                    fi
+                    projection_helper_call validate-runtime-rollback-current >/dev/null
+                    return 0
+                fi
+                [[ "$active" =~ ^[a-f0-9]{64}$ ]] \
+                    || fail "Runtime-Rollback-Current traf einen ungueltigen privaten Selector" 70
+                # A fully formed Current authority may remain dormant after a
+                # later v7 activation; TARGET steady is validated below by its
+                # own projection/root authority and does not select history.
+                ;;
+            1) ;;
+            *) fail "Root-Rollback-State konnte nicht sicher inventarisiert werden" "$rollback_root_status" ;;
+        esac
+        if [ -e "$RUNTIME_PROJECTION_JOURNAL" ] || [ -L "$RUNTIME_PROJECTION_JOURNAL" ]; then
+            systemd_autostart_guard_present
+            remove_autostart_approval
+            disable_genus_cron_block
+            stop_all_genus_units
+            prove_no_old_runtime_processes
+            prove_no_db_handles
+            fail "root-eigenes Projection-Journal ohne privates Activation-Journal; Dienste/Cron bleiben fail-closed" 70
+        fi
         if [ -e "$ACTIVE_LINK" ] || [ -L "$ACTIVE_LINK" ] || [ -e "$AUTOSTART_APPROVAL" ] || [ -L "$AUTOSTART_APPROVAL" ]; then
             if [ -e "$OPERATOR_REAUTH_TOKEN" ] || [ -L "$OPERATOR_REAUTH_TOKEN" ]; then
                 set +e
@@ -4976,13 +13645,23 @@ recover_pending_activation() {
         cleanup_completed_activation_artifacts
         return 0
     fi
+    if [ "$(journal_field schema)" = genus-a0.3c-runtime-activation-pending-v7 ]; then
+        recover_pending_activation_v7
+        cleanup_completed_activation_artifacts
+        return 0
+    fi
     set +e
     (
         set -Eeuo pipefail
         recover_incomplete_migration
         validate_activation_journal 1
+        consume_activation_reservation 0
         phase="$(journal_field phase)"
-        if [ "$phase" = receipt-written ]; then
+        if [ "$phase" = human-recovery-required ]; then
+            fail "Legacy-Restore ist bereits selector-konsistent; Dienste und Cron bleiben bis zur menschlichen Recovery fail-closed" 70
+        fi
+        if [ "$phase" = receipt-written ] || [ "$phase" = projection-committed ] \
+            || [ "$phase" = restore-receipt-written ]; then
             validate_activation_journal
             validate_autostart_approval
             receipt="$(journal_field activation_receipt_path)"
@@ -4995,37 +13674,107 @@ recover_pending_activation() {
             validate_completion_receipt "$receipt"
             [ "$VERIFIED_COMPLETION_RECEIPT_SHA256" = "$receipt_hash" ] \
                 || fail "Completion-Snapshot stimmt nicht mit dem persistierten Receipt-Hash ueberein" 70
-            services_output="$(journal_service_lines)"
-            [ -n "$services_output" ] \
-                || fail "persistiertes Service-Inventar ist leer/ungueltig" 70
-            mapfile -t recovery_services <<< "$services_output"
+            if [ "$phase" = restore-receipt-written ]; then
+                services_output="$(journal_service_lines)"
+            else
+                services_output="$(journal_target_service_lines)"
+            fi
+            recovery_services=()
+            if [ -n "$services_output" ]; then mapfile -t recovery_services <<< "$services_output"; fi
             attest_recovered_services
+            if [ "$phase" = restore-receipt-written ]; then
+                target="$(journal_field prior_active_manifest)"
+                projection_helper_call validate-terminal --expected "$target" --outcome prior-or-none \
+                    --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+                    --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+                validate_projection_steady_state "$target"
+                finalize_guarded_transition
+                log "vollstaendig attestierten Projection-Restore nach Unterbrechung finalisiert"
+                exit 0
+            fi
+            target="$(journal_field target_manifest)"
+            if [ "$phase" = receipt-written ]; then
+                if [ -e "$RUNTIME_PROJECTION_JOURNAL" ] || [ -L "$RUNTIME_PROJECTION_JOURNAL" ]; then
+                    projection_helper_call validate-pending-active >/dev/null
+                    projection_helper_call commit --expected "$target"
+                fi
+                projection_helper_call validate-terminal --expected "$target" --outcome target \
+                    --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+                    --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+                update_activation_journal projection-committed "$receipt" "$receipt_hash"
+            else
+                [ ! -e "$RUNTIME_PROJECTION_JOURNAL" ] && [ ! -L "$RUNTIME_PROJECTION_JOURNAL" ] \
+                    || fail "projection-committed Phase hat noch ein root Journal" 70
+                projection_helper_call validate-terminal --expected "$target" --outcome target \
+                    --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+                    --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+            fi
+            validate_projection_steady_state "$target"
             finalize_guarded_transition
             log "vollstaendig attestierte Activation nach Unterbrechung finalisiert"
             exit 0
         fi
         [ ! -e "$OPERATOR_REAUTH_TOKEN" ] \
             || fail "unterbrochener reautorisierter Transition bleibt absichtlich fail-closed; keine alte Runtime unter neuem Repo starten" 70
-        install_systemd_autostart_guard
+        systemd_autostart_guard_present
         remove_autostart_approval
-        disable_genus_cron_block
+        consumer_state="$(journal_field consumer_state)"
+        case "$consumer_state" in
+            snapshotted|published|target-verified|prior-restored)
+                if ! disable_consumer_cron_from_journal; then
+                    systemd_autostart_guard_present
+                    [ ! -e "$AUTOSTART_APPROVAL" ] && [ ! -L "$AUTOSTART_APPROVAL" ] \
+                        || fail "gemischte Consumer-Recovery ist nicht logisch fail-closed" 70
+                    log "Consumer-Cron ist in einem publisher-seitig recoverbaren Mischzustand; Boot-Guard blockiert Starts bis nach Quiescence"
+                fi
+                ;;
+            *) disable_genus_cron_block ;;
+        esac
         services_output="$(journal_service_lines)"
-        [ -n "$services_output" ] \
-            || fail "persistiertes Service-Inventar ist leer/ungueltig" 70
-        mapfile -t recovery_services <<< "$services_output"
-        GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" pause \
+        recovery_services=()
+        if [ -n "$services_output" ]; then mapfile -t recovery_services <<< "$services_output"; fi
+        GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
             --reason "A0.3c interrupted activation recovery"
         stop_all_genus_units
         prove_no_old_runtime_processes
         prove_no_db_handles
+        case "$consumer_state" in
+            snapshotted|published|target-verified|prior-restored) restore_and_verify_prior_consumers ;;
+        esac
+        projection_prior="$(journal_field projection_prior_manifest)"
+        if [ -e "$RUNTIME_PROJECTION_JOURNAL" ] || [ -L "$RUNTIME_PROJECTION_JOURNAL" ]; then
+            if [ -n "$projection_prior" ]; then desired=prior; else desired=none; fi
+            projection_helper_call restore --desired "$desired"
+            bind_projection_journal restored-prior restored-prior
+        fi
         restore_selector_from_journal
+        if [ -e "$RUNTIME_PROJECTION_JOURNAL" ] || [ -L "$RUNTIME_PROJECTION_JOURNAL" ]; then
+            projection_helper_call commit --expected "${projection_prior:-none}"
+        fi
+        projection_helper_call validate-terminal --expected "${projection_prior:-none}" --outcome prior-or-none \
+            --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+            --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null \
+            || {
+                [ -z "$(journal_field projection_target_receipt_sha256)" ] \
+                    || fail "Projection-Restore hat kein gueltiges nonce-gebundenes Terminal-Receipt" 70
+            }
+        if [[ "$(journal_field prior_active_manifest)" = legacy-* ]]; then
+            update_activation_journal human-recovery-required
+            fail "Legacy-Restore ist selector-konsistent, bleibt aber unter getrennten Service-UIDs absichtlich pausiert/gestoppt; menschliche Recovery erforderlich" 70
+        fi
+        case "$(journal_field consumer_state)" in
+            unbound|contract-bound)
+                update_consumer_journal_state unbound,contract-bound prior-unchanged
+                ;;
+        esac
+        validate_projection_steady_state "$(journal_field prior_active_manifest)"
         write_autostart_approval
         start_recorded_services
         attest_recovered_services
-        GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" resume
+        GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" resume
         receipt="$(write_transition_completion_receipt interrupted-restored)"
         validate_completion_receipt "$receipt"
-        update_activation_journal receipt-written "$receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
+        update_activation_journal restore-receipt-written "$receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
         finalize_guarded_transition
         log "unterbrochenen Runtimewechsel auf den verifizierten Ausgangszustand restauriert"
     )
@@ -5062,15 +13811,54 @@ activation_fault_point() {
     esac
 }
 
+quiesce_for_root_artifact_migration() {
+    local phase
+    [ "$(journal_field schema)" = genus-a0.3c-runtime-activation-pending-v7 ] \
+        && [ "$(journal_field root_artifact_state)" = staged ] \
+        && [ "$(journal_field consumer_state)" = baseline-snapshotted ] \
+        || fail "Root-Artefakt-Quiescence braucht staged v7 Intent plus Baseline-Snapshot" 70
+    phase="$(journal_field phase)"
+    case "$phase" in
+        consumer-baseline|quiescence-guarded|quiescence-paused|quiescence-stopped) ;;
+        *) fail "Root-Artefakt-Quiescence traf eine unmoegliche v7-Phase" 70 ;;
+    esac
+    disable_genus_cron_block
+    remove_autostart_approval
+    if [ "$phase" = consumer-baseline ]; then
+        activation_v7_transition quiescence-guarded
+        phase=quiescence-guarded
+    fi
+    prove_no_backup_in_progress
+    QUIESCENCE_BACKUP_RECEIPT="$(fresh_backup_receipt)"
+    if [ "$phase" = quiescence-guarded ]; then
+        GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" \
+            "$CORE_POINTER/bin/genus" pause --reason "A0.3c root artifact migration"
+        activation_v7_transition quiescence-paused
+        phase=quiescence-paused
+    else
+        GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" \
+            "$CORE_POINTER/bin/genus" paused >/dev/null
+    fi
+    if [ "$phase" = quiescence-paused ]; then
+        stop_services
+        activation_v7_transition quiescence-stopped
+    fi
+    prove_no_old_runtime_processes
+    prove_no_db_handles
+    validate_activation_journal 1
+}
+
 switch_with_quiescence() {
     local expected="$1" target_manifest="$2" mode="$3" readiness="${4:-}" series="${5:-}"
     local readiness_receipt="" readiness_hash="" series_receipt="" series_hash=""
     local current_target="" previous_selector="" backup_receipt="" postflight_receipt=""
-    local active_identity_receipt="" activation_receipt="" restore_status
+    local active_identity_receipt="" activation_receipt="" restore_status projection_prior=""
+    local CONSUMER_PLAN_VALUES CONSUMER_BASELINE_HINT
     local -a recovery_services=()
     assert_expected_commit "$expected"
     init_user_roots
     acquire_operator_lock
+    validate_product_data_contract
     [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
     require_command "$FUSER_BIN"
     # Serialize every recovery and selector transition before its first
@@ -5079,14 +13867,16 @@ switch_with_quiescence() {
     acquire_backup_lock
     prove_no_backup_in_progress
     recover_pending_activation
-    if [ -e "$OPERATOR_REAUTH_TOKEN" ]; then
-        [ "$mode" = activate ] \
-            || fail "Operator-Reauthorization erlaubt nur stage gefolgt von activate, niemals rollback" 70
-        [ "$target_manifest" = "$(selector_manifest "$STAGED_LINK")" ] \
-            || fail "reautorisierte Activation muss exakt das staged NEW-Commit-Set verwenden" 70
-        [[ "$target_manifest" != legacy-* ]] \
-            || fail "Reauthorization darf kein Legacy-Set aktivieren" 70
-    fi
+    [ "$mode" = activate ] \
+        || fail "Activation-v7 ist nur als autorisierter Roll-forward definiert" 70
+    [ -f "$OPERATOR_REAUTH_TOKEN" ] && [ ! -L "$OPERATOR_REAUTH_TOKEN" ] \
+        || fail "Activation-v7 braucht die separate menschliche Operator-Reauthorization-v2" 77
+    validate_operator_reauthorization
+    [ "$ROOT_ARTIFACT_NEW_COMMIT" = "$expected" ] \
+        && [ "$target_manifest" = "$(selector_manifest "$STAGED_LINK")" ] \
+        || fail "Activation-v7 muss exakt NEW-Commit und staged Zielset verwenden" 70
+    [[ "$target_manifest" != legacy-* ]] \
+        || fail "Activation-v7 darf kein Legacy-Set als Ziel aktivieren" 70
     recover_incomplete_migration
     verify_target "$target_manifest" >/dev/null
     if [ "$mode" = activate ]; then
@@ -5100,15 +13890,35 @@ switch_with_quiescence() {
         [ "$readiness_hash" = "$VERIFIED_SERIES_READINESS_SHA256" ] \
             || fail "Readiness-Manifest driftete zwischen Einzelverifikation und Serien-Replay" 65
     fi
+    CONSUMER_PLAN_VALUES="$(consumer_plan_values)"
+    CONSUMER_BASELINE_HINT="${CONSUMER_PLAN_VALUES%%$'\n'*}"
+    if [ "$CONSUMER_BASELINE_HINT" = present ]; then
+        validate_code_release_service_privilege_boundary
+    else
+        [ "$CONSUMER_BASELINE_HINT" = absent ] \
+            || fail "Consumer-Baseline ist weder present noch absent" 70
+        validate_consumer_bootstrap_prerequisites
+    fi
     remember_services
-    [ "${#active_services[@]}" -gt 0 ] \
-        || fail "kein aktives GENUS-Service-Inventar; Activation bleibt vor jeder Mutation gesperrt" 70
+    if [ "$CONSUMER_BASELINE_HINT" = present ]; then
+        [ "${#active_services[@]}" -gt 0 ] \
+            || fail "vorhandene Consumer-Baseline hat kein aktives GENUS-Service-Inventar" 70
+    else
+        [ "${#active_services[@]}" -eq 0 ] \
+            || fail "absente Consumer-Baseline hat unerwartet aktive Dienste" 70
+    fi
     assert_not_previously_paused
     capture_activation_crontab
-    install_systemd_autostart_guard
-    systemd_autostart_guard_present
-    create_activation_journal "$expected" "$target_manifest" "$mode" "$readiness" "$readiness_hash" \
-        "$series_receipt" "$series_hash"
+    systemd_autostart_guard_present "$ROOT_ARTIFACT_OLD_COMMIT"
+    current_target="$(selector_manifest)"
+    [ -n "$current_target" ] \
+        || fail "Activation-v7 braucht einen manifestierten privaten Ausgangsselector" 70
+    create_activation_reservation_v2 "$expected" "$target_manifest" "$mode" \
+        "$readiness_hash" "$series_hash" "$current_target"
+    prepare_root_artifact_inputs "$expected"
+    root_artifact_stage
+    create_activation_intent_journal "$expected" "$target_manifest" "$mode" \
+        "$readiness" "$readiness_hash" "$series_receipt" "$series_hash"
     cleanup_switch() {
         local status="${1:-$?}"
         trap - EXIT INT TERM
@@ -5123,35 +13933,62 @@ switch_with_quiescence() {
     trap 'cleanup_switch $?' EXIT
     trap 'cleanup_switch 130' INT
     trap 'cleanup_switch 143' TERM
-    disable_genus_cron_block
-    remove_autostart_approval
-    update_activation_journal guarded
-    prove_no_backup_in_progress
-    if [ "$mode" = activate ]; then
-        backup_receipt="$(fresh_backup_receipt)"
-    fi
-    GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" pause --reason "A0.3c runtime switch"
-    update_activation_journal paused
-    stop_services
-    update_activation_journal stopped
+    snapshot_consumers_staged
+    activation_fault_point after-consumer-snapshot
+    quiesce_for_root_artifact_migration
+    backup_receipt="$QUIESCENCE_BACKUP_RECEIPT"
     activation_fault_point after-stop
-    prove_no_old_runtime_processes
-    prove_no_db_handles
+    root_artifact_arm
+    activation_v7_transition root-pending
+    activation_fault_point after-root-arm
+    root_artifact_apply
+    activation_fault_point after-root-apply
+    verify_root_artifacts_reloaded
+    bind_root_artifact_handoff
+    activation_fault_point after-root-handoff
+    root_artifact_commit
+    bind_root_artifact_terminal
+    root_artifact_validate_terminal committed >/dev/null
+    activation_fault_point after-root-commit
+    bind_projection_contract_to_journal
+    authorize_consumer_snapshot
+    projection_prior="$(journal_field projection_prior_manifest)"
+    [ -n "$projection_prior" ] || projection_prior=none
+    projection_helper_call prepare --private-set "$(set_path "$target_manifest")" \
+        --manifest "$target_manifest" --prior "$projection_prior" \
+        --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+        --plan "$(journal_field projection_plan_path)" \
+        --plan-sha256 "$(journal_field projection_plan_sha256)"
+    bind_projection_journal prepared projection-prepared
+    publish_and_verify_consumers
+    activation_fault_point after-consumer-publish
     prepare_legacy_pointer_unit
     current_target="$(readlink "$ACTIVE_LINK")"
     previous_selector="${current_target##*/}"
-    rebind_activation_journal legacy-ready "$previous_selector"
-    validate_activation_journal
+    [ "$previous_selector" = "$(journal_field prior_active_manifest)" ] \
+        || fail "Activation-v7-Ausgangsselector driftete vor dem Dual-Swap" 70
+    validate_activation_journal 1
+    activation_fault_point after-projection-prepare
     atomic_link "$current_target" "$PREVIOUS_LINK"
     atomic_link "sets/$target_manifest" "$ACTIVE_LINK"
-    rebind_activation_journal swapped "$target_manifest"
     activation_fault_point after-swap
+    projection_helper_call activate
+    bind_projection_journal activated projection-activated
+    projection_helper_call validate-pending-active >/dev/null
+    [ "$(selector_manifest)" = "$target_manifest" ] \
+        && [ "$(public_projection_manifest)" = "$target_manifest" ] \
+        || fail "private/oeffentliche Runtime-Selector divergieren nach Dual-Swap" 70
+    activation_fault_point after-public-swap
     verify_target "$target_manifest" >/dev/null
     if [[ "$target_manifest" != legacy-* ]]; then
         active_identity_receipt="$(attest_active_pointer_unit "$target_manifest")"
     fi
-    GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" paused >/dev/null
-    update_activation_journal target-verified
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" paused >/dev/null
+    validate_consumer_root_approval
+    reload_and_verify_consumer_units target
+    [ "$(consumer_publisher_from_journal validate-target disabled)" \
+        = "$(journal_field consumer_snapshot_sha256)" ] \
+        || fail "Consumer-Zieltopologie driftete an der Startgrenze" 70
     if [ "$mode" = activate ]; then
         verify_series_receipt "$target_manifest" "$expected" "$readiness" "$series_receipt"
         [ "$VERIFIED_SERIES_SHA256" = "$series_hash" ] \
@@ -5160,47 +13997,679 @@ switch_with_quiescence() {
     fi
     write_autostart_approval
     validate_autostart_approval
+    prepare_target_service_inventory
     start_previous_services
     validate_autostart_approval
-    GENUS_DB_PATH="$DB_PATH" "$CORE_POINTER/bin/genus" resume
-    update_activation_journal resumed
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" resume
     activation_fault_point after-resume
-    if [ "$mode" = activate ]; then
-        postflight_receipt="$(attest_restarted_services)"
-        update_activation_journal postflight
-        activation_receipt="$(write_activation_receipt "$target_manifest" "$expected" "$readiness" \
-            "$series_receipt" "$series_hash" "$readiness_receipt" "$previous_selector" \
-            "$backup_receipt" "$postflight_receipt" "$active_identity_receipt")"
-        validate_completion_receipt "$activation_receipt"
-        update_activation_journal receipt-written "$activation_receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
-    else
-        recovery_services=("${active_services[@]}")
-        attest_recovered_services
-        activation_receipt="$(write_transition_completion_receipt rollback-restored)"
-        validate_completion_receipt "$activation_receipt"
-        update_activation_journal receipt-written "$activation_receipt" "$VERIFIED_COMPLETION_RECEIPT_SHA256"
-    fi
+    postflight_receipt="$(attest_restarted_services)"
+    activation_receipt="$(write_activation_receipt "$target_manifest" "$expected" "$readiness" \
+        "$series_receipt" "$series_hash" "$readiness_receipt" "$previous_selector" \
+        "$backup_receipt" "$postflight_receipt" "$active_identity_receipt")"
+    validate_completion_receipt "$activation_receipt"
+    projection_helper_call validate-pending-active >/dev/null
+    projection_helper_call commit --expected "$target_manifest"
+    projection_helper_call validate-terminal --expected "$target_manifest" --outcome target \
+        --transaction-nonce "$(journal_field projection_transaction_nonce)" \
+        --plan-sha256 "$(journal_field projection_plan_sha256)" >/dev/null
+    activation_v7_transition projection-committed \
+        "activation_receipt_path=$activation_receipt" \
+        "activation_receipt_sha256=$VERIFIED_COMPLETION_RECEIPT_SHA256"
+    validate_activation_journal
     finalize_guarded_transition
     SERVICES_RESTARTED=0
     trap - EXIT INT TERM
     log "$mode abgeschlossen: $target_manifest"
 }
 
+runtime_rollback_json() {
+    projection_helper_call inspect-runtime-rollback
+}
+
+runtime_rollback_field() {
+    local field="$1" raw
+    raw="$(runtime_rollback_json)"
+    RAW="$raw" FIELD="$field" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os
+data=json.loads(os.environ["RAW"]); value=data[os.environ["FIELD"]]
+if isinstance(value,(dict,list,bool)) or value is None:
+    raise SystemExit("runtime rollback field is not scalar")
+print(value)
+PY
+}
+
+runtime_rollback_service_lines() {
+    local field="$1" raw
+    case "$field" in prior_active_services|target_active_services) ;; *) return 64 ;; esac
+    raw="$(runtime_rollback_json)"
+    RAW="$raw" FIELD="$field" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service",
+         "genus-learner.service","genus-telegram-bot.service"}
+values=json.loads(os.environ["RAW"])[os.environ["FIELD"]]
+if (not isinstance(values,list) or len(values)!=len(set(values))
+        or any(not isinstance(value,str) or value not in allowed for value in values)):
+    raise SystemExit("runtime rollback service inventory differs")
+print("\n".join(values))
+PY
+}
+
+parse_runtime_rollback_source_selection() {
+    local raw="$1"
+    RAW="$raw" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os,re
+raw=os.environ["RAW"].encode()+b"\n"
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate rollback source selection key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+canonical=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+required={"candidate_commit","consumer_baseline","prior_active_manifest","prior_active_services",
+          "source_authority_path","source_authority_sha256","source_transaction_nonce",
+          "target_active_services","target_manifest"}
+if (raw!=canonical or set(data)!=required or not re.fullmatch(r"[0-9a-f]{40}",str(data["candidate_commit"]))
+        or data["consumer_baseline"] not in {"present","absent"}
+        or not re.fullmatch(r"legacy-[0-9a-f]{64}",str(data["prior_active_manifest"]))
+        or not re.fullmatch(r"[0-9a-f]{64}",str(data["source_authority_sha256"]))
+        or not re.fullmatch(r"[0-9a-f]{64}",str(data["source_transaction_nonce"]))
+        or not re.fullmatch(r"[0-9a-f]{64}",str(data["target_manifest"]))):
+    raise SystemExit("rollback source selection result differs")
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service",
+         "genus-learner.service","genus-telegram-bot.service"}
+for key in ("prior_active_services","target_active_services"):
+    values=data[key]
+    if (not isinstance(values,list) or len(values)!=len(set(values))
+            or any(not isinstance(value,str) or value not in allowed for value in values)):
+        raise SystemExit("rollback source selection service inventory differs")
+print(data["candidate_commit"])
+print(data["target_manifest"])
+print(data["prior_active_manifest"])
+print(data["consumer_baseline"])
+print(data["source_transaction_nonce"])
+print(data["source_authority_path"])
+print(data["source_authority_sha256"])
+PY
+}
+
+runtime_rollback_source_selection_service_lines() {
+    local raw="$1" field="$2"
+    case "$field" in prior_active_services|target_active_services) ;; *) return 64 ;; esac
+    RAW="$raw" FIELD="$field" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import json,os
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service",
+         "genus-learner.service","genus-telegram-bot.service"}
+values=json.loads(os.environ["RAW"])[os.environ["FIELD"]]
+if (not isinstance(values,list) or len(values)!=len(set(values))
+        or any(not isinstance(value,str) or value not in allowed for value in values)):
+    raise SystemExit("rollback source selection service inventory differs")
+print("\n".join(values))
+PY
+}
+
+new_runtime_rollback_nonce() {
+    "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+}
+
+runtime_rollback_control_cron_paths() {
+    local nonce="$1"
+    RUNTIME_ROLLBACK_CRON_CONTROL_ORIGINAL="$STATE_ROOT/runtime-rollback-cron-control-original.$nonce.txt"
+    RUNTIME_ROLLBACK_CRON_CONTROL_IDENTITY="$STATE_ROOT/runtime-rollback-cron-control-identity.$nonce.json"
+}
+
+capture_runtime_rollback_cron() {
+    local nonce="$1" baseline="$2"
+    runtime_rollback_control_cron_paths "$nonce"
+    (
+        ACTIVATION_CRON_SNAPSHOT="$RUNTIME_ROLLBACK_CRON_CONTROL_ORIGINAL"
+        ACTIVATION_CRON_DISABLED="$RUNTIME_ROLLBACK_CRON_CONTROL_IDENTITY"
+        CONSUMER_BASELINE_HINT="$baseline"
+        capture_root_schedule
+    )
+}
+
+runtime_rollback_verify_root_schedule_state() (
+    local nonce="$1" expected="$2"
+    runtime_rollback_control_cron_paths "$nonce"
+    ACTIVATION_CRON_SNAPSHOT="$RUNTIME_ROLLBACK_CRON_CONTROL_ORIGINAL"
+    ACTIVATION_CRON_DISABLED="$RUNTIME_ROLLBACK_CRON_CONTROL_IDENTITY"
+    verify_root_schedule_state "$expected"
+)
+
+create_runtime_rollback_intent() {
+    local rollback_nonce="$1" source_nonce="$2" source_sha="$3" target="$4" prior="$5"
+    local publisher_sha intent original identity
+    runtime_rollback_control_cron_paths "$rollback_nonce"
+    intent="$STATE_ROOT/runtime-rollback-intent.$rollback_nonce.json"
+    original="$STATE_ROOT/runtime-rollback-cron-original.$rollback_nonce.txt"
+    identity="$STATE_ROOT/runtime-rollback-cron-identity.$rollback_nonce.json"
+    publisher_sha="$(root_stable_sha256 "$PROJECTION_HELPER_PATH" 0555)"
+    ROLLBACK_NONCE="$rollback_nonce" SOURCE_NONCE="$source_nonce" SOURCE_SHA="$source_sha" \
+    TARGET_MANIFEST="$target" PRIOR_ACTIVE_MANIFEST="$prior" PUBLISHER_SHA="$publisher_sha" \
+    OPERATOR_UID="$(id -u)" STATE_ROOT_VALUE="$STATE_ROOT" DB_PATH_VALUE="$DB_PATH" \
+        "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$RUNTIME_ROLLBACK_CRON_CONTROL_ORIGINAL" "$original" "$identity" "$intent" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+control,original,identity,intent=map(pathlib.Path,sys.argv[1:5]); uid=int(os.environ["OPERATOR_UID"])
+def canonical(value):
+    return (json.dumps(value,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+def stable(path,mode,limit):
+    before=path.lstat(); fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns","st_ctime_ns")
+    ident=lambda value:tuple(getattr(value,key) for key in fields)
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1 or before.st_size>limit):
+        raise SystemExit("rollback private source evidence metadata differs")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); chunks=[]; size=0
+    try:
+        opened=os.fstat(fd)
+        while True:
+            chunk=os.read(fd,min(1024*1024,limit+1-size))
+            if not chunk: break
+            size+=len(chunk)
+            if size>limit: raise SystemExit("rollback private source evidence is oversized")
+            chunks.append(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=path.lstat(); raw=b"".join(chunks)
+    if not ident(before)==ident(opened)==ident(final)==ident(after) or len(raw)!=before.st_size:
+        raise SystemExit("rollback private source evidence changed during read")
+    return raw
+def publish(path,raw,mode):
+    flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0); fd=os.open(path,flags,mode)
+    try:
+        view=memoryview(raw)
+        while view:
+            count=os.write(fd,view)
+            if count<=0: raise SystemExit("short rollback evidence write")
+            view=view[count:]
+        os.fchmod(fd,mode); os.fsync(fd)
+    finally: os.close(fd)
+control_raw=stable(control,0o600,1024*1024); original_sha=hashlib.sha256(control_raw).hexdigest()
+publish(original,control_raw,0o400)
+identity_data={"cron_original_sha256":original_sha,"operator_uid":uid,
+ "rollback_transaction_nonce":os.environ["ROLLBACK_NONCE"],
+ "schema":"genus-a0.3c-runtime-rollback-cron-identity-v1",
+ "source_transaction_nonce":os.environ["SOURCE_NONCE"],"state_root":os.environ["STATE_ROOT_VALUE"]}
+identity_raw=canonical(identity_data); publish(identity,identity_raw,0o400)
+database=pathlib.Path(os.environ["DB_PATH_VALUE"]); db=database.lstat()
+if (database.is_symlink() or not stat.S_ISREG(db.st_mode) or db.st_uid!=uid or db.st_nlink!=1
+        or stat.S_IMODE(db.st_mode)&0o022):
+    raise SystemExit("rollback product database metadata differs")
+data={"cron_identity_path":str(identity),"cron_identity_sha256":hashlib.sha256(identity_raw).hexdigest(),
+ "cron_original_path":str(original),"cron_original_sha256":original_sha,"mode":"rollback",
+ "operator_uid":uid,"outcome":"prior-or-none","prior_active_manifest":os.environ["PRIOR_ACTIVE_MANIFEST"],
+ "prior_manifest":"","product_db_device":db.st_dev,"product_db_inode":db.st_ino,
+ "product_db_path":str(database),"protocol":"committed-runtime-rollback-v1",
+ "publisher_sha256":os.environ["PUBLISHER_SHA"],"rollback_transaction_nonce":os.environ["ROLLBACK_NONCE"],
+ "schema":"genus-a0.3c-runtime-rollback-intent-v1","source_authority_sha256":os.environ["SOURCE_SHA"],
+ "source_transaction_nonce":os.environ["SOURCE_NONCE"],"state_root":os.environ["STATE_ROOT_VALUE"],
+ "target_manifest":os.environ["TARGET_MANIFEST"]}
+authorization={"schema":"genus-a0.3c-runtime-rollback-authorization-v1",
+ **{key:value for key,value in data.items() if key!="schema"}}
+data["authorization_sha256"]=hashlib.sha256(canonical(authorization)).hexdigest()
+publish(intent,canonical(data),0o400)
+directory=os.open(intent.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    RUNTIME_ROLLBACK_INTENT="$intent"
+    RUNTIME_ROLLBACK_INTENT_SHA256="$(user_stable_sha256 "$intent" 0400)"
+}
+
+consumer_publisher_from_rollback_journal() {
+    local command="$1" cron_location="${2:-}" plan plan_sha inventory inventory_sha snapshot snapshot_sha output
+    plan="$(runtime_rollback_field consumer_plan_path)"; plan_sha="$(runtime_rollback_field consumer_plan_sha256)"
+    inventory="$(runtime_rollback_field consumer_inventory_path)"; inventory_sha="$(runtime_rollback_field consumer_inventory_sha256)"
+    snapshot="$(runtime_rollback_field consumer_snapshot_path)"; snapshot_sha="$(runtime_rollback_field consumer_snapshot_sha256)"
+    local -a arguments=("$command" --plan "$plan" --plan-sha256 "$plan_sha" \
+        --inventory "$inventory" --inventory-sha256 "$inventory_sha" --snapshot "$snapshot")
+    if [ "$command" != snapshot ]; then arguments+=(--snapshot-sha256 "$snapshot_sha"); fi
+    if [[ "$command" = validate-* ]]; then arguments+=(--cron-location "$cron_location"); fi
+    output="$(consumer_publisher_call "${arguments[@]}")"
+    parse_consumer_result "$command" "$output"
+}
+
+validate_consumer_root_approval_from_rollback() {
+    local approval expected nonce snapshot
+    nonce="$(runtime_rollback_field source_transaction_nonce)"
+    approval="$(runtime_rollback_field consumer_approval_path)"
+    expected="$CODE_RELEASE_TRUST_ROOT/runtime-consumer.approval.$nonce.json"
+    [ "$approval" = "$expected" ] \
+        && [ "$(root_stable_sha256 "$approval" 0400)" = "$(runtime_rollback_field consumer_approval_sha256)" ] \
+        || fail "Rollback-Consumer-Approval driftet von der root-gebundenen Source" 70
+    [ "$(root_stable_sha256 "$CONSUMER_PUBLISHER_PATH" 0755)" = "$(runtime_rollback_field consumer_publisher_sha256)" ] \
+        && [ "$(root_stable_sha256 "$CONSUMER_RENDERER_PATH" 0755)" = "$(runtime_rollback_field consumer_renderer_sha256)" ] \
+        || fail "Rollback-Consumer-Werkzeuge driften von der Source" 70
+    snapshot="$(runtime_rollback_field consumer_snapshot_path)/snapshot.json"
+    [ "$(root_stable_sha256 "$snapshot" 0400)" = "$(runtime_rollback_field consumer_snapshot_sha256)" ] \
+        || fail "Rollback-Consumer-Snapshot driftet" 70
+}
+
+validate_consumer_snapshot_evidence_from_rollback() {
+    [ "$(user_stable_sha256 "$(runtime_rollback_field consumer_plan_path)" 0400)" \
+        = "$(runtime_rollback_field consumer_plan_sha256)" ] \
+        && [ "$(user_stable_sha256 "$(runtime_rollback_field consumer_inventory_path)" 0400)" \
+        = "$(runtime_rollback_field consumer_inventory_sha256)" ] \
+        || fail "Rollback-Consumer-Plan/Inventar driftet" 70
+    validate_consumer_root_approval_from_rollback
+}
+
+runtime_rollback_transition() {
+    local expected="$1" next="$2"; shift 2
+    projection_helper_call transition-runtime-rollback \
+        --rollback-transaction-nonce "$(runtime_rollback_field rollback_transaction_nonce)" \
+        --expected-phase "$expected" --next-phase "$next" "$@" >/dev/null
+}
+
+disable_consumer_cron_from_rollback_journal() {
+    local snapshot_sha topology target_disabled=0 prior_disabled=0 target_active=0 prior_active=0
+    snapshot_sha="$(runtime_rollback_field consumer_snapshot_sha256)"
+    [ "$(consumer_publisher_from_rollback_journal validate-target disabled 2>/dev/null || true)" != "$snapshot_sha" ] \
+        || target_disabled=1
+    [ "$(consumer_publisher_from_rollback_journal validate-prior disabled 2>/dev/null || true)" != "$snapshot_sha" ] \
+        || prior_disabled=1
+    [ "$(consumer_publisher_from_rollback_journal validate-target active 2>/dev/null || true)" != "$snapshot_sha" ] \
+        || target_active=1
+    [ "$(consumer_publisher_from_rollback_journal validate-prior active 2>/dev/null || true)" != "$snapshot_sha" ] \
+        || prior_active=1
+    if [ "$target_active" -eq 0 ] && [ "$prior_active" -eq 0 ] \
+        && { [ "$target_disabled" -eq 1 ] || [ "$prior_disabled" -eq 1 ]; }; then
+        return 0
+    fi
+    [ $((target_active + prior_active)) -eq 1 ] \
+        && [ $((target_disabled + prior_disabled)) -eq 0 ] \
+        || fail "Rollback-Consumer-Cronzustand ist vor Deaktivierung nicht eindeutig" 70
+    if [ "$target_active" -eq 1 ]; then
+        topology=target
+    else
+        topology=prior
+    fi
+    as_root "$ROOT_MV_BIN" -T -n -- "$ROOT_CRON_FILE" "$ROOT_CRON_DISABLED_FILE"
+    as_root "$ROOT_SYNC_BIN" -f "$(dirname "$ROOT_CRON_FILE")"
+    [ "$(consumer_publisher_from_rollback_journal "validate-$topology" disabled)" = "$snapshot_sha" ] \
+        || fail "Rollback-Consumer blieb nach Cron-Deaktivierung aktiv/unsicher" 70
+}
+
+activate_prior_consumer_cron_from_rollback_journal() {
+    local snapshot_sha
+    snapshot_sha="$(runtime_rollback_field consumer_snapshot_sha256)"
+    if [ "$(consumer_publisher_from_rollback_journal validate-prior active 2>/dev/null || true)" = "$snapshot_sha" ]; then
+        return 0
+    fi
+    [ "$(consumer_publisher_from_rollback_journal validate-prior disabled)" = "$snapshot_sha" ] \
+        || fail "Rollback-Prior-Consumer ist vor Cron-Reaktivierung nicht exakt deaktiviert" 70
+    as_root "$ROOT_MV_BIN" -T -n -- "$ROOT_CRON_DISABLED_FILE" "$ROOT_CRON_FILE"
+    as_root "$ROOT_SYNC_BIN" -f "$(dirname "$ROOT_CRON_FILE")"
+    [ "$(consumer_publisher_from_rollback_journal validate-prior active)" = "$snapshot_sha" ] \
+        || fail "Rollback-Prior-Consumer ist nach Cron-Reaktivierung nicht exakt" 70
+}
+
+restore_private_runtime_rollback_selector() {
+    local target_manifest prior_active_manifest current previous
+    target_manifest="$(runtime_rollback_field target_manifest)"
+    prior_active_manifest="$(runtime_rollback_field prior_active_manifest)"
+    verify_target "$target_manifest" >/dev/null
+    verify_target "$prior_active_manifest" >/dev/null
+    current="$(selector_manifest)"; previous="$(selector_manifest "$PREVIOUS_LINK")"
+    case "$current:$previous" in
+        "$target_manifest:$prior_active_manifest")
+            # PREVIOUS is published first.  A crash can therefore only leave
+            # TARGET/TARGET, which the next invocation advances to Legacy.
+            atomic_link "sets/$target_manifest" "$PREVIOUS_LINK"
+            previous="$target_manifest"
+            ;;
+        "$target_manifest:$target_manifest") ;;
+        "$prior_active_manifest:$target_manifest") return 0 ;;
+        *) fail "private Rollback-Selectoren liegen ausserhalb des erlaubten CAS-Frontiers" 70 ;;
+    esac
+    [ "$previous" = "$target_manifest" ] \
+        || fail "Rollback-PREVIOUS wurde nicht exakt auf TARGET gebunden" 70
+    atomic_link "sets/$prior_active_manifest" "$ACTIVE_LINK"
+    [ "$(selector_manifest)" = "$prior_active_manifest" ] \
+        && [ "$(selector_manifest "$PREVIOUS_LINK")" = "$target_manifest" ] \
+        || fail "private Rollback-Selectoren sind nach CAS nicht Legacy/TARGET" 70
+}
+
+restore_prior_consumers_from_rollback_journal() {
+    local baseline snapshot_sha next
+    baseline="$(runtime_rollback_field consumer_baseline)"
+    snapshot_sha="$(runtime_rollback_field consumer_snapshot_sha256)"
+    validate_consumer_root_approval_from_rollback
+    validate_consumer_snapshot_evidence_from_rollback
+    [ "$(consumer_publisher_from_rollback_journal restore)" = "$snapshot_sha" ] \
+        || fail "Rollback-Consumer-Restore resultiert in fremdem Snapshot" 70
+    reload_and_verify_consumer_units prior "$baseline"
+    [ "$(consumer_publisher_from_rollback_journal validate-prior disabled)" = "$snapshot_sha" ] \
+        || fail "Rollback-Consumer-Prior ist nach Restore nicht exakt/quiescent" 70
+    if [ "$baseline" = present ]; then
+        next=consumer-prior-restored
+        runtime_rollback_transition private-restored "$next"
+    else
+        next=consumer-prior-unchanged
+        runtime_rollback_transition private-restored "$next" \
+            --consumer-approval-sha256 "$(runtime_rollback_field consumer_approval_sha256)"
+    fi
+}
+
+write_runtime_rollback_autostart_approval() {
+    local active active_hash commit
+    active="$(runtime_rollback_field prior_active_manifest)"
+    active_hash="$(runtime_rollback_field prior_active_manifest_sha256)"
+    commit="$(runtime_rollback_field candidate_commit)"
+    ACTIVE="$active" ACTIVE_HASH="$active_hash" COMMIT="$commit" OPERATOR_UID="$(id -u)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); uid=int(os.environ["OPERATOR_UID"])
+data={"active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
+ "readiness_path":"","readiness_sha256":"","reason":"rollback","repo_commit":os.environ["COMMIT"],
+ "schema":"genus-a0.3c-runtime-start-authorization-v3","series_path":"","series_sha256":""}
+raw=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+def stable():
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1):
+        raise SystemExit("rollback start authorization metadata differs")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try: payload=os.read(fd,1024*1024+1); final=os.fstat(fd)
+    finally: os.close(fd)
+    if len(payload)>1024*1024 or (before.st_dev,before.st_ino,before.st_size)!=(final.st_dev,final.st_ino,final.st_size):
+        raise SystemExit("rollback start authorization changed during read")
+    return payload
+try: existing=stable()
+except FileNotFoundError:
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+    try: os.write(fd,raw); os.fsync(fd)
+    finally: os.close(fd)
+    directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(directory)
+    finally: os.close(directory)
+    existing=stable()
+if existing!=raw: raise SystemExit("existing rollback start authorization differs")
+PY
+}
+
+validate_runtime_rollback_autostart_approval() {
+    [ "$(user_stable_sha256 "$AUTOSTART_APPROVAL" 0600)" \
+        = "$(runtime_rollback_field start_authorization_sha256)" ] \
+        || fail "Rollback-Autostart-Approval driftet vom Root-Journal" 70
+}
+
+load_runtime_rollback_recovery_services() {
+    local services_output
+    services_output="$(runtime_rollback_service_lines prior_active_services)"
+    recovery_services=()
+    [ -z "$services_output" ] || mapfile -t recovery_services <<< "$services_output"
+}
+
+start_runtime_rollback_services() {
+    local unit active
+    validate_runtime_rollback_autostart_approval
+    for unit in "${recovery_services[@]}"; do
+        systemctl_root start "$unit"
+        active="$($SYSTEMCTL_BIN show "$unit" -p ActiveState --value 2>/dev/null || true)"
+        [ "$active" = active ] || fail "Rollback-Prior-Dienst startete nicht: $unit" 70
+    done
+    validate_runtime_rollback_autostart_approval
+}
+
+attest_runtime_rollback_services() {
+    local deadline=$((SECONDS + 30)) consecutive=0 unit active pid restarts entered ok
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        ok=1
+        for unit in "${recovery_services[@]}"; do
+            active="$($SYSTEMCTL_BIN show "$unit" -p ActiveState --value 2>/dev/null || true)"
+            [ "$active" = active ] || { ok=0; break; }
+            if [[ "$unit" = *.timer ]]; then
+                entered="$($SYSTEMCTL_BIN show "$unit" -p ActiveEnterTimestampMonotonic --value 2>/dev/null || true)"
+                [[ "$entered" =~ ^[0-9]+$ ]] || { ok=0; break; }
+            else
+                pid="$($SYSTEMCTL_BIN show "$unit" -p MainPID --value 2>/dev/null || true)"
+                restarts="$($SYSTEMCTL_BIN show "$unit" -p NRestarts --value 2>/dev/null || true)"
+                [[ "$pid" =~ ^[1-9][0-9]*$ ]] && [[ "$restarts" =~ ^[0-9]+$ ]] \
+                    || { ok=0; break; }
+            fi
+        done
+        if [ "$ok" -eq 1 ]; then
+            consecutive=$((consecutive + 1))
+            [ "$consecutive" -ge 3 ] && return 0
+        else
+            consecutive=0
+        fi
+        sleep 1
+    done
+    fail "Rollback-Prior-Dienste erreichten keine drei stabilen Stichproben" 70
+}
+
+write_runtime_rollback_completion_receipt() {
+    local nonce target services_csv active active_hash commit authorization_sha
+    nonce="$(runtime_rollback_field rollback_transaction_nonce)"
+    target="$RECEIPT_ROOT/completion-runtime-rollback-$nonce.json"
+    active="$(runtime_rollback_field prior_active_manifest)"
+    active_hash="$(runtime_rollback_field prior_active_manifest_sha256)"
+    commit="$(runtime_rollback_field candidate_commit)"
+    authorization_sha="$(runtime_rollback_field start_authorization_sha256)"
+    services_csv="$(IFS=,; printf '%s' "${recovery_services[*]}")"
+    ACTIVE="$active" ACTIVE_HASH="$active_hash" COMMIT="$commit" AUTH_SHA="$authorization_sha" \
+    SERVICES_CSV="$services_csv" OPERATOR_UID="$(id -u)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
+import json,os,pathlib,stat,sys
+path=pathlib.Path(sys.argv[1]); uid=int(os.environ["OPERATOR_UID"])
+data={"active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
+ "active_services":[value for value in os.environ["SERVICES_CSV"].split(",") if value],
+ "database_rollback_performed":False,"outcome":"rollback-restored","repo_commit":os.environ["COMMIT"],
+ "schema":"genus-a0.3c-runtime-transition-completion-v1","start_authorization_sha256":os.environ["AUTH_SHA"]}
+raw=(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+def stable():
+    before=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid
+            or stat.S_IMODE(before.st_mode)!=0o600 or before.st_nlink!=1):
+        raise SystemExit("rollback completion metadata differs")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try: payload=os.read(fd,1024*1024+1); final=os.fstat(fd)
+    finally: os.close(fd)
+    if len(payload)>1024*1024 or (before.st_dev,before.st_ino,before.st_size)!=(final.st_dev,final.st_ino,final.st_size):
+        raise SystemExit("rollback completion changed during read")
+    return payload
+try: existing=stable()
+except FileNotFoundError:
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+    try: os.write(fd,raw); os.fsync(fd)
+    finally: os.close(fd)
+    directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0)|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(directory)
+    finally: os.close(directory)
+    existing=stable()
+if existing!=raw: raise SystemExit("existing rollback completion differs")
+PY
+    printf '%s\n' "$target"
+}
+
+cleanup_runtime_rollback_control_evidence() {
+    local nonce="$1"
+    runtime_rollback_control_cron_paths "$nonce"
+    rm -f -- "$RUNTIME_ROLLBACK_CRON_CONTROL_ORIGINAL" "$RUNTIME_ROLLBACK_CRON_CONTROL_IDENTITY"
+    fsync_dir "$STATE_ROOT"
+}
+
+force_pending_runtime_rollback_fail_closed() (
+    local result=0
+    set +e
+    systemd_autostart_guard_present || result=70
+    remove_autostart_approval || result=70
+    disable_consumer_cron_from_rollback_journal || result=70
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
+        --reason "A0.3c committed runtime rollback fail-closed" >/dev/null 2>&1 || result=70
+    stop_all_genus_units || result=70
+    prove_no_old_runtime_processes || result=70
+    prove_no_db_handles || result=70
+    return "$result"
+)
+
+recover_pending_runtime_rollback() {
+    local phase nonce candidate baseline completion completion_sha source_services live_services
+    local -a recovery_services=()
+    as_root "$ROOT_TEST_BIN" -e "$RUNTIME_ROLLBACK_JOURNAL" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$RUNTIME_ROLLBACK_JOURNAL" \
+        || fail "Runtime-Rollback-Recovery fehlt das root-eigene Pending-Journal" 70
+    candidate="$(runtime_rollback_field candidate_commit)"
+    [ "$candidate" = "$(repo_commit)" ] \
+        || fail "Runtime-Rollback-Pending gehoert nicht zum ausgecheckten Kandidatencommit" 70
+    nonce="$(runtime_rollback_field rollback_transaction_nonce)"
+    baseline="$(runtime_rollback_field consumer_baseline)"
+    runtime_rollback_control_cron_paths "$nonce"
+    systemd_autostart_guard_present "$candidate"
+    while :; do
+        phase="$(runtime_rollback_field phase)"
+        case "$phase" in
+            intent-staged)
+                remove_autostart_approval
+                disable_consumer_cron_from_rollback_journal
+                runtime_rollback_transition intent-staged quiescence-guarded
+                ;;
+            quiescence-guarded)
+                if ! GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" paused >/dev/null 2>&1; then
+                    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
+                        --reason "A0.3c committed runtime rollback"
+                fi
+                runtime_rollback_transition quiescence-guarded quiescence-paused
+                ;;
+            quiescence-paused)
+                stop_all_genus_units
+                prove_no_old_runtime_processes
+                prove_no_db_handles
+                runtime_rollback_transition quiescence-paused quiescence-stopped
+                ;;
+            quiescence-stopped)
+                prove_no_old_runtime_processes
+                prove_no_db_handles
+                runtime_rollback_transition quiescence-stopped projection-pending
+                ;;
+            projection-pending)
+                projection_helper_call restore-committed-rollback >/dev/null
+                runtime_rollback_transition projection-pending projection-restored
+                ;;
+            projection-restored)
+                projection_helper_call commit-committed-rollback >/dev/null
+                restore_private_runtime_rollback_selector
+                runtime_rollback_transition projection-restored private-restored
+                ;;
+            private-restored)
+                restore_prior_consumers_from_rollback_journal
+                ;;
+            consumer-prior-restored|consumer-prior-unchanged)
+                write_runtime_rollback_autostart_approval
+                runtime_rollback_transition "$phase" start-authorized \
+                    --start-authorization "$AUTOSTART_APPROVAL" \
+                    --start-authorization-sha256 "$(user_stable_sha256 "$AUTOSTART_APPROVAL" 0600)"
+                ;;
+            start-authorized)
+                validate_runtime_rollback_autostart_approval
+                load_runtime_rollback_recovery_services
+                start_runtime_rollback_services
+                attest_runtime_rollback_services
+                GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" resume
+                runtime_rollback_transition start-authorized services-verified
+                ;;
+            services-verified)
+                load_runtime_rollback_recovery_services
+                attest_runtime_rollback_services
+                completion="$(write_runtime_rollback_completion_receipt)"
+                completion_sha="$(user_stable_sha256 "$completion" 0600)"
+                runtime_rollback_transition services-verified receipt-written \
+                    --completion "$completion" --completion-sha256 "$completion_sha"
+                ;;
+            receipt-written)
+                load_runtime_rollback_recovery_services
+                attest_runtime_rollback_services
+                activate_prior_consumer_cron_from_rollback_journal
+                completion="$(runtime_rollback_field completion_path)"
+                completion_sha="$(runtime_rollback_field completion_sha256)"
+                # The two 0600 control copies are no longer authority once the
+                # root-bound prior topology is live.  Remove them before
+                # terminalization so KILL cannot strand post-terminal clutter;
+                # the durable 0400 intent/cron evidence remains retained.
+                cleanup_runtime_rollback_control_evidence "$nonce"
+                projection_helper_call terminalize-runtime-rollback \
+                    --rollback-transaction-nonce "$nonce" --completion "$completion" \
+                    --completion-sha256 "$completion_sha" >/dev/null
+                projection_helper_call validate-runtime-rollback-terminal \
+                    --rollback-transaction-nonce "$nonce" >/dev/null
+                projection_helper_call validate-runtime-rollback-current >/dev/null
+                log "committed Runtime-Rollback abgeschlossen: $(selector_manifest) (Code/Root/DB unveraendert)"
+                return 0
+                ;;
+            *) fail "Runtime-Rollback-Recovery traf eine unbekannte Phase: $phase" 70 ;;
+        esac
+    done
+}
+
 rollback_runtime() {
-    local expected="$1" target
+    local expected="$1" target prior selection source_commit source_target source_prior baseline
+    local source_nonce source_path source_sha live_services source_services rollback_nonce recovery_status
+    local -a selected=()
     assert_expected_commit "$expected"
     init_user_roots
     acquire_operator_lock
+    validate_product_data_contract
     [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
     require_command "$FUSER_BIN"
     acquire_backup_lock
     prove_no_backup_in_progress
     recover_pending_activation
-    target="$(selector_manifest "$PREVIOUS_LINK")"
-    [ -n "$target" ] || fail "kein vorheriges Runtime-Set" 65
-    [[ "$target" =~ ^legacy-[a-f0-9]{64}$ ]] \
+    [ ! -e "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
+        && [ ! -e "$CODE_RELEASE_JOURNAL" ] && [ ! -L "$CODE_RELEASE_JOURNAL" ] \
+        || fail "committed Rollback ist mit einer privaten Paralleltransition verboten" 70
+    ! as_root "$ROOT_TEST_BIN" -e "$RUNTIME_PROJECTION_JOURNAL" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$RUNTIME_PROJECTION_JOURNAL" \
+        && ! as_root "$ROOT_TEST_BIN" -e "$RUNTIME_PROJECTION_ROLLBACK_JOURNAL" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$RUNTIME_PROJECTION_ROLLBACK_JOURNAL" \
+        && ! as_root "$ROOT_TEST_BIN" -e "$RUNTIME_ROLLBACK_JOURNAL" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$RUNTIME_ROLLBACK_JOURNAL" \
+        || fail "committed Rollback traf eine root-eigene Paralleltransition" 70
+    target="$(selector_manifest)"; prior="$(selector_manifest "$PREVIOUS_LINK")"
+    [[ "$target" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "committed Rollback verlangt ein aktives v7-Zielset" 65
+    [[ "$prior" =~ ^legacy-[a-f0-9]{64}$ ]] \
         || fail "rollback akzeptiert nur das gebundene Legacy-Set; Roll-forward braucht activate+Readiness" 65
-    switch_with_quiescence "$expected" "$target" rollback "" ""
+    verify_target "$target" >/dev/null
+    verify_target "$prior" >/dev/null
+    validate_projection_steady_state "$target"
+    systemd_autostart_guard_present "$expected"
+    selection="$(projection_helper_call select-rollback-source --expected-commit "$expected" \
+        --target-manifest "$target" --prior-active-manifest "$prior")"
+    mapfile -t selected < <(parse_runtime_rollback_source_selection "$selection")
+    [ "${#selected[@]}" -eq 7 ] || fail "Rollback-Source-Auswahl ist unvollstaendig" 70
+    source_commit="${selected[0]}"; source_target="${selected[1]}"; source_prior="${selected[2]}"
+    baseline="${selected[3]}"; source_nonce="${selected[4]}"; source_path="${selected[5]}"; source_sha="${selected[6]}"
+    [ "$source_commit" = "$expected" ] && [ "$source_target" = "$target" ] \
+        && [ "$source_prior" = "$prior" ] \
+        && [ "$source_path" = "$CODE_RELEASE_TRUST_ROOT/runtime-projection.rollback-source.$source_nonce.json" ] \
+        || fail "Rollback-Source-Auswahl driftet vom lokalen Selectorvertrag" 70
+    remember_services
+    live_services="$(IFS=$'\n'; printf '%s' "${active_services[*]}")"
+    source_services="$(runtime_rollback_source_selection_service_lines "$selection" target_active_services)"
+    [ "$live_services" = "$source_services" ] \
+        || fail "Live-Zieldienste driften vor der Autorisierung von der committed Source" 70
+    rollback_nonce="$(new_runtime_rollback_nonce)"
+    [ "$rollback_nonce" != "$source_nonce" ] || fail "Rollback-Nonce kollidiert mit Source-Nonce" 70
+    capture_runtime_rollback_cron "$rollback_nonce" "$baseline"
+    create_runtime_rollback_intent "$rollback_nonce" "$source_nonce" "$source_sha" "$target" "$prior"
+    projection_helper_call begin-committed-rollback \
+        --source-transaction-nonce "$source_nonce" --rollback-transaction-nonce "$rollback_nonce" \
+        --intent "$RUNTIME_ROLLBACK_INTENT" --intent-sha256 "$RUNTIME_ROLLBACK_INTENT_SHA256" >/dev/null
+    set +e
+    ( set -Eeuo pipefail; recover_pending_runtime_rollback )
+    recovery_status=$?
+    set -e
+    if [ "$recovery_status" -ne 0 ]; then
+        force_pending_runtime_rollback_fail_closed || true
+        fail "committed Runtime-Rollback blieb fail-closed pending" "$recovery_status"
+    fi
 }
 
 recover_runtime() {
@@ -5208,6 +14677,7 @@ recover_runtime() {
     assert_expected_commit "$expected"
     init_user_roots
     acquire_operator_lock
+    validate_product_data_contract
     [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
     require_command "$FUSER_BIN"
     acquire_backup_lock
@@ -5219,7 +14689,7 @@ recover_runtime() {
 
 reauthorize_runtime() {
     local old="$1" new="$2" active active_hash old_tree new_tree guard_hash diff_file diff_hash
-    local path stale_copy receipt token
+    local path stale_copy receipt token executor_sha
     [[ "$old" =~ ^[a-f0-9]{40}$ ]] && [[ "$new" =~ ^[a-f0-9]{40}$ ]] && [ "$old" != "$new" ] \
         || fail "reauthorize braucht verschiedene volle OLD/NEW SHA-1" 64
     init_user_roots
@@ -5229,7 +14699,7 @@ reauthorize_runtime() {
         || fail "Reauthorization ist mit pending Activation verboten" 70
     [ ! -e "$OPERATOR_REAUTH_TOKEN" ] && [ ! -L "$OPERATOR_REAUTH_TOKEN" ] \
         || fail "Operator-Reauthorization ist bereits pending" 70
-    "$GIT_BIN" -C "$REPO_DIR" merge-base --is-ancestor "$old" "$new" \
+    safe_git merge-base --is-ancestor "$old" "$new" \
         || fail "NEW ist kein sauberer Fast-Forward von OLD" 65
     systemd_autostart_guard_present "$old" \
         || fail "Boot-Guard entspricht nicht exakt dem reautorisierten OLD-Commit" 70
@@ -5239,17 +14709,18 @@ reauthorize_runtime() {
         || fail "aktive Core-/Embed-Pointer sind vor Reauthorization nicht exakt" 70
     cleanup_completed_activation_artifacts
     diff_file="$(mktemp "$STATE_ROOT/reauthorize.diff.XXXXXX")"
-    "$GIT_BIN" -C "$REPO_DIR" diff --name-only -z "$old" "$new" > "$diff_file"
+    safe_git diff --name-only -z "$old" "$new" > "$diff_file"
     while IFS= read -r -d '' path; do
         case "$path" in
-            deploy/pi_a0_3c_runtime.sh|deploy/backup_ledger_to_sd.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
+            deploy/pi_a0_3c_runtime.sh|deploy/pi_a0_3c_projection.py|deploy/pi_a0_3c_consumer_publish.py|deploy/pi_a0_3c_consumer_bundle.py|deploy/pi_a0_3c_root_artifact_transaction.py|deploy/a0_3c_consumers/*|deploy/backup_ledger_to_sd.sh|deploy/README.md|docs/*|tests/*|experiments/*|.github/*|README*|CONTRIBUTING.md) ;;
             *) fail "Fast-Forward beruehrt live-importierbaren/nicht freigegebenen Pfad: $path" 65 ;;
         esac
     done < "$diff_file"
     diff_hash="$(sha256_file "$diff_file")"; rm -f -- "$diff_file"
-    old_tree="$("$GIT_BIN" -C "$REPO_DIR" rev-parse "$old^{tree}")"
-    new_tree="$("$GIT_BIN" -C "$REPO_DIR" rev-parse "$new^{tree}")"
+    old_tree="$(safe_git rev-parse "$old^{tree}")"
+    new_tree="$(safe_git rev-parse "$new^{tree}")"
     guard_hash="$(sha256_file "$BOOT_GUARD_PATH")"
+    executor_sha="$(root_artifact_executor_expected_sha256 "$new")"
     stale_copy="$(receipt_target stale-start-authorization)"
     install -m 0600 "$AUTOSTART_APPROVAL" "$stale_copy"
     sync -f "$stale_copy"; fsync_dir "$RECEIPT_ROOT"
@@ -5259,15 +14730,19 @@ reauthorize_runtime() {
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
         OLD="$old" NEW="$new" OLD_TREE="$old_tree" NEW_TREE="$new_tree" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
         STALE_PATH="$stale_copy" STALE_HASH="$(sha256_file "$stale_copy")" GUARD_PATH="$BOOT_GUARD_PATH" \
-        GUARD_HASH="$guard_hash" DIFF_HASH="$diff_hash" \
-        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+        GUARD_HASH="$guard_hash" DIFF_HASH="$diff_hash" EXECUTOR_SHA="$executor_sha" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" "${ROOT_ARTIFACT_TARGETS[@]}" <<'PY'
 import json,os,pathlib,sys
-data={"schema":"genus-a0.3c-operator-reauthorization-v1","old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],
+targets=sys.argv[2:]
+if len(targets)!=10 or len(set(targets))!=10: raise SystemExit("root artifact target authority is not exact ten")
+data={"schema":"genus-a0.3c-operator-reauthorization-v2","old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],
       "old_tree":os.environ["OLD_TREE"],"new_tree":os.environ["NEW_TREE"],"active_manifest":os.environ["ACTIVE"],
       "active_manifest_sha256":os.environ["ACTIVE_HASH"],"stale_approval_path":os.environ["STALE_PATH"],
       "stale_approval_sha256":os.environ["STALE_HASH"],"guard_path":os.environ["GUARD_PATH"],"guard_sha256":os.environ["GUARD_HASH"],
       "allowed_diff_sha256":os.environ["DIFF_HASH"],"intended_command":"stage-and-activate","boot_approval_updated":False,
-      "paths_logged":True,"payloads_logged":False}
+      "paths_logged":True,"payloads_logged":False,"root_artifact_paths":targets,
+      "root_artifact_executor_sha256":os.environ["EXECUTOR_SHA"],
+      "root_artifact_commit_policy":"retain-on-activation-rollback"}
 path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
 try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
 finally: os.close(fd)
@@ -5278,13 +14753,15 @@ PY
     token="$OPERATOR_REAUTH_TOKEN"
     "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
         RECEIPT="$receipt" RECEIPT_HASH="$(sha256_file "$receipt")" OLD="$old" NEW="$new" \
-        ACTIVE="$active" ACTIVE_HASH="$active_hash" GUARD_HASH="$guard_hash" \
+        ACTIVE="$active" ACTIVE_HASH="$active_hash" GUARD_HASH="$guard_hash" EXECUTOR_SHA="$executor_sha" \
         "$SYSTEM_PYTHON_BIN" -I -P - "$token" <<'PY'
 import json,os,pathlib,sys
-data={"schema":"genus-a0.3c-operator-reauthorization-token-v1","receipt_path":os.environ["RECEIPT"],
+data={"schema":"genus-a0.3c-operator-reauthorization-token-v2","receipt_path":os.environ["RECEIPT"],
       "receipt_sha256":os.environ["RECEIPT_HASH"],"old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],
       "active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
-      "guard_sha256":os.environ["GUARD_HASH"],"intended_command":"stage-and-activate"}
+      "guard_sha256":os.environ["GUARD_HASH"],"intended_command":"stage-and-activate",
+      "root_artifact_executor_sha256":os.environ["EXECUTOR_SHA"],
+      "root_artifact_commit_policy":"retain-on-activation-rollback"}
 path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
 try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
 finally: os.close(fd)
@@ -5293,8 +14770,3593 @@ try: os.fsync(directory)
 finally: os.close(directory)
 PY
     validate_operator_reauthorization
-    log "cleanen Fast-Forward fuer genau stage+activate reautorisiert; Boot-Approval bleibt absichtlich stale"
+    log "cleanen Fast-Forward plus monotones 10er-Control-Plane-Upgrade fuer stage+activate reautorisiert; Boot-Approval bleibt absichtlich stale"
     printf '%s\n' "$receipt"
+}
+
+# A0 EXIT CANDIDATE — PENDING HUMAN REVIEW
+# Code releases are deliberately a separate contract from runtime-set activation.
+# In particular, no v3 activation approval/receipt is widened or reinterpreted.
+code_release_machine_id_sha256() {
+    [ -f /etc/machine-id ] && [ ! -L /etc/machine-id ] \
+        || fail "stabile Maschinenidentitaet fehlt" 70
+    sha256_file /etc/machine-id
+}
+
+code_release_branch_name() {
+    local branch
+    branch="$(safe_git symbolic-ref --quiet --short HEAD)" \
+        || fail "Code-Release ist auf detached HEAD verboten" 70
+    [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] && [[ "$branch" != *..* ]] \
+        || fail "Code-Release-Branchname ist nicht kanonisch" 70
+    printf '%s\n' "$branch"
+}
+
+code_release_origin_remote_sha256() {
+    local remote
+    remote="$(safe_git config --get remote.origin.url)" \
+        || fail "Code-Release braucht eine origin-Remote" 70
+    [ -n "$remote" ] && [[ "$remote" != *$'\n'* ]] && [[ "$remote" != *$'\r'* ]] \
+        || fail "origin-Remote ist leer oder enthaelt Steuerzeichen" 70
+    printf '%s' "$remote" | sha256sum | awk '{print $1}'
+}
+
+code_release_repo_path() {
+    local canonical
+    canonical="$(realpath -e -- "$REPO_DIR")" || fail "Code-Release-Repo ist nicht kanonisch" 70
+    [ "$canonical" = "$REPO_DIR" ] || fail "Code-Release-Repo-Pfad driftet von der kanonischen Form" 70
+    printf '%s\n' "$canonical"
+}
+
+code_release_db_path() {
+    local canonical
+    canonical="$(realpath -e -- "$DB_PATH")" || fail "Produkt-DB ist nicht kanonisch" 70
+    [ "$canonical" = "$DB_PATH" ] || fail "Produkt-DB-Pfad driftet von der kanonischen Form" 70
+    printf '%s\n' "$canonical"
+}
+
+write_code_release_db_canary() {
+    local target data_gid allowed_uids
+    validate_product_data_contract
+    target="$(receipt_target code-release-product-db-canary)"
+    data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+    allowed_uids="$(id -u):$(id -u -- "$RUNTIME_USER"):$(id -u -- "$TELEGRAM_USER")"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        DB="$(code_release_db_path)" OPERATOR_UID="$(id -u)" ALLOWED_UIDS="$allowed_uids" DATA_GID="$data_gid" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+
+db=pathlib.Path(os.environ["DB"]); operator_uid=int(os.environ["OPERATOR_UID"])
+allowed_uids={int(value) for value in os.environ["ALLOWED_UIDS"].split(":")}; gid=int(os.environ["DATA_GID"])
+
+def snapshot(path, required=False, main=False):
+    try: before=path.lstat()
+    except FileNotFoundError:
+        if required: raise SystemExit("product database disappeared")
+        return {"present":False,"device":0,"inode":0,"owner_uid":0,"group_gid":0,"mode":0,"nlink":0,"size":0,"mtime_ns":0,"sha256":""}
+    expected_uids={operator_uid} if main else allowed_uids
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid not in expected_uids
+            or before.st_gid!=gid or stat.S_IMODE(before.st_mode)!=0o660 or before.st_nlink!=1):
+        raise SystemExit("product database member is not an allowed genus-data 0660 regular file")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd)
+        if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit("database member changed before open")
+        digest=hashlib.sha256(); size=0
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            digest.update(chunk); size+=len(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=path.lstat(); fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) or getattr(before,key)!=getattr(after,key) for key in fields) or size!=before.st_size:
+        raise SystemExit("database member changed during canary read")
+    return {"present":True,"device":before.st_dev,"inode":before.st_ino,"owner_uid":before.st_uid,
+            "group_gid":before.st_gid,"mode":stat.S_IMODE(before.st_mode),"nlink":before.st_nlink,"size":before.st_size,
+            "mtime_ns":before.st_mtime_ns,"sha256":digest.hexdigest()}
+
+data={"schema":"genus-a0.3c-code-release-product-db-canary-v2","database_path":str(db),
+      "database":snapshot(db,True,True),"wal":snapshot(pathlib.Path(str(db)+"-wal")),
+      "shm":snapshot(pathlib.Path(str(db)+"-shm"))}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+try: directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+except PermissionError:
+    if os.name!="nt": raise
+else:
+    try: os.fsync(directory)
+    finally: os.close(directory)
+PY
+    printf '%s\n' "$target"
+}
+
+validate_code_release_db_canary() {
+    local receipt="$1" compare_live="${2:-1}" data_gid allowed_uids
+    validate_product_data_contract
+    data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+    allowed_uids="$(id -u):$(id -u -- "$RUNTIME_USER"):$(id -u -- "$TELEGRAM_USER")"
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
+        || fail "Produkt-DB-Canary ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        DB="$(code_release_db_path)" OPERATOR_UID="$(id -u)" ALLOWED_UIDS="$allowed_uids" DATA_GID="$data_gid" COMPARE_LIVE="$compare_live" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+
+receipt=pathlib.Path(sys.argv[1]); data=json.loads(receipt.read_text()); db=pathlib.Path(os.environ["DB"]); operator_uid=int(os.environ["OPERATOR_UID"])
+allowed_uids={int(value) for value in os.environ["ALLOWED_UIDS"].split(":")}; gid=int(os.environ["DATA_GID"])
+keys={"schema","database_path","database","wal","shm"}; member_keys={"present","device","inode","owner_uid","group_gid","mode","nlink","size","mtime_ns","sha256"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-product-db-canary-v2" or data.get("database_path")!=str(db): raise SystemExit("database canary schema/path differs")
+for name in ("database","wal","shm"):
+    value=data[name]
+    if set(value)!=member_keys or not isinstance(value["present"],bool): raise SystemExit("database canary member schema differs")
+    if value["present"]:
+        if (any(not isinstance(value[key],int) or value[key]<0 for key in ("device","inode","owner_uid","group_gid","mode","nlink","size","mtime_ns"))
+                or value["owner_uid"] not in allowed_uids or value["group_gid"]!=gid or value["mode"]!=0o660 or value["nlink"]!=1
+                or not re.fullmatch(r"[a-f0-9]{64}",value["sha256"])): raise SystemExit("database canary member malformed")
+    elif value!={"present":False,"device":0,"inode":0,"owner_uid":0,"group_gid":0,"mode":0,"nlink":0,"size":0,"mtime_ns":0,"sha256":""}: raise SystemExit("absent database canary member differs")
+if data["database"]["present"] is not True: raise SystemExit("database canary lacks main database")
+if data["database"]["owner_uid"]!=operator_uid: raise SystemExit("main database is not operator-owned")
+if os.environ["COMPARE_LIVE"]!="1": raise SystemExit(0)
+
+def snapshot(path, required=False, main=False):
+    try: before=path.lstat()
+    except FileNotFoundError:
+        if required: raise SystemExit("product database disappeared")
+        return {"present":False,"device":0,"inode":0,"owner_uid":0,"group_gid":0,"mode":0,"nlink":0,"size":0,"mtime_ns":0,"sha256":""}
+    expected_uids={operator_uid} if main else allowed_uids
+    if (path.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid not in expected_uids or before.st_gid!=gid
+            or stat.S_IMODE(before.st_mode)!=0o660 or before.st_nlink!=1): raise SystemExit("live database member metadata differs")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd); digest=hashlib.sha256(); size=0
+        if (opened.st_dev,opened.st_ino)!=(before.st_dev,before.st_ino): raise SystemExit("live database member changed before open")
+        while True:
+            chunk=os.read(fd,1024*1024)
+            if not chunk: break
+            digest.update(chunk); size+=len(chunk)
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    after=path.lstat(); fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) or getattr(before,key)!=getattr(after,key) for key in fields) or size!=before.st_size: raise SystemExit("live database member changed during read")
+    return {"present":True,"device":before.st_dev,"inode":before.st_ino,"owner_uid":before.st_uid,"group_gid":before.st_gid,
+            "mode":stat.S_IMODE(before.st_mode),"nlink":before.st_nlink,"size":before.st_size,"mtime_ns":before.st_mtime_ns,"sha256":digest.hexdigest()}
+
+live={"database":snapshot(db,True,True),"wal":snapshot(pathlib.Path(str(db)+"-wal")),"shm":snapshot(pathlib.Path(str(db)+"-shm"))}
+if any(live[name]!=data[name] for name in live): raise SystemExit("product database/WAL/SHM changed during code release")
+PY
+    [ "$(private_stable_sha256 "$receipt")" = "$(sha256_file "$receipt")" ] \
+        || fail "Produkt-DB-Canary driftete bei Stable-Read" 70
+}
+
+fresh_code_release_backup_receipt() {
+    local canary="$1" snapshots generation partial final receipt
+    validate_code_release_db_canary "$canary"
+    [ -f "$DB_PATH" ] && [ ! -L "$DB_PATH" ] \
+        || fail "Produkt-DB ist vor Code-Release-Bytebackup nicht regulaer" 65
+    install -d -m 0700 "$BACKUP_DIR"
+    [ -d "$BACKUP_DIR" ] && [ ! -L "$BACKUP_DIR" ] \
+        && [ "$(stat -c %u "$BACKUP_DIR")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$BACKUP_DIR")" = 700 ] \
+        || fail "Code-Release-Backup-Root ist nicht privat/operator-eigen" 70
+    [ "$(stat -c %d "$DB_PATH")" != "$(stat -c %d "$BACKUP_DIR")" ] \
+        || fail "Code-Release-Bytebackup liegt nicht auf einem anderen Geraet" 65
+    snapshots="$BACKUP_DIR/a03c-code-release-byte-snapshots"
+    install -d -m 0700 "$snapshots"
+    [ -d "$snapshots" ] && [ ! -L "$snapshots" ] \
+        && [ "$(stat -c %u "$snapshots")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$snapshots")" = 700 ] \
+        || fail "Code-Release-Bytebackup-Verzeichnis ist nicht privat" 70
+    generation="$(date -u +%Y%m%dT%H%M%S%N)-$$-$RANDOM"
+    partial="$snapshots/.partial-$generation"
+    final="$snapshots/snapshot-$generation"
+    [ ! -e "$partial" ] && [ ! -L "$partial" ] && [ ! -e "$final" ] && [ ! -L "$final" ] \
+        || fail "Code-Release-Bytebackup-Generation kollidiert" 70
+    mkdir -m 0700 -- "$partial"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        DB="$(code_release_db_path)" CANARY="$canary" PARTIAL="$partial" FINAL="$final" \
+        OPERATOR_UID="$(id -u)" \
+        "$CORE_POINTER/bin/python" -I -P - <<'PY'
+import hashlib,json,os,pathlib,shutil,sqlite3,stat,tempfile
+
+db=pathlib.Path(os.environ["DB"]); canary=json.loads(pathlib.Path(os.environ["CANARY"]).read_text())
+partial=pathlib.Path(os.environ["PARTIAL"]); final=pathlib.Path(os.environ["FINAL"]); uid=int(os.environ["OPERATOR_UID"])
+member_names={"database":db,"wal":pathlib.Path(str(db)+"-wal"),"shm":pathlib.Path(str(db)+"-shm")}
+
+def fields(info):
+    return (info.st_dev,info.st_ino,info.st_uid,info.st_mode,info.st_nlink,info.st_size,info.st_mtime_ns)
+
+def copy_member(name,source):
+    expected=canary[name]
+    if not expected["present"]:
+        if source.exists() or source.is_symlink(): raise SystemExit(f"absent {name} appeared before byte backup")
+        return "", ""
+    before=source.lstat()
+    if source.is_symlink() or not stat.S_ISREG(before.st_mode) or before.st_uid!=uid or before.st_nlink!=1:
+        raise SystemExit(f"unsafe live {name} during byte backup")
+    expected_tuple=(expected["device"],expected["inode"],uid,before.st_mode,1,expected["size"],expected["mtime_ns"])
+    if fields(before)!=expected_tuple: raise SystemExit(f"live {name} metadata differs from canary")
+    target=partial/("database.sqlite3" if name=="database" else f"database.sqlite3-{name}")
+    source_fd=os.open(source,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)); target_fd=-1
+    digest=hashlib.sha256(); size=0
+    try:
+        opened=os.fstat(source_fd)
+        if fields(opened)!=fields(before): raise SystemExit(f"live {name} changed during open")
+        target_fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+        while True:
+            chunk=os.read(source_fd,1024*1024)
+            if not chunk: break
+            digest.update(chunk); size+=len(chunk)
+            view=memoryview(chunk)
+            while view:
+                written=os.write(target_fd,view)
+                if written<=0: raise SystemExit(f"short byte-backup write for {name}")
+                view=view[written:]
+        os.fsync(target_fd); final_source=os.fstat(source_fd)
+    finally:
+        if target_fd>=0: os.close(target_fd)
+        os.close(source_fd)
+    after=source.lstat()
+    if fields(opened)!=fields(final_source) or fields(opened)!=fields(after) or size!=expected["size"]:
+        raise SystemExit(f"live {name} changed during byte backup")
+    actual=digest.hexdigest()
+    if actual!=expected["sha256"]: raise SystemExit(f"live {name} digest differs from canary")
+    copied=hashlib.sha256(target.read_bytes()).hexdigest()
+    if copied!=actual or target.stat().st_size!=size: raise SystemExit(f"byte-backup copy differs for {name}")
+    return str(final/target.name), copied
+
+copies={name:copy_member(name,path) for name,path in member_names.items()}
+verify=pathlib.Path(tempfile.mkdtemp(prefix=".verify-",dir=partial.parent))
+try:
+    verify_db=verify/"database.sqlite3"
+    shutil.copyfile(partial/"database.sqlite3",verify_db)
+    if canary["wal"]["present"]: shutil.copyfile(partial/"database.sqlite3-wal",pathlib.Path(str(verify_db)+"-wal"))
+    connection=sqlite3.connect(str(verify_db))
+    try:
+        result=connection.execute("pragma integrity_check").fetchone()
+        if result is None or result[0]!="ok": raise SystemExit("byte-backup copy integrity_check differs")
+    finally: connection.close()
+finally:
+    shutil.rmtree(verify)
+for item in partial.iterdir():
+    os.chmod(item,0o400)
+    fd=os.open(item,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try: os.fsync(fd)
+    finally: os.close(fd)
+os.chmod(partial,0o500)
+directory=os.open(partial,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+os.replace(partial,final)
+directory=os.open(final.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    receipt="$(receipt_target code-release-byte-backup)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        COMMIT="$(repo_commit)" SNAPSHOT="$final" DB_SOURCE="$(code_release_db_path)" \
+        CANARY="$canary" CANARY_HASH="$(sha256_file "$canary")" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import hashlib,json,os,pathlib,sys
+snapshot=pathlib.Path(os.environ["SNAPSHOT"]); canary=json.loads(pathlib.Path(os.environ["CANARY"]).read_text())
+def member(name):
+    present=canary[name]["present"]
+    path=snapshot/("database.sqlite3" if name=="database" else f"database.sqlite3-{name}")
+    return {"present":present,"copy_path":str(path) if present else "",
+            "copy_sha256":hashlib.sha256(path.read_bytes()).hexdigest() if present else ""}
+data={"schema":"genus-a0.3c-code-release-byte-backup-v1","repo_commit":os.environ["COMMIT"],
+      "snapshot_root":str(snapshot),"database_source_path":os.environ["DB_SOURCE"],
+      "product_db_canary_path":os.environ["CANARY"],"product_db_canary_sha256":os.environ["CANARY_HASH"],
+      "database":member("database"),"wal":member("wal"),"shm":member("shm"),
+      "sqlite_live_opened":False,"copy_integrity_check_pass":True,"candidate_access":False,
+      "config_secrets_copied":False,"paths_logged":True,"payloads_logged":False}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_backup_receipt "$receipt"
+    validate_code_release_db_canary "$canary"
+    printf '%s\n' "$receipt"
+}
+
+validate_code_release_backup_receipt() {
+    local receipt="$1" expected_commit="${2:-}"
+    [ -n "$expected_commit" ] || expected_commit="$(repo_commit)"
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] \
+        && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
+        || fail "Code-Release-Bytebackup-Receipt ist nicht regulaer/privat" 70
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        RECEIPT_HASH="$(sha256_file "$receipt")" COMMIT="$expected_commit" DB="$(code_release_db_path)" \
+        SNAPSHOTS="$BACKUP_DIR/a03c-code-release-byte-snapshots" RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        OPERATOR_UID="$(id -u)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+receipt=pathlib.Path(sys.argv[1]); raw=receipt.read_bytes(); data=json.loads(raw); uid=int(os.environ["OPERATOR_UID"])
+keys={"schema","repo_commit","snapshot_root","database_source_path","product_db_canary_path","product_db_canary_sha256",
+      "database","wal","shm","sqlite_live_opened","copy_integrity_check_pass","candidate_access","config_secrets_copied",
+      "paths_logged","payloads_logged"}
+member_keys={"present","copy_path","copy_sha256"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-byte-backup-v1": raise SystemExit("code release byte backup schema differs")
+if hashlib.sha256(raw).hexdigest()!=os.environ["RECEIPT_HASH"] or data["repo_commit"]!=os.environ["COMMIT"] or data["database_source_path"]!=os.environ["DB"]: raise SystemExit("code release byte backup live binding differs")
+if any(data[key] is not value for key,value in (("sqlite_live_opened",False),("copy_integrity_check_pass",True),("candidate_access",False),("config_secrets_copied",False),("paths_logged",True),("payloads_logged",False))): raise SystemExit("code release byte backup safety flags differ")
+receipt_root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve(strict=True)
+if receipt.parent.resolve(strict=True)!=receipt_root: raise SystemExit("code release byte backup receipt escapes receipt root")
+snapshots=pathlib.Path(os.environ["SNAPSHOTS"]); snapshots_info=snapshots.lstat()
+if snapshots.is_symlink() or not stat.S_ISDIR(snapshots_info.st_mode) or snapshots_info.st_uid!=uid or stat.S_IMODE(snapshots_info.st_mode)!=0o700: raise SystemExit("byte backup root is unsafe")
+snapshot=pathlib.Path(data["snapshot_root"]); info=snapshot.lstat()
+if snapshot.parent.resolve(strict=True)!=snapshots.resolve(strict=True) or snapshot.is_symlink() or not stat.S_ISDIR(info.st_mode) or info.st_uid!=uid or stat.S_IMODE(info.st_mode)!=0o500 or not snapshot.name.startswith("snapshot-"): raise SystemExit("byte backup snapshot is unsafe")
+canary_path=pathlib.Path(data["product_db_canary_path"]); canary_raw=canary_path.read_bytes()
+if canary_path.parent.resolve(strict=True)!=receipt_root or hashlib.sha256(canary_raw).hexdigest()!=data["product_db_canary_sha256"]: raise SystemExit("byte backup canary binding differs")
+canary=json.loads(canary_raw)
+expected_names=set()
+for name,filename in (("database","database.sqlite3"),("wal","database.sqlite3-wal"),("shm","database.sqlite3-shm")):
+    member=data[name]
+    if set(member)!=member_keys or not isinstance(member["present"],bool) or member["present"] is not canary[name]["present"]: raise SystemExit("byte backup member schema differs")
+    if member["present"]:
+        path=pathlib.Path(member["copy_path"]); entry=path.lstat(); expected_names.add(filename)
+        if path!=snapshot/filename or path.is_symlink() or not stat.S_ISREG(entry.st_mode) or entry.st_uid!=uid or stat.S_IMODE(entry.st_mode)!=0o400 or entry.st_nlink!=1: raise SystemExit("byte backup member is unsafe")
+        digest=hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest!=member["copy_sha256"] or digest!=canary[name]["sha256"] or entry.st_size!=canary[name]["size"] or not re.fullmatch(r"[a-f0-9]{64}",digest): raise SystemExit("byte backup member digest differs")
+    elif member!={"present":False,"copy_path":"","copy_sha256":""}: raise SystemExit("absent byte backup member differs")
+if {path.name for path in snapshot.iterdir()}!=expected_names: raise SystemExit("byte backup snapshot inventory differs")
+PY
+    local canary
+    canary="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["product_db_canary_path"])
+PY
+    )"
+    validate_code_release_db_canary "$canary"
+}
+
+require_code_release_commits() {
+    local old="$1" new="$2" old_blob new_blob
+    [[ "$old" =~ ^[a-f0-9]{40}$ ]] && [[ "$new" =~ ^[a-f0-9]{40}$ ]] && [ "$old" != "$new" ] \
+        || fail "Code-Release braucht verschiedene volle OLD/NEW SHA-1" 64
+    safe_git cat-file -e "$old^{commit}" \
+        && safe_git cat-file -e "$new^{commit}" \
+        || fail "Code-Release-Commitobjekt fehlt" 65
+    safe_git merge-base --is-ancestor "$old" "$new" \
+        || fail "Code-Release NEW ist kein Fast-Forward von OLD" 65
+    old_blob="$(safe_git rev-parse "$old:deploy/pi_a0_3c_runtime.sh")" \
+        || fail "OLD enthaelt die Release-Lane nicht" 65
+    new_blob="$(safe_git rev-parse "$new:deploy/pi_a0_3c_runtime.sh")" \
+        || fail "NEW enthaelt die Release-Lane nicht" 65
+    [ "$old_blob" = "$new_blob" ] \
+        || fail "die normale Code-Release-Lane darf sich nicht selbst aktualisieren" 65
+}
+
+write_code_release_diff() {
+    local old="$1" new="$2" target="$3"
+    safe_git diff --name-only -z --no-renames "$old" "$new" > "$target"
+    [ -s "$target" ] || fail "leerer Code-Release-Diff ist nicht autorisierbar" 65
+}
+
+validate_a0_exit_cli_guard_at_commit() {
+    local old="$1" new="$2" old_source new_source
+    old_source="$(mktemp "$STATE_ROOT/cli-old.XXXXXX")"
+    new_source="$(mktemp "$STATE_ROOT/cli-new.XXXXXX")"
+    safe_git show "$old:genus/cli.py" > "$old_source" \
+        && safe_git show "$new:genus/cli.py" > "$new_source" \
+        || { rm -f -- "$old_source" "$new_source"; fail "CLI-Bootstrapobjekte fehlen" 65; }
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$old_source" "$new_source" <<'PY'
+import ast,hashlib,pathlib,sys
+old=ast.parse(pathlib.Path(sys.argv[1]).read_text())
+new_payload=pathlib.Path(sys.argv[2]).read_bytes()
+if hashlib.sha256(new_payload).hexdigest()!="a49331d1dff630842cfe192c60ba4829b13c551e0eec90ed02c25339037e824e":
+    raise SystemExit("A0 exit bootstrap genus/cli.py full-file digest differs")
+new=ast.parse(new_payload)
+def functions(tree):
+    result={}
+    for node in tree.body:
+        if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)):
+            if node.name in result: raise SystemExit(f"duplicate top-level function: {node.name}")
+            result[node.name]=node
+    return result
+before,after=functions(old),functions(new)
+expected_guard_ast_sha256={
+    "_product_ledger_path":"51173c1ecd57d9e725886aac447dc0c280756335d147e6d94148957e94dea033",
+    "_refuse_product_ledger_mutation":"e936aeb1accf83131514d82028f22c296e74f9064fbca8800b18842a7d40d981",
+}
+for name,expected in expected_guard_ast_sha256.items():
+    node=after.get(name)
+    if node is None:
+        raise SystemExit(f"missing product ledger guard helper: {name}")
+    payload=ast.dump(node,annotate_fields=True,include_attributes=False).encode()
+    if hashlib.sha256(payload).hexdigest()!=expected:
+        raise SystemExit(f"product ledger guard helper semantics differ: {name}")
+frozen={"integrity_group","integrity_check","ledger_group","ledger_tail","ledger_seal_init",
+        "ledger_head","ledger_verify","ledger_anchor_group","ledger_anchor_create","ledger_anchor_verify"}
+for name in frozen:
+    if name not in before or name not in after or ast.dump(before[name],include_attributes=False)!=ast.dump(after[name],include_attributes=False):
+        raise SystemExit(f"A0 exit bootstrap changes frozen CLI function: {name}")
+helper=after.get("_refuse_product_ledger_mutation")
+if helper is None or len(helper.body)!=1 or not isinstance(helper.body[0],ast.If):
+    raise SystemExit("product ledger refusal helper is not the exact fail-closed shape")
+guard=helper.body[0]
+if (guard.orelse or len(guard.body)!=1 or not isinstance(guard.body[0],ast.Raise)
+        or not isinstance(guard.test,ast.Compare) or len(guard.test.ops)!=1
+        or not isinstance(guard.test.ops[0],ast.IsNot) or len(guard.test.comparators)!=1
+        or not isinstance(guard.test.left,ast.Call) or guard.test.left.args or guard.test.left.keywords
+        or not isinstance(guard.test.left.func,ast.Name) or guard.test.left.func.id!="_product_ledger_path"
+        or not isinstance(guard.test.comparators[0],ast.Constant) or guard.test.comparators[0].value is not None):
+    raise SystemExit("product ledger refusal helper conditional differs")
+for name,label in (("replay_command","replay"),("ledger_reseal","ledger reseal")):
+    node=after.get(name)
+    body=[] if node is None else list(node.body)
+    if body and isinstance(body[0],ast.Expr) and isinstance(body[0].value,ast.Constant) and isinstance(body[0].value.value,str):
+        body=body[1:]
+    if not body or not isinstance(body[0],ast.Expr) or not isinstance(body[0].value,ast.Call):
+        raise SystemExit(f"{name} lacks the first-statement product guard")
+    call=body[0].value
+    if (not isinstance(call.func,ast.Name) or call.func.id!="_refuse_product_ledger_mutation"
+            or len(call.args)!=1 or not isinstance(call.args[0],ast.Constant) or call.args[0].value!=label):
+        raise SystemExit(f"{name} product guard differs")
+for node in new.body:
+    if isinstance(node,(ast.Assign,ast.AnnAssign,ast.AugAssign)):
+        targets=node.targets if isinstance(node,ast.Assign) else [node.target]
+        if any(isinstance(target,ast.Name) and target.id=="_refuse_product_ledger_mutation" for target in targets):
+            raise SystemExit("product guard is reassigned")
+PY
+    local status=$?
+    rm -f -- "$old_source" "$new_source"
+    [ "$status" -eq 0 ] || fail "A0-Exit-CLI-Guard ist nicht fail-closed/frozen" 65
+}
+
+validate_code_release_path_policy() {
+    local old="$1" new="$2" transition_kind="$3" diff_file="$4" path
+    require_code_release_commits "$old" "$new"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$diff_file" <<'PY'
+import pathlib,sys,unicodedata
+raw=pathlib.Path(sys.argv[1]).read_bytes()
+if not raw or not raw.endswith(b"\0"): raise SystemExit("code release diff is not nonempty NUL framing")
+items=raw[:-1].split(b"\0")
+if not items or any(not item for item in items): raise SystemExit("code release diff has an empty path")
+for item in items:
+    try: value=item.decode("utf-8","strict")
+    except UnicodeDecodeError as exc: raise SystemExit("code release path is not strict UTF-8") from exc
+    if unicodedata.normalize("NFC",value)!=value: raise SystemExit("code release path is not NFC-normalized")
+    if any(ord(ch)<32 or ord(ch)==127 or unicodedata.category(ch).startswith("C") for ch in value):
+        raise SystemExit("code release path contains control characters")
+    path=pathlib.PurePosixPath(value)
+    if value.startswith("/") or path.is_absolute() or any(part in {"",".",".."} for part in value.split("/")) or path.as_posix()!=value:
+        raise SystemExit("code release path is not a canonical relative POSIX path")
+PY
+    while IFS= read -r -d '' path; do
+        case "$transition_kind" in
+        a0-exit-bootstrap)
+            case "$path" in
+                deploy/pi_a0_3c_runtime.sh|deploy/pi_safe_update.sh|deploy/pi_deploy.sh|deploy/deploy_to_pi.ps1|deploy/README.md|\
+                genus/cli.py|\
+                tests/test_a0_3c_runtime_scripts.py|tests/test_safe_update_scripts.py|tests/test_deploy_scripts.py|tests/test_cli.py|tests/test_startup_gate.py|tests/test_control.py|\
+                docs/NOW.md|docs/ROADMAP.md|docs/QUALITY.md|docs/operations/README.md|docs/operations/REMOTE_ACCESS.md|docs/decisions/README.md|\
+                docs/decisions/ADR-0012-HUMAN-SUPERVISED-MODEL-ASSISTANCE-A0-EXIT.md|docs/design/ANSWER_QUALITY.md|\
+                docs/generated/ANTWORTQUALITAET.md) ;;
+                *) fail "A0-Exit-Bootstrap beruehrt nicht autorisierten Pfad: $path" 65 ;;
+            esac
+            ;;
+        quick-release)
+            case "$path" in
+                deploy/*|schema.sql|pyproject.toml|requirements*.txt|requirements*.lock|uv.lock|poetry.lock|Pipfile*|setup.py|setup.cfg|\
+                genus/__init__.py|genus/anchor.py|genus/db.py|genus/event_router.py|genus/integrity.py|genus/ledger.py|genus/projection.py|genus/sealing.py|genus/constants.py|genus/cli.py|genus/cli_schema_detection.py|genus/startup.py|genus/governance.py|genus/control.py|\
+                tests/fixtures/golden_ledger_v1/*|tests/test_anchor.py|tests/test_db_hardening.py|tests/test_event_vertrag.py|tests/test_integrity.py|tests/test_ledger.py|tests/test_projection_contract.py|tests/test_sealing.py|tests/test_cli.py|\
+                docs/decisions/*|docs/reviews/A0_2_GOLDEN_LEDGER_ENTRY_CONTRACT.md|.github/workflows/*)
+                    fail "Quick-Release beruehrt Fundament-/Supply-/Deploypfad: $path" 65 ;;
+                genus/*.py|tests/*.py|docs/*|README*|CONTRIBUTING.md) ;;
+                *) fail "Quick-Release-Pfad ist nicht positiv freigegeben: $path" 65 ;;
+            esac
+            ;;
+        *) fail "unbekannte Code-Release-Uebergangsart" 70 ;;
+        esac
+    done < "$diff_file"
+    if [ "$transition_kind" = a0-exit-bootstrap ]; then
+        validate_a0_exit_cli_guard_at_commit "$old" "$new"
+    fi
+}
+
+code_release_transition_kind() {
+    case "$(start_authorization_schema)" in
+        genus-a0.3c-runtime-start-authorization-v3) printf 'a0-exit-bootstrap\n' ;;
+        genus-a0.3c-runtime-start-authorization-v4) printf 'quick-release\n' ;;
+        *) fail "Code-Release braucht eine exakt bekannte v3/v4-Startfreigabe" 70 ;;
+    esac
+}
+
+code_release_used_receipt() {
+    local nonce="$1"
+    [[ "$nonce" =~ ^[a-f0-9]{64}$ ]] || fail "Code-Release-Nonce ist malformed" 70
+    printf '%s/code-release-authorization-used-%s.json\n' "$RECEIPT_ROOT" "$nonce"
+}
+
+write_code_release_plan() {
+    local old="$1" new="$2" transition_kind="$3" diff_file="$4"
+    local plan token active active_hash old_tree new_tree plan_hash seal nonce used
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    old_tree="$(safe_git rev-parse "$old^{tree}")"
+    new_tree="$(safe_git rev-parse "$new^{tree}")"
+    plan="$(receipt_target code-release-plan)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        TRANSITION_KIND="$transition_kind" OLD="$old" NEW="$new" OLD_TREE="$old_tree" NEW_TREE="$new_tree" \
+        ACTIVE="$active" ACTIVE_HASH="$active_hash" AUTH_PATH="$AUTOSTART_APPROVAL" \
+        AUTH_HASH="$(sha256_file "$AUTOSTART_APPROVAL")" GUARD_PATH="$BOOT_GUARD_PATH" \
+        GUARD_HASH="$(sha256_file "$BOOT_GUARD_PATH")" DIFF_HASH="$(sha256_file "$diff_file")" \
+        REPO_PATH="$(code_release_repo_path)" DB_PATH_ENV="$(code_release_db_path)" \
+        DB_DEVICE="$(stat -c %d "$DB_PATH")" DB_INODE="$(stat -c %i "$DB_PATH")" \
+        OPERATOR_UID="$(id -u)" OPERATOR_NAME="$(id -un)" MACHINE_ID_HASH="$(code_release_machine_id_sha256)" \
+        BRANCH_NAME="$(code_release_branch_name)" ORIGIN_REMOTE_HASH="$(code_release_origin_remote_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$diff_file" "$plan" <<'PY'
+import datetime,hashlib,json,os,pathlib,secrets,sys
+raw=pathlib.Path(sys.argv[1]).read_bytes(); parts=raw.split(b"\0")
+if not raw.endswith(b"\0") or parts[-1]!=b"": raise SystemExit("diff inventory is not NUL terminated")
+paths=[item.decode("utf-8","strict") for item in parts[:-1]]
+if not paths or len(paths)!=len(set(paths)) or paths!=sorted(paths,key=os.fsencode): raise SystemExit("diff path inventory differs")
+now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+expires=now+datetime.timedelta(minutes=30); nonce=secrets.token_hex(32)
+data={"schema":"genus-a0.3c-code-release-plan-v1","contract_version":"genus-a0.3c-code-release-contract-v1",
+ "transition_kind":os.environ["TRANSITION_KIND"],"created_at":now.isoformat().replace("+00:00","Z"),
+ "expires_at":expires.isoformat().replace("+00:00","Z"),"nonce":nonce,"old_commit":os.environ["OLD"],
+ "new_commit":os.environ["NEW"],"old_tree":os.environ["OLD_TREE"],"new_tree":os.environ["NEW_TREE"],
+ "active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
+ "start_authorization_path":os.environ["AUTH_PATH"],"start_authorization_sha256":os.environ["AUTH_HASH"],
+ "boot_guard_path":os.environ["GUARD_PATH"],"boot_guard_sha256":os.environ["GUARD_HASH"],
+ "allowed_diff_sha256":os.environ["DIFF_HASH"],"changed_paths":paths,"intended_command":"release",
+ "repo_path":os.environ["REPO_PATH"],"product_db_path":os.environ["DB_PATH_ENV"],
+ "product_db_device":int(os.environ["DB_DEVICE"]),"product_db_inode":int(os.environ["DB_INODE"]),
+ "operator_uid":int(os.environ["OPERATOR_UID"]),"operator_name":os.environ["OPERATOR_NAME"],
+ "machine_id_sha256":os.environ["MACHINE_ID_HASH"],"branch_name":os.environ["BRANCH_NAME"],
+ "origin_remote_sha256":os.environ["ORIGIN_REMOTE_HASH"],
+ "paths_logged":True,"payloads_logged":False}
+data["release_seal"]=hashlib.sha256(json.dumps(data,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+path=pathlib.Path(sys.argv[2]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    plan_hash="$(sha256_file "$plan")"
+    read -r seal nonce < <("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$plan" <<'PY'
+import json,pathlib,sys
+d=json.loads(pathlib.Path(sys.argv[1]).read_text()); print(d["release_seal"],d["nonce"])
+PY
+    )
+    used="$(code_release_used_receipt "$nonce")"
+    [ ! -e "$used" ] && [ ! -L "$used" ] || fail "Code-Release-Nonce wurde bereits verbraucht" 70
+    token="$CODE_RELEASE_TOKEN"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        PLAN="$plan" PLAN_HASH="$plan_hash" SEAL="$seal" NONCE="$nonce" USED="$used" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$plan" "$token" <<'PY'
+import json,os,pathlib,sys
+plan=json.loads(pathlib.Path(sys.argv[1]).read_text())
+data={"schema":"genus-a0.3c-code-release-authorization-v1","plan_path":os.environ["PLAN"],
+ "plan_sha256":os.environ["PLAN_HASH"],"release_seal":os.environ["SEAL"],"nonce":os.environ["NONCE"],
+ "created_at":plan["created_at"],"expires_at":plan["expires_at"],"old_commit":plan["old_commit"],
+ "new_commit":plan["new_commit"],"active_manifest":plan["active_manifest"],
+ "active_manifest_sha256":plan["active_manifest_sha256"],"intended_command":"release","used_receipt_path":os.environ["USED"]}
+for key in ("repo_path","product_db_path","product_db_device","product_db_inode","operator_uid","operator_name",
+            "machine_id_sha256","branch_name","origin_remote_sha256"):
+    data[key]=plan[key]
+path=pathlib.Path(sys.argv[2]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    printf '%s\n' "$seal"
+}
+
+validate_code_release_authorization() {
+    local expected_old="$1" expected_new="$2" expected_seal="$3" expiry_policy="${4:-current}" plan used diff_file transition_kind
+    local active active_hash plan_hash final_plan_hash
+    [ -f "$CODE_RELEASE_TOKEN" ] && [ ! -L "$CODE_RELEASE_TOKEN" ] \
+        && [ "$(stat -c %u "$CODE_RELEASE_TOKEN")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$CODE_RELEASE_TOKEN")" = 600 ] \
+        && [ "$(stat -c %h "$CODE_RELEASE_TOKEN")" -eq 1 ] \
+        || fail "Code-Release-Authorization ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+    assert_expected_commit "$expected_old"
+    require_code_release_commits "$expected_old" "$expected_new"
+    [[ "$expected_seal" =~ ^[a-f0-9]{64}$ ]] || fail "EXPECTED_RELEASE_SEAL muss SHA-256 sein" 64
+    validate_autostart_approval
+    validate_code_release_initial_root_trust
+    systemd_autostart_guard_present \
+        || fail "Code-Release verlangt den aktuellen v4-faehigen Boot-Guard" 70
+    plan="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_TOKEN" <<'PY'
+import json,pathlib,sys
+value=json.loads(pathlib.Path(sys.argv[1]).read_text()).get("plan_path","")
+if not isinstance(value,str): raise SystemExit("plan path malformed")
+print(value)
+PY
+    )"
+    case "$(realpath -e -- "$plan" 2>/dev/null || true)" in "$RECEIPT_ROOT"/*) ;; *)
+        fail "Code-Release-Plan entkommt Receipt-Root" 70 ;;
+    esac
+    [ -f "$plan" ] && [ ! -L "$plan" ] && [ "$(stat -c %u "$plan")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$plan")" = 600 ] && [ "$(stat -c %h "$plan")" -eq 1 ] \
+        || fail "Code-Release-Plan ist nicht regulaer/privat" 70
+    used="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_TOKEN" <<'PY'
+import json,pathlib,sys
+value=json.loads(pathlib.Path(sys.argv[1]).read_text()).get("used_receipt_path","")
+if not isinstance(value,str): raise SystemExit("used receipt path malformed")
+print(value)
+PY
+    )"
+    case "$used" in "$RECEIPT_ROOT"/code-release-authorization-used-[a-f0-9][a-f0-9]*) ;; *)
+        fail "Code-Release-Consumption-Pfad ist nicht exakt begrenzt" 70 ;;
+    esac
+    if [ "$expiry_policy" != allow-expired-used ]; then
+        [ ! -e "$used" ] && [ ! -L "$used" ] || fail "Code-Release-Authorization wurde bereits verbraucht" 70
+    fi
+    transition_kind="$(code_release_transition_kind)"
+    diff_file="$(mktemp "$STATE_ROOT/code-release-verify.diff.XXXXXX")"
+    write_code_release_diff "$expected_old" "$expected_new" "$diff_file"
+    validate_code_release_path_policy "$expected_old" "$expected_new" "$transition_kind" "$diff_file"
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    plan_hash="$(sha256_file "$plan")"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        PLAN_HASH="$plan_hash" DIFF_HASH="$(sha256_file "$diff_file")" RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        OLD="$expected_old" NEW="$expected_new" OLD_TREE="$(safe_git rev-parse "$expected_old^{tree}")" \
+        NEW_TREE="$(safe_git rev-parse "$expected_new^{tree}")" EXPECTED_SEAL="$expected_seal" \
+        TRANSITION_KIND="$transition_kind" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+        AUTH_PATH="$AUTOSTART_APPROVAL" AUTH_HASH="$(sha256_file "$AUTOSTART_APPROVAL")" \
+        GUARD_PATH="$BOOT_GUARD_PATH" GUARD_HASH="$(sha256_file "$BOOT_GUARD_PATH")" NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        EXPIRY_POLICY="$expiry_policy" REPO_PATH="$(code_release_repo_path)" DB_PATH_ENV="$(code_release_db_path)" \
+        DB_DEVICE="$(stat -c %d "$DB_PATH")" DB_INODE="$(stat -c %i "$DB_PATH")" \
+        OPERATOR_UID="$(id -u)" OPERATOR_NAME="$(id -un)" MACHINE_ID_HASH="$(code_release_machine_id_sha256)" \
+        BRANCH_NAME="$(code_release_branch_name)" ORIGIN_REMOTE_HASH="$(code_release_origin_remote_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$CODE_RELEASE_TOKEN" "$plan" "$used" "$diff_file" <<'PY'
+import datetime,hashlib,json,os,pathlib,re,sys
+token=json.loads(pathlib.Path(sys.argv[1]).read_text()); raw=pathlib.Path(sys.argv[2]).read_bytes(); plan=json.loads(raw)
+token_keys={"schema","plan_path","plan_sha256","release_seal","nonce","created_at","expires_at","old_commit","new_commit",
+ "active_manifest","active_manifest_sha256","intended_command","used_receipt_path","repo_path","product_db_path",
+ "product_db_device","product_db_inode","operator_uid","operator_name","machine_id_sha256","branch_name","origin_remote_sha256"}
+plan_keys={"schema","contract_version","transition_kind","created_at","expires_at","nonce","old_commit","new_commit","old_tree",
+ "new_tree","active_manifest","active_manifest_sha256","start_authorization_path","start_authorization_sha256","boot_guard_path",
+ "boot_guard_sha256","allowed_diff_sha256","changed_paths","release_seal","intended_command","repo_path","product_db_path",
+ "product_db_device","product_db_inode","operator_uid","operator_name","machine_id_sha256","branch_name","origin_remote_sha256",
+ "paths_logged","payloads_logged"}
+if set(token)!=token_keys or token.get("schema")!="genus-a0.3c-code-release-authorization-v1": raise SystemExit("code release token schema differs")
+if set(plan)!=plan_keys or plan.get("schema")!="genus-a0.3c-code-release-plan-v1" or plan.get("contract_version")!="genus-a0.3c-code-release-contract-v1": raise SystemExit("code release plan schema differs")
+unsigned={key:value for key,value in plan.items() if key!="release_seal"}
+seal=hashlib.sha256(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+if seal!=plan["release_seal"] or seal!=os.environ["EXPECTED_SEAL"]: raise SystemExit("code release plan seal differs")
+if hashlib.sha256(raw).hexdigest()!=os.environ["PLAN_HASH"]: raise SystemExit("code release plan changed during validation")
+for key in ("old_commit","new_commit","active_manifest","active_manifest_sha256","release_seal","nonce","created_at","expires_at",
+            "repo_path","product_db_path","product_db_device","product_db_inode","operator_uid","operator_name",
+            "machine_id_sha256","branch_name","origin_remote_sha256"):
+    if token[key]!=plan[key]: raise SystemExit("code release token/plan crossbinding differs")
+expected_used=str(pathlib.Path(os.environ["RECEIPT_ROOT_ENV"])/f"code-release-authorization-used-{plan['nonce']}.json")
+if token["plan_path"]!=sys.argv[2] or token["plan_sha256"]!=os.environ["PLAN_HASH"] or token["used_receipt_path"]!=sys.argv[3] or token["used_receipt_path"]!=expected_used or token["intended_command"]!="release": raise SystemExit("code release token target differs")
+if (plan["old_commit"]!=os.environ["OLD"] or plan["new_commit"]!=os.environ["NEW"]
+        or plan["old_tree"]!=os.environ["OLD_TREE"] or plan["new_tree"]!=os.environ["NEW_TREE"]
+        or plan["transition_kind"]!=os.environ["TRANSITION_KIND"] or plan["active_manifest"]!=os.environ["ACTIVE"]
+        or plan["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"]): raise SystemExit("code release git/runtime binding differs")
+if (plan["start_authorization_path"]!=os.environ["AUTH_PATH"] or plan["start_authorization_sha256"]!=os.environ["AUTH_HASH"]
+        or plan["boot_guard_path"]!=os.environ["GUARD_PATH"] or plan["boot_guard_sha256"]!=os.environ["GUARD_HASH"]
+        or plan["allowed_diff_sha256"]!=os.environ["DIFF_HASH"]): raise SystemExit("code release evidence binding differs")
+target={"repo_path":os.environ["REPO_PATH"],"product_db_path":os.environ["DB_PATH_ENV"],
+        "product_db_device":int(os.environ["DB_DEVICE"]),"product_db_inode":int(os.environ["DB_INODE"]),
+        "operator_uid":int(os.environ["OPERATOR_UID"]),"operator_name":os.environ["OPERATOR_NAME"],
+        "machine_id_sha256":os.environ["MACHINE_ID_HASH"],"branch_name":os.environ["BRANCH_NAME"],
+        "origin_remote_sha256":os.environ["ORIGIN_REMOTE_HASH"]}
+if any(plan[key]!=value for key,value in target.items()): raise SystemExit("code release target binding differs")
+if plan["intended_command"]!="release" or plan["paths_logged"] is not True or plan["payloads_logged"] is not False: raise SystemExit("code release safety fields differ")
+diff_raw=pathlib.Path(sys.argv[4]).read_bytes(); parts=diff_raw.split(b"\0")
+if not diff_raw.endswith(b"\0") or parts[-1]!=b"": raise SystemExit("code release diff inventory framing differs")
+changed=[item.decode("utf-8","strict") for item in parts[:-1]]
+if plan["changed_paths"]!=changed or not changed or len(changed)!=len(set(changed)): raise SystemExit("code release changed path inventory differs")
+if not re.fullmatch(r"[a-f0-9]{64}",plan["nonce"]): raise SystemExit("code release nonce malformed")
+def stamp(value): return datetime.datetime.fromisoformat(value.replace("Z","+00:00"))
+created,expires,now=stamp(plan["created_at"]),stamp(plan["expires_at"]),stamp(os.environ["NOW"])
+if created.tzinfo is None or expires.tzinfo is None or expires<=created or expires-created>datetime.timedelta(minutes=30) or now<created-datetime.timedelta(minutes=2): raise SystemExit("code release authorization time bounds differ")
+if os.environ["EXPIRY_POLICY"]=="current" and now>expires: raise SystemExit("code release authorization is stale")
+if os.environ["EXPIRY_POLICY"] not in {"current","allow-expired","allow-expired-used"}: raise SystemExit("unknown expiry validation policy")
+PY
+    final_plan_hash="$(private_stable_sha256 "$plan")" \
+        || { rm -f -- "$diff_file"; fail "Code-Release-Plan driftete waehrend Verifikation" 70; }
+    [ "$final_plan_hash" = "$plan_hash" ] \
+        || { rm -f -- "$diff_file"; fail "Code-Release-Plan wurde atomar ersetzt" 70; }
+    VERIFIED_CODE_RELEASE_PLAN="$plan"
+    VERIFIED_CODE_RELEASE_PLAN_SHA256="$final_plan_hash"
+    VERIFIED_CODE_RELEASE_SEAL="$expected_seal"
+    VERIFIED_CODE_RELEASE_NONCE="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$plan" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["nonce"])
+PY
+    )"
+    rm -f -- "$diff_file"
+}
+
+code_release_plan() {
+    local old="$1" new="$2" transition_kind diff_file seal
+    init_user_roots
+    acquire_operator_lock
+    validate_product_data_contract
+    assert_expected_commit "$old"
+    require_code_release_commits "$old" "$new"
+    [ ! -e "$ACTIVATION_JOURNAL" ] && [ ! -L "$ACTIVATION_JOURNAL" ] \
+        && [ ! -e "$CODE_RELEASE_JOURNAL" ] && [ ! -L "$CODE_RELEASE_JOURNAL" ] \
+        || fail "Release-Plan ist mit pending Transition verboten" 70
+    [ ! -e "$OPERATOR_REAUTH_TOKEN" ] && [ ! -L "$OPERATOR_REAUTH_TOKEN" ] \
+        || fail "Release-Plan ist mit pending Runtime-Reauthorization verboten" 70
+    [ ! -e "$CODE_RELEASE_TOKEN" ] && [ ! -L "$CODE_RELEASE_TOKEN" ] \
+        || fail "eine Code-Release-Authorization ist bereits pending" 70
+    validate_autostart_approval
+    validate_code_release_initial_root_trust
+    systemd_autostart_guard_present \
+        || fail "Release-Plan braucht den aktuellen v4-faehigen Boot-Guard" 70
+    verify_active_runtime_for_release
+    validate_code_release_service_privilege_boundary
+    transition_kind="$(code_release_transition_kind)"
+    diff_file="$(mktemp "$STATE_ROOT/code-release-plan.diff.XXXXXX")"
+    write_code_release_diff "$old" "$new" "$diff_file"
+    validate_code_release_path_policy "$old" "$new" "$transition_kind" "$diff_file"
+    seal="$(write_code_release_plan "$old" "$new" "$transition_kind" "$diff_file")"
+    rm -f -- "$diff_file"
+    validate_code_release_authorization "$old" "$new" "$seal"
+    printf '[A0.3c] CANDIDATE-Plan zur Human-Pruefung: %s (Feld changed_paths pruefen)\n' \
+        "$VERIFIED_CODE_RELEASE_PLAN" >&2
+    printf '%s\n' "$seal"
+}
+
+create_code_release_journal() {
+    local old="$1" new="$2" transition_kind active active_hash old_tree new_tree services_csv
+    local prior_approval prior_guard
+    [ ! -e "$CODE_RELEASE_JOURNAL" ] && [ ! -L "$CODE_RELEASE_JOURNAL" ] \
+        || fail "Code-Release-Journal existiert bereits" 70
+    [ "${#active_services[@]}" -gt 0 ] || fail "Code-Release braucht ein aktives Service-Inventar" 70
+    validate_code_release_authorization "$old" "$new" "$VERIFIED_CODE_RELEASE_SEAL"
+    transition_kind="$(code_release_transition_kind)"
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    old_tree="$(safe_git rev-parse "$old^{tree}")"
+    new_tree="$(safe_git rev-parse "$new^{tree}")"
+    prior_approval="$(receipt_target code-release-prior-start-authorization)"
+    prior_guard="$(receipt_target code-release-prior-boot-guard)"
+    install -m 0600 "$AUTOSTART_APPROVAL" "$prior_approval"
+    install -m 0600 "$BOOT_GUARD_PATH" "$prior_guard"
+    sync -f "$prior_approval"; sync -f "$prior_guard"; fsync_dir "$RECEIPT_ROOT"
+    [ "$(sha256_file "$prior_approval")" = "$(sha256_file "$AUTOSTART_APPROVAL")" ] \
+        && [ "$(sha256_file "$prior_guard")" = "$(sha256_file "$BOOT_GUARD_PATH")" ] \
+        || fail "Code-Release-Ausgangsevidenz driftete beim Kopieren" 70
+    services_csv="$(IFS=,; printf '%s' "${active_services[*]}")"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        TRANSITION_KIND="$transition_kind" OLD="$old" NEW="$new" OLD_TREE="$old_tree" NEW_TREE="$new_tree" \
+        SEAL="$VERIFIED_CODE_RELEASE_SEAL" NONCE="$VERIFIED_CODE_RELEASE_NONCE" \
+        PLAN="$VERIFIED_CODE_RELEASE_PLAN" PLAN_HASH="$VERIFIED_CODE_RELEASE_PLAN_SHA256" \
+        ACTIVE="$active" ACTIVE_HASH="$active_hash" SERVICES_CSV="$services_csv" \
+        CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
+        CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" \
+        PRIOR_APPROVAL="$prior_approval" PRIOR_APPROVAL_HASH="$(sha256_file "$prior_approval")" \
+        PRIOR_GUARD="$prior_guard" PRIOR_GUARD_HASH="$(sha256_file "$prior_guard")" \
+        REPO_PATH="$(code_release_repo_path)" DB_PATH_ENV="$(code_release_db_path)" \
+        DB_DEVICE="$(stat -c %d "$DB_PATH")" DB_INODE="$(stat -c %i "$DB_PATH")" \
+        OPERATOR_UID="$(id -u)" OPERATOR_NAME="$(id -un)" MACHINE_ID_HASH="$(code_release_machine_id_sha256)" \
+        BRANCH_NAME="$(code_release_branch_name)" ORIGIN_REMOTE_HASH="$(code_release_origin_remote_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" <<'PY'
+import json,os,pathlib,sys
+data={"schema":"genus-a0.3c-code-release-pending-v1","phase":"prepared","transition_kind":os.environ["TRANSITION_KIND"],
+ "old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],"old_tree":os.environ["OLD_TREE"],"new_tree":os.environ["NEW_TREE"],
+ "release_seal":os.environ["SEAL"],"nonce":os.environ["NONCE"],"plan_path":os.environ["PLAN"],"plan_sha256":os.environ["PLAN_HASH"],
+ "active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
+ "prior_active_services":[item for item in os.environ["SERVICES_CSV"].split(",") if item],
+ "cron_original_sha256":os.environ["CRON_ORIGINAL_HASH"],"cron_disabled_sha256":os.environ["CRON_DISABLED_HASH"],
+ "prior_start_authorization_path":os.environ["PRIOR_APPROVAL"],"prior_start_authorization_sha256":os.environ["PRIOR_APPROVAL_HASH"],
+ "prior_boot_guard_path":os.environ["PRIOR_GUARD"],"prior_boot_guard_sha256":os.environ["PRIOR_GUARD_HASH"],
+ "repo_path":os.environ["REPO_PATH"],"product_db_path":os.environ["DB_PATH_ENV"],
+ "product_db_device":int(os.environ["DB_DEVICE"]),"product_db_inode":int(os.environ["DB_INODE"]),
+ "operator_uid":int(os.environ["OPERATOR_UID"]),"operator_name":os.environ["OPERATOR_NAME"],
+ "machine_id_sha256":os.environ["MACHINE_ID_HASH"],"branch_name":os.environ["BRANCH_NAME"],
+ "origin_remote_sha256":os.environ["ORIGIN_REMOTE_HASH"],
+ "product_db_canary_path":"","product_db_canary_sha256":"",
+ "release_start_authorization_path":"","release_start_authorization_sha256":"",
+ "backup_receipt_path":"","backup_receipt_sha256":"","preflight_receipt_path":"","preflight_receipt_sha256":"",
+ "postflight_receipt_path":"","postflight_receipt_sha256":"","completion_receipt_path":"","completion_receipt_sha256":"",
+ "consumption_receipt_path":"","consumption_receipt_sha256":"",
+ "database_replay_performed":False,"database_reseal_performed":False,"database_restore_performed":False}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+}
+
+code_release_journal_field() {
+    local field="$1"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" "$field" <<'PY'
+import json,pathlib,sys
+value=json.loads(pathlib.Path(sys.argv[1]).read_text())[sys.argv[2]]
+if isinstance(value,(dict,list,bool)) or value is None: raise SystemExit("code release journal field is not scalar")
+print(value)
+PY
+}
+
+code_release_journal_service_lines() {
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" <<'PY'
+import json,pathlib,sys
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+values=json.loads(pathlib.Path(sys.argv[1]).read_text())["prior_active_services"]
+if not values or len(values)!=len(set(values)) or any(value not in allowed for value in values): raise SystemExit("code release service inventory differs")
+print("\n".join(values))
+PY
+}
+
+validate_code_release_journal() {
+    local allow_head_mismatch="${1:-0}" head active active_hash old new transition_kind diff_file token_required=1
+    local canary backup preflight postflight completion consumption phase used
+    [ -f "$CODE_RELEASE_JOURNAL" ] && [ ! -L "$CODE_RELEASE_JOURNAL" ] \
+        && [ "$(stat -c %u "$CODE_RELEASE_JOURNAL")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$CODE_RELEASE_JOURNAL")" = 600 ] \
+        && [ "$(stat -c %h "$CODE_RELEASE_JOURNAL")" -eq 1 ] \
+        || fail "Code-Release-Journal ist nicht regulaer/operator-eigen/0600/einfach verlinkt" 70
+    [ -f "$ACTIVATION_CRON_SNAPSHOT" ] && [ ! -L "$ACTIVATION_CRON_SNAPSHOT" ] \
+        && [ -f "$ACTIVATION_CRON_DISABLED" ] && [ ! -L "$ACTIVATION_CRON_DISABLED" ] \
+        || fail "Code-Release-Crontab-Evidenz fehlt" 70
+    old="$(code_release_journal_field old_commit)"; new="$(code_release_journal_field new_commit)"
+    transition_kind="$(code_release_journal_field transition_kind)"
+    require_code_release_commits "$old" "$new"
+    diff_file="$(mktemp "$STATE_ROOT/code-release-journal.diff.XXXXXX")"
+    write_code_release_diff "$old" "$new" "$diff_file"
+    validate_code_release_path_policy "$old" "$new" "$transition_kind" "$diff_file"
+    head="$(repo_commit)"; active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        PHASE_ALLOW_MISMATCH="$allow_head_mismatch" HEAD_COMMIT="$head" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+        OLD_TREE="$(safe_git rev-parse "$old^{tree}")" NEW_TREE="$(safe_git rev-parse "$new^{tree}")" \
+        DIFF_HASH="$(sha256_file "$diff_file")" CRON_ORIGINAL_HASH="$(sha256_file "$ACTIVATION_CRON_SNAPSHOT")" \
+        CRON_DISABLED_HASH="$(sha256_file "$ACTIVATION_CRON_DISABLED")" RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        REPO_PATH="$(code_release_repo_path)" DB_PATH_ENV="$(code_release_db_path)" \
+        DB_DEVICE="$(stat -c %d "$DB_PATH")" DB_INODE="$(stat -c %i "$DB_PATH")" \
+        OPERATOR_UID="$(id -u)" OPERATOR_NAME="$(id -un)" MACHINE_ID_HASH="$(code_release_machine_id_sha256)" \
+        BRANCH_NAME="$(code_release_branch_name)" ORIGIN_REMOTE_HASH="$(code_release_origin_remote_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); data=json.loads(path.read_text())
+keys={"schema","phase","transition_kind","old_commit","new_commit","old_tree","new_tree","release_seal","nonce","plan_path","plan_sha256",
+ "active_manifest","active_manifest_sha256","prior_active_services","cron_original_sha256","cron_disabled_sha256",
+ "prior_start_authorization_path","prior_start_authorization_sha256","prior_boot_guard_path","prior_boot_guard_sha256",
+ "repo_path","product_db_path","product_db_device","product_db_inode","operator_uid","operator_name","machine_id_sha256",
+ "branch_name","origin_remote_sha256","product_db_canary_path","product_db_canary_sha256",
+ "release_start_authorization_path","release_start_authorization_sha256",
+ "backup_receipt_path","backup_receipt_sha256","preflight_receipt_path","preflight_receipt_sha256","postflight_receipt_path",
+ "postflight_receipt_sha256","completion_receipt_path","completion_receipt_sha256","consumption_receipt_path",
+ "consumption_receipt_sha256","database_replay_performed",
+ "database_reseal_performed","database_restore_performed"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-pending-v1": raise SystemExit("code release journal schema differs")
+phases=["prepared","quiesced","checked-out","backed-up","candidate-verified","authorized","started-paused","postflight",
+        "receipt-written","terminalized","resumed","rollback-authorized"]
+if data["phase"] not in phases or data["transition_kind"] not in {"a0-exit-bootstrap","quick-release"}: raise SystemExit("code release journal state differs")
+if data["old_tree"]!=os.environ["OLD_TREE"] or data["new_tree"]!=os.environ["NEW_TREE"]: raise SystemExit("code release journal tree differs")
+if any(not re.fullmatch(r"[a-f0-9]{64}",data[key]) for key in ("release_seal","nonce","plan_sha256","active_manifest_sha256","cron_original_sha256","cron_disabled_sha256","prior_start_authorization_sha256","prior_boot_guard_sha256")): raise SystemExit("code release journal digest malformed")
+if data["active_manifest"]!=os.environ["ACTIVE"] or data["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"]: raise SystemExit("code release ACTIVE drifted")
+if data["cron_original_sha256"]!=os.environ["CRON_ORIGINAL_HASH"] or data["cron_disabled_sha256"]!=os.environ["CRON_DISABLED_HASH"]: raise SystemExit("code release cron evidence drifted")
+target={"repo_path":os.environ["REPO_PATH"],"product_db_path":os.environ["DB_PATH_ENV"],
+        "product_db_device":int(os.environ["DB_DEVICE"]),"product_db_inode":int(os.environ["DB_INODE"]),
+        "operator_uid":int(os.environ["OPERATOR_UID"]),"operator_name":os.environ["OPERATOR_NAME"],
+        "machine_id_sha256":os.environ["MACHINE_ID_HASH"],"branch_name":os.environ["BRANCH_NAME"],
+        "origin_remote_sha256":os.environ["ORIGIN_REMOTE_HASH"]}
+if any(data[key]!=value for key,value in target.items()): raise SystemExit("code release journal target binding differs")
+if any(data[key] is not False for key in ("database_replay_performed","database_reseal_performed","database_restore_performed")): raise SystemExit("code release data mutation flag differs")
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+if not data["prior_active_services"] or len(data["prior_active_services"])!=len(set(data["prior_active_services"])) or any(item not in allowed for item in data["prior_active_services"]): raise SystemExit("code release service inventory differs")
+index=phases.index(data["phase"]); rollback=data["phase"]=="rollback-authorized"
+expected=data["old_commit"] if index<2 or rollback else data["new_commit"]
+if os.environ["PHASE_ALLOW_MISMATCH"]=="1":
+    if os.environ["HEAD_COMMIT"] not in {data["old_commit"],data["new_commit"]}: raise SystemExit("code release checkout escaped OLD/NEW")
+elif os.environ["HEAD_COMMIT"]!=expected: raise SystemExit("code release phase/head binding differs")
+root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve(strict=True)
+def evidence(value,digest,label):
+    p=pathlib.Path(value)
+    if p.parent.resolve(strict=True)!=root: raise SystemExit(f"{label} escapes receipt root")
+    info=p.lstat()
+    if p.is_symlink() or not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1: raise SystemExit(f"{label} privacy differs")
+    payload=p.read_bytes()
+    if hashlib.sha256(payload).hexdigest()!=digest: raise SystemExit(f"{label} hash differs")
+    return payload
+plan=json.loads(evidence(data["plan_path"],data["plan_sha256"],"release plan"))
+unsigned={key:value for key,value in plan.items() if key!="release_seal"}
+seal=hashlib.sha256(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()
+if seal!=data["release_seal"] or plan.get("allowed_diff_sha256")!=os.environ["DIFF_HASH"] or plan.get("old_commit")!=data["old_commit"] or plan.get("new_commit")!=data["new_commit"] or plan.get("nonce")!=data["nonce"] or plan.get("transition_kind")!=data["transition_kind"] or any(plan.get(key)!=data[key] for key in target): raise SystemExit("release plan/journal binding differs")
+prior=json.loads(evidence(data["prior_start_authorization_path"],data["prior_start_authorization_sha256"],"prior authorization"))
+if prior.get("schema") not in {"genus-a0.3c-runtime-start-authorization-v3","genus-a0.3c-runtime-start-authorization-v4"}: raise SystemExit("prior authorization schema differs")
+evidence(data["prior_boot_guard_path"],data["prior_boot_guard_sha256"],"prior boot guard")
+if index>=1:
+    if not data["product_db_canary_path"] or not re.fullmatch(r"[a-f0-9]{64}",data["product_db_canary_sha256"]): raise SystemExit("product database canary binding missing")
+    evidence(data["product_db_canary_path"],data["product_db_canary_sha256"],"product database canary")
+elif data["product_db_canary_path"] or data["product_db_canary_sha256"]: raise SystemExit("premature product database canary")
+if index>=5 and not rollback:
+    if not data["release_start_authorization_path"] or not re.fullmatch(r"[a-f0-9]{64}",data["release_start_authorization_sha256"]): raise SystemExit("release start authorization binding missing")
+    evidence(data["release_start_authorization_path"],data["release_start_authorization_sha256"],"release start authorization")
+elif not rollback and (data["release_start_authorization_path"] or data["release_start_authorization_sha256"]): raise SystemExit("premature release start authorization")
+if rollback:
+    for prefix in ("backup","preflight","postflight"):
+        p=data[f"{prefix}_receipt_path"]; d=data[f"{prefix}_receipt_sha256"]
+        if bool(p)!=bool(d): raise SystemExit(f"partial rollback {prefix} binding")
+        if p: evidence(p,d,f"{prefix} receipt")
+    for prefix in ("completion","consumption"):
+        p=data[f"{prefix}_receipt_path"]; d=data[f"{prefix}_receipt_sha256"]
+        if bool(p)!=bool(d): raise SystemExit(f"partial rollback {prefix} binding")
+        if p: evidence(p,d,f"{prefix} receipt")
+else:
+    for threshold,prefix in ((3,"backup"),(4,"preflight"),(7,"postflight"),(8,"completion"),(9,"consumption")):
+        p=data[f"{prefix}_receipt_path"]; d=data[f"{prefix}_receipt_sha256"]
+        if index>=threshold:
+            if not p or not re.fullmatch(r"[a-f0-9]{64}",d): raise SystemExit(f"{prefix} receipt binding missing")
+            evidence(p,d,f"{prefix} receipt")
+        elif p or d: raise SystemExit(f"premature {prefix} receipt binding")
+PY
+    rm -f -- "$diff_file"
+    phase="$(code_release_journal_field phase)"
+    used="$(code_release_used_receipt "$(code_release_journal_field nonce)")"
+    case "$phase" in
+    prepared|quiesced|checked-out|backed-up|candidate-verified|authorized|started-paused|postflight)
+        [ -f "$CODE_RELEASE_TOKEN" ] && [ ! -L "$CODE_RELEASE_TOKEN" ] \
+            || fail "pending Code-Release verlor seine One-shot-Authorization" 70
+        [ ! -e "$used" ] && [ ! -L "$used" ] \
+            || fail "pending Code-Release-Authorization ist bereits als verbraucht markiert" 70
+        ;;
+    receipt-written)
+        { [ -f "$CODE_RELEASE_TOKEN" ] && [ ! -L "$CODE_RELEASE_TOKEN" ]; } \
+            || { [ -f "$used" ] && [ ! -L "$used" ]; } \
+            || fail "receipt-written verlor Token und Consumption-Evidence" 70
+        ;;
+    terminalized|resumed)
+        [ ! -e "$CODE_RELEASE_TOKEN" ] && [ ! -L "$CODE_RELEASE_TOKEN" ] \
+            && [ -f "$used" ] && [ ! -L "$used" ] \
+            || fail "terminale Code-Release-Phase hat keinen exakten One-shot-Verbrauch" 70
+        ;;
+    rollback-authorized) ;;
+    esac
+    canary="$(code_release_journal_field product_db_canary_path)"
+    backup="$(code_release_journal_field backup_receipt_path)"
+    preflight="$(code_release_journal_field preflight_receipt_path)"
+    postflight="$(code_release_journal_field postflight_receipt_path)"
+    completion="$(code_release_journal_field completion_receipt_path)"
+    consumption="$(code_release_journal_field consumption_receipt_path)"
+    [ -z "$canary" ] || validate_code_release_db_canary "$canary" 0
+    if [ "$phase" != rollback-authorized ] && [ "$head" = "$new" ]; then
+        [ -z "$backup" ] || validate_code_release_backup_receipt "$backup" "$new"
+        [ -z "$preflight" ] || validate_code_release_preflight_receipt "$preflight"
+        [ -z "$postflight" ] || validate_code_release_postflight_receipt "$postflight"
+    fi
+    [ -z "$completion" ] || validate_code_release_completion_receipt "$completion"
+    [ -z "$consumption" ] || validate_code_release_consumption_receipt "$consumption" "$completion"
+}
+
+update_code_release_journal() {
+    local phase="$1" receipt="${2:-}" current expected_previous path_key="" hash_key="" tmp hash=""
+    validate_code_release_journal 1
+    current="$(code_release_journal_field phase)"
+    case "$phase" in
+        quiesced) expected_previous=prepared; path_key=product_db_canary_path; hash_key=product_db_canary_sha256 ;;
+        checked-out) expected_previous=quiesced ;;
+        backed-up) expected_previous=checked-out; path_key=backup_receipt_path; hash_key=backup_receipt_sha256 ;;
+        candidate-verified) expected_previous=backed-up; path_key=preflight_receipt_path; hash_key=preflight_receipt_sha256 ;;
+        authorized) expected_previous=candidate-verified; path_key=release_start_authorization_path; hash_key=release_start_authorization_sha256 ;;
+        started-paused) expected_previous=authorized ;;
+        postflight) expected_previous=started-paused; path_key=postflight_receipt_path; hash_key=postflight_receipt_sha256 ;;
+        receipt-written) expected_previous=postflight; path_key=completion_receipt_path; hash_key=completion_receipt_sha256 ;;
+        terminalized) expected_previous=receipt-written; path_key=consumption_receipt_path; hash_key=consumption_receipt_sha256 ;;
+        resumed) expected_previous=terminalized ;;
+        *) fail "ungueltige Code-Release-Phasenfortschreibung" 70 ;;
+    esac
+    [ "$current" = "$expected_previous" ] || fail "Code-Release-Phase ist nicht monoton/sequentiell" 70
+    if [ -n "$path_key" ]; then
+        [ -n "$receipt" ] || fail "Code-Release-Phase $phase braucht ein Receipt" 70
+        hash="$(sha256_file "$receipt")"
+    else
+        [ -z "$receipt" ] || fail "Code-Release-Phase $phase darf kein Receipt binden" 70
+    fi
+    tmp="$CODE_RELEASE_JOURNAL.tmp.$$.$RANDOM"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        PHASE="$phase" PATH_KEY="$path_key" HASH_KEY="$hash_key" RECEIPT="$receipt" RECEIPT_HASH="$hash" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" "$tmp" <<'PY'
+import json,os,pathlib,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text()); data["phase"]=os.environ["PHASE"]
+if os.environ["PATH_KEY"]:
+    data[os.environ["PATH_KEY"]]=os.environ["RECEIPT"]
+    data[os.environ["HASH_KEY"]]=os.environ["RECEIPT_HASH"]
+fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_journal
+}
+
+code_release_sandbox_run() {
+    local scratch="$1" log command_status cap_status
+    local -a pipeline_status=()
+    shift
+    log="$(mktemp "$STATE_ROOT/candidate-output.XXXXXX")"
+    set +e
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$ROOT_SYSTEMD_RUN_BIN" \
+        --quiet --wait --pipe --collect --property=Type=exec \
+        --property=User=nobody --property=Group=nogroup --property=UMask=0077 \
+        --property=ProtectHome=yes --property=ProtectSystem=strict \
+        --property=PrivateNetwork=yes --property=PrivateDevices=yes --property=PrivateTmp=yes \
+        --property=NoNewPrivileges=yes --property=CapabilityBoundingSet= \
+        --property=RestrictAddressFamilies=AF_UNIX --property=ProtectProc=invisible \
+        --property=ProtectKernelTunables=yes --property=ProtectKernelModules=yes \
+        --property=ProtectControlGroups=yes --property=LockPersonality=yes \
+        --property=TasksMax=512 --property=RuntimeMaxSec=30m \
+        --property=MemoryMax=3G --property=LimitFSIZE=64M \
+        --property="ReadOnlyPaths=$scratch/input $RUNTIME_PREFIX" \
+        --property="ReadWritePaths=$scratch/work $scratch/output" \
+        --property="InaccessiblePaths=$REPO_DIR $STATE_ROOT $GENUS_HOME $BACKUP_DIR $DB_PATH $DB_PATH-wal $DB_PATH-shm" \
+        --property="WorkingDirectory=$scratch/input/repo" \
+        --setenv=PATH=/usr/bin:/bin --setenv="HOME=$scratch/work/home" --setenv=LC_ALL=C.UTF-8 \
+        --setenv=PYTHONNOUSERSITE=1 --setenv=PYTHONDONTWRITEBYTECODE=1 \
+        --setenv=GENUS_PRODUCT_MODE=1 --setenv="GENUS_DB_PATH=$scratch/work/synthetic/genus.sqlite3" \
+        -- "$@" 2>&1 | "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+            "$SYSTEM_PYTHON_BIN" -I -P -c 'import pathlib,sys
+limit=1024*1024; target=pathlib.Path(sys.argv[1]); written=0; overflow=False
+with target.open("wb") as stream:
+    while True:
+        chunk=sys.stdin.buffer.read(65536)
+        if not chunk: break
+        keep=chunk[:max(0,limit-written)]
+        if keep: stream.write(keep); written+=len(keep)
+        if len(keep)!=len(chunk): overflow=True
+raise SystemExit(75 if overflow else 0)' "$log"
+    pipeline_status=("${PIPESTATUS[@]}")
+    command_status="${pipeline_status[0]}"; cap_status="${pipeline_status[1]}"
+    set -e
+    if [ "$command_status" -ne 0 ] || [ "$cap_status" -ne 0 ]; then
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P -c \
+            'import pathlib,sys; sys.stderr.buffer.write(pathlib.Path(sys.argv[1]).read_bytes())' "$log"
+        rm -f -- "$log"
+        [ "$cap_status" -eq 0 ] || fail "Candidate-Ausgabe ueberschritt 1 MiB" 70
+        fail "Candidate-Sandbox-Gate ist fehlgeschlagen" "$command_status"
+    fi
+    rm -f -- "$log"
+}
+
+extract_commit_tree_for_candidate() {
+    local commit="$1" target="$2"
+    [[ "$commit" =~ ^[a-f0-9]{40}$ ]] \
+        || fail "Candidate-Commit ist malformed" 70
+    [ ! -e "$target" ] && [ ! -L "$target" ] \
+        || fail "Candidate-Tree-Ausgabepfad ist nicht frisch" 70
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C \
+        GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_OPTIONAL_LOCKS=0 \
+        GIT_NO_REPLACE_OBJECTS=1 \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$REPO_DIR" "$GIT_BIN" "$commit" "$target" <<'PY'
+import hashlib
+import os
+import pathlib
+import re
+import stat
+import subprocess
+import sys
+
+repo, git, commit, target = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], pathlib.Path(sys.argv[4])
+MAX_ENTRIES = 100_000
+MAX_DEPTH = 64
+MAX_PATH_BYTES = 4096
+MAX_OBJECT_BYTES = 64 * 1024 * 1024
+MAX_TOTAL_BYTES = 512 * 1024 * 1024
+if re.fullmatch(r"[a-f0-9]{40}", commit) is None:
+    raise SystemExit("malformed candidate commit")
+if target.exists() or target.is_symlink() or target.parent.resolve(strict=True) != target.parent:
+    raise SystemExit("candidate output is not a fresh canonical child")
+
+git_env = {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/nonexistent",
+    "LC_ALL": "C",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+}
+base = [
+    git, "--no-replace-objects", "-c", f"safe.directory={repo}",
+    "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+    "-c", "core.hooksPath=/dev/null", "-c", "core.attributesFile=/dev/null",
+    "-c", "diff.external=", "-C", str(repo),
+]
+
+
+def git_object(kind: str, oid: str, *, limit: int = MAX_OBJECT_BYTES) -> bytes:
+    if re.fullmatch(r"[a-f0-9]{40}", oid) is None:
+        raise SystemExit("malformed candidate object id")
+    process = subprocess.Popen(
+        [*base, "cat-file", kind, oid],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        env=git_env,
+    )
+    assert process.stdout is not None
+    payload = process.stdout.read(limit + 1)
+    if len(payload) > limit:
+        process.kill()
+        process.wait()
+        raise SystemExit("candidate Git object exceeds fixed byte limit")
+    status = process.wait(timeout=60)
+    if status != 0:
+        raise SystemExit("candidate Git object is unreadable")
+    digest = hashlib.sha1(kind.encode() + b" " + str(len(payload)).encode() + b"\0" + payload).hexdigest()
+    if digest != oid:
+        raise SystemExit("candidate Git object bytes differ from object id")
+    return payload
+
+
+commit_payload = git_object("commit", commit, limit=8 * 1024 * 1024)
+first_line = commit_payload.split(b"\n", 1)[0]
+if re.fullmatch(rb"tree [a-f0-9]{40}", first_line) is None:
+    raise SystemExit("candidate commit has no exact SHA-1 tree binding")
+root_tree = first_line.removeprefix(b"tree ").decode()
+files: dict[str, tuple[int, str]] = {}
+directories: set[str] = {""}
+
+
+def safe_component(raw: bytes) -> str:
+    try:
+        value = raw.decode("utf-8", "strict")
+    except UnicodeDecodeError as exc:
+        raise SystemExit("candidate path is not UTF-8") from exc
+    if (
+        value in {"", ".", "..", ".git"}
+        or "/" in value
+        or "\\" in value
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in value)
+    ):
+        raise SystemExit("candidate tree contains an unsafe path component")
+    return value
+
+
+def walk_tree(tree_oid: str, prefix: tuple[str, ...] = ()) -> None:
+    if len(prefix) > MAX_DEPTH:
+        raise SystemExit("candidate tree depth limit exceeded")
+    raw = git_object("tree", tree_oid)
+    offset = 0
+    names: set[str] = set()
+    while offset < len(raw):
+        space = raw.find(b" ", offset)
+        nul = raw.find(b"\0", space + 1)
+        if space < 0 or nul < 0 or nul + 21 > len(raw):
+            raise SystemExit("malformed candidate tree object")
+        mode_raw = raw[offset:space]
+        name = safe_component(raw[space + 1 : nul])
+        if name in names:
+            raise SystemExit("duplicate candidate tree member")
+        names.add(name)
+        oid = raw[nul + 1 : nul + 21].hex()
+        offset = nul + 21
+        parts = (*prefix, name)
+        relative = "/".join(parts)
+        if len(relative.encode("utf-8")) > MAX_PATH_BYTES:
+            raise SystemExit("candidate path length limit exceeded")
+        if mode_raw == b"40000":
+            directories.add(relative)
+            walk_tree(oid, parts)
+        elif mode_raw in {b"100644", b"100755"}:
+            if relative in files:
+                raise SystemExit("duplicate candidate file path")
+            files[relative] = (0o555 if mode_raw == b"100755" else 0o444, oid)
+        else:
+            raise SystemExit("candidate tree contains symlink, gitlink, or special member")
+        if len(files) + len(directories) > MAX_ENTRIES:
+            raise SystemExit("candidate tree entry limit exceeded")
+
+
+walk_tree(root_tree)
+if not files:
+    raise SystemExit("candidate tree contains no files")
+os.mkdir(target, 0o755)
+root_fd = os.open(target, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0))
+directory_fds: dict[str, int] = {"": root_fd}
+total = 0
+try:
+    for relative in sorted((item for item in directories if item), key=lambda item: (item.count("/"), os.fsencode(item))):
+        parent, _, name = relative.rpartition("/")
+        os.mkdir(name, 0o755, dir_fd=directory_fds[parent])
+        directory_fds[relative] = os.open(
+            name,
+            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=directory_fds[parent],
+        )
+    for relative in sorted(files, key=os.fsencode):
+        parent, _, name = relative.rpartition("/")
+        mode, oid = files[relative]
+        payload = git_object("blob", oid)
+        total += len(payload)
+        if total > MAX_TOTAL_BYTES:
+            raise SystemExit("candidate tree total byte limit exceeded")
+        fd = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            mode,
+            dir_fd=directory_fds[parent],
+        )
+        try:
+            view = memoryview(payload)
+            while view:
+                written = os.write(fd, view)
+                if written <= 0:
+                    raise SystemExit("candidate file short write")
+                view = view[written:]
+            os.fchmod(fd, mode)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    for relative in sorted(directory_fds, key=lambda item: item.count("/"), reverse=True):
+        os.fchmod(directory_fds[relative], 0o555)
+        os.fsync(directory_fds[relative])
+finally:
+    for relative, fd in reversed(tuple(directory_fds.items())):
+        os.close(fd)
+PY
+}
+
+run_code_release_candidate_checks() (
+    local expected_new="$1" scratch core_source nobody_uid nobody_gid
+    assert_expected_commit "$expected_new"
+    verify_active_runtime_for_release
+    nobody_uid="$(getent passwd nobody | cut -d: -f3)"
+    nobody_gid="$(getent group nogroup | cut -d: -f3)"
+    [[ "$nobody_uid" =~ ^[0-9]+$ ]] && [[ "$nobody_gid" =~ ^[0-9]+$ ]] \
+        && [ "$nobody_uid" -ne "$(id -u)" ] \
+        || fail "Candidate-Sandbox braucht eine getrennte nobody:nogroup-Identitaet" 70
+    scratch="$(create_build_scratch)"
+    [[ "$scratch" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]] \
+        || fail "Candidate-Scratch liegt nicht unter dem fixen /var/lib-Root" 70
+    cleanup_code_release_scratch() {
+        local status=$?
+        trap - EXIT
+        set +e
+        if [[ "$scratch" =~ ^/var/lib/genus-a03c-build\.[0-9a-f]{24}$ ]]; then
+            as_root "$ROOT_RM_BIN" -rf -- "$scratch"
+            as_root "$ROOT_SYNC_BIN" -f /var/lib
+        fi
+        exit "$status"
+    }
+    trap cleanup_code_release_scratch EXIT
+    as_root "$ROOT_CHMOD_BIN" 0711 "$scratch"
+    as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0555 "$scratch/input"
+    extract_commit_tree_for_candidate "$expected_new" "$scratch/input/repo"
+    core_source="$(readlink -f "$CORE_POINTER/current")"
+    [ -d "$core_source" ] && [ ! -L "$core_source" ] || fail "aktive Core-Runtime ist nicht kopierbar" 70
+    as_root "$ROOT_CP_BIN" -a -- "$core_source" "$scratch/input/core"
+    as_root "$ROOT_CHOWN_BIN" -R root:root "$scratch/input"
+    as_root "$ROOT_FIND_BIN" "$scratch/input" -type d -exec "$ROOT_CHMOD_BIN" 0555 {} +
+    as_root "$ROOT_FIND_BIN" "$scratch/input" -type f -perm /111 -exec "$ROOT_CHMOD_BIN" 0555 {} +
+    as_root "$ROOT_FIND_BIN" "$scratch/input" -type f ! -perm /111 -exec "$ROOT_CHMOD_BIN" 0444 {} +
+    as_root "$ROOT_INSTALL_BIN" -d -o nobody -g nogroup -m 0700 \
+        "$scratch/work" "$scratch/work/home" "$scratch/work/synthetic" "$scratch/output"
+    code_release_sandbox_run "$scratch" "$scratch/input/core/bin/python" -I -P - \
+        "$(id -u)" "$REPO_DIR" "$STATE_ROOT" "$DB_PATH" "$GENUS_HOME" "$BACKUP_DIR" \
+        "$scratch/work/synthetic/genus.sqlite3" <<'PY'
+import errno,os,pathlib,socket,sys
+assert os.getuid()!=int(sys.argv[1])
+expected={"HOME":str(pathlib.Path(sys.argv[7]).parent.parent/"home"),"LC_ALL":"C.UTF-8","PATH":"/usr/bin:/bin",
+          "PYTHONNOUSERSITE":"1","PYTHONDONTWRITEBYTECODE":"1","GENUS_PRODUCT_MODE":"1","GENUS_DB_PATH":sys.argv[7]}
+if any(os.environ.get(key)!=value for key,value in expected.items()): raise SystemExit("candidate sandbox environment differs")
+allowed=set(expected)|{"INVOCATION_ID","SYSTEMD_EXEC_PID","JOURNAL_STREAM"}
+if set(os.environ)-allowed: raise SystemExit("candidate sandbox inherited unexpected environment")
+for family in (socket.AF_INET,socket.AF_INET6):
+    try: probe=socket.socket(family,socket.SOCK_STREAM)
+    except OSError as exc:
+        if exc.errno not in {errno.EAFNOSUPPORT,errno.EPERM,errno.EACCES}: raise
+    else:
+        probe.close()
+        raise SystemExit("candidate sandbox exposes network socket family")
+for raw in sys.argv[2:7]:
+    try: pathlib.Path(raw).stat()
+    except OSError as exc:
+        if exc.errno not in {errno.EACCES,errno.ENOENT,errno.EPERM}: raise
+    else: raise SystemExit("candidate sandbox exposes product/operator path")
+pathlib.Path(sys.argv[7]).write_bytes(b"synthetic-only\n")
+PY
+    code_release_sandbox_run "$scratch" "$scratch/input/core/bin/python" -I -P - \
+        "$scratch/input/repo/genus" "$scratch/input/repo/deploy" <<'PY'
+import pathlib,sys
+for root in map(pathlib.Path,sys.argv[1:]):
+    for path in sorted(root.rglob("*.py")):
+        compile(path.read_bytes(),str(path),"exec")
+PY
+    code_release_sandbox_run "$scratch" "$scratch/input/core/bin/python" -I -P -m ruff check \
+        --no-cache genus deploy tests
+    code_release_sandbox_run "$scratch" "$scratch/input/core/bin/python" -I -P -m pytest \
+        -q -p no:cacheprovider --basetemp "$scratch/work/pytest" tests
+    assert_expected_commit "$expected_new"
+)
+
+write_code_release_preflight_receipt() {
+    local backup="$1" target active active_hash canary
+    validate_code_release_journal
+    [ "$(code_release_journal_field phase)" = backed-up ] \
+        || fail "Preflight-Receipt darf nur nach durablem Backup entstehen" 70
+    validate_code_release_backup_receipt "$backup"
+    canary="$(code_release_journal_field product_db_canary_path)"
+    validate_code_release_db_canary "$canary"
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    target="$(receipt_target code-release-preflight)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        OLD="$(code_release_journal_field old_commit)" NEW="$(code_release_journal_field new_commit)" \
+        NEW_TREE="$(code_release_journal_field new_tree)" ACTIVE="$active" ACTIVE_HASH="$active_hash" \
+        PLAN="$(code_release_journal_field plan_path)" PLAN_HASH="$(code_release_journal_field plan_sha256)" \
+        SEAL="$(code_release_journal_field release_seal)" NONCE="$(code_release_journal_field nonce)" \
+        BACKUP="$backup" BACKUP_HASH="$(sha256_file "$backup")" \
+        DB_CANARY="$canary" DB_CANARY_HASH="$(sha256_file "$canary")" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
+import json,os,pathlib,sys
+data={"schema":"genus-a0.3c-code-release-preflight-v1","outcome":"verified","old_commit":os.environ["OLD"],
+ "new_commit":os.environ["NEW"],"new_tree":os.environ["NEW_TREE"],"active_manifest":os.environ["ACTIVE"],
+ "active_manifest_sha256":os.environ["ACTIVE_HASH"],"release_plan_path":os.environ["PLAN"],
+ "release_plan_sha256":os.environ["PLAN_HASH"],"release_seal":os.environ["SEAL"],"nonce":os.environ["NONCE"],
+ "backup_receipt_path":os.environ["BACKUP"],"backup_receipt_sha256":os.environ["BACKUP_HASH"],
+ "product_db_canary_path":os.environ["DB_CANARY"],"product_db_canary_sha256":os.environ["DB_CANARY_HASH"],
+ "compileall_pass":True,"ruff_pass":True,"pytest_pass":True,
+ "test_scope":"a0-exit-full-suite-synthetic-v1","product_database_modified":False,"product_database_replayed":False,
+ "product_database_resealed":False,"product_database_restored":False,"paths_logged":True,"payloads_logged":False}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_preflight_receipt "$target"
+    printf '%s\n' "$target"
+}
+
+validate_code_release_preflight_receipt() {
+    local receipt="$1" plan backup canary
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
+        || fail "Code-Release-Preflight ist nicht regulaer/privat" 70
+    case "$(realpath -e -- "$receipt" 2>/dev/null || true)" in "$RECEIPT_ROOT"/*) ;; *)
+        fail "Code-Release-Preflight entkommt Receipt-Root" 70 ;;
+    esac
+    plan="$(code_release_journal_field plan_path)"; backup="$(code_release_journal_field backup_receipt_path)"
+    canary="$(code_release_journal_field product_db_canary_path)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        RECEIPT_HASH="$(sha256_file "$receipt")" OLD="$(code_release_journal_field old_commit)" \
+        NEW="$(code_release_journal_field new_commit)" NEW_TREE="$(code_release_journal_field new_tree)" \
+        ACTIVE="$(selector_manifest)" ACTIVE_HASH="$(manifest_file_hash "$(selector_manifest)")" \
+        PLAN="$plan" PLAN_HASH="$(code_release_journal_field plan_sha256)" SEAL="$(code_release_journal_field release_seal)" \
+        NONCE="$(code_release_journal_field nonce)" BACKUP="$backup" BACKUP_HASH="$(code_release_journal_field backup_receipt_sha256)" \
+        DB_CANARY="$canary" DB_CANARY_HASH="$(code_release_journal_field product_db_canary_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import hashlib,json,os,pathlib,re,sys
+raw=pathlib.Path(sys.argv[1]).read_bytes(); data=json.loads(raw)
+keys={"schema","outcome","old_commit","new_commit","new_tree","active_manifest","active_manifest_sha256","release_plan_path",
+ "release_plan_sha256","release_seal","nonce","backup_receipt_path","backup_receipt_sha256","compileall_pass","ruff_pass",
+ "product_db_canary_path","product_db_canary_sha256",
+ "pytest_pass","test_scope","product_database_modified","product_database_replayed","product_database_resealed",
+ "product_database_restored","paths_logged","payloads_logged"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-preflight-v1" or data.get("outcome")!="verified": raise SystemExit("code release preflight schema differs")
+if hashlib.sha256(raw).hexdigest()!=os.environ["RECEIPT_HASH"]: raise SystemExit("code release preflight changed during read")
+expected={"old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],"new_tree":os.environ["NEW_TREE"],
+ "active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],"release_plan_path":os.environ["PLAN"],
+ "release_plan_sha256":os.environ["PLAN_HASH"],"release_seal":os.environ["SEAL"],"nonce":os.environ["NONCE"],
+ "backup_receipt_path":os.environ["BACKUP"],"backup_receipt_sha256":os.environ["BACKUP_HASH"],
+ "product_db_canary_path":os.environ["DB_CANARY"],"product_db_canary_sha256":os.environ["DB_CANARY_HASH"]}
+if any(data[key]!=value for key,value in expected.items()): raise SystemExit("code release preflight evidence differs")
+if any(data[key] is not True for key in ("compileall_pass","ruff_pass","pytest_pass","paths_logged")): raise SystemExit("code release preflight gate is not green")
+if any(data[key] is not False for key in ("product_database_modified","product_database_replayed","product_database_resealed","product_database_restored","payloads_logged")): raise SystemExit("code release preflight data safety differs")
+if data["test_scope"]!="a0-exit-full-suite-synthetic-v1" or not re.fullmatch(r"[a-f0-9]{64}",data["release_seal"]): raise SystemExit("code release preflight contract differs")
+PY
+    validate_code_release_backup_receipt "$backup"
+    validate_code_release_db_canary "$canary" 0
+    [ "$(sha256_file "$plan")" = "$(code_release_journal_field plan_sha256)" ] \
+        || fail "Code-Release-Plan driftete nach Preflight" 70
+    VERIFIED_CODE_RELEASE_PREFLIGHT_SHA256="$(sha256_file "$receipt")"
+}
+
+write_code_release_autostart_approval() {
+    local preflight="$1" active active_hash copy
+    validate_code_release_journal
+    [ "$(code_release_journal_field phase)" = candidate-verified ] \
+        || fail "v4-Startfreigabe darf nur an candidate-verified anschliessen" 70
+    validate_code_release_preflight_receipt "$preflight"
+    systemd_autostart_guard_present
+    [ ! -e "$AUTOSTART_APPROVAL" ] && [ ! -L "$AUTOSTART_APPROVAL" ] \
+        || fail "Autostart-Approval existiert vor v4-Freigabe bereits" 70
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        ACTIVE="$active" ACTIVE_HASH="$active_hash" COMMIT="$(repo_commit)" \
+        PRIOR="$(code_release_journal_field prior_start_authorization_path)" \
+        PRIOR_HASH="$(code_release_journal_field prior_start_authorization_sha256)" \
+        PREFLIGHT="$preflight" PREFLIGHT_HASH="$(sha256_file "$preflight")" SEAL="$(code_release_journal_field release_seal)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,os,pathlib,sys
+data={"schema":"genus-a0.3c-runtime-start-authorization-v4","repo_commit":os.environ["COMMIT"],
+ "active_manifest":os.environ["ACTIVE"],"active_manifest_sha256":os.environ["ACTIVE_HASH"],
+ "prior_start_authorization_path":os.environ["PRIOR"],"prior_start_authorization_sha256":os.environ["PRIOR_HASH"],
+ "code_release_preflight_path":os.environ["PREFLIGHT"],"code_release_preflight_sha256":os.environ["PREFLIGHT_HASH"],
+ "release_seal":os.environ["SEAL"],"completion_receipt_path":"","completion_receipt_sha256":"",
+ "consumption_receipt_path":"","consumption_receipt_sha256":"","reason":"code-release"}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_autostart_approval
+    copy="$(receipt_target code-release-start-authorization)"
+    install -m 0600 "$AUTOSTART_APPROVAL" "$copy"
+    sync -f "$copy"; fsync_dir "$RECEIPT_ROOT"
+    [ "$(sha256_file "$copy")" = "$(sha256_file "$AUTOSTART_APPROVAL")" ] \
+        || fail "v4-Startfreigabe-Copy driftete" 70
+    VERIFIED_CODE_RELEASE_START_AUTH_PATH="$copy"
+    printf '%s\n' "$copy"
+}
+
+validate_code_release_autostart_approval() {
+    local preflight prior completion consumption phase
+    [ -f "$AUTOSTART_APPROVAL" ] && [ ! -L "$AUTOSTART_APPROVAL" ] \
+        && [ "$(stat -c %u "$AUTOSTART_APPROVAL")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$AUTOSTART_APPROVAL")" = 600 ] && [ "$(stat -c %h "$AUTOSTART_APPROVAL")" -eq 1 ] \
+        || fail "v4-Startfreigabe ist nicht regulaer/privat" 70
+    assert_expected_commit "$(repo_commit)"
+    preflight="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text()).get("code_release_preflight_path",""))
+PY
+    )"
+    prior="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text()).get("prior_start_authorization_path",""))
+PY
+    )"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        APPROVAL_HASH="$(sha256_file "$AUTOSTART_APPROVAL")" COMMIT="$(repo_commit)" ACTIVE="$(selector_manifest)" \
+        ACTIVE_HASH="$(manifest_file_hash "$(selector_manifest)")" RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" "$preflight" "$prior" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+raw=pathlib.Path(sys.argv[1]).read_bytes(); data=json.loads(raw)
+keys={"schema","repo_commit","active_manifest","active_manifest_sha256","prior_start_authorization_path",
+ "prior_start_authorization_sha256","code_release_preflight_path","code_release_preflight_sha256","release_seal",
+ "completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256","reason"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-runtime-start-authorization-v4" or data.get("reason")!="code-release": raise SystemExit("v4 start authorization schema differs")
+if hashlib.sha256(raw).hexdigest()!=os.environ["APPROVAL_HASH"]: raise SystemExit("v4 start authorization changed during read")
+if data["repo_commit"]!=os.environ["COMMIT"] or data["active_manifest"]!=os.environ["ACTIVE"] or data["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"] or not re.fullmatch(r"[a-f0-9]{64}",data["release_seal"]): raise SystemExit("v4 start authorization runtime binding differs")
+root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve(strict=True)
+for path_value,digest,label in ((sys.argv[2],data["code_release_preflight_sha256"],"preflight"),(sys.argv[3],data["prior_start_authorization_sha256"],"prior authorization")):
+    path=pathlib.Path(path_value); info=path.lstat()
+    if path.parent.resolve(strict=True)!=root or path.is_symlink() or not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1 or hashlib.sha256(path.read_bytes()).hexdigest()!=digest: raise SystemExit(f"v4 {label} evidence differs")
+if data["code_release_preflight_path"]!=sys.argv[2] or data["prior_start_authorization_path"]!=sys.argv[3]: raise SystemExit("v4 evidence path differs")
+terminal=(data["completion_receipt_path"],data["completion_receipt_sha256"],data["consumption_receipt_path"],data["consumption_receipt_sha256"])
+if any(terminal) and not all(terminal): raise SystemExit("v4 terminal evidence is partially bound")
+for digest in (data["completion_receipt_sha256"],data["consumption_receipt_sha256"]):
+    if digest and not re.fullmatch(r"[a-f0-9]{64}",digest): raise SystemExit("v4 terminal evidence digest malformed")
+PY
+    completion="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["completion_receipt_path"])
+PY
+    )"
+    consumption="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["consumption_receipt_path"])
+PY
+    )"
+    if [ -e "$CODE_RELEASE_JOURNAL" ] || [ -L "$CODE_RELEASE_JOURNAL" ]; then
+        phase="$(code_release_journal_field phase)"
+        if [ "$phase" = rollback-authorized ]; then
+            [ "$(code_release_journal_field old_commit)" = "$(repo_commit)" ] \
+                && [ "$(code_release_journal_field prior_start_authorization_sha256)" = "$(sha256_file "$AUTOSTART_APPROVAL")" ] \
+                || fail "restaurierte v4-Freigabe driftet vom Rollback-Journal" 70
+        else
+            [ "$(code_release_journal_field new_commit)" = "$(repo_commit)" ] \
+                && [ "$(code_release_journal_field preflight_receipt_path)" = "$preflight" ] \
+                && [ "$(code_release_journal_field release_seal)" = "$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["release_seal"])
+PY
+                )" ] || fail "v4-Startfreigabe driftet vom pending Code-Release" 70
+            validate_code_release_preflight_receipt "$preflight"
+            if [ -n "$completion" ]; then
+                [ "$phase" = terminalized ] || [ "$phase" = resumed ] \
+                    || fail "terminale v4-Freigabe ist fuer diese pending Phase verfrueht" 70
+                [ "$(code_release_journal_field completion_receipt_path)" = "$completion" ] \
+                    && [ "$(code_release_journal_field consumption_receipt_path)" = "$consumption" ] \
+                    || fail "terminale v4-Freigabe driftet vom Journal" 70
+            fi
+        fi
+        if [ -n "$completion" ]; then
+            validate_code_release_completion_receipt "$completion"
+            validate_code_release_consumption_receipt "$consumption" "$completion"
+        fi
+    else
+        # Without a pending journal, preflight alone is never a boot authorization.
+        [ -n "$completion" ] && [ -n "$consumption" ] \
+            || fail "v4-Freigabe ohne Journal braucht Completion und One-shot-Consumption" 70
+        validate_code_release_completion_receipt "$completion"
+        validate_code_release_consumption_receipt "$consumption" "$completion"
+    fi
+    systemd_autostart_guard_present
+}
+
+publish_code_release_terminal_approval() {
+    local completion="$1" consumption="$2" tmp
+    validate_code_release_completion_receipt "$completion"
+    validate_code_release_consumption_receipt "$consumption" "$completion"
+    tmp="$STATE_ROOT/start-authorization.terminal.$$.$RANDOM"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        COMPLETION="$completion" COMPLETION_HASH="$(sha256_file "$completion")" \
+        CONSUMPTION="$consumption" CONSUMPTION_HASH="$(sha256_file "$consumption")" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" "$tmp" <<'PY'
+import json,os,pathlib,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text())
+terminal=("completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256")
+if data.get("schema")!="genus-a0.3c-runtime-start-authorization-v4" or any(data.get(key) for key in terminal):
+    raise SystemExit("v4 approval is not preterminal")
+data["completion_receipt_path"]=os.environ["COMPLETION"]; data["completion_receipt_sha256"]=os.environ["COMPLETION_HASH"]
+data["consumption_receipt_path"]=os.environ["CONSUMPTION"]; data["consumption_receipt_sha256"]=os.environ["CONSUMPTION_HASH"]
+fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+}
+
+validate_code_release_postflight_receipt() {
+    local receipt="$1"
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
+        || fail "Code-Release-Postflight ist nicht regulaer/privat" 70
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        SERVICES_EXPECTED="$(code_release_journal_service_lines)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import hashlib,json,os,pathlib,re,sys
+data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+keys={"schema","outcome","consecutive_samples","services","service_state_sha256","bot_private_runtime_attested",
+ "learner_pinned_script_attested","paths_logged","payloads_logged"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-runtime-service-postflight-v1" or data.get("outcome")!="verified" or data.get("consecutive_samples")!=3: raise SystemExit("code release postflight schema differs")
+expected=os.environ["SERVICES_EXPECTED"].splitlines(); names=[item.get("service") for item in data["services"]]
+if names!=expected or len(names)!=len(set(names)): raise SystemExit("code release postflight service inventory differs")
+payload=json.dumps(data["services"],sort_keys=True,separators=(",", ":")).encode()
+if hashlib.sha256(payload).hexdigest()!=data["service_state_sha256"] or data["paths_logged"] is not False or data["payloads_logged"] is not False: raise SystemExit("code release postflight evidence differs")
+for item in data["services"]:
+    if item.get("active_state")!="active" or item.get("nrestarts")!=0 or not re.fullmatch(r"[a-f0-9]{32}",item.get("invocation_id","")): raise SystemExit("code release service state differs")
+PY
+}
+
+write_code_release_completion_receipt() {
+    local outcome="$1" target active active_hash backup preflight postflight services_csv canary start_auth
+    case "$outcome" in activated|rolled-back) ;; *) fail "ungueltiges Code-Release-Outcome" 70 ;; esac
+    active="$(selector_manifest)"; active_hash="$(manifest_file_hash "$active")"
+    backup="$(code_release_journal_field backup_receipt_path)"
+    preflight="$(code_release_journal_field preflight_receipt_path)"
+    postflight="$(code_release_journal_field postflight_receipt_path)"
+    canary="$(code_release_journal_field product_db_canary_path)"
+    if [ "$outcome" = activated ]; then
+        start_auth="$(code_release_journal_field release_start_authorization_path)"
+    else
+        start_auth="$(code_release_journal_field prior_start_authorization_path)"
+    fi
+    validate_code_release_db_canary "$canary"
+    services_csv="$(code_release_journal_service_lines | paste -sd, -)"
+    target="$(receipt_target code-release-completion)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        OUTCOME="$outcome" OLD="$(code_release_journal_field old_commit)" NEW="$(code_release_journal_field new_commit)" \
+        SEAL="$(code_release_journal_field release_seal)" NONCE="$(code_release_journal_field nonce)" \
+        PLAN="$(code_release_journal_field plan_path)" PLAN_HASH="$(code_release_journal_field plan_sha256)" \
+        ACTIVE="$active" ACTIVE_HASH="$active_hash" BACKUP="$backup" \
+        BACKUP_HASH="$([ -n "$backup" ] && sha256_file "$backup" || true)" PREFLIGHT="$preflight" \
+        PREFLIGHT_HASH="$([ -n "$preflight" ] && sha256_file "$preflight" || true)" POSTFLIGHT="$postflight" \
+        POSTFLIGHT_HASH="$([ -n "$postflight" ] && sha256_file "$postflight" || true)" \
+        START_AUTH="$start_auth" START_AUTH_HASH="$(sha256_file "$start_auth")" \
+        PRIOR_AUTH="$(code_release_journal_field prior_start_authorization_path)" \
+        PRIOR_AUTH_HASH="$(code_release_journal_field prior_start_authorization_sha256)" \
+        PRIOR_GUARD="$(code_release_journal_field prior_boot_guard_path)" \
+        PRIOR_GUARD_HASH="$(code_release_journal_field prior_boot_guard_sha256)" SERVICES_CSV="$services_csv" \
+        DB_CANARY="$canary" DB_CANARY_HASH="$(sha256_file "$canary")" \
+        REPO_PATH="$(code_release_journal_field repo_path)" DB_PATH_ENV="$(code_release_journal_field product_db_path)" \
+        DB_DEVICE="$(code_release_journal_field product_db_device)" DB_INODE="$(code_release_journal_field product_db_inode)" \
+        OPERATOR_UID="$(code_release_journal_field operator_uid)" OPERATOR_NAME="$(code_release_journal_field operator_name)" \
+        MACHINE_ID_HASH="$(code_release_journal_field machine_id_sha256)" BRANCH_NAME="$(code_release_journal_field branch_name)" \
+        ORIGIN_REMOTE_HASH="$(code_release_journal_field origin_remote_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$target" <<'PY'
+import json,os,pathlib,sys
+data={"schema":"genus-a0.3c-code-release-completion-v1","outcome":os.environ["OUTCOME"],
+ "old_commit":os.environ["OLD"],"new_commit":os.environ["NEW"],"release_seal":os.environ["SEAL"],"nonce":os.environ["NONCE"],
+ "plan_path":os.environ["PLAN"],"plan_sha256":os.environ["PLAN_HASH"],"active_manifest":os.environ["ACTIVE"],
+ "active_manifest_sha256":os.environ["ACTIVE_HASH"],"backup_receipt_path":os.environ["BACKUP"],
+ "backup_receipt_sha256":os.environ["BACKUP_HASH"],"preflight_receipt_path":os.environ["PREFLIGHT"],
+ "preflight_receipt_sha256":os.environ["PREFLIGHT_HASH"],"postflight_receipt_path":os.environ["POSTFLIGHT"],
+ "postflight_receipt_sha256":os.environ["POSTFLIGHT_HASH"],"start_authorization_path":os.environ["START_AUTH"],
+ "start_authorization_sha256":os.environ["START_AUTH_HASH"],"prior_start_authorization_path":os.environ["PRIOR_AUTH"],
+ "prior_start_authorization_sha256":os.environ["PRIOR_AUTH_HASH"],"prior_boot_guard_path":os.environ["PRIOR_GUARD"],
+ "prior_boot_guard_sha256":os.environ["PRIOR_GUARD_HASH"],"active_services":[item for item in os.environ["SERVICES_CSV"].split(",") if item],
+ "product_db_canary_path":os.environ["DB_CANARY"],"product_db_canary_sha256":os.environ["DB_CANARY_HASH"],
+ "repo_path":os.environ["REPO_PATH"],"product_db_path":os.environ["DB_PATH_ENV"],
+ "product_db_device":int(os.environ["DB_DEVICE"]),"product_db_inode":int(os.environ["DB_INODE"]),
+ "operator_uid":int(os.environ["OPERATOR_UID"]),"operator_name":os.environ["OPERATOR_NAME"],
+ "machine_id_sha256":os.environ["MACHINE_ID_HASH"],"branch_name":os.environ["BRANCH_NAME"],
+ "origin_remote_sha256":os.environ["ORIGIN_REMOTE_HASH"],
+ "database_replay_performed":False,"database_reseal_performed":False,"database_restore_performed":False,
+ "paths_logged":True,"payloads_logged":False}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_completion_receipt "$target"
+    printf '%s\n' "$target"
+}
+
+validate_code_release_completion_receipt() {
+    local receipt="$1"
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
+        || fail "Code-Release-Completion ist nicht regulaer/privat" 70
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        RECEIPT_HASH="$(sha256_file "$receipt")" HEAD_COMMIT="$(repo_commit)" ACTIVE="$(selector_manifest)" \
+        ACTIVE_HASH="$(manifest_file_hash "$(selector_manifest)")" RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        REPO_PATH="$(code_release_repo_path)" DB_PATH_ENV="$(code_release_db_path)" \
+        DB_DEVICE="$(stat -c %d "$DB_PATH")" DB_INODE="$(stat -c %i "$DB_PATH")" \
+        OPERATOR_UID="$(id -u)" OPERATOR_NAME="$(id -un)" MACHINE_ID_HASH="$(code_release_machine_id_sha256)" \
+        BRANCH_NAME="$(code_release_branch_name)" ORIGIN_REMOTE_HASH="$(code_release_origin_remote_sha256)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+raw=pathlib.Path(sys.argv[1]).read_bytes(); data=json.loads(raw)
+keys={"schema","outcome","old_commit","new_commit","release_seal","nonce","plan_path","plan_sha256","active_manifest",
+ "active_manifest_sha256","backup_receipt_path","backup_receipt_sha256","preflight_receipt_path","preflight_receipt_sha256",
+ "postflight_receipt_path","postflight_receipt_sha256","start_authorization_path","start_authorization_sha256",
+ "prior_start_authorization_path","prior_start_authorization_sha256","prior_boot_guard_path","prior_boot_guard_sha256",
+ "product_db_canary_path","product_db_canary_sha256","repo_path","product_db_path","product_db_device","product_db_inode",
+ "operator_uid","operator_name","machine_id_sha256","branch_name","origin_remote_sha256",
+ "active_services","database_replay_performed","database_reseal_performed","database_restore_performed","paths_logged","payloads_logged"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-completion-v1" or data.get("outcome") not in {"activated","rolled-back"}: raise SystemExit("code release completion schema differs")
+if hashlib.sha256(raw).hexdigest()!=os.environ["RECEIPT_HASH"]: raise SystemExit("code release completion changed during read")
+expected_head=data["new_commit"] if data["outcome"]=="activated" else data["old_commit"]
+if os.environ["HEAD_COMMIT"]!=expected_head or data["active_manifest"]!=os.environ["ACTIVE"] or data["active_manifest_sha256"]!=os.environ["ACTIVE_HASH"]: raise SystemExit("code release completion live binding differs")
+target={"repo_path":os.environ["REPO_PATH"],"product_db_path":os.environ["DB_PATH_ENV"],
+        "product_db_device":int(os.environ["DB_DEVICE"]),"product_db_inode":int(os.environ["DB_INODE"]),
+        "operator_uid":int(os.environ["OPERATOR_UID"]),"operator_name":os.environ["OPERATOR_NAME"],
+        "machine_id_sha256":os.environ["MACHINE_ID_HASH"],"branch_name":os.environ["BRANCH_NAME"],
+        "origin_remote_sha256":os.environ["ORIGIN_REMOTE_HASH"]}
+if any(data[key]!=value for key,value in target.items()): raise SystemExit("code release completion target binding differs")
+if any(not re.fullmatch(r"[a-f0-9]{64}",data[key]) for key in ("release_seal","nonce","plan_sha256","active_manifest_sha256","start_authorization_sha256","prior_start_authorization_sha256","prior_boot_guard_sha256","product_db_canary_sha256","machine_id_sha256","origin_remote_sha256")): raise SystemExit("code release completion digest malformed")
+if any(data[key] is not False for key in ("database_replay_performed","database_reseal_performed","database_restore_performed","payloads_logged")) or data["paths_logged"] is not True: raise SystemExit("code release completion data safety differs")
+allowed={"genus-network-watchdog.timer","genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+if not data["active_services"] or len(data["active_services"])!=len(set(data["active_services"])) or any(item not in allowed for item in data["active_services"]): raise SystemExit("code release completion service inventory differs")
+root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve(strict=True)
+def evidence(path_value,digest,label,required=True):
+    if not path_value:
+        if required or digest: raise SystemExit(f"{label} binding missing")
+        return None
+    path=pathlib.Path(path_value); info=path.lstat()
+    if path.parent.resolve(strict=True)!=root or path.is_symlink() or not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1 or hashlib.sha256(path.read_bytes()).hexdigest()!=digest: raise SystemExit(f"{label} evidence differs")
+    return json.loads(path.read_text())
+plan=evidence(data["plan_path"],data["plan_sha256"],"plan")
+unsigned={key:value for key,value in plan.items() if key!="release_seal"}
+if hashlib.sha256(json.dumps(unsigned,ensure_ascii=True,allow_nan=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest()!=data["release_seal"] or plan.get("nonce")!=data["nonce"] or any(plan.get(key)!=data[key] for key in target): raise SystemExit("completion plan seal/target differs")
+evidence(data["start_authorization_path"],data["start_authorization_sha256"],"release start authorization")
+evidence(data["prior_start_authorization_path"],data["prior_start_authorization_sha256"],"prior authorization")
+evidence(data["prior_boot_guard_path"],data["prior_boot_guard_sha256"],"prior boot guard")
+evidence(data["product_db_canary_path"],data["product_db_canary_sha256"],"product database canary")
+required=data["outcome"]=="activated"
+evidence(data["backup_receipt_path"],data["backup_receipt_sha256"],"backup",required)
+evidence(data["preflight_receipt_path"],data["preflight_receipt_sha256"],"preflight",required)
+evidence(data["postflight_receipt_path"],data["postflight_receipt_sha256"],"postflight",required)
+PY
+    validate_code_release_db_canary "$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["product_db_canary_path"])
+PY
+    )" 0
+    VERIFIED_CODE_RELEASE_COMPLETION_SHA256="$(private_stable_sha256 "$receipt")" \
+        || fail "Code-Release-Completion driftete bei Stable-Read" 70
+    [ "$VERIFIED_CODE_RELEASE_COMPLETION_SHA256" = "$(sha256_file "$receipt")" ] \
+        || fail "Code-Release-Completion wurde ersetzt" 70
+}
+
+validate_code_release_consumption_receipt() {
+    local receipt="$1" completion="$2"
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(stat -c %u "$receipt")" -eq "$(id -u)" ] \
+        && [ "$(stat -c %a "$receipt")" = 600 ] && [ "$(stat -c %h "$receipt")" -eq 1 ] \
+        || fail "Code-Release-Consumption ist nicht regulaer/privat" 70
+    [ -f "$completion" ] && [ ! -L "$completion" ] || fail "Code-Release-Consumption verlor Completion" 70
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        RECEIPT_HASH="$(sha256_file "$receipt")" COMPLETION_HASH="$(sha256_file "$completion")" \
+        RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$receipt" "$completion" <<'PY'
+import hashlib,json,os,pathlib,re,stat,sys
+raw=pathlib.Path(sys.argv[1]).read_bytes(); data=json.loads(raw)
+completion_raw=pathlib.Path(sys.argv[2]).read_bytes(); completion=json.loads(completion_raw)
+keys={"schema","nonce","release_seal","plan_path","plan_sha256","completion_path","completion_sha256","outcome","consumed_at"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-authorization-consumed-v1": raise SystemExit("consumption receipt schema differs")
+if hashlib.sha256(raw).hexdigest()!=os.environ["RECEIPT_HASH"] or hashlib.sha256(completion_raw).hexdigest()!=os.environ["COMPLETION_HASH"]: raise SystemExit("consumption evidence changed during read")
+if data["completion_path"]!=sys.argv[2] or data["completion_sha256"]!=os.environ["COMPLETION_HASH"] or data["outcome"]!=completion.get("outcome"): raise SystemExit("consumption completion binding differs")
+for key in ("nonce","release_seal","plan_path","plan_sha256"):
+    if data[key]!=completion.get(key): raise SystemExit("consumption/completion crossbinding differs")
+if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ",data["consumed_at"]): raise SystemExit("consumption timestamp malformed")
+root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve(strict=True); plan=pathlib.Path(data["plan_path"]); info=plan.lstat()
+if plan.parent.resolve(strict=True)!=root or plan.is_symlink() or not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1 or hashlib.sha256(plan.read_bytes()).hexdigest()!=data["plan_sha256"]: raise SystemExit("consumption plan evidence differs")
+PY
+    VERIFIED_CODE_RELEASE_CONSUMPTION_PATH="$receipt"
+    VERIFIED_CODE_RELEASE_CONSUMPTION_SHA256="$(private_stable_sha256 "$receipt")" \
+        || fail "Code-Release-Consumption driftete bei Stable-Read" 70
+}
+
+consume_code_release_authorization() {
+    local completion="$1" nonce used outcome
+    validate_code_release_completion_receipt "$completion"
+    nonce="$(code_release_journal_field nonce)"; used="$(code_release_used_receipt "$nonce")"
+    outcome="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$completion" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text())["outcome"])
+PY
+    )"
+    if [ ! -e "$used" ] && [ ! -L "$used" ]; then
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+            NONCE="$nonce" SEAL="$(code_release_journal_field release_seal)" PLAN="$(code_release_journal_field plan_path)" \
+            PLAN_HASH="$(code_release_journal_field plan_sha256)" COMPLETION="$completion" \
+            COMPLETION_HASH="$VERIFIED_CODE_RELEASE_COMPLETION_SHA256" OUTCOME="$outcome" \
+            "$SYSTEM_PYTHON_BIN" -I -P - "$used" <<'PY'
+import datetime,json,os,pathlib,sys
+data={"schema":"genus-a0.3c-code-release-authorization-consumed-v1","nonce":os.environ["NONCE"],
+ "release_seal":os.environ["SEAL"],"plan_path":os.environ["PLAN"],"plan_sha256":os.environ["PLAN_HASH"],
+ "completion_path":os.environ["COMPLETION"],"completion_sha256":os.environ["COMPLETION_HASH"],
+ "outcome":os.environ["OUTCOME"],"consumed_at":datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00","Z")}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    fi
+    validate_code_release_consumption_receipt "$used" "$completion"
+    rm -f -- "$CODE_RELEASE_TOKEN"
+    fsync_dir "$STATE_ROOT"
+    printf '%s\n' "$used"
+}
+
+checkout_code_release_commit() {
+    local expected="$1"
+    [[ "$expected" =~ ^[a-f0-9]{40}$ ]] || fail "Checkout-Commit ist malformed" 70
+    safe_git reset --keep "$expected" \
+        || fail "journalisierter Code-Release-Checkout ist gescheitert" 70
+    assert_expected_commit "$expected"
+}
+
+restore_code_release_boot_guard() {
+    local source expected_hash guard_dir root_tmp
+    source="$(code_release_journal_field prior_boot_guard_path)"
+    expected_hash="$(code_release_journal_field prior_boot_guard_sha256)"
+    [ -f "$source" ] && [ ! -L "$source" ] && [ "$(sha256_file "$source")" = "$expected_hash" ] \
+        || fail "prior Boot-Guard-Evidence ist nicht restaurierbar" 70
+    if as_root "$ROOT_TEST_BIN" -f "$BOOT_GUARD_PATH" && ! as_root "$ROOT_TEST_BIN" -L "$BOOT_GUARD_PATH" \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$BOOT_GUARD_PATH")" -eq 0 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$BOOT_GUARD_PATH")" = 755 ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$BOOT_GUARD_PATH")" -eq 1 ] \
+        && [ "$(sha256_file "$BOOT_GUARD_PATH")" = "$expected_hash" ]; then
+        return 0
+    fi
+    guard_dir="$(dirname "$BOOT_GUARD_PATH")"
+    root_tmp="$(as_root "$ROOT_MKTEMP_BIN" -p "$guard_dir" '.genus-a0-3c-code-release-guard.XXXXXX')"
+    case "$root_tmp" in "$guard_dir"/.genus-a0-3c-code-release-guard.*) ;; *)
+        fail "Boot-Guard-Restore-Temp entkommt Zielverzeichnis" 70 ;;
+    esac
+    as_root "$ROOT_INSTALL_BIN" -o root -g root -m 0755 "$source" "$root_tmp"
+    as_root "$ROOT_SYNC_BIN" -f "$root_tmp"
+    as_root "$ROOT_MV_BIN" -Tf -- "$root_tmp" "$BOOT_GUARD_PATH"
+    as_root "$ROOT_SYNC_BIN" -f "$guard_dir"
+    [ "$(sha256_file "$BOOT_GUARD_PATH")" = "$expected_hash" ] \
+        || fail "Boot-Guard-Restore driftete" 70
+}
+
+restore_code_release_start_authorization() {
+    local source expected_hash tmp
+    source="$(code_release_journal_field prior_start_authorization_path)"
+    expected_hash="$(code_release_journal_field prior_start_authorization_sha256)"
+    [ -f "$source" ] && [ ! -L "$source" ] && [ "$(sha256_file "$source")" = "$expected_hash" ] \
+        || fail "prior Start-Authorization-Evidence ist nicht restaurierbar" 70
+    tmp="$STATE_ROOT/start-authorization.restore.$$.$RANDOM"
+    install -m 0600 "$source" "$tmp"
+    sync -f "$tmp"
+    mv -Tf -- "$tmp" "$AUTOSTART_APPROVAL"
+    fsync_dir "$STATE_ROOT"
+    [ "$(sha256_file "$AUTOSTART_APPROVAL")" = "$expected_hash" ] \
+        || fail "Start-Authorization-Restore driftete" 70
+}
+
+mark_code_release_rollback_authorized() {
+    local tmp
+    tmp="$CODE_RELEASE_JOURNAL.tmp.$$.$RANDOM"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" "$tmp" <<'PY'
+import json,os,pathlib,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text())
+if data.get("phase") in {"receipt-written","terminalized","resumed","rollback-authorized"}: raise SystemExit("rollback phase is already terminal")
+data["phase"]="rollback-authorized"
+fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_journal 1
+}
+
+bind_code_release_rollback_receipt() {
+    local kind="$1" receipt="$2" path_key hash_key tmp
+    case "$kind" in
+        completion) path_key=completion_receipt_path; hash_key=completion_receipt_sha256 ;;
+        consumption) path_key=consumption_receipt_path; hash_key=consumption_receipt_sha256 ;;
+        *) fail "unbekannte Rollback-Evidence-Art" 70 ;;
+    esac
+    validate_code_release_journal 1
+    [ "$(code_release_journal_field phase)" = rollback-authorized ] \
+        || fail "Rollback-Evidence braucht rollback-authorized" 70
+    [ -z "$(code_release_journal_field "$path_key")" ] \
+        || fail "Rollback-Evidence ist bereits gebunden" 70
+    tmp="$CODE_RELEASE_JOURNAL.tmp.$$.$RANDOM"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        PATH_KEY="$path_key" HASH_KEY="$hash_key" RECEIPT="$receipt" RECEIPT_HASH="$(sha256_file "$receipt")" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_JOURNAL" "$tmp" <<'PY'
+import json,os,pathlib,sys
+source,target=map(pathlib.Path,sys.argv[1:3]); data=json.loads(source.read_text())
+if data.get("phase")!="rollback-authorized" or data.get(os.environ["PATH_KEY"]) or data.get(os.environ["HASH_KEY"]):
+    raise SystemExit("rollback evidence journal state differs")
+data[os.environ["PATH_KEY"]]=os.environ["RECEIPT"]; data[os.environ["HASH_KEY"]]=os.environ["RECEIPT_HASH"]
+fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+os.replace(target,source); directory=os.open(source.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+    validate_code_release_journal 1
+}
+
+clear_code_release_journal() {
+    rm -f -- "$CODE_RELEASE_JOURNAL"
+    fsync_dir "$STATE_ROOT"
+}
+
+abandon_orphan_code_release_authorization() {
+    local old new seal plan nonce used outcome now
+    [ -f "$CODE_RELEASE_TOKEN" ] && [ ! -L "$CODE_RELEASE_TOKEN" ] \
+        || fail "verwaiste Code-Release-Authorization ist nicht regulaer" 70
+    read -r old new seal plan nonce < <("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_TOKEN" <<'PY'
+import json,pathlib,sys
+data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+values=[data.get(key,"") for key in ("old_commit","new_commit","release_seal","plan_path","nonce")]
+if any(not isinstance(value,str) or any(ch.isspace() for ch in value) for value in values): raise SystemExit("orphan token scalar malformed")
+print(*values)
+PY
+    )
+    used="$(code_release_used_receipt "$nonce")"
+    if [ -e "$used" ] || [ -L "$used" ]; then
+        validate_code_release_authorization "$old" "$new" "$seal" allow-expired-used
+    else
+        validate_code_release_authorization "$old" "$new" "$seal" allow-expired
+    fi
+    [ "$plan" = "$VERIFIED_CODE_RELEASE_PLAN" ] && [ "$nonce" = "$VERIFIED_CODE_RELEASE_NONCE" ] \
+        || fail "verwaiste Authorization driftet von validiertem Plan" 70
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    outcome="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin NOW="$now" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$plan" <<'PY'
+import datetime,json,os,pathlib,sys
+data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+now=datetime.datetime.fromisoformat(os.environ["NOW"].replace("Z","+00:00"))
+expires=datetime.datetime.fromisoformat(data["expires_at"].replace("Z","+00:00"))
+print("expired" if now>expires else "rejected")
+PY
+    )"
+    if [ ! -e "$used" ] && [ ! -L "$used" ]; then
+        "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+            NONCE="$nonce" SEAL="$seal" PLAN="$plan" PLAN_HASH="$VERIFIED_CODE_RELEASE_PLAN_SHA256" \
+            OUTCOME="$outcome" NOW="$now" \
+            "$SYSTEM_PYTHON_BIN" -I -P - "$used" <<'PY'
+import json,os,pathlib,sys
+data={"schema":"genus-a0.3c-code-release-authorization-abandoned-v1","nonce":os.environ["NONCE"],
+      "release_seal":os.environ["SEAL"],"plan_path":os.environ["PLAN"],"plan_sha256":os.environ["PLAN_HASH"],
+      "outcome":os.environ["OUTCOME"],"abandoned_at":os.environ["NOW"]}
+path=pathlib.Path(sys.argv[1]); fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(path.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+        code_release_fault_point after-abandonment-receipt
+    fi
+    outcome="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        NONCE="$nonce" SEAL="$seal" PLAN="$plan" PLAN_HASH="$VERIFIED_CODE_RELEASE_PLAN_SHA256" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$used" <<'PY'
+import datetime,hashlib,json,os,pathlib,re,stat,sys
+path=pathlib.Path(sys.argv[1]); info=path.lstat()
+if path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1:
+    raise SystemExit("abandonment receipt is unsafe")
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try:
+    opened=os.fstat(fd); payload=b""
+    while True:
+        chunk=os.read(fd,65536)
+        if not chunk: break
+        payload+=chunk
+        if len(payload)>65536: raise SystemExit("abandonment receipt is oversized")
+    final=os.fstat(fd)
+finally: os.close(fd)
+fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+if any(getattr(info,key)!=getattr(opened,key) or getattr(info,key)!=getattr(final,key) for key in fields) or len(payload)!=info.st_size:
+    raise SystemExit("abandonment receipt changed during read")
+data=json.loads(payload)
+keys={"schema","nonce","release_seal","plan_path","plan_sha256","outcome","abandoned_at"}
+expected={"nonce":os.environ["NONCE"],"release_seal":os.environ["SEAL"],"plan_path":os.environ["PLAN"],
+          "plan_sha256":os.environ["PLAN_HASH"]}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-authorization-abandoned-v1" or any(data[key]!=value for key,value in expected.items()) or data["outcome"] not in {"rejected","expired"} or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ",data["abandoned_at"]): raise SystemExit("abandonment receipt differs")
+plan_raw=pathlib.Path(os.environ["PLAN"]).read_bytes()
+if hashlib.sha256(plan_raw).hexdigest()!=os.environ["PLAN_HASH"]: raise SystemExit("abandonment plan hash differs")
+plan=json.loads(plan_raw); abandoned=datetime.datetime.fromisoformat(data["abandoned_at"].replace("Z","+00:00")); expires=datetime.datetime.fromisoformat(plan["expires_at"].replace("Z","+00:00"))
+expected_outcome="expired" if abandoned>expires else "rejected"
+if data["outcome"]!=expected_outcome: raise SystemExit("abandonment outcome/time classification differs")
+print(data["outcome"])
+PY
+    )"
+    rm -f -- "$CODE_RELEASE_TOKEN"
+    fsync_dir "$STATE_ROOT"
+    printf '[A0.3c] verwaister CANDIDATE-Plan dauerhaft als %s verworfen: %s\n' "$outcome" "$used" >&2
+}
+
+code_release_fault_point() {
+    local phase="$1" configured="${GENUS_A03C_TEST_RELEASE_FAULT_PHASE:-}" kind="${GENUS_A03C_TEST_RELEASE_FAULT_KIND:-}"
+    [ "$configured" = "$phase" ] || return 0
+    [ "${GENUS_A03C_TEST_MODE:-0}" = 1 ] && [ "${GENUS_A03C_SOURCE_ONLY:-0}" = 1 ] \
+        || fail "Code-Release-Fault-Injection ist ausserhalb eines gesourcten Testprozesses verboten" 70
+    case "$kind" in
+        explicit-fail) fail "injected code release failure at $phase" 98 ;;
+        set-e) false ;;
+        INT) kill -INT "$$" ;;
+        TERM) kill -TERM "$$" ;;
+        KILL) kill -KILL "$$" ;;
+        *) fail "unbekannte Code-Release-Fault-Injection" 70 ;;
+    esac
+}
+
+require_code_release_production_environment() {
+    local name
+    [[ ! -v GENUS_A03C_TEST_MODE ]] \
+        || fail "Code-Release verweigert gesetzten GENUS_A03C_TEST_MODE" 77
+    [[ ! -v GENUS_A03C_SOURCE_ONLY ]] \
+        || fail "Code-Release verweigert gesetzten GENUS_A03C_SOURCE_ONLY" 77
+    while IFS= read -r name; do
+        case "$name" in
+            GENUS_A03C_TEST_*FAULT*)
+                fail "Code-Release verweigert ambient Fault-Injection: $name" 77 ;;
+        esac
+    done < <(compgen -v)
+}
+
+validate_service_account_contract() {
+    local account="$1" primary_group="$2" entry name uid gid home shell primary_gid data_gid groups expected status expected_home
+    entry="$(getent passwd "$account")" || fail "Servicekonto fehlt: $account" 77
+    IFS=: read -r name _ uid gid _ home shell <<<"$entry"
+    primary_gid="$(getent group "$primary_group" | cut -d: -f3)"
+    data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+    expected_home="/var/lib/$account/home"
+    [ "$name" = "$account" ] && [[ "$uid" =~ ^[1-9][0-9]*$ ]] \
+        && [[ "$primary_gid" =~ ^[1-9][0-9]*$ ]] && [[ "$data_gid" =~ ^[1-9][0-9]*$ ]] \
+        && [ "$primary_gid" != "$data_gid" ] \
+        && [ "$gid" = "$primary_gid" ] && [ "$home" = "$expected_home" ] \
+        && [ "$shell" = /usr/sbin/nologin ] \
+        || fail "Servicekonto $account ist nicht nologin/hat nicht exakte Primaergruppe und Service-Home" 77
+    groups="$(id -G -- "$account" | tr ' ' '\n' | sort -n | xargs)"
+    expected="$(printf '%s\n%s\n' "$primary_gid" "$data_gid" | sort -nu | xargs)"
+    [ "$groups" = "$expected" ] \
+        || fail "Servicekonto $account hat Supplementaergruppen ausserhalb genus-data" 77
+    status="$(as_root "$ROOT_PASSWD_BIN" -S "$account" | awk '{print $2}')"
+    case "$status" in L|LK) ;; *) fail "Servicekonto $account ist nicht passwortgesperrt" 77 ;; esac
+    ! as_root "$ROOT_TEST_BIN" -e "/var/lib/systemd/linger/$account" \
+        && ! as_root "$ROOT_TEST_BIN" -L "/var/lib/systemd/linger/$account" \
+        || fail "Servicekonto $account hat systemd-Linger" 77
+    printf '%s\n' "$uid"
+}
+
+validate_service_group_separation() {
+    local runtime_gid="$1" telegram_gid="$2" backup_gid="$3" data_gid="$4"
+    [[ "$runtime_gid" =~ ^[1-9][0-9]*$ ]] && [[ "$telegram_gid" =~ ^[1-9][0-9]*$ ]] \
+        && [[ "$backup_gid" =~ ^[1-9][0-9]*$ ]] && [[ "$data_gid" =~ ^[1-9][0-9]*$ ]] \
+        && [ "$runtime_gid" != "$telegram_gid" ] && [ "$runtime_gid" != "$backup_gid" ] \
+        && [ "$telegram_gid" != "$backup_gid" ] && [ "$runtime_gid" != "$data_gid" ] \
+        && [ "$telegram_gid" != "$data_gid" ] && [ "$backup_gid" != "$data_gid" ] \
+        || fail "Service- und Datengruppen brauchen vier getrennte kanonische Nicht-Root-GIDs" 77
+}
+
+validate_legacy_telegram_token_absent() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$GENUS_USER" "$GENUS_HOME" "${GENUS_A03C_TEST_MODE:-0}" <<'PY' \
+        || fail "Legacy-Telegram-Tokenpfad muss vor Runtime-/Code-Release entfernt und rotiert sein" 77
+import os
+import pathlib
+import sys
+
+account, home, test_mode = sys.argv[1:]
+if test_mode not in {"0", "1"}:
+    raise SystemExit("legacy token gate received an invalid test-mode marker")
+if test_mode == "0":
+    import pwd
+
+    try:
+        passwd_home = pwd.getpwnam(account).pw_dir
+    except KeyError:
+        raise SystemExit("operator account is absent from the passwd database") from None
+    if home != passwd_home:
+        raise SystemExit("operator home differs from the passwd database")
+legacy = pathlib.Path(home) / ".genus" / "telegram_bot_token"
+try:
+    os.lstat(legacy)
+except FileNotFoundError:
+    raise SystemExit(0) from None
+except OSError as exc:
+    raise SystemExit(f"legacy token path cannot be classified safely: {exc}") from None
+raise SystemExit("legacy token path still exists")
+PY
+}
+
+validate_polkit_action_catalog() {
+    local action
+    for action in "${POLKIT_SYSTEMD_ACTIONS[@]}"; do
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin LC_ALL=C \
+            "$ROOT_PKACTION_BIN" --action-id "$action" >/dev/null 2>&1 \
+            || fail "Polkit kennt die erforderliche systemd-Aktion nicht eindeutig: $action" 77
+    done
+}
+
+root_polkit_subject_spec() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os
+import pathlib
+
+pid = 1
+raw = pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+fields = raw[raw.rfind(")") + 2 :].split()
+if len(fields) < 20:
+    raise SystemExit("PID 1 stat is truncated")
+uids = pathlib.Path(f"/proc/{pid}/status").read_text(encoding="ascii").splitlines()
+uid_row = next((row for row in uids if row.startswith("Uid:")), "").split()[1:]
+if len(uid_row) != 4 or any(value != "0" for value in uid_row):
+    raise SystemExit("PID 1 is not an all-root positive-control subject")
+print(f"{pid},{fields[19]},0")
+PY
+}
+
+assert_polkit_root_positive_control() {
+    local subject="$1" status
+    set +e
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin LC_ALL=C \
+        "$ROOT_PKCHECK_BIN" --process "$subject" \
+        --action-id org.freedesktop.systemd1.manage-units \
+        --detail unit "$POLKIT_CANARY_UNIT" --detail verb start >/dev/null 2>&1
+    status=$?
+    set -e
+    [ "$status" -eq 0 ] \
+        || fail "Polkit-Root-Positivkontrolle ist nicht autorisiert (rc=$status)" 77
+}
+
+assert_service_polkit_denied() {
+    local account="$1" subject="$2" action="$3" status
+    shift 3
+    set +e
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin LC_ALL=C \
+        "$ROOT_PKCHECK_BIN" --process "$subject" --action-id "$action" "$@" >/dev/null 2>&1
+    status=$?
+    set -e
+    case "$status" in
+        1|2) return 0 ;;
+        0) fail "Servicekonto $account besitzt Polkit-Autoritaet fuer $action $*" 77 ;;
+        *) fail "Polkit-Negativprobe fuer $account/$action ist nicht beweiskraeftig (rc=$status)" 77 ;;
+    esac
+}
+
+probe_service_account_polkit_authority() {
+    local account="$1" subject="$2" action unit verb
+    for action in "${POLKIT_SYSTEMD_ACTIONS[@]}"; do
+        assert_service_polkit_denied "$account" "$subject" "$action"
+    done
+    for unit in "${GUARDED_UNITS[@]}" "$POLKIT_CANARY_UNIT"; do
+        for verb in "${POLKIT_SYSTEMD_UNIT_VERBS[@]}"; do
+            assert_service_polkit_denied "$account" "$subject" \
+                org.freedesktop.systemd1.manage-units \
+                --detail unit "$unit" --detail verb "$verb"
+        done
+    done
+}
+
+active_service_polkit_subject_spec() {
+    local unit="$1" account="$2" expected_uid="$3" primary_gid="$4" data_gid="$5"
+    local load_state active_state main_pid configured_user spec
+    load_state="$($SYSTEMCTL_BIN show "$unit" --property=LoadState --value)" \
+        || fail "Polkit-Live-Subjekt kann LoadState fuer $unit nicht lesen" 77
+    case "$load_state" in
+        not-found) printf 'absent\n'; return 0 ;;
+        loaded) ;;
+        *) fail "Polkit-Live-Subjekt traf unbekannten LoadState fuer $unit: $load_state" 77 ;;
+    esac
+    active_state="$($SYSTEMCTL_BIN show "$unit" --property=ActiveState --value)" \
+        || fail "Polkit-Live-Subjekt kann ActiveState fuer $unit nicht lesen" 77
+    main_pid="$($SYSTEMCTL_BIN show "$unit" --property=MainPID --value)" \
+        || fail "Polkit-Live-Subjekt kann MainPID fuer $unit nicht lesen" 77
+    configured_user="$($SYSTEMCTL_BIN show "$unit" --property=User --value)" \
+        || fail "Polkit-Live-Subjekt kann User fuer $unit nicht lesen" 77
+    [ "$configured_user" = "$account" ] \
+        || fail "Polkit-Live-Subjekt fuer $unit hat nicht das gebundene Servicekonto" 77
+    case "$active_state" in
+        inactive|failed)
+            [ "$main_pid" = 0 ] \
+                || fail "inaktives Polkit-Live-Subjekt fuer $unit hat eine MainPID" 77
+            printf 'inactive\n'
+            return 0
+            ;;
+        active) ;;
+        *) fail "Polkit-Live-Subjekt fuer $unit ist waehrend der Autoritaetsprobe transient: $active_state" 77 ;;
+    esac
+    [[ "$main_pid" =~ ^[1-9][0-9]*$ ]] \
+        || fail "aktives Polkit-Live-Subjekt fuer $unit hat keine MainPID" 77
+    spec="$(as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$main_pid" "$expected_uid" "$primary_gid" "$data_gid" "$unit" <<'PY'
+import os
+import pathlib
+import sys
+
+pid, expected_uid, primary_gid, data_gid = map(int, sys.argv[1:5])
+unit = sys.argv[5]
+proc = pathlib.Path("/proc") / str(pid)
+
+def read_starttime():
+    raw = (proc / "stat").read_text(encoding="ascii")
+    fields = raw[raw.rfind(")") + 2 :].split()
+    if len(fields) < 20:
+        raise SystemExit("live service stat is truncated")
+    return int(fields[19])
+
+before = read_starttime()
+status = (proc / "status").read_text(encoding="ascii").splitlines()
+rows = {row.partition(":")[0]: row.partition(":")[2].split() for row in status if ":" in row}
+if rows.get("Uid") != [str(expected_uid)] * 4:
+    raise SystemExit("live service uid identity differs")
+if rows.get("Gid") != [str(primary_gid)] * 4:
+    raise SystemExit("live service primary gid identity differs")
+observed_groups = set(rows.get("Groups", []))
+allowed_groups = {str(primary_gid), str(data_gid)}
+if str(data_gid) not in observed_groups or not observed_groups <= allowed_groups:
+    raise SystemExit("live service supplementary groups differ")
+if rows.get("NoNewPrivs") != ["1"]:
+    raise SystemExit("live service lacks NoNewPrivileges")
+cgroups = (proc / "cgroup").read_text(encoding="ascii").splitlines()
+paths = [row.split(":", 2)[-1] for row in cgroups]
+if not any(unit in pathlib.PurePosixPath(path).parts for path in paths):
+    raise SystemExit("live service process is outside its exact systemd unit cgroup")
+after = read_starttime()
+if after != before:
+    raise SystemExit("live service process changed during identity read")
+print(f"{pid},{before},{expected_uid}")
+PY
+    )" || fail "aktives Polkit-Live-Subjekt fuer $unit ist nicht stabil gebunden" 77
+    [ "$($SYSTEMCTL_BIN show "$unit" --property=ActiveState --value)" = active ] \
+        && [ "$($SYSTEMCTL_BIN show "$unit" --property=MainPID --value)" = "$main_pid" ] \
+        && [ "$($SYSTEMCTL_BIN show "$unit" --property=User --value)" = "$account" ] \
+        || fail "Polkit-Live-Subjekt fuer $unit driftete nach der Identitaetsbindung" 77
+    [[ "$spec" =~ ^${main_pid},[1-9][0-9]*,${expected_uid}$ ]] \
+        || fail "Polkit-Live-Subjekt fuer $unit lieferte keine kanonische Identitaet" 77
+    printf '%s\n' "$spec"
+}
+
+probe_active_service_account_polkit_authority() {
+    local unit="$1" account="$2" uid="$3" primary_gid="$4" data_gid="$5" subject after
+    subject="$(active_service_polkit_subject_spec "$unit" "$account" "$uid" "$primary_gid" "$data_gid")"
+    case "$subject" in
+        absent|inactive) return 0 ;;
+    esac
+    [[ "$subject" =~ ^[1-9][0-9]*,[1-9][0-9]*,${uid}$ ]] \
+        || fail "Polkit-Live-Subjekt fuer $unit ist nicht kanonisch" 77
+    probe_service_account_polkit_authority "$account" "$subject"
+    after="$(active_service_polkit_subject_spec "$unit" "$account" "$uid" "$primary_gid" "$data_gid")"
+    [ "$after" = "$subject" ] \
+        || fail "Polkit-Live-Subjekt fuer $unit wechselte waehrend der Negativprobe" 77
+}
+
+start_service_polkit_subject() {
+    local account="$1" uid="$2" primary_gid="$3" data_gid="$4"
+    [[ "$uid" =~ ^[0-9]+$ ]] && [ "$uid" -ne 0 ] \
+        && [[ "$primary_gid" =~ ^[0-9]+$ ]] && [[ "$data_gid" =~ ^[0-9]+$ ]] \
+        || fail "Polkit-Subjekt fuer $account hat ungueltige UID/GID" 77
+    exec {POLKIT_SUBJECT_FD}< <(
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+            "$SYSTEM_PYTHON_BIN" -I -P - "$uid" "$primary_gid" "$data_gid" <<'PY'
+import ctypes
+import os
+import pathlib
+import select
+import signal
+import sys
+
+uid, primary_gid, data_gid = map(int, sys.argv[1:])
+if os.geteuid() != 0 or uid <= 0 or min(primary_gid, data_gid) < 0:
+    raise SystemExit("service Polkit subject needs root and positive target uid")
+supplementary = sorted({primary_gid, data_gid})
+os.setgroups(supplementary)
+os.setgid(primary_gid)
+os.setuid(uid)
+libc = ctypes.CDLL(None, use_errno=True)
+if libc.prctl(38, 1, 0, 0, 0) != 0:  # PR_SET_NO_NEW_PRIVS
+    raise OSError(ctypes.get_errno(), "PR_SET_NO_NEW_PRIVS")
+if os.getuid() != uid or os.geteuid() != uid or os.getgid() != primary_gid or os.getegid() != primary_gid:
+    raise SystemExit("service Polkit subject identity differs")
+if sorted(os.getgroups()) != sorted(supplementary):
+    raise SystemExit("service Polkit subject supplementary groups differ")
+os.umask(0o077)
+os.chdir("/")
+pid = os.getpid()
+raw = pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+fields = raw[raw.rfind(")") + 2 :].split()
+if len(fields) < 20:
+    raise SystemExit("service Polkit subject stat is truncated")
+def terminate(_signum, _frame):
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, terminate)
+signal.signal(signal.SIGHUP, terminate)
+signal.signal(signal.SIGALRM, terminate)
+signal.alarm(900)
+parent_watch = select.poll()
+parent_watch.register(sys.stdout.fileno(), select.POLLERR | select.POLLHUP)
+print(f"{pid},{fields[19]},{uid}", flush=True)
+while True:
+    if parent_watch.poll(1000):
+        raise SystemExit(0)
+PY
+    )
+    POLKIT_SUBJECT_JOB_PID=$!
+    if ! IFS= read -r POLKIT_SUBJECT_SPEC <&"$POLKIT_SUBJECT_FD"; then
+        fail "Polkit-Subjekt fuer $account konnte nicht gestartet werden" 77
+    fi
+    [[ "$POLKIT_SUBJECT_SPEC" =~ ^([1-9][0-9]*),([1-9][0-9]*),([1-9][0-9]*)$ ]] \
+        && [ "${BASH_REMATCH[3]}" = "$uid" ] \
+        || fail "Polkit-Subjekt fuer $account lieferte keine gebundene pid,starttime,uid-Identitaet" 77
+}
+
+stop_service_polkit_subject() {
+    local spec="${POLKIT_SUBJECT_SPEC:-}" job="${POLKIT_SUBJECT_JOB_PID:-}"
+    if [[ "$spec" =~ ^([1-9][0-9]*),([1-9][0-9]*),([1-9][0-9]*)$ ]]; then
+        as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+            "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" <<'PY' >/dev/null 2>&1 || true
+import os
+import pathlib
+import signal
+import sys
+
+pid, expected_start, expected_uid = map(int, sys.argv[1:])
+try:
+    raw = pathlib.Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+    fields = raw[raw.rfind(")") + 2 :].split()
+    status = pathlib.Path(f"/proc/{pid}/status").read_text(encoding="ascii").splitlines()
+except FileNotFoundError:
+    raise SystemExit(0)
+uids = next((row for row in status if row.startswith("Uid:")), "").split()[1:]
+if len(fields) < 20 or int(fields[19]) != expected_start or len(uids) != 4:
+    raise SystemExit("refusing to stop an unbound Polkit subject")
+if any(int(value) != expected_uid for value in uids):
+    raise SystemExit("refusing to stop a Polkit subject with changed uid")
+os.kill(pid, signal.SIGTERM)
+PY
+    fi
+    if [ -n "${POLKIT_SUBJECT_FD:-}" ]; then
+        exec {POLKIT_SUBJECT_FD}<&-
+    fi
+    if [ -n "$job" ]; then
+        wait "$job" 2>/dev/null || true
+    fi
+    POLKIT_SUBJECT_SPEC=""; POLKIT_SUBJECT_JOB_PID=""; POLKIT_SUBJECT_FD=""
+}
+
+validate_service_account_polkit_boundary() (
+    local account="$1" uid="$2" primary_gid="$3" data_gid="$4"
+    POLKIT_SUBJECT_SPEC=""; POLKIT_SUBJECT_JOB_PID=""; POLKIT_SUBJECT_FD=""
+    trap stop_service_polkit_subject EXIT
+    start_service_polkit_subject "$account" "$uid" "$primary_gid" "$data_gid"
+    probe_service_account_polkit_authority "$account" "$POLKIT_SUBJECT_SPEC"
+    stop_service_polkit_subject
+    trap - EXIT
+)
+
+validate_service_account_authority_boundary() {
+    local runtime_uid="$1" telegram_uid="$2" backup_uid="$3" data_gid="$4"
+    local root_subject runtime_gid telegram_gid backup_gid
+    validate_legacy_telegram_token_absent
+    assert_no_genus_user_crontab "$RUNTIME_USER" 1
+    assert_no_genus_user_crontab "$TELEGRAM_USER" 1
+    assert_no_genus_user_crontab "$BACKUP_USER" 1
+    validate_polkit_action_catalog
+    root_subject="$(root_polkit_subject_spec)" \
+        || fail "Polkit-Root-Positivkontrolle konnte PID 1 nicht binden" 77
+    [[ "$root_subject" =~ ^1,[1-9][0-9]*,0$ ]] \
+        || fail "Polkit-Root-Positivkontrolle lieferte keine kanonische Identitaet" 77
+    assert_polkit_root_positive_control "$root_subject"
+    runtime_gid="$(getent group "$RUNTIME_GROUP" | cut -d: -f3)"
+    telegram_gid="$(getent group "$TELEGRAM_GROUP" | cut -d: -f3)"
+    backup_gid="$(getent group "$BACKUP_GROUP" | cut -d: -f3)"
+    validate_service_group_separation "$runtime_gid" "$telegram_gid" "$backup_gid" "$data_gid"
+    validate_service_account_polkit_boundary "$RUNTIME_USER" "$runtime_uid" "$runtime_gid" "$data_gid"
+    validate_service_account_polkit_boundary "$TELEGRAM_USER" "$telegram_uid" "$telegram_gid" "$data_gid"
+    validate_service_account_polkit_boundary "$BACKUP_USER" "$backup_uid" "$backup_gid" "$data_gid"
+    probe_active_service_account_polkit_authority \
+        genus-learner.service "$RUNTIME_USER" "$runtime_uid" "$runtime_gid" "$data_gid"
+    probe_active_service_account_polkit_authority \
+        genus-telegram-bot.service "$TELEGRAM_USER" "$telegram_uid" "$telegram_gid" "$data_gid"
+    probe_active_service_account_polkit_authority \
+        genus-backup.service "$BACKUP_USER" "$backup_uid" "$backup_gid" "$data_gid"
+    validate_legacy_telegram_token_absent
+}
+
+public_projection_smoke_run() {
+    local account="$1" primary_group
+    shift
+    primary_group="$(id -gn -- "$account")"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$ROOT_SYSTEMD_RUN_BIN" \
+        --quiet --wait --pipe --collect --property=Type=exec \
+        --property="User=$account" --property="Group=$primary_group" --property=UMask=0077 \
+        --property=ProtectHome=tmpfs --property=ProtectSystem=strict \
+        --property=PrivateNetwork=yes --property=PrivateDevices=yes --property=PrivateTmp=yes \
+        --property=NoNewPrivileges=yes --property=CapabilityBoundingSet= \
+        --property=RestrictAddressFamilies=AF_UNIX --property=ProtectProc=invisible \
+        --property=ProtectKernelTunables=yes --property=ProtectKernelModules=yes \
+        --property=ProtectControlGroups=yes --property=LockPersonality=yes \
+        --property=TasksMax=512 --property=RuntimeMaxSec=20m --property=MemoryMax=7G \
+        --property="ReadOnlyPaths=$RUNTIME_VIEW_ROOT $RUNTIME_PREFIX" \
+        --property="InaccessiblePaths=$REPO_DIR -$DB_PATH -$PAUSE_FILE" \
+        --property="WorkingDirectory=$RUNTIME_VIEW_ROOT/source" \
+        --setenv=PATH=/usr/bin:/bin --setenv=HOME=/nonexistent --setenv=LC_ALL=C.UTF-8 \
+        --setenv=PYTHONDONTWRITEBYTECODE=1 --setenv=PYTHONNOUSERSITE=1 \
+        --setenv=PIP_CONFIG_FILE=/dev/null --setenv=PIP_DISABLE_PIP_VERSION_CHECK=1 \
+        --setenv=PIP_NO_INPUT=1 --setenv=PIP_NO_CACHE_DIR=1 \
+        --setenv=GENUS_PRODUCT_MODE=1 --setenv=GENUS_MODEL_OFFLINE=1 \
+        --setenv=HF_HUB_OFFLINE=1 --setenv=HF_HUB_DISABLE_TELEMETRY=1 \
+        --setenv=TRANSFORMERS_OFFLINE=1 --setenv=NO_PROXY='*' -- "$@"
+}
+
+validate_root_published_runtime_view() {
+    local manifest private_set account service_home
+    manifest="$(selector_manifest)"
+    [ -n "$manifest" ] || fail "root-eigener Runtime-Ausfuehrungs-View hat kein aktives Manifest" 77
+    [[ "$manifest" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "root-eigener Runtime-Ausfuehrungs-View verweigert Legacy-/malformed Manifest" 77
+    private_set="$(set_path "$manifest")"
+    verify_set "$manifest" >/dev/null
+    validate_projection_steady_state "$manifest"
+    projection_helper_call validate-active --private-set "$private_set" >/dev/null
+    public_projection_smoke_run "$RUNTIME_USER" "$RUNTIME_VIEW_ROOT/core/bin/python" -I -P -m pip check \
+        || fail "root-eigene Core-Projection besteht pip check nicht" 77
+    public_projection_smoke_run "$RUNTIME_USER" "$RUNTIME_VIEW_ROOT/embed/bin/python" -I -P -m pip check \
+        || fail "root-eigene Embed-Projection besteht pip check nicht" 77
+    for account in "$RUNTIME_USER" "$TELEGRAM_USER"; do
+        public_projection_smoke_run "$account" "$RUNTIME_VIEW_ROOT/core/bin/python" -I -P -c \
+            'import pathlib,sys
+sys.addaudithook(lambda event,args: (_ for _ in ()).throw(PermissionError("network denied")) if event.startswith("socket.") else None)
+import genus,sqlite3
+source=pathlib.Path(sys.argv[1]).resolve(strict=True)
+assert source in pathlib.Path(genus.__file__).resolve(strict=True).parents
+assert sqlite3.sqlite_version=="3.53.4"' "$RUNTIME_VIEW_ROOT/source" \
+            || fail "root-eigene Core-/Source-Projection ist fuer $account nicht ausfuehrbar" 77
+    done
+    public_projection_smoke_run "$RUNTIME_USER" "$RUNTIME_VIEW_ROOT/embed/bin/python" -I -P - \
+        "$MODEL" "$RUNTIME_VIEW_ROOT/assets/fastembed-cache" <<'PY' \
+        || fail "root-eigene FastEmbed-Projektion besteht die echte Offline-Probe nicht" 77
+import pathlib,sys
+sys.addaudithook(lambda event,args: (_ for _ in ()).throw(PermissionError("network denied")) if event.startswith("socket.") else None)
+from fastembed import TextEmbedding
+cache=pathlib.Path(sys.argv[2]).resolve(strict=True)
+model=TextEmbedding(model_name=sys.argv[1],cache_dir=str(cache),local_files_only=True)
+vectors=list(model.embed(["bereit"]))
+if len(vectors)!=1 or len(vectors[0])==0: raise SystemExit("offline service-UID embedding probe is empty")
+PY
+    public_projection_smoke_run "$TELEGRAM_USER" "$RUNTIME_VIEW_ROOT/core/bin/python" -I -P - \
+        "$RUNTIME_VIEW_ROOT/assets/$DEUTER_MODEL_RELATIVE" <<'PY' \
+        || fail "root-eigene Deuter-Projektion kann das autorisierte GGUF nicht offline laden" 77
+import pathlib,sys
+sys.addaudithook(lambda event,args: (_ for _ in ()).throw(PermissionError("network denied")) if event.startswith("socket.") else None)
+from llama_cpp import Llama
+path=pathlib.Path(sys.argv[1]).resolve(strict=True)
+engine=Llama(model_path=str(path),n_ctx=128,n_batch=32,n_threads=1,verbose=False)
+if engine is None: raise SystemExit("Deuter model load returned no engine")
+PY
+}
+
+validate_unit_namespace_contract() {
+    local unit="$1" account="$2" role="$3" service_home="$4" manifest="${5:-}"
+    local bind_ro bind_rw read_only read_write working protect_home protect_system generation
+    [ -n "$manifest" ] || manifest="$(selector_manifest)"
+    [[ "$manifest" =~ ^[a-f0-9]{64}$ ]] \
+        || fail "Code-Release NO-GO: $unit hat keine nicht-legacy Public-Generation" 77
+    generation="$(public_set_path "$manifest")"
+    working="$("$SYSTEMCTL_BIN" show "$unit" --property=WorkingDirectory --value)"
+    protect_home="$("$SYSTEMCTL_BIN" show "$unit" --property=ProtectHome --value)"
+    protect_system="$("$SYSTEMCTL_BIN" show "$unit" --property=ProtectSystem --value)"
+    [ "$working" = "$service_home" ] && [ "$protect_home" = tmpfs ] && [ "$protect_system" = strict ] \
+        || fail "Code-Release NO-GO: $unit hat keinen exakten privaten WorkingDirectory/Home-Namespace" 77
+    bind_ro="$("$SYSTEMCTL_BIN" show "$unit" --property=BindReadOnlyPaths --value)"
+    bind_rw="$("$SYSTEMCTL_BIN" show "$unit" --property=BindPaths --value)"
+    read_only="$("$SYSTEMCTL_BIN" show "$unit" --property=ReadOnlyPaths --value)"
+    read_write="$("$SYSTEMCTL_BIN" show "$unit" --property=ReadWritePaths --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin ROLE="$role" ACCOUNT="$account" \
+        BIND_RO="$bind_ro" BIND_RW="$bind_rw" READ_ONLY="$read_only" READ_WRITE="$read_write" \
+        EXPECTED_REPO="$REPO_DIR" EXPECTED_SOURCE="$generation/source" EXPECTED_DATA="$(dirname "$DB_PATH")" \
+        EXPECTED_CONTROL="$(dirname "$PAUSE_FILE")" EXPECTED_ACTIVE="$RUNTIME_VIEW_ROOT" \
+        EXPECTED_GENERATION="$generation" EXPECTED_ASSETS="$generation/assets" \
+        EXPECTED_LAUNCHER="$TELEGRAM_LAUNCHER_PATH" \
+        EXPECTED_BACKUP="$SCHEDULED_BACKUP_DIR" EXPECTED_LOCK="$BACKUP_LOCK_FILE" \
+        EXPECTED_ANCHORS="$GENUS_HOME/.genus/anchors" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,pathlib,shlex
+role=os.environ["ROLE"]; repo=pathlib.PurePosixPath(os.environ["EXPECTED_REPO"])
+source=os.environ["EXPECTED_SOURCE"]
+def paths(raw, *, allow_optional=False):
+    result=[]
+    for token in shlex.split(raw):
+        optional=False
+        while token and token[0] in "-+!":
+            optional|=token[0]=="-"; token=token[1:]
+        if optional and not allow_optional: raise SystemExit(f"{role} namespace uses an optional required path")
+        parts=token.split(":")
+        if len(parts)>1 and parts[1] not in {"",parts[0]}:
+            raise SystemExit(f"{role} namespace remaps a trusted path")
+        if len(parts)>2 and any(option not in {"rbind","norbind"} for option in parts[2:] if option):
+            raise SystemExit(f"{role} namespace has an unknown bind option")
+        value=parts[0]
+        path=pathlib.PurePosixPath(value)
+        if not path.is_absolute() or str(path)!=value: raise SystemExit(f"{role} namespace path is not canonical")
+        result.append((value,optional))
+    if len(result)!=len({value for value,_ in result}): raise SystemExit(f"{role} namespace repeats a path")
+    return result
+bind_ro=paths(os.environ["BIND_RO"],allow_optional=role=="backup")
+bind_rw=paths(os.environ["BIND_RW"])
+read_only=paths(os.environ["READ_ONLY"])
+read_write=paths(os.environ["READ_WRITE"])
+control=os.environ["EXPECTED_CONTROL"]; data=os.environ["EXPECTED_DATA"]
+active=os.environ["EXPECTED_ACTIVE"]; generation=os.environ["EXPECTED_GENERATION"]
+assets=os.environ["EXPECTED_ASSETS"]
+launcher=os.environ["EXPECTED_LAUNCHER"]
+for value,_ in (*bind_ro,*bind_rw,*read_only,*read_write):
+    path=pathlib.PurePosixPath(value)
+    if path==repo or repo in path.parents:
+        raise SystemExit(f"{role} unit exposes the operator checkout: {value}")
+if role in {"runtime","telegram","scheduled"}:
+    required={source,control,assets}
+    if role=="telegram":
+        required.update({launcher,generation+"/projection.receipt",generation+"/projection.inventory"})
+    if role=="scheduled":
+        required.update({generation+"/projection.receipt",generation+"/projection.inventory"})
+    if {value for value,_ in bind_ro}!=required or any(optional for _,optional in bind_ro):
+        raise SystemExit(f"{role} read-only bind allowlist differs")
+    if {value for value,_ in bind_rw}!={data}:
+        raise SystemExit(f"{role} writable bind is not exactly product data")
+else:
+    anchors=os.environ["EXPECTED_ANCHORS"]
+    required={source,control,data,assets,generation+"/projection.receipt",generation+"/projection.inventory"}
+    actual={value for value,_ in bind_ro}
+    if not required.issubset(actual) or actual-required not in (set(),{anchors}):
+        raise SystemExit("backup read-only bind allowlist differs")
+    for value,optional in bind_ro:
+        if value==anchors and not optional: raise SystemExit("backup optional anchors bind is not fail-closed optional")
+        if value!=anchors and optional: raise SystemExit("backup required read-only bind is optional")
+    if {value for value,_ in bind_rw}!={os.environ["EXPECTED_BACKUP"],os.environ["EXPECTED_LOCK"]}:
+        raise SystemExit("backup writable bind is not exactly backup target plus shared lock")
+if {value for value,_ in read_only}!={generation}:
+    raise SystemExit(f"{role} public runtime read-only namespace differs")
+expected_read_write={os.environ["EXPECTED_BACKUP"],os.environ["EXPECTED_LOCK"]} if role=="backup" else set()
+if {value for value,_ in read_write}!=expected_read_write:
+    raise SystemExit(f"{role} explicit writable path allowlist differs")
+if any(value in {str(repo),source,control,active,generation,assets} for value,_ in bind_rw):
+    raise SystemExit(f"{role} writable namespace crosses a trusted read-only boundary")
+PY
+}
+
+validate_unit_origin_and_executable_edges() {
+    local unit="$1" guard_mode="$2" fragment dropins property value exec_condition exec_start_pre
+    fragment="$("$SYSTEMCTL_BIN" show "$unit" --property=FragmentPath --value)"
+    dropins="$("$SYSTEMCTL_BIN" show "$unit" --property=DropInPaths --value)"
+    [ "$fragment" = "$SYSTEMD_GUARD_ROOT/$unit" ] \
+        && [ "$dropins" = "$SYSTEMD_GUARD_ROOT/$unit.d/90-genus-a0-3c-pending.conf" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=Transient --value)" = no ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=SourcePath --value)" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=NeedDaemonReload --value)" = no ] \
+        || fail "Code-Release NO-GO: $unit hat fremde Fragment-/Drop-in-/Transient-Herkunft" 77
+    for property in ExecStartPost ExecReload ExecStop ExecStopPost \
+                    EnvironmentFiles PassEnvironment SetCredential SetCredentialEncrypted; do
+        value="$("$SYSTEMCTL_BIN" show "$unit" --property="$property" --value)"
+        [ -z "$value" ] \
+            || fail "Code-Release NO-GO: $unit hat eine verborgene $property-Kante" 77
+    done
+    exec_start_pre="$("$SYSTEMCTL_BIN" show "$unit" --property=ExecStartPre --value)"
+    case "$unit" in
+        genus-learner.service|genus-telegram-bot.service|genus-backup.service|genus-cron@.service)
+            "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$exec_start_pre" EXPECTED_GUARD="$BOOT_GUARD_PATH" \
+                EXPECTED_UNIT="$unit" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+raw=os.environ["RAW"]; guard=os.environ["EXPECTED_GUARD"]; unit=os.environ["EXPECTED_UNIT"]
+paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
+argv_rows=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
+if paths!=[guard] or len(argv_rows)!=1:
+    raise SystemExit("workload ExecStartPre path topology differs")
+argv=shlex.split(argv_rows[0]); terminal={unit,"%n"}
+if len(argv)!=3 or argv[:2]!=[guard,"--probe-workload-authority"] or argv[2] not in terminal:
+    raise SystemExit("workload ExecStartPre self-probe argv differs")
+PY
+            ;;
+        *)
+            [ -z "$exec_start_pre" ] \
+                || fail "Code-Release NO-GO: $unit hat eine unerwartete ExecStartPre-Kante" 77
+            ;;
+    esac
+    exec_condition="$("$SYSTEMCTL_BIN" show "$unit" --property=ExecCondition --value)"
+    if [ "$guard_mode" = timer ]; then
+        [ -z "$exec_condition" ] \
+            || fail "Code-Release NO-GO: $unit hat eine unerwartete ExecCondition" 77
+        return 0
+    fi
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$exec_condition" EXPECTED_GUARD="$BOOT_GUARD_PATH" \
+        EXPECTED_UNIT="$unit" GUARD_MODE="$guard_mode" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+raw=os.environ["RAW"]
+guard=os.environ["EXPECTED_GUARD"]
+unit=os.environ["EXPECTED_UNIT"]
+mode=os.environ["GUARD_MODE"]
+paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
+argv_rows=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
+expected_count=1 if mode=="guard-only" else 2
+if paths != [guard]*expected_count or len(argv_rows)!=expected_count:
+    raise SystemExit("systemd ExecCondition path topology differs")
+parsed=[shlex.split(row) for row in argv_rows]
+terminal={unit,"%n"}
+if mode=="guard-only":
+    valid=(len(parsed[0])==2 and parsed[0][0]==guard and parsed[0][1] in terminal)
+else:
+    valid=(len(parsed[0])==3 and parsed[0][:2]==[guard,"--prepare-code-release-start"]
+           and parsed[0][2] in terminal and len(parsed[1])==2 and parsed[1][0]==guard
+           and parsed[1][1] in terminal)
+if not valid:
+    raise SystemExit("systemd ExecCondition argv differs")
+PY
+}
+
+validate_network_watchdog_timer_contract() {
+    local unit=genus-network-watchdog.timer
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=LoadState --value 2>/dev/null || true)" = loaded ] \
+        || fail "Code-Release NO-GO: $unit ist nicht geladen" 77
+    validate_unit_origin_and_executable_edges "$unit" timer
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=Unit --value)" = genus-network-watchdog.service ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=Persistent --value)" = yes ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=OnBootUSec --value)" = 2min ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=OnUnitActiveUSec --value)" = 5min ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=AccuracyUSec --value)" = 30s ] \
+        || fail "Code-Release NO-GO: Watchdog-Timervertrag driftet" 77
+}
+
+validate_public_entrypoint_closure() {
+    local entry="$1" manifest generation
+    manifest="$(selector_manifest)"
+    generation="$(public_set_path "$manifest")"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$generation/source/deploy" "$entry" <<'PY'
+import ast,os,pathlib,re,stat,sys
+deploy=pathlib.Path(sys.argv[1]); entry=sys.argv[2]
+dinfo=deploy.lstat()
+if (deploy.is_symlink() or not stat.S_ISDIR(dinfo.st_mode) or dinfo.st_uid!=0 or dinfo.st_gid!=0
+        or stat.S_IMODE(dinfo.st_mode)!=0o555):
+    raise SystemExit("learner deploy namespace is not root-owned public source")
+queue=[entry]; checked=set(); references={}
+shell_ref=re.compile(r'(?:\$SCRIPT_DIR|\$\{SCRIPT_DIR\})/([A-Za-z0-9_.-]+)')
+forbidden=(re.compile(r'\beval\b'),re.compile(r'\b(?:ba|z|k)?sh\s+-c\b'),re.compile(r'\bpython(?:3)?\s+-c\b'))
+while queue:
+    name=queue.pop(0)
+    if name in checked: continue
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+",name): raise SystemExit("learner dependency name is unsafe")
+    path=deploy/name; info=path.lstat()
+    if (path.is_symlink() or not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_gid!=0 or info.st_nlink!=1
+            or stat.S_IMODE(info.st_mode) not in {0o444,0o555}
+            or path.resolve(strict=True).parent!=deploy.resolve(strict=True)):
+        raise SystemExit(f"learner reachable source is unsafe: {name}")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try: raw=os.read(fd,4*1024*1024+1); final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_gid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if len(raw)>4*1024*1024 or len(raw)!=info.st_size or any(getattr(info,key)!=getattr(final,key) for key in fields):
+        raise SystemExit(f"learner reachable source changed during read: {name}")
+    text=raw.decode("utf-8"); checked.add(name)
+    local=set(shell_ref.findall(text))
+    if name.endswith(".sh"):
+        code="\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+        if any(pattern.search(code) for pattern in forbidden):
+            raise SystemExit(f"learner reachable shell creates an unbounded command edge: {name}")
+    if name.endswith(".py"):
+        tree=ast.parse(text,filename=name)
+        modules={node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node,ast.ImportFrom) and node.module}
+        modules.update(alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node,ast.Import) for alias in node.names)
+        local.update(f"{module}.py" for module in modules if (deploy/f"{module}.py").is_file())
+    references[name]=sorted(local)
+    for child in sorted(local):
+        child_path=deploy/child
+        if not child_path.exists(): raise SystemExit(f"learner reachable source is missing: {name} -> {child}")
+        if child_path.suffix in {".sh",".py"}: queue.append(child)
+if entry not in checked or len(checked)<2:
+    raise SystemExit("learner reachable-script closure is unexpectedly empty")
+PY
+}
+
+validate_workload_unit_contract() {
+    local unit="$1" expected_user="$2" expected_group="$3" role="$4"
+    local env exec_start load_credential expected_path expected_argv service_home active_commit active_manifest generation
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=LoadState --value 2>/dev/null || true)" = loaded ] \
+        || fail "Code-Release NO-GO: $unit ist nicht geladen" 77
+    validate_unit_origin_and_executable_edges "$unit" restartable
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=User --value)" = "$expected_user" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=Group --value)" = "$expected_group" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=SupplementaryGroups --value)" = "$DATA_GROUP" ] \
+        || fail "Code-Release NO-GO: $unit hat keine exakte User/Group/genus-data-Trennung" 77
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=NoNewPrivileges --value)" = yes ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=RestrictSUIDSGID --value)" = yes ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=CapabilityBoundingSet --value)" ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=AmbientCapabilities --value)" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=UMask --value)" = 0007 ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=PrivateMounts --value)" = yes ] \
+        || fail "Code-Release NO-GO: $unit hat keine vollstaendige fail-closed Privileggrenze" 77
+    service_home="/var/lib/$expected_user/home"
+    active_manifest="$(selector_manifest)"
+    active_commit="$(manifest_source_commit "$active_manifest")"
+    generation="$(public_set_path "$active_manifest")"
+    validate_unit_namespace_contract "$unit" "$expected_user" "$role" "$service_home" "$active_manifest"
+    env="$("$SYSTEMCTL_BIN" show "$unit" --property=Environment --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$env" ROLE="$role" EXPECTED_DB="$DB_PATH" \
+        EXPECTED_PAUSE="$PAUSE_FILE" EXPECTED_DATA_GROUP="$DATA_GROUP" EXPECTED_RUNTIME_USER="$RUNTIME_USER" \
+        EXPECTED_TELEGRAM_USER="$TELEGRAM_USER" EXPECTED_TOKEN_FILE="/run/credentials/$unit/telegram_bot_token" \
+        EXPECTED_CORE="$generation/core/bin/python" EXPECTED_EMBED="$generation/embed/bin/python" \
+        EXPECTED_ASSETS="$generation/assets" EXPECTED_MODEL="$MODEL" \
+        EXPECTED_SOURCE="$generation/source" EXPECTED_GENERATION="$generation" \
+        EXPECTED_SOURCE_SNAPSHOT="$generation/source/source.snapshot.json" \
+        EXPECTED_REPO_COMMIT="$active_commit" \
+        EXPECTED_DEUTER="$RUNTIME_VIEW_ROOT/assets/deuter-model/qwen2.5-1.5b-instruct-q4_k_m.gguf" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import hashlib,os,pathlib,re,shlex
+role=os.environ["ROLE"]
+expected={"GENUS_DB_PATH":os.environ["EXPECTED_DB"],"GENUS_PAUSE_FILE":os.environ["EXPECTED_PAUSE"],
+          "GENUS_DATA_GROUP":os.environ["EXPECTED_DATA_GROUP"],"GENUS_PRODUCT_MODE":"1",
+          "GENUS_REPO_DIR":os.environ["EXPECTED_SOURCE"],"GENUS_SOURCE_ROOT":os.environ["EXPECTED_SOURCE"],
+          "GENUS_SOURCE_SNAPSHOT":os.environ["EXPECTED_SOURCE_SNAPSHOT"],
+           "GENUS_EXPECTED_REPO_COMMIT":os.environ["EXPECTED_REPO_COMMIT"],
+           "GENUS_RUNTIME_SET_ROOT":os.environ["EXPECTED_GENERATION"],
+          "GENUS_ASSET_ROOT":os.environ["EXPECTED_ASSETS"],
+          "GENUS_ASSET_RECEIPT":os.environ["EXPECTED_ASSETS"]+"/receipt.sha256",
+          "HF_HUB_OFFLINE":"1","TRANSFORMERS_OFFLINE":"1","GENUS_MODEL_OFFLINE":"1"}
+if role=="runtime":
+    expected.update({"GENUS_USER":os.environ["EXPECTED_RUNTIME_USER"],
+                     "GENUS_RUNTIME_USER":os.environ["EXPECTED_RUNTIME_USER"],
+                     "GENUS_CORE_PYTHON":os.environ["EXPECTED_CORE"],
+                     "GENUS_EMBED_PYTHON":os.environ["EXPECTED_EMBED"],
+                     "GENUS_EMBED_MODEL":os.environ["EXPECTED_MODEL"],
+                     "GENUS_EMBED_CACHE":os.environ["EXPECTED_ASSETS"]+"/fastembed-cache",
+                     "FASTEMBED_CACHE_PATH":os.environ["EXPECTED_ASSETS"]+"/fastembed-cache"})
+else:
+    expected.update({"GENUS_TELEGRAM_USER":os.environ["EXPECTED_TELEGRAM_USER"],
+                     "GENUS_TELEGRAM_TOKEN_FILE":os.environ["EXPECTED_TOKEN_FILE"],
+                     "GENUS_DEUTER_MODEL":os.environ["EXPECTED_DEUTER"]})
+values={key:[] for key in {*expected,"GENUS_DEUTER_MODEL","GENUS_EXPECTED_ASSET_RECEIPT_SHA256"}}
+for item in shlex.split(os.environ["RAW"]):
+    key,sep,value=item.partition("=")
+    if sep and key in values: values[key].append(value)
+for key,value in expected.items():
+    if values[key]!=[value]: raise SystemExit(f"{role} unit {key} binding differs")
+if "TELEGRAM_BOT_TOKEN" in os.environ["RAW"]: raise SystemExit("telegram token leaked into Environment")
+assets=pathlib.Path(os.environ["EXPECTED_ASSETS"])
+receipt=assets/"receipt.sha256"
+if len(values["GENUS_EXPECTED_ASSET_RECEIPT_SHA256"])!=1 or not re.fullmatch(r"[a-f0-9]{64}",values["GENUS_EXPECTED_ASSET_RECEIPT_SHA256"][0]):
+    raise SystemExit(f"{role} unit lacks the exact asset receipt pin")
+if not receipt.is_file() or receipt.is_symlink() or hashlib.sha256(receipt.read_bytes()).hexdigest()!=values["GENUS_EXPECTED_ASSET_RECEIPT_SHA256"][0]:
+    raise SystemExit(f"{role} unit asset receipt pin differs")
+if role=="telegram":
+    deuter=pathlib.Path(values["GENUS_DEUTER_MODEL"][0]); root=assets/"deuter-model"
+    if root not in deuter.parents or not deuter.is_file() or deuter.is_symlink():
+        raise SystemExit("telegram Deuter model escaped the public asset projection")
+elif values["GENUS_DEUTER_MODEL"]:
+    raise SystemExit("runtime learner unexpectedly receives a Deuter model path")
+PY
+    exec_start="$("$SYSTEMCTL_BIN" show "$unit" --property=ExecStart --value)"
+    if [ "$role" = runtime ]; then
+        expected_path=/bin/bash
+        expected_argv="/bin/bash $generation/source/deploy/pi_learn.sh"
+    else
+        expected_path="$generation/core/bin/python"
+        expected_argv="$expected_path -I -P $TELEGRAM_LAUNCHER_PATH $generation/source"
+    fi
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$exec_start" EXPECTED_PATH="$expected_path" \
+        EXPECTED_ARGV="$expected_argv" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+raw=os.environ["RAW"]
+paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
+argv_rows=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
+if paths!=[os.environ["EXPECTED_PATH"]] or len(argv_rows)!=1:
+    raise SystemExit("systemd ExecStart path/argv structure differs")
+if shlex.split(argv_rows[0])!=shlex.split(os.environ["EXPECTED_ARGV"]):
+    raise SystemExit("systemd ExecStart argv differs")
+PY
+    if [ "$role" = telegram ]; then
+        load_credential="$("$SYSTEMCTL_BIN" show "$unit" --property=LoadCredential --value)"
+        [ "$load_credential" = "telegram_bot_token:/etc/genus/telegram_bot_token" ] \
+            || fail "Code-Release NO-GO: Telegram-Token ist nicht exklusiv systemd-credential-getrennt" 77
+    else
+        validate_public_entrypoint_closure pi_learn.sh
+    fi
+}
+
+validate_scheduled_runtime_template_contract() {
+    local unit=genus-cron@.service exec_start env active_commit active_manifest generation
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=LoadState --value 2>/dev/null || true)" = loaded ] \
+        || fail "Code-Release NO-GO: $unit ist nicht geladen" 77
+    validate_unit_origin_and_executable_edges "$unit" guard-only
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=User --value)" = "$RUNTIME_USER" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=Group --value)" = "$RUNTIME_GROUP" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=SupplementaryGroups --value)" = "$DATA_GROUP" ] \
+        || fail "Code-Release NO-GO: $unit hat keine exakte Runtime/genus-data-Identitaet" 77
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=NoNewPrivileges --value)" = yes ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=RestrictSUIDSGID --value)" = yes ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=CapabilityBoundingSet --value)" ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=AmbientCapabilities --value)" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=UMask --value)" = 0007 ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=PrivateMounts --value)" = yes ] \
+        || fail "Code-Release NO-GO: $unit hat keine vollstaendige fail-closed Privileggrenze" 77
+    active_manifest="$(selector_manifest)"
+    generation="$(public_set_path "$active_manifest")"
+    validate_unit_namespace_contract "$unit" "$RUNTIME_USER" scheduled /var/lib/genus-runtime/home "$active_manifest"
+    active_commit="$(manifest_source_commit "$active_manifest")"
+    env="$("$SYSTEMCTL_BIN" show "$unit" --property=Environment --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$env" EXPECTED_DB="$DB_PATH" EXPECTED_PAUSE="$PAUSE_FILE" \
+        EXPECTED_CORE="$generation/core/bin/python" EXPECTED_SOURCE="$generation/source" \
+        EXPECTED_GENERATION="$generation" EXPECTED_ASSETS="$generation/assets" \
+        EXPECTED_SOURCE_SNAPSHOT="$generation/source/source.snapshot.json" \
+        EXPECTED_REPO_COMMIT="$active_commit" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,shlex
+expected={"GENUS_DB_PATH":os.environ["EXPECTED_DB"],"GENUS_PAUSE_FILE":os.environ["EXPECTED_PAUSE"],
+           "GENUS_CORE_PYTHON":os.environ["EXPECTED_CORE"],"GENUS_PRODUCT_MODE":"1",
+           "GENUS_MODEL_OFFLINE":"1","HF_HUB_OFFLINE":"1",
+           "GENUS_RUNTIME_SET_ROOT":os.environ["EXPECTED_GENERATION"],
+           "GENUS_ASSET_ROOT":os.environ["EXPECTED_ASSETS"],
+           "GENUS_REPO_DIR":os.environ["EXPECTED_SOURCE"],"GENUS_SOURCE_ROOT":os.environ["EXPECTED_SOURCE"],
+           "GENUS_SOURCE_SNAPSHOT":os.environ["EXPECTED_SOURCE_SNAPSHOT"],
+           "GENUS_EXPECTED_REPO_COMMIT":os.environ["EXPECTED_REPO_COMMIT"]}
+values={key:[] for key in expected}
+for item in shlex.split(os.environ["RAW"]):
+    key,sep,value=item.partition("=")
+    if sep and key in values: values[key].append(value)
+for key,value in expected.items():
+    if values[key]!=[value]: raise SystemExit(f"scheduled runtime {key} binding differs")
+if "TELEGRAM_BOT_TOKEN" in os.environ["RAW"] or "GENUS_SD_BACKUP=" in os.environ["RAW"]:
+    raise SystemExit("scheduled runtime receives a secret or backup target")
+PY
+    exec_start="$("$SYSTEMCTL_BIN" show "$unit" --property=ExecStart --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$exec_start" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+raw=os.environ["RAW"]
+paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
+argv=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
+expected="/usr/local/libexec/genus/pi_cron_dispatch.sh %i"
+if paths!="/usr/local/libexec/genus/pi_cron_dispatch.sh".split() or len(argv)!=1 or shlex.split(argv[0])!=shlex.split(expected):
+    raise SystemExit("scheduled runtime dispatcher argv differs")
+PY
+}
+
+validate_backup_unit_contract() {
+    local unit=genus-backup.service env exec_start backup_home=/var/lib/genus-backup/home active_commit active_manifest generation
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=LoadState --value 2>/dev/null || true)" = loaded ] \
+        || fail "Code-Release NO-GO: dedizierte $unit fehlt" 77
+    validate_unit_origin_and_executable_edges "$unit" guard-only
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=User --value)" = "$BACKUP_USER" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=Group --value)" = "$BACKUP_GROUP" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=SupplementaryGroups --value)" = "$DATA_GROUP" ] \
+        || fail "Code-Release NO-GO: Backup-Unit hat keine exakte genus-backup/genus-data-Identitaet" 77
+    [ "$("$SYSTEMCTL_BIN" show "$unit" --property=NoNewPrivileges --value)" = yes ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=RestrictSUIDSGID --value)" = yes ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=CapabilityBoundingSet --value)" ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=AmbientCapabilities --value)" ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=UMask --value)" = 0007 ] \
+        && [ "$("$SYSTEMCTL_BIN" show "$unit" --property=PrivateMounts --value)" = yes ] \
+        || fail "Code-Release NO-GO: Backup-Unit hat keine vollstaendige fail-closed Privileggrenze" 77
+    active_manifest="$(selector_manifest)"
+    generation="$(public_set_path "$active_manifest")"
+    validate_unit_namespace_contract "$unit" "$BACKUP_USER" backup "$backup_home" "$active_manifest"
+    active_commit="$(manifest_source_commit "$active_manifest")"
+    env="$("$SYSTEMCTL_BIN" show "$unit" --property=Environment --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$env" EXPECTED_HOME="$backup_home" \
+        EXPECTED_OPERATOR="$GENUS_USER" EXPECTED_OPERATOR_HOME="$GENUS_HOME" EXPECTED_BACKUP_USER="$BACKUP_USER" \
+        EXPECTED_BACKUP_GROUP="$BACKUP_GROUP" EXPECTED_DATA_GROUP="$DATA_GROUP" EXPECTED_SOURCE="$generation/source" \
+        EXPECTED_GENERATION="$generation" EXPECTED_ASSETS="$generation/assets" \
+        EXPECTED_SOURCE_SNAPSHOT="$generation/source/source.snapshot.json" \
+        EXPECTED_REPO_COMMIT="$active_commit" \
+        EXPECTED_DB="$DB_PATH" EXPECTED_PAUSE="$PAUSE_FILE" EXPECTED_BACKUP="$SCHEDULED_BACKUP_DIR" \
+        EXPECTED_LOCK="$BACKUP_LOCK_FILE" EXPECTED_CORE="$generation/core/bin/python" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,shlex
+home=os.environ["EXPECTED_OPERATOR_HOME"]
+expected={"HOME":os.environ["EXPECTED_HOME"],"GENUS_HOME":os.environ["EXPECTED_HOME"],
+          "GENUS_OPERATOR_USER":os.environ["EXPECTED_OPERATOR"],"GENUS_OPERATOR_HOME":home,
+          "GENUS_BACKUP_USER":os.environ["EXPECTED_BACKUP_USER"],"GENUS_BACKUP_GROUP":os.environ["EXPECTED_BACKUP_GROUP"],
+           "GENUS_DATA_GROUP":os.environ["EXPECTED_DATA_GROUP"],"GENUS_REPO_DIR":os.environ["EXPECTED_SOURCE"],
+           "GENUS_RUNTIME_SET_ROOT":os.environ["EXPECTED_GENERATION"],
+          "GENUS_SOURCE_ROOT":os.environ["EXPECTED_SOURCE"],
+          "GENUS_SOURCE_SNAPSHOT":os.environ["EXPECTED_SOURCE_SNAPSHOT"],
+          "GENUS_EXPECTED_REPO_COMMIT":os.environ["EXPECTED_REPO_COMMIT"],
+          "GENUS_CONTROL_DIR":home+"/.genus","GENUS_OPERATOR_CONTROL_DIR":home+"/.genus/control",
+          "GENUS_PRODUCT_DATA_DIR":home+"/.genus/data","GENUS_DB_PATH":os.environ["EXPECTED_DB"],
+          "GENUS_LOG_DIR":home+"/.genus/data/logs","GENUS_PAUSE_FILE":os.environ["EXPECTED_PAUSE"],
+          "GENUS_ANCHOR_DIR":home+"/.genus/anchors","GENUS_SD_BACKUP":os.environ["EXPECTED_BACKUP"],
+           "GENUS_BACKUP_LOCK_FILE":os.environ["EXPECTED_LOCK"],"GENUS_CORE_PYTHON":os.environ["EXPECTED_CORE"],
+           "GENUS_ASSET_ROOT":os.environ["EXPECTED_ASSETS"],
+           "GENUS_EXPECTED_DB_MOUNT":home+"/.genus/data","GENUS_EXPECTED_DB_DEVICE":"/dev/sda1",
+          "GENUS_PRODUCT_MODE":"1","GENUS_MODEL_OFFLINE":"1","HF_HUB_OFFLINE":"1"}
+values={key:[] for key in expected}
+for item in shlex.split(os.environ["RAW"]):
+    key,sep,value=item.partition("=")
+    if sep and key in values: values[key].append(value)
+for key,value in expected.items():
+    if values[key]!=[value]: raise SystemExit(f"backup unit {key} binding differs")
+if "TELEGRAM" in os.environ["RAW"]: raise SystemExit("backup unit receives Telegram material")
+PY
+    exec_start="$("$SYSTEMCTL_BIN" show "$unit" --property=ExecStart --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$exec_start" EXPECTED_SCRIPT="$generation/source/deploy/backup_ledger_to_sd.sh" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+raw=os.environ["RAW"]
+paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
+argv=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
+expected=f"/bin/bash {os.environ['EXPECTED_SCRIPT']}"
+if paths!=["/bin/bash"] or len(argv)!=1 or shlex.split(argv[0])!=shlex.split(expected):
+    raise SystemExit("backup unit ExecStart argv differs")
+PY
+    [ -z "$("$SYSTEMCTL_BIN" show "$unit" --property=LoadCredential --value)" ] \
+        || fail "Code-Release NO-GO: Backup-Unit erhaelt unerwartete Credentials" 77
+    as_root "$ROOT_TEST_BIN" -d "$SCHEDULED_BACKUP_DIR" && ! as_root "$ROOT_TEST_BIN" -L "$SCHEDULED_BACKUP_DIR" \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$SCHEDULED_BACKUP_DIR")" -eq "$(getent passwd "$BACKUP_USER" | cut -d: -f3)" ] \
+        && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$SCHEDULED_BACKUP_DIR")" = 700 ] \
+        || fail "Code-Release NO-GO: Backup-Ziel ist nicht vorprovisioniert/genus-backup-owned 0700" 77
+}
+
+validate_code_release_service_privilege_boundary() {
+    local operator_uid runtime_uid telegram_uid backup_uid data_gid watchdog_env watchdog_exec helper installed property
+    local active_manifest active_commit generation asset_receipt_sha bind_ro read_only
+    operator_uid="$(id -u)"; data_gid="$(getent group "$DATA_GROUP" | cut -d: -f3)"
+    runtime_uid="$(validate_service_account_contract "$RUNTIME_USER" "$RUNTIME_GROUP")"
+    telegram_uid="$(validate_service_account_contract "$TELEGRAM_USER" "$TELEGRAM_GROUP")"
+    backup_uid="$(validate_service_account_contract "$BACKUP_USER" "$BACKUP_GROUP")"
+    [ "$runtime_uid" -ne "$telegram_uid" ] && [ "$runtime_uid" -ne "$backup_uid" ] \
+        && [ "$telegram_uid" -ne "$backup_uid" ] && [ "$runtime_uid" -ne "$operator_uid" ] \
+        && [ "$telegram_uid" -ne "$operator_uid" ] && [ "$backup_uid" -ne "$operator_uid" ] \
+        || fail "Code-Release NO-GO: Operator/Runtime/Telegram/Backup-UIDs sind nicht getrennt" 77
+    case " $(id -G -- "$GENUS_USER") " in *" $data_gid "*) ;; *)
+        fail "Code-Release NO-GO: Operator fehlt tatsaechlich in genus-data" 77 ;;
+    esac
+    validate_service_account_authority_boundary \
+        "$runtime_uid" "$telegram_uid" "$backup_uid" "$data_gid"
+    validate_product_data_contract
+    validate_shared_backup_lock_contract
+    validate_root_schedule_contract
+    validate_scheduled_runtime_template_contract
+    validate_workload_unit_contract genus-learner.service "$RUNTIME_USER" "$RUNTIME_GROUP" runtime
+    validate_workload_unit_contract genus-telegram-bot.service "$TELEGRAM_USER" "$TELEGRAM_GROUP" telegram
+    validate_backup_unit_contract
+    validate_network_watchdog_timer_contract
+    validate_root_published_runtime_view
+    active_manifest="$(selector_manifest)"
+    generation="$(public_set_path "$active_manifest")"
+    active_commit="$(manifest_source_commit "$active_manifest")"
+    asset_receipt_sha="$(as_root "$ROOT_SHA256_BIN" "$generation/assets/receipt.sha256" | awk '{print $1}')"
+    [ "$("$SYSTEMCTL_BIN" show genus-telegram-bot-fallback.service --property=LoadState --value 2>/dev/null || true)" = not-found ] \
+        || fail "Code-Release NO-GO: transiente Telegram-Fallback-Unit ist noch installiert" 77
+    [ "$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=LoadState --value 2>/dev/null || true)" = loaded ] \
+        && [ "$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=User --value)" = root ] \
+        && [ "$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=Group --value)" = root ] \
+        || fail "Code-Release NO-GO: Watchdog-Orchestrator ist nicht exakt root:root" 77
+    validate_unit_origin_and_executable_edges genus-network-watchdog.service restartable
+    for property in NoNewPrivileges RestrictSUIDSGID PrivateMounts; do
+        [ "$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property="$property" --value)" = yes ] \
+            || fail "Code-Release NO-GO: Watchdog-Orchestrator fehlt $property" 77
+    done
+    [ "$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=CapabilityBoundingSet --value | tr '[:upper:]' '[:lower:]')" = cap_net_raw ] \
+        && [ -z "$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=AmbientCapabilities --value)" ] \
+        || fail "Code-Release NO-GO: Watchdog-Orchestrator hat nicht exakt CAP_NET_RAW" 77
+    bind_ro="$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=BindReadOnlyPaths --value)"
+    read_only="$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=ReadOnlyPaths --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$bind_ro" EXPECTED_SOURCE="$generation/source" \
+        EXPECTED_CONTROL="$(dirname "$PAUSE_FILE")" EXPECTED_DATA="$(dirname "$DB_PATH")" \
+        EXPECTED_ASSETS="$generation/assets" EXPECTED_GENERATION="$generation" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,shlex
+actual=shlex.split(os.environ["RAW"])
+expected={os.environ["EXPECTED_SOURCE"],os.environ["EXPECTED_CONTROL"],os.environ["EXPECTED_DATA"],
+          os.environ["EXPECTED_ASSETS"],os.environ["EXPECTED_GENERATION"]+"/projection.receipt",
+          os.environ["EXPECTED_GENERATION"]+"/projection.inventory"}
+if len(actual)!=len(set(actual)) or set(actual)!=expected:
+    raise SystemExit("watchdog read-only bind allowlist differs")
+PY
+    [ "$read_only" = "$generation" ] \
+        || fail "Code-Release NO-GO: Watchdog ReadOnlyPaths ist nicht die exakte Generation" 77
+    watchdog_env="$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=Environment --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$watchdog_env" EXPECTED_OPERATOR="$GENUS_USER" \
+        EXPECTED_RUNTIME="$RUNTIME_USER" EXPECTED_TELEGRAM="$TELEGRAM_USER" EXPECTED_BACKUP="$BACKUP_USER" \
+        EXPECTED_DATA="$DATA_GROUP" EXPECTED_HOME="$GENUS_HOME" EXPECTED_DB="$DB_PATH" EXPECTED_PAUSE="$PAUSE_FILE" \
+        EXPECTED_GENERATION="$generation" EXPECTED_SOURCE="$generation/source" EXPECTED_COMMIT="$active_commit" \
+        EXPECTED_ASSETS="$generation/assets" EXPECTED_ASSET_SHA="$asset_receipt_sha" \
+        "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,shlex
+expected={"GENUS_OPERATOR_USER":os.environ["EXPECTED_OPERATOR"],"GENUS_RUNTIME_USER":os.environ["EXPECTED_RUNTIME"],
+          "GENUS_TELEGRAM_USER":os.environ["EXPECTED_TELEGRAM"],"GENUS_BACKUP_USER":os.environ["EXPECTED_BACKUP"],
+          "GENUS_DATA_GROUP":os.environ["EXPECTED_DATA"],"GENUS_HOME":os.environ["EXPECTED_HOME"],
+          "GENUS_DB_PATH":os.environ["EXPECTED_DB"],"GENUS_PAUSE_FILE":os.environ["EXPECTED_PAUSE"],
+          "GENUS_EXPECTED_DB_MOUNT":os.path.dirname(os.environ["EXPECTED_DB"]),
+          "GENUS_RUNTIME_SET_ROOT":os.environ["EXPECTED_GENERATION"],
+          "GENUS_SOURCE_ROOT":os.environ["EXPECTED_SOURCE"],
+          "GENUS_SOURCE_SNAPSHOT":os.environ["EXPECTED_SOURCE"]+"/source.snapshot.json",
+          "GENUS_EXPECTED_REPO_COMMIT":os.environ["EXPECTED_COMMIT"],
+          "GENUS_ASSET_ROOT":os.environ["EXPECTED_ASSETS"],
+          "GENUS_ASSET_RECEIPT":os.environ["EXPECTED_ASSETS"]+"/receipt.sha256",
+          "GENUS_EXPECTED_ASSET_RECEIPT_SHA256":os.environ["EXPECTED_ASSET_SHA"],
+          "GENUS_PRIVILEGED_HELPER_DIR":"/usr/local/libexec/genus"}
+values={key:[] for key in expected}
+for item in shlex.split(os.environ["RAW"]):
+    key,sep,value=item.partition("=")
+    if sep and key in values: values[key].append(value)
+for key,value in expected.items():
+    if values[key]!=[value]: raise SystemExit(f"watchdog {key} binding differs")
+PY
+    watchdog_exec="$("$SYSTEMCTL_BIN" show genus-network-watchdog.service --property=ExecStart --value)"
+    "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin RAW="$watchdog_exec" "$SYSTEM_PYTHON_BIN" -I -P - <<'PY'
+import os,re,shlex
+raw=os.environ["RAW"]; expected="/usr/local/libexec/genus/pi_network_watchdog.sh"
+paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
+argv=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
+if paths!=[expected] or len(argv)!=1 or shlex.split(argv[0])!=[expected]:
+    raise SystemExit("watchdog ExecStart differs")
+PY
+    for helper in pi_network_watchdog.sh pi_cron_dispatch.sh pi_telegram_launcher.py; do
+        installed="/usr/local/libexec/genus/$helper"
+        as_root "$ROOT_TEST_BIN" -f "$installed" && ! as_root "$ROOT_TEST_BIN" -L "$installed" \
+            && [ "$(as_root "$ROOT_STAT_BIN" -c %u "$installed")" -eq 0 ] \
+            && [ "$(as_root "$ROOT_STAT_BIN" -c %g "$installed")" -eq 0 ] \
+            && [ "$(as_root "$ROOT_STAT_BIN" -c %a "$installed")" = 755 ] \
+            && [ "$(as_root "$ROOT_STAT_BIN" -c %h "$installed")" -eq 1 ] \
+            && [ "$(sha256_file "$installed")" = "$(sha256_file "$generation/source/deploy/$helper")" ] \
+            || fail "Code-Release NO-GO: root-eigener Privileg-Helper driftet: $helper" 77
+    done
+    for helper in pi_install_network_watchdog.sh pi_install_learner.sh pi_install_telegram_bot.sh; do
+        installed="/usr/local/libexec/genus/$helper"
+        ! as_root "$ROOT_TEST_BIN" -e "$installed" && ! as_root "$ROOT_TEST_BIN" -L "$installed" \
+            || fail "Code-Release NO-GO: Installer ist unerwartet als root-Helper publiziert: $helper" 77
+    done
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        /usr/local/libexec/genus/pi_network_watchdog.sh <<'PY'
+import pathlib,sys
+payload=pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+if "systemd-run" in payload: raise SystemExit("watchdog still creates transient workload units")
+for fixed in ("systemctl start genus-learner.service","systemctl start genus-telegram-bot.service"):
+    if fixed not in payload: raise SystemExit(f"watchdog lacks fixed-unit delegation: {fixed}")
+PY
+}
+
+publish_code_release_root_trust() {
+    local state="$1" phase="$2"
+    case "$state:$phase" in
+        pending:authorized|pending:receipt-written|pending:rollback-authorized|\
+        terminal-ready:terminalized|terminal-ready:resumed|terminal-ready:rollback-authorized|\
+        steady:resumed|steady:rollback-authorized) ;;
+        *) fail "unbekannter Code-Release-Root-Trust-Uebergang" 70 ;;
+    esac
+    as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0700 "$CODE_RELEASE_TRUST_ROOT"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        REQUESTED_STATE="$state" REQUESTED_PHASE="$phase" COMMIT="$(repo_commit)" \
+        USER_UID="$(id -u)" RECEIPT_ROOT_ENV="$RECEIPT_ROOT" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_TRUST_ANCHOR" \
+        "$AUTOSTART_APPROVAL" "$CODE_RELEASE_JOURNAL" <<'PY'
+import datetime,hashlib,json,os,pathlib,re,secrets,stat,sys
+anchor,approval_path,journal_path=map(pathlib.Path,sys.argv[1:4]); user_uid=int(os.environ["USER_UID"])
+root=anchor.parent; root_info=root.lstat()
+if (root.resolve(strict=True)!=root or not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=0
+        or root_info.st_gid!=0 or stat.S_IMODE(root_info.st_mode)!=0o700): raise SystemExit("code release trust root is unsafe")
+def strict(raw):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise SystemExit("duplicate root trust evidence key")
+            result[key]=value
+        return result
+    value=json.loads(raw,object_pairs_hook=pairs)
+    if not isinstance(value,dict): raise SystemExit("root trust evidence is not an object")
+    return value
+def stable(path,owner,mode,limit=1024*1024):
+    before=path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid!=owner or (owner==0 and before.st_gid!=0) or stat.S_IMODE(before.st_mode)!=mode
+            or before.st_nlink!=1): raise SystemExit("root trust source is unsafe")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try:
+        opened=os.fstat(fd); raw=b""
+        while True:
+            chunk=os.read(fd,65536)
+            if not chunk: break
+            raw+=chunk
+            if len(raw)>limit: raise SystemExit("root trust source is oversized")
+        final=os.fstat(fd)
+    finally: os.close(fd)
+    fields=("st_dev","st_ino","st_uid","st_mode","st_nlink","st_size","st_mtime_ns")
+    if any(getattr(before,key)!=getattr(opened,key) or getattr(before,key)!=getattr(final,key) for key in fields) or len(raw)!=before.st_size:
+        raise SystemExit("root trust source changed during read")
+    return raw
+approval_raw=stable(approval_path,user_uid,0o600); journal_raw=stable(journal_path,user_uid,0o600)
+approval=strict(approval_raw); journal=strict(journal_raw)
+approval_schema=approval.get("schema")
+v3={"schema","repo_commit","active_manifest","active_manifest_sha256","readiness_path","readiness_sha256","series_path","series_sha256","reason"}
+v4={"schema","repo_commit","active_manifest","active_manifest_sha256","prior_start_authorization_path",
+    "prior_start_authorization_sha256","code_release_preflight_path","code_release_preflight_sha256","release_seal",
+    "completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256","reason"}
+if ((approval_schema=="genus-a0.3c-runtime-start-authorization-v3" and set(approval)!=v3)
+        or (approval_schema=="genus-a0.3c-runtime-start-authorization-v4" and set(approval)!=v4)
+        or approval_schema not in {"genus-a0.3c-runtime-start-authorization-v3","genus-a0.3c-runtime-start-authorization-v4"}):
+    raise SystemExit("root trust approval schema differs")
+if (journal.get("schema")!="genus-a0.3c-code-release-pending-v1"
+        or journal.get("phase")!=os.environ["REQUESTED_PHASE"] and os.environ["REQUESTED_STATE"]=="pending"
+        or any(journal.get(key) is not False for key in ("database_replay_performed","database_reseal_performed","database_restore_performed"))):
+    raise SystemExit("root trust journal differs")
+commit=os.environ["COMMIT"]
+if approval.get("repo_commit")!=commit: raise SystemExit("root trust approval commit differs")
+expected_commit=journal.get("old_commit") if journal.get("phase")=="rollback-authorized" else journal.get("new_commit")
+if expected_commit!=commit: raise SystemExit("root trust journal commit differs")
+for key,size in (("repo_commit",40),("active_manifest_sha256",64)):
+    if not re.fullmatch(rf"[a-f0-9]{{{size}}}",approval.get(key,"")): raise SystemExit("root trust digest differs")
+if not re.fullmatch(r"(?:legacy-)?[a-f0-9]{64}",approval.get("active_manifest","")):
+    raise SystemExit("root trust active manifest differs")
+for key in ("release_seal","nonce"):
+    if not re.fullmatch(r"[a-f0-9]{64}",journal.get(key,"")): raise SystemExit("root trust release binding differs")
+receipt_root=pathlib.Path(os.environ["RECEIPT_ROOT_ENV"]).resolve(strict=True)
+prior_path=pathlib.Path(journal.get("prior_start_authorization_path",""))
+if prior_path.parent.resolve(strict=True)!=receipt_root: raise SystemExit("root trust prior approval escapes receipt root")
+prior_raw=stable(prior_path,user_uid,0o600)
+if hashlib.sha256(prior_raw).hexdigest()!=journal.get("prior_start_authorization_sha256"):
+    raise SystemExit("root trust prior approval hash differs")
+prior=strict(prior_raw)
+if prior.get("schema") not in {"genus-a0.3c-runtime-start-authorization-v3","genus-a0.3c-runtime-start-authorization-v4"}:
+    raise SystemExit("root trust prior approval version differs")
+state=os.environ["REQUESTED_STATE"]; phase=os.environ["REQUESTED_PHASE"]
+if state=="pending" and phase not in {"authorized","receipt-written","rollback-authorized"}:
+    raise SystemExit("root trust pending phase differs")
+if state=="terminal-ready" and phase not in {"terminalized","resumed","rollback-authorized"}:
+    raise SystemExit("root trust terminal-ready phase differs")
+if state in {"terminal-ready","steady"}:
+    if journal.get("phase") not in {"terminalized","resumed","rollback-authorized"} or phase!=journal.get("phase"):
+        raise SystemExit("root trust terminal phase differs")
+    if journal.get("phase") in {"terminalized","resumed"}:
+        if approval_schema!="genus-a0.3c-runtime-start-authorization-v4" or not all(
+            approval.get(key) for key in ("completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256")
+        ): raise SystemExit("forward root trust lacks terminal v4 evidence")
+    elif approval_schema=="genus-a0.3c-runtime-start-authorization-v4" and not all(
+        approval.get(key) for key in ("completion_receipt_path","completion_receipt_sha256","consumption_receipt_path","consumption_receipt_sha256")
+    ): raise SystemExit("rollback root trust restored a nonterminal v4 approval")
+def existing_anchor():
+    try: raw=stable(anchor,0,0o444,65536)
+    except FileNotFoundError: return None
+    data=strict(raw)
+    keys={"schema","state","repo_commit","active_manifest","active_manifest_sha256","release_seal","nonce",
+          "approval_schema","approval_sha256","journal_phase","journal_sha256","published_at"}
+    if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-root-trust-v1" or data.get("state") not in {"pending","terminal-ready","steady"}:
+        raise SystemExit("existing root trust anchor differs")
+    return data
+current=existing_anchor(); approval_sha=hashlib.sha256(approval_raw).hexdigest(); journal_sha=hashlib.sha256(journal_raw).hexdigest()
+if state=="pending":
+    if current is None:
+        if journal.get("transition_kind")!="a0-exit-bootstrap" or prior.get("schema")!="genus-a0.3c-runtime-start-authorization-v3":
+            raise SystemExit("only the first v3 bootstrap may create root trust")
+    elif current.get("state")=="steady":
+        if (current.get("approval_sha256")!=journal.get("prior_start_authorization_sha256")
+                or current.get("repo_commit")!=journal.get("old_commit")):
+            raise SystemExit("steady to pending root trust CAS differs")
+    elif current.get("state") not in {"pending","terminal-ready"} or current.get("release_seal")!=journal.get("release_seal") or current.get("nonce")!=journal.get("nonce"):
+        raise SystemExit("pending root trust belongs to another release")
+elif state=="terminal-ready":
+    if current is None or current.get("state") not in {"pending","terminal-ready","steady"} or current.get("release_seal")!=journal.get("release_seal") or current.get("nonce")!=journal.get("nonce"):
+        raise SystemExit("pending to terminal-ready root trust CAS differs")
+else:
+    if current is None or current.get("state")!="terminal-ready" or current.get("release_seal")!=journal.get("release_seal") or current.get("nonce")!=journal.get("nonce"):
+        if not (current and current.get("state")=="steady" and current.get("approval_sha256")==approval_sha and current.get("repo_commit")==commit):
+            raise SystemExit("terminal-ready to steady root trust CAS differs")
+data={"schema":"genus-a0.3c-code-release-root-trust-v1","state":state,"repo_commit":commit,
+      "active_manifest":approval["active_manifest"],"active_manifest_sha256":approval["active_manifest_sha256"],
+      "release_seal":journal["release_seal"],"nonce":journal["nonce"],"approval_schema":approval_schema,
+      "approval_sha256":approval_sha,"journal_phase":phase if state!="steady" else "",
+      "journal_sha256":journal_sha if state!="steady" else "",
+      "published_at":datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00","Z")}
+tmp=anchor.with_name(f"{anchor.name}.tmp.{secrets.token_hex(12)}")
+fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try:
+    os.fchown(fd,0,0); os.fchmod(fd,0o600)
+    os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+os.chmod(tmp,0o444); fd=os.open(tmp,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try: os.fsync(fd)
+finally: os.close(fd)
+os.replace(tmp,anchor); directory=os.open(root,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+}
+
+code_release_root_trust_state() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - \
+        "$CODE_RELEASE_TRUST_ROOT" "$CODE_RELEASE_TRUST_ANCHOR" <<'PY'
+import json,os,pathlib,stat,sys
+root,path=map(pathlib.Path,sys.argv[1:3])
+try: root_info=root.lstat()
+except FileNotFoundError:
+    print("absent"); raise SystemExit(0)
+if root.resolve(strict=True)!=root or not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=0 or root_info.st_gid!=0 or stat.S_IMODE(root_info.st_mode)!=0o700:
+    raise SystemExit("code release trust root is unsafe")
+try: info=path.lstat()
+except FileNotFoundError:
+    print("absent"); raise SystemExit(0)
+if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=0o444 or info.st_nlink!=1:
+    raise SystemExit("code release trust anchor is unsafe")
+fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+try: raw=os.read(fd,65537); final=os.fstat(fd)
+finally: os.close(fd)
+if len(raw)>65536 or (final.st_dev,final.st_ino,final.st_uid,final.st_mode,final.st_nlink,final.st_size,final.st_mtime_ns)!=(info.st_dev,info.st_ino,info.st_uid,info.st_mode,info.st_nlink,info.st_size,info.st_mtime_ns) or len(raw)!=info.st_size:
+    raise SystemExit("code release trust anchor changed during read")
+def pairs(items):
+    result={}
+    for key,value in items:
+        if key in result: raise SystemExit("duplicate code release trust key")
+        result[key]=value
+    return result
+data=json.loads(raw,object_pairs_hook=pairs)
+keys={"schema","state","repo_commit","active_manifest","active_manifest_sha256","release_seal","nonce",
+      "approval_schema","approval_sha256","journal_phase","journal_sha256","published_at"}
+if set(data)!=keys or data.get("schema")!="genus-a0.3c-code-release-root-trust-v1" or data.get("state") not in {"pending","terminal-ready","steady"}:
+    raise SystemExit("code release trust anchor schema differs")
+print(data["state"])
+PY
+}
+
+validate_code_release_initial_root_trust() {
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin USER_UID="$(id -u)" COMMIT="$(repo_commit)" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_TRUST_ROOT" "$CODE_RELEASE_TRUST_ANCHOR" \
+        "$AUTOSTART_APPROVAL" <<'PY'
+import hashlib,json,os,pathlib,stat,sys
+root,anchor,approval_path=map(pathlib.Path,sys.argv[1:4]); uid=int(os.environ["USER_UID"])
+def stable(path,owner,mode):
+    before=path.lstat()
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid!=owner or (owner==0 and before.st_gid!=0)
+            or stat.S_IMODE(before.st_mode)!=mode or before.st_nlink!=1):
+        raise SystemExit("initial root trust evidence is unsafe")
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0))
+    try: raw=os.read(fd,65537); final=os.fstat(fd)
+    finally: os.close(fd)
+    if len(raw)>65536 or (final.st_dev,final.st_ino,final.st_uid,final.st_mode,final.st_nlink,final.st_size,final.st_mtime_ns)!=(before.st_dev,before.st_ino,before.st_uid,before.st_mode,before.st_nlink,before.st_size,before.st_mtime_ns) or len(raw)!=before.st_size:
+        raise SystemExit("initial root trust evidence changed during read")
+    return raw
+approval_raw=stable(approval_path,uid,0o600); approval=json.loads(approval_raw)
+schema=approval.get("schema")
+try: root_info=root.lstat()
+except FileNotFoundError:
+    if schema!="genus-a0.3c-runtime-start-authorization-v3": raise SystemExit("v4 approval lacks persistent root trust")
+    raise SystemExit(0)
+if root.resolve(strict=True)!=root or not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid!=0 or root_info.st_gid!=0 or stat.S_IMODE(root_info.st_mode)!=0o700:
+    raise SystemExit("initial code release trust root is unsafe")
+try: anchor_raw=stable(anchor,0,0o444)
+except FileNotFoundError:
+    if schema!="genus-a0.3c-runtime-start-authorization-v3": raise SystemExit("v4 approval lacks persistent root trust")
+    raise SystemExit(0)
+data=json.loads(anchor_raw)
+if (data.get("schema")!="genus-a0.3c-code-release-root-trust-v1" or data.get("state")!="steady"
+        or data.get("approval_schema")!=schema or data.get("approval_sha256")!=hashlib.sha256(approval_raw).hexdigest()
+        or data.get("repo_commit")!=os.environ["COMMIT"] or data.get("repo_commit")!=approval.get("repo_commit")
+        or data.get("active_manifest")!=approval.get("active_manifest")
+        or data.get("active_manifest_sha256")!=approval.get("active_manifest_sha256")):
+    raise SystemExit("current approval differs from steady persistent root trust")
+PY
+}
+
+create_code_release_start_capability() {
+    local phase="$1"; shift
+    as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0711 "$CODE_RELEASE_START_ROOT"
+    ! as_root "$ROOT_TEST_BIN" -e "$CODE_RELEASE_START_CAPABILITY" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$CODE_RELEASE_START_CAPABILITY" \
+        && ! as_root "$ROOT_TEST_BIN" -e "$CODE_RELEASE_START_CAPABILITY.lock" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$CODE_RELEASE_START_CAPABILITY.lock" \
+        || fail "Code-Release-Start-Capability ist nicht frisch" 70
+    as_root "$ROOT_RM_BIN" -f -- "$CODE_RELEASE_START_MARKER" \
+        "$CODE_RELEASE_START_MARKER.genus-network-watchdog.service" \
+        "$CODE_RELEASE_START_MARKER.genus-learner.service" \
+        "$CODE_RELEASE_START_MARKER.genus-telegram-bot.service"
+    as_root "$ROOT_SYNC_BIN" -f "$CODE_RELEASE_START_ROOT"
+    as_root "$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin \
+        COMMIT="$(repo_commit)" SEAL="$(code_release_journal_field release_seal)" \
+        NONCE="$(code_release_journal_field nonce)" PHASE="$phase" \
+        APPROVAL_SHA256="$(sha256_file "$AUTOSTART_APPROVAL")" \
+        JOURNAL_SHA256="$(sha256_file "$CODE_RELEASE_JOURNAL")" \
+        "$SYSTEM_PYTHON_BIN" -I -P - "$CODE_RELEASE_START_CAPABILITY" "$@" <<'PY'
+import json,os,pathlib,sys,time
+capability=pathlib.Path(sys.argv[1]); requested=sys.argv[2:]
+allowed={"genus-network-watchdog.service","genus-learner.service","genus-telegram-bot.service"}
+remaining=[]
+for unit in requested:
+    if unit.endswith(".timer"): continue
+    if unit not in allowed: raise SystemExit("controlled start inventory contains an unknown unit")
+    if unit not in remaining: remaining.append(unit)
+if not remaining: raise SystemExit(0)
+issued=time.monotonic_ns()
+data={"schema":"genus-a0.3c-code-release-start-capability-v1",
+      "boot_id":pathlib.Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+      "issued_monotonic_ns":issued,"expires_monotonic_ns":issued+120_000_000_000,
+      "repo_commit":os.environ["COMMIT"],"release_seal":os.environ["SEAL"],"nonce":os.environ["NONCE"],
+      "journal_phase":os.environ["PHASE"],"approval_sha256":os.environ["APPROVAL_SHA256"],
+      "journal_sha256":os.environ["JOURNAL_SHA256"],"remaining_units":remaining}
+for key,size in (("repo_commit",40),("release_seal",64),("nonce",64),("approval_sha256",64),("journal_sha256",64)):
+    value=data[key]
+    if len(value)!=size or any(ch not in "0123456789abcdef" for ch in value):
+        raise SystemExit("controlled start binding is malformed")
+lock=pathlib.Path(str(capability)+".lock")
+lock_fd=os.open(lock,os.O_RDWR|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.fsync(lock_fd)
+finally: os.close(lock_fd)
+fd=os.open(capability,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),0o600)
+try: os.write(fd,(json.dumps(data,sort_keys=True,separators=(",", ":"))+"\n").encode()); os.fsync(fd)
+finally: os.close(fd)
+directory=os.open(capability.parent,os.O_RDONLY|getattr(os,"O_DIRECTORY",0))
+try: os.fsync(directory)
+finally: os.close(directory)
+PY
+}
+
+finish_code_release_start_capability() {
+    ! as_root "$ROOT_TEST_BIN" -e "$CODE_RELEASE_START_CAPABILITY" \
+        && ! as_root "$ROOT_TEST_BIN" -L "$CODE_RELEASE_START_CAPABILITY" \
+        || fail "nicht jede kontrollierte Service-Start-Capability wurde one-shot verbraucht" 70
+    as_root "$ROOT_RM_BIN" -f -- "$CODE_RELEASE_START_CAPABILITY.lock" "$CODE_RELEASE_START_MARKER" \
+        "$CODE_RELEASE_START_MARKER.genus-network-watchdog.service" \
+        "$CODE_RELEASE_START_MARKER.genus-learner.service" \
+        "$CODE_RELEASE_START_MARKER.genus-telegram-bot.service"
+    as_root "$ROOT_SYNC_BIN" -f "$CODE_RELEASE_START_ROOT"
+}
+
+revoke_code_release_start_capability() {
+    as_root "$ROOT_INSTALL_BIN" -d -o root -g root -m 0711 "$CODE_RELEASE_START_ROOT"
+    as_root "$ROOT_RM_BIN" -f -- "$CODE_RELEASE_START_CAPABILITY" "$CODE_RELEASE_START_CAPABILITY.lock" \
+        "$CODE_RELEASE_START_MARKER" "$CODE_RELEASE_START_MARKER.genus-network-watchdog.service" \
+        "$CODE_RELEASE_START_MARKER.genus-learner.service" \
+        "$CODE_RELEASE_START_MARKER.genus-telegram-bot.service"
+    as_root "$ROOT_SYNC_BIN" -f "$CODE_RELEASE_START_ROOT"
+}
+
+resume_code_release_product_idempotently() {
+    local canary="$1" status
+    set +e
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" paused >/dev/null 2>&1
+    status=$?
+    set -e
+    case "$status" in
+        0)
+            validate_code_release_db_canary "$canary"
+            GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" resume
+            ;;
+        1) ;; # A crash may have happened after resume but before the journal fsync.
+        *) fail "Produkt-Pausezustand ist bei Code-Release-Finalisierung unlesbar" 70 ;;
+    esac
+}
+
+requiesce_code_release_services_for_controlled_start() {
+    local reason="$1" canary="$2"
+    disable_genus_cron_block
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause --reason "$reason"
+    stop_all_genus_units
+    revoke_code_release_start_capability
+    prove_no_old_runtime_processes
+    prove_no_db_handles
+    validate_code_release_db_canary "$canary"
+}
+
+finalize_code_release_forward() {
+    local completion consumption canary phase terminal_completion services_output
+    local -a recovery_services=()
+    validate_code_release_journal
+    phase="$(code_release_journal_field phase)"
+    case "$phase" in receipt-written|terminalized|resumed) ;; *)
+        fail "Forward-Finalisierung braucht eine durable Terminalphase" 70 ;;
+    esac
+    completion="$(code_release_journal_field completion_receipt_path)"
+    canary="$(code_release_journal_field product_db_canary_path)"
+    validate_code_release_completion_receipt "$completion"
+    if [ "$phase" = terminalized ] || [ "$phase" = resumed ]; then
+        consumption="$(code_release_journal_field consumption_receipt_path)"
+        validate_code_release_consumption_receipt "$consumption" "$completion"
+        terminal_completion="$("$ROOT_ENV_BIN" -i PATH=/usr/bin:/bin "$SYSTEM_PYTHON_BIN" -I -P - "$AUTOSTART_APPROVAL" <<'PY'
+import json,pathlib,sys
+print(json.loads(pathlib.Path(sys.argv[1]).read_text()).get("completion_receipt_path",""))
+PY
+        )"
+        if [ -z "$terminal_completion" ]; then
+            [ "$phase" = terminalized ] || fail "resumed Phase verlor terminale v4-Freigabe" 70
+            publish_code_release_terminal_approval "$completion" "$consumption"
+        fi
+    fi
+    validate_code_release_autostart_approval
+    if [ "$phase" = terminalized ] || [ "$phase" = resumed ]; then
+        publish_code_release_root_trust terminal-ready "$phase"
+    fi
+    services_output="$(code_release_journal_service_lines)"; mapfile -t recovery_services <<< "$services_output"
+    if [ "$phase" = receipt-written ]; then
+        requiesce_code_release_services_for_controlled_start \
+            "A0.3c interrupted code release forward recovery" "$canary"
+        publish_code_release_root_trust pending receipt-written
+        create_code_release_start_capability receipt-written "${recovery_services[@]}"
+    fi
+    start_recorded_services
+    if [ "$phase" = receipt-written ]; then
+        finish_code_release_start_capability
+    fi
+    attest_recovered_services
+    if [ "$phase" = receipt-written ]; then
+        validate_code_release_db_canary "$canary"
+        consumption="$(consume_code_release_authorization "$completion")"
+        update_code_release_journal terminalized "$consumption"
+        publish_code_release_terminal_approval "$completion" "$consumption"
+        phase=terminalized
+        publish_code_release_root_trust terminal-ready terminalized
+    fi
+    validate_code_release_autostart_approval
+    if [ "$phase" != resumed ]; then
+        resume_code_release_product_idempotently "$canary"
+        update_code_release_journal resumed
+        phase=resumed
+        publish_code_release_root_trust terminal-ready resumed
+    fi
+    restore_genus_cron_block
+    publish_code_release_root_trust steady resumed
+    validate_code_release_autostart_approval
+    clear_code_release_journal
+    validate_code_release_autostart_approval
+    cleanup_completed_activation_artifacts
+    log "Code-Release vollstaendig attestiert und One-shot-Authorization verbraucht"
+}
+
+finalize_code_release_rollback() {
+    local completion consumption canary services_output
+    local -a recovery_services=()
+    validate_code_release_journal 1
+    [ "$(code_release_journal_field phase)" = rollback-authorized ] \
+        || fail "Rollback-Finalisierung braucht rollback-authorized" 70
+    validate_autostart_approval
+    systemd_autostart_guard_present
+    canary="$(code_release_journal_field product_db_canary_path)"
+    requiesce_code_release_services_for_controlled_start \
+        "A0.3c interrupted code release rollback recovery" "$canary"
+    services_output="$(code_release_journal_service_lines)"; mapfile -t recovery_services <<< "$services_output"
+    publish_code_release_root_trust pending rollback-authorized
+    create_code_release_start_capability rollback-authorized "${recovery_services[@]}"
+    start_recorded_services
+    finish_code_release_start_capability
+    attest_recovered_services
+    completion="$(code_release_journal_field completion_receipt_path)"
+    if [ -z "$completion" ]; then
+        completion="$(write_code_release_completion_receipt rolled-back)"
+        bind_code_release_rollback_receipt completion "$completion"
+    else
+        validate_code_release_completion_receipt "$completion"
+    fi
+    consumption="$(code_release_journal_field consumption_receipt_path)"
+    if [ -z "$consumption" ]; then
+        consumption="$(consume_code_release_authorization "$completion")"
+        bind_code_release_rollback_receipt consumption "$consumption"
+    else
+        validate_code_release_consumption_receipt "$consumption" "$completion"
+    fi
+    publish_code_release_root_trust terminal-ready rollback-authorized
+    resume_code_release_product_idempotently "$canary"
+    restore_genus_cron_block
+    publish_code_release_root_trust steady rollback-authorized
+    clear_code_release_journal
+    cleanup_completed_activation_artifacts
+    log "Code-Release sicher auf OLD restauriert; Produkt-DB blieb unveraendert"
+}
+
+recover_pending_code_release() {
+    local phase old completion services_output recovery_status fail_closed_status head trust_state trust_status
+    local -a recovery_services=()
+    [ -e "$CODE_RELEASE_JOURNAL" ] || {
+        set +e
+        trust_state="$(code_release_root_trust_state)"; trust_status=$?
+        set -e
+        if [ "$trust_status" -ne 0 ] || [ "$trust_state" = pending ] || [ "$trust_state" = terminal-ready ]; then
+            set +e
+            fail_closed_status=0
+            disable_genus_cron_block || fail_closed_status=70
+            GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause \
+                --reason "A0.3c missing-journal root-trust fail-closed" || fail_closed_status=70
+            remove_autostart_approval || fail_closed_status=70
+            stop_all_genus_units || fail_closed_status=70
+            revoke_code_release_start_capability || fail_closed_status=70
+            set -e
+            [ "$fail_closed_status" -eq 0 ] \
+                || printf '[A0.3c] FEHLER: Missing-Journal-Fail-closed-Sicherung ist unvollstaendig\n' >&2
+            fail "pending/unsicherer Root-Trust verlor sein User-Journal; Human-Recovery erforderlich" 70
+        fi
+        if [ -e "$CODE_RELEASE_TOKEN" ] || [ -L "$CODE_RELEASE_TOKEN" ]; then
+            abandon_orphan_code_release_authorization
+        fi
+        return 0
+    }
+    set +e
+    (
+        set -Eeuo pipefail
+        validate_code_release_journal 1
+        phase="$(code_release_journal_field phase)"
+        case "$phase" in
+            receipt-written|terminalized|resumed) finalize_code_release_forward; exit 0 ;;
+            rollback-authorized) finalize_code_release_rollback; exit 0 ;;
+        esac
+        old="$(code_release_journal_field old_commit)"
+        disable_genus_cron_block
+        GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause --reason "A0.3c interrupted code release recovery"
+        remove_autostart_approval
+        stop_all_genus_units
+        revoke_code_release_start_capability
+        prove_no_old_runtime_processes
+        prove_no_db_handles
+        if [ -z "$(code_release_journal_field product_db_canary_path)" ]; then
+            [ "$phase" = prepared ] || fail "pending Release verlor seinen Produkt-DB-Canary" 70
+            update_code_release_journal quiesced "$(write_code_release_db_canary)"
+            phase=quiesced
+        else
+            validate_code_release_db_canary "$(code_release_journal_field product_db_canary_path)"
+        fi
+        head="$(repo_commit)"
+        case "$head" in
+            "$old") assert_expected_commit "$old" ;;
+            "$(code_release_journal_field new_commit)") checkout_code_release_commit "$old" ;;
+            *) fail "Code-Release-Recovery-HEAD liegt ausserhalb OLD/NEW" 70 ;;
+        esac
+        restore_code_release_boot_guard
+        restore_code_release_start_authorization
+        verify_active_runtime_for_release
+        mark_code_release_rollback_authorized
+        code_release_fault_point after-rollback-authorized
+        finalize_code_release_rollback
+    )
+    recovery_status=$?
+    set -e
+    [ "$recovery_status" -eq 0 ] && return 0
+    set +e
+    fail_closed_status=0
+    disable_genus_cron_block || fail_closed_status=70
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause --reason "A0.3c fail-closed code release recovery" \
+        || fail_closed_status=70
+    remove_autostart_approval || fail_closed_status=70
+    stop_all_genus_units || fail_closed_status=70
+    revoke_code_release_start_capability || fail_closed_status=70
+    set -e
+    [ "$fail_closed_status" -eq 0 ] \
+        || printf '[A0.3c] FEHLER: Code-Release-Fail-closed-Sicherung ist unvollstaendig\n' >&2
+    fail "Code-Release-Recovery gescheitert; Journal bleibt fuer erneuten release-recover erhalten" "$recovery_status"
+}
+
+code_release_recover_command() {
+    init_user_roots
+    acquire_operator_lock
+    validate_product_data_contract
+    [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
+    require_command "$FUSER_BIN"
+    acquire_backup_lock
+    prove_no_backup_in_progress
+    [ ! -e "$ACTIVATION_JOURNAL" ] \
+        || fail "Code-Release-Recovery ist mit pending Runtime-Activation verboten" 70
+    recover_pending_code_release
+    release_backup_lock
+}
+
+code_release_execute() {
+    local old="$1" new="$2" expected_seal="$3" canary backup preflight start_auth postflight completion consumption restore_status
+    init_user_roots
+    acquire_operator_lock
+    validate_product_data_contract
+    [ -f "$DB_PATH" ] || fail "Produkt-DB fehlt" 65
+    require_command "$FUSER_BIN"
+    acquire_backup_lock
+    prove_no_backup_in_progress
+    recover_pending_activation
+    validate_code_release_initial_root_trust
+    [ ! -e "$CODE_RELEASE_JOURNAL" ] && [ ! -L "$CODE_RELEASE_JOURNAL" ] \
+        || fail "pending Code-Release zuerst mit release-recover abschliessen" 70
+    validate_code_release_authorization "$old" "$new" "$expected_seal"
+    verify_active_runtime_for_release
+    remember_services
+    validate_code_release_service_privilege_boundary
+    [ "${#active_services[@]}" -gt 0 ] \
+        || fail "Code-Release bleibt ohne aktives GENUS-Service-Inventar gesperrt" 70
+    assert_not_previously_paused
+    capture_code_release_crontab
+    systemd_autostart_guard_present
+    create_code_release_journal "$old" "$new"
+    cleanup_code_release() {
+        local status="${1:-$?}"
+        trap - EXIT INT TERM
+        set +e
+        recover_pending_code_release
+        restore_status=$?
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+        exit "$restore_status"
+    }
+    trap 'cleanup_code_release $?' EXIT
+    trap 'cleanup_code_release 130' INT
+    trap 'cleanup_code_release 143' TERM
+    code_release_fault_point after-prepared
+    disable_genus_cron_block
+    GENUS_DB_PATH="$DB_PATH" GENUS_PAUSE_FILE="$PAUSE_FILE" "$CORE_POINTER/bin/genus" pause --reason "A0.3c code release"
+    remove_autostart_approval
+    stop_services
+    prove_no_old_runtime_processes
+    prove_no_db_handles
+    canary="$(write_code_release_db_canary)"
+    update_code_release_journal quiesced "$canary"
+    code_release_fault_point after-quiesced
+    checkout_code_release_commit "$new"
+    update_code_release_journal checked-out
+    code_release_fault_point after-checked-out
+    backup="$(fresh_code_release_backup_receipt "$canary")"
+    update_code_release_journal backed-up "$backup"
+    code_release_fault_point after-backed-up
+    run_code_release_candidate_checks "$new"
+    validate_code_release_db_canary "$canary"
+    preflight="$(write_code_release_preflight_receipt "$backup")"
+    update_code_release_journal candidate-verified "$preflight"
+    code_release_fault_point after-candidate-verified
+    start_auth="$(write_code_release_autostart_approval "$preflight")"
+    update_code_release_journal authorized "$start_auth"
+    publish_code_release_root_trust pending authorized
+    validate_code_release_autostart_approval
+    code_release_fault_point after-authorized
+    create_code_release_start_capability authorized "${active_services[@]}"
+    start_previous_services
+    finish_code_release_start_capability
+    update_code_release_journal started-paused
+    code_release_fault_point after-started-paused
+    postflight="$(attest_restarted_services)"
+    update_code_release_journal postflight "$postflight"
+    code_release_fault_point after-postflight
+    validate_code_release_db_canary "$canary"
+    completion="$(write_code_release_completion_receipt activated)"
+    update_code_release_journal receipt-written "$completion"
+    code_release_fault_point after-receipt-written
+    consumption="$(consume_code_release_authorization "$completion")"
+    update_code_release_journal terminalized "$consumption"
+    code_release_fault_point after-terminalized
+    publish_code_release_terminal_approval "$completion" "$consumption"
+    publish_code_release_root_trust terminal-ready terminalized
+    validate_code_release_autostart_approval
+    resume_code_release_product_idempotently "$canary"
+    update_code_release_journal resumed
+    publish_code_release_root_trust terminal-ready resumed
+    code_release_fault_point after-resumed
+    finalize_code_release_forward
+    SERVICES_RESTARTED=0
+    release_backup_lock
+    trap - EXIT INT TERM
+    log "Code-Release aktiviert: $old -> $new"
 }
 
 status_command() {
@@ -5317,8 +18379,11 @@ status_command() {
 main() {
     local command="${1:-}" expected manifest
     case "$command" in
+        release-plan|release|release-recover) require_code_release_production_environment ;;
+    esac
+    case "$command" in
         status) shift; [ "$#" -le 1 ] || fail "zu viele Argumente" 64; status_command "${1:-}" ;;
-        stage) [ "$#" -le 2 ] || fail "stage akzeptiert hoechstens EXPECTED_SUPPLY_SEAL" 64; stage_set "${2:-}" ;;
+        stage) [ "$#" -le 3 ] || fail "stage akzeptiert hoechstens EXPECTED_SUPPLY_SEAL und EXPECTED_ASSET_SEAL" 64; stage_set "${2:-}" "${3:-}" ;;
         verify)
             shift
             [ "$#" -le 1 ] || fail "zu viele Argumente" 64
@@ -5335,11 +18400,18 @@ main() {
         rollback) [ "$#" -eq 2 ] || fail "rollback braucht EXPECTED_COMMIT" 64; rollback_runtime "$2" ;;
         recover) [ "$#" -eq 2 ] || fail "recover braucht EXPECTED_COMMIT" 64; recover_runtime "$2" ;;
         reauthorize) [ "$#" -eq 3 ] || fail "reauthorize braucht EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT" 64; reauthorize_runtime "$2" "$3" ;;
+        release-plan) [ "$#" -eq 3 ] || fail "release-plan braucht EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT" 64; code_release_plan "$2" "$3" ;;
+        release) [ "$#" -eq 4 ] || fail "release braucht EXPECTED_OLD_COMMIT EXPECTED_NEW_COMMIT EXPECTED_RELEASE_SEAL" 64; code_release_execute "$2" "$3" "$4" ;;
+        release-recover) [ "$#" -eq 1 ] || fail "release-recover akzeptiert keine Argumente" 64; code_release_recover_command ;;
         -h|--help|help) usage ;;
         *) usage >&2; fail "unbekannter Befehl" 64 ;;
     esac
 }
 
-if [ "${GENUS_A03C_SOURCE_ONLY:-0}" != 1 ]; then
+if [ "${GENUS_A03C_SOURCE_ONLY:-0}" = 1 ]; then
+    case "${1:-}" in
+        release-plan|release|release-recover) require_code_release_production_environment ;;
+    esac
+else
     main "$@"
 fi

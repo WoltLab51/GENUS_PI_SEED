@@ -2,13 +2,62 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "codex/a03c-polkit-staging"]
   pull_request:
     branches: ["main"]
 
 jobs:
+  a03c-polkit-staging:
+    name: A0.3c disposable systemd/Polkit evidence
+    if: github.ref == 'refs/heads/codex/a03c-polkit-staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Prepare disposable systemd and Polkit runner
+        run: |
+          test "$(cat /proc/1/comm)" = systemd
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes policykit-1
+          sudo systemctl start polkit.service
+          sudo systemctl is-active --quiet polkit.service
+          python -m pip install --disable-pip-version-check pytest
+
+      - name: Prove fail-closed concrete-unit authority detection
+        env:
+          GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING: I_UNDERSTAND_THIS_IS_A_DISPOSABLE_VM
+        run: |
+          python_bin="$(command -v python)"
+          sudo env \
+            GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING="$GENUS_A03C_DISPOSABLE_SYSTEMD_POLKIT_STAGING" \
+            "$python_bin" -m pytest -vv -s tests/test_a0_3c_workload_self_probe_staging.py
+
+      - name: Prove staging cleanup
+        if: always()
+        run: |
+          test ! -e /usr/local/libexec/genus-a0-3c-boot-guard
+          test ! -e /etc/polkit-1/rules.d/49-genus-a03c-self-probe-staging.rules
+          for unit in genus-learner.service genus-telegram-bot.service genus-backup.service 'genus-cron@.service'; do
+            test ! -e "/run/systemd/system/$unit"
+          done
+          for user in genus-runtime genus-telegram genus-backup; do
+            ! getent passwd "$user"
+          done
+          for group in genus-data genus-runtime genus-telegram genus-backup; do
+            ! getent group "$group"
+          done
+
   test:
     name: Python ${{ matrix.python-version }}
+    if: github.ref != 'refs/heads/codex/a03c-polkit-staging'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
