@@ -218,32 +218,51 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
                     pytrace=False,
                 )
 
-        results = {}
-        predicates = {
-            "user": 'subject.user == "genus-runtime"',
-            "system_unit": 'subject.system_unit == "genus-cron@doctor.service"',
-            "nnp": "subject.no_new_privileges == true",
-            "pid": "subject.pid > 0",
-        }
-        for name, predicate in predicates.items():
-            RULE.write_text(
-                "polkit.addRule(function(action, subject) {\n"
-                '    if (action.id == "org.freedesktop.systemd1.manage-units" &&\n'
-                f"        {predicate} &&\n"
-                '        action.lookup("unit") == "genus-telegram-bot.service" &&\n'
-                '        action.lookup("verb") == "start") {\n'
-                "        return polkit.Result.YES;\n"
-                "    }\n"
-                "});\n",
-                encoding="ascii",
-            )
-            RULE.chmod(0o644)
-            _run("/usr/bin/systemctl", "restart", "polkit.service")
-            _run("/usr/bin/systemctl", "is-active", "--quiet", "polkit.service")
-            _run("/usr/bin/systemctl", "reset-failed", CONCRETE_CRON, check=False)
-            result = _run("/usr/bin/systemctl", "start", CONCRETE_CRON, check=False)
-            results[name] = result.returncode
-        pytest.fail(f"diagnostic predicate return codes (nonzero means grant observed): {results}", pytrace=False)
+        # Polkit's subject.user and the exact pid/start-time/uid tuple bind the
+        # decision to the real workload child.  system_unit/no_new_privileges
+        # are deliberately not policy inputs here: with ExecStartPre=+ Polkit
+        # does not project those two derived fields onto the child.  The guard
+        # verifies cgroup and kernel NoNewPrivs directly from /proc instead.
+        RULE.write_text(
+            """polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "genus-runtime" &&
+        action.lookup("unit") == "genus-telegram-bot.service" &&
+        action.lookup("verb") == "start") {
+        return polkit.Result.YES;
+    }
+});
+""",
+            encoding="ascii",
+        )
+        RULE.chmod(0o644)
+        # Reload deterministically instead of treating a filesystem-watcher
+        # delay as security evidence.  The disposable VM has no live consumers.
+        _run("/usr/bin/systemctl", "restart", "polkit.service")
+        _run("/usr/bin/systemctl", "is-active", "--quiet", "polkit.service")
+        _run("/usr/bin/systemctl", "reset-failed", CONCRETE_CRON, check=False)
+        result = _run("/usr/bin/systemctl", "start", CONCRETE_CRON, check=False)
+        polkit_journal = _run(
+            "/usr/bin/journalctl",
+            "--unit",
+            "polkit.service",
+            "--no-pager",
+            "--lines=50",
+            "--output=cat",
+            check=False,
+        )
+        assert result is not None and result.returncode != 0, (
+            "targeted workload-user Polkit grant did not block ExecStartPre: "
+            f"polkit_journal={polkit_journal.stdout!r}"
+        )
+        show = _run(
+            "/usr/bin/systemctl",
+            "show",
+            CONCRETE_CRON,
+            "--property=Result",
+            "--property=ExecMainStatus",
+        ).stdout
+        assert "Result=exit-code" in show
     finally:
         RULE.unlink(missing_ok=True)
         for unit in (*UNITS.keys(), CONCRETE_CRON):
