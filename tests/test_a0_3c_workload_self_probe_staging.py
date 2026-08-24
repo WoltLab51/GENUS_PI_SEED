@@ -223,6 +223,14 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
         # about its bound child process, not about root or a synthetic subject.
         RULE.write_text(
             """polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units") {
+        polkit.log("GENUS_A03C_SUBJECT pid=" + subject.pid +
+                   " user=" + subject.user +
+                   " system_unit=" + subject.system_unit +
+                   " nnp=" + subject.no_new_privileges +
+                   " unit=" + action.lookup("unit") +
+                   " verb=" + action.lookup("verb"));
+    }
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         subject.user == "genus-runtime" &&
         subject.system_unit == "genus-cron@doctor.service" &&
@@ -252,7 +260,8 @@ def test_exact_unit_context_denies_targeted_polkit_authority() -> None:
         )
         assert result is not None and result.returncode != 0, (
             "targeted concrete-unit Polkit grant did not block ExecStartPre: "
-            f"polkit_journal={polkit_journal.stdout!r}"
+            "subjects="
+            f"{[line for line in polkit_journal.stdout.splitlines() if 'GENUS_A03C_SUBJECT' in line]!r}"
         )
         show = _run(
             "/usr/bin/systemctl",
