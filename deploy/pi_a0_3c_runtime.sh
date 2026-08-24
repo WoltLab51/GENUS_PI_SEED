@@ -6408,11 +6408,9 @@ def validate_runtime_rollback_approval(authority, approval, approval_sha256, uni
     return record
 
 
-def workload_authority_self_probe(unit):
+def workload_account_binding(unit):
     import grp
 
-    if os.geteuid()==0 or os.getuid()==0 or len(sys.argv)!=3:
-        raise RuntimeError("workload authority self-probe requires one non-root systemd unit")
     accounts={
         "genus-learner.service": ("genus-runtime","genus-runtime"),
         "genus-telegram-bot.service": ("genus-telegram","genus-telegram"),
@@ -6428,24 +6426,55 @@ def workload_authority_self_probe(unit):
     expected_uid=passwd.pw_uid; primary_gid=primary.gr_gid; data_gid=data.gr_gid
     if expected_uid<=0 or passwd.pw_gid!=primary_gid or primary_gid==data_gid:
         raise RuntimeError("workload authority self-probe account binding differs")
+    return expected_uid,primary_gid,data_gid
+
+
+def workload_process_snapshot(unit):
     proc=pathlib.Path("/proc/self")
+    raw=(proc/"stat").read_text(encoding="ascii")
+    fields=raw[raw.rfind(")")+2:].split()
+    if len(fields)<20: raise RuntimeError("workload authority self-probe stat is truncated")
+    status=(proc/"status").read_text(encoding="ascii").splitlines()
+    rows={row.partition(":")[0]:row.partition(":")[2].split() for row in status if ":" in row}
+    if rows.get("NoNewPrivs")!=["1"]:
+        raise RuntimeError("workload authority self-probe lacks NoNewPrivileges")
+    paths=[row.split(":",2)[-1] for row in (proc/"cgroup").read_text(encoding="ascii").splitlines()]
+    if not any(unit in pathlib.PurePosixPath(path).parts for path in paths):
+        raise RuntimeError("workload authority self-probe is outside its exact systemd unit cgroup")
+    return os.getpid(),int(fields[19]),rows
+
+
+def workload_context_self_probe(unit):
+    if os.geteuid()==0 or os.getuid()==0 or len(sys.argv)!=3:
+        raise RuntimeError("workload context self-probe requires one non-root systemd unit")
+    expected_uid,primary_gid,data_gid=workload_account_binding(unit)
     def identity():
-        raw=(proc/"stat").read_text(encoding="ascii")
-        fields=raw[raw.rfind(")")+2:].split()
-        if len(fields)<20: raise RuntimeError("workload authority self-probe stat is truncated")
-        status=(proc/"status").read_text(encoding="ascii").splitlines()
-        rows={row.partition(":")[0]:row.partition(":")[2].split() for row in status if ":" in row}
+        pid,starttime,rows=workload_process_snapshot(unit)
         if rows.get("Uid")!=[str(expected_uid)]*4 or rows.get("Gid")!=[str(primary_gid)]*4:
-            raise RuntimeError("workload authority self-probe uid/gid identity differs")
+            raise RuntimeError("workload context self-probe uid/gid identity differs")
         observed_groups={int(value) for value in rows.get("Groups",[])}
         if data_gid not in observed_groups or not observed_groups<={primary_gid,data_gid}:
-            raise RuntimeError("workload authority self-probe supplementary groups differ")
-        if rows.get("NoNewPrivs")!=["1"]:
-            raise RuntimeError("workload authority self-probe lacks NoNewPrivileges")
-        paths=[row.split(":",2)[-1] for row in (proc/"cgroup").read_text(encoding="ascii").splitlines()]
-        if not any(unit in pathlib.PurePosixPath(path).parts for path in paths):
-            raise RuntimeError("workload authority self-probe is outside its exact systemd unit cgroup")
-        return os.getpid(),int(fields[19]),expected_uid
+            raise RuntimeError("workload context self-probe supplementary groups differ")
+        return pid,starttime,expected_uid
+    before=identity()
+    if identity()!=before:
+        raise RuntimeError("workload context self-probe identity drifted")
+
+
+def workload_authority_root_probe(unit):
+    import ctypes
+
+    if os.geteuid()!=0 or os.getuid()!=0 or len(sys.argv)!=3:
+        raise RuntimeError("workload authority root probe requires one root systemd unit")
+    expected_uid,_,_=workload_account_binding(unit)
+    libc=ctypes.CDLL(None,use_errno=True)
+    if libc.prctl(38,1,0,0,0)!=0:
+        raise RuntimeError(f"workload authority root probe could not set NoNewPrivileges (errno={ctypes.get_errno()})")
+    def identity():
+        pid,starttime,rows=workload_process_snapshot(unit)
+        if rows.get("Uid")!=["0"]*4 or rows.get("Gid")!=["0"]*4:
+            raise RuntimeError("workload authority root probe uid/gid identity differs")
+        return pid,starttime,expected_uid
     before=identity(); subject=",".join(str(value) for value in before)
     actions=(
         "org.freedesktop.systemd1.manage-units",
@@ -6478,15 +6507,22 @@ def workload_authority_self_probe(unit):
         for verb in verbs:
             require_denial("org.freedesktop.systemd1.manage-units",("unit",target),("verb",verb))
     if identity()!=before:
-        raise RuntimeError("workload authority self-probe identity drifted during the Polkit matrix")
+        raise RuntimeError("workload authority root probe identity drifted during the Polkit matrix")
 
 
 def main():
-    if sys.argv[1:2]==["--probe-workload-authority"]:
+    if sys.argv[1:2]==["--probe-workload-authority-root"]:
         try:
-            workload_authority_self_probe(sys.argv[2] if len(sys.argv)==3 else "")
+            workload_authority_root_probe(sys.argv[2] if len(sys.argv)==3 else "")
         except Exception as error:
-            print(f"GENUS workload authority self-probe failed: {error}",file=sys.stderr)
+            print(f"GENUS workload authority root probe failed: {error}",file=sys.stderr)
+            raise
+        return
+    if sys.argv[1:2]==["--probe-workload-context"]:
+        try:
+            workload_context_self_probe(sys.argv[2] if len(sys.argv)==3 else "")
+        except Exception as error:
+            print(f"GENUS workload context self-probe failed: {error}",file=sys.stderr)
             raise
         return
     root_activation_journal_sha256=root_projection_guard()
@@ -17298,10 +17334,13 @@ import os,re,shlex
 raw=os.environ["RAW"]; guard=os.environ["EXPECTED_GUARD"]; unit=os.environ["EXPECTED_UNIT"]
 paths=re.findall(r"(?:^|[ {;])path=([^ ;}]+)",raw)
 argv_rows=re.findall(r"(?:^|[ {;])argv\[\]=(.*?)(?: ;| })",raw)
-if paths!=[guard] or len(argv_rows)!=1:
+records=re.findall(r"\{ (.*?) \}",raw)
+if paths!=[guard,guard] or len(argv_rows)!=2 or len(records)!=2:
     raise SystemExit("workload ExecStartPre path topology differs")
-argv=shlex.split(argv_rows[0]); terminal={unit,"%n"}
-if len(argv)!=3 or argv[:2]!=[guard,"--probe-workload-authority"] or argv[2] not in terminal:
+root_argv=shlex.split(argv_rows[0]); context_argv=shlex.split(argv_rows[1]); terminal={unit,"%n"}
+if (root_argv not in ([guard,"--probe-workload-authority-root",value] for value in terminal)
+        or context_argv not in ([guard,"--probe-workload-context",value] for value in terminal)
+        or "flags=full-privileges" not in records[0] or "flags=" in records[1]):
     raise SystemExit("workload ExecStartPre self-probe argv differs")
 PY
             ;;

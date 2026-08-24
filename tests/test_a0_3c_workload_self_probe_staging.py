@@ -66,7 +66,8 @@ NoNewPrivileges=true
 RestrictSUIDSGID=true
 CapabilityBoundingSet=
 AmbientCapabilities=
-ExecStartPre={GUARD} --probe-workload-authority %n
+ExecStartPre=+{GUARD} --probe-workload-authority-root %n
+ExecStartPre={GUARD} --probe-workload-context %n
 ExecStart=/bin/true
     """
 
